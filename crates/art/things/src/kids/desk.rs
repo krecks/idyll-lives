@@ -1,9 +1,10 @@
 //! KD3: the kids' desk (and its chair), table and chair.
 
-use super::common::{P, heart, place, still, turned, walls};
+use super::common::{P, heart, place, still, walls};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{PI, TAU, cos, sin};
@@ -183,9 +184,11 @@ pub fn kids_desk() -> Vec<Obj> {
         plane = Facing::Top,
         rot = (0, 0, 6)
     );
-    turned(
+    kit::turned!(
+        F,
         "cup",
         0.24,
+        0.575,
         0.3,
         &[
             (0.0, 0.0),
@@ -196,8 +199,7 @@ pub fn kids_desk() -> Vec<Obj> {
             (0.0, 0.012),
         ],
         M.toy_yellow,
-        14,
-        0.575,
+        segments = 14
     );
     for (k, (dx, dz, m)) in [
         (-0.012, -0.006, M.toy_red),
@@ -378,14 +380,15 @@ pub fn kids_table() -> Vec<Obj> {
     ];
     for sx in [-1, 1] {
         for sz in [-1, 1] {
-            turned(
-                &format!("leg{sx}{sz}"),
+            kit::turned!(
+                F,
+                format!("leg{sx}{sz}"),
                 sx as f64 * 0.235,
+                0.0,
                 sz as f64 * 0.235,
                 &prof,
                 M.ktable,
-                10,
-                0.0,
+                segments = 10
             );
         }
     }

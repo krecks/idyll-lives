@@ -22,7 +22,7 @@ K9 (2026-10-14): catalog2's `sideboard`, `buffet`, `chinaCabinet` and `barCart`.
   its top (seen in play). The planked tops (banquet, farmhouse, the oak set, the bench) are separate planks meeting
   in a shallow rounded joint, their tops at the height; no joint lies on the middle line (the gate's probe), and the
   oak set's breadboard pegs stand 0.5 mm proud.
-- **Seats** at `characters.ts` SEATS or the content's `seat`: the seat's (hard) top at that height, the pad or
+- **Seats** at furniture.json `seats` or the content's `seat`: the seat's (hard) top at that height, the pad or
   cushion a little above, as the old parts: the sets' chairs 0.46 (at the content's `places`, `fwd` 0), the bar
   stool 0.74 (sitters at 0.72), the counter stool 0.685 (0.68), the high stool 0.805 (0.8), the
   chairs 0.46–0.48, the carver chair's board 0.425 under a cushion to 0.475 (0.47, a dining chair's height: G-30),

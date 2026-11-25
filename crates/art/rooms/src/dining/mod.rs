@@ -105,12 +105,12 @@ const DINING_TOP: [(&str, &str); 2] = [("top_oak", "Top"), ("legs_oakd", "Legs")
 const SEAT: [(&str, &str); 2] = [("frame_oak", "Frame"), ("seat_sage", "Seat")];
 
 /// The family, as far as it is built here.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let stool =
         json!({"uses": {"sit": "swivel", "drink": "swivel"}, "hold": 0.6, "ride": "swivel"});
     // putting clean dishes away (a `cupboard` station, cooking putAwayAt, anim fetch) opens a door
     let put_away = json!({"uses": {"fetch": "door_open"}, "hold": 1.5});
-    Some(Family::new(
+    Family::new(
         "dining",
         M.palette(),
         vec![
@@ -272,5 +272,5 @@ pub fn family() -> Option<Family> {
          group. Table tops stand at the content's surface heights and seats where the game seats residents; the \
          stools' seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart's cocktail \
          shaker is taken off it while a drink is mixed (`shake`).",
-    ))
+    )
 }

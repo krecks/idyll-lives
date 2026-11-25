@@ -1,6 +1,7 @@
 //! The garden pond (2x2): a stone-edged pool with lilies and reeds, ripples, and a koi that comes up.
 
-use super::common::{_mesh, _own, F, M};
+use super::common::{_own, F, M};
+use crate::ground::common::_mesh;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
@@ -599,7 +600,7 @@ fn _pad(name: &str, r: f64, at: (f64, f64, f64), yaw: f64, material: Mat, n: usi
         ]);
     }
     faces.extend([vec![ct, cb, m, 0], vec![ct, n, m + n, cb]]);
-    let obj = _mesh(name, verts, &faces, material, false);
+    let obj = _mesh(name, verts, &faces, material, false, 0.0, false);
     obj.set_location(F.at(at.0, at.1, at.2));
     obj.set_rotation((0.0, 0.0, yaw));
     obj

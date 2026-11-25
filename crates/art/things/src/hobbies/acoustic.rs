@@ -1,7 +1,7 @@
 //! H1: the acoustic guitar on its stand.
 
 use super::M;
-use super::common::{frets, guitar_stand, lean, off_stand, strings, upright};
+use super::common::{frets, guitar_stand, lean, off_stand, strings};
 use super::guitars::{dots, figure8, inset, neck};
 use artkit::forms::smooth_outline;
 use artkit::math::P3;
@@ -241,7 +241,7 @@ fn acoustic(fr: &GameFrame) -> Obj {
             0.0215,
         );
     });
-    upright(&p, "guitar")
+    join(&p, "guitar", Some(P3::ZERO))
 }
 
 pub fn guitar_acoustic() -> Vec<Obj> {

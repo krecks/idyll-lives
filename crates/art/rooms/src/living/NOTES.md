@@ -16,7 +16,7 @@ Each is built where the old part stood (`F`, game axes), its back on the wall's 
   them 2 cm in 0.6 s (`squash`), held while the use lasts: `motions: {"uses": {"relax": "sink_in", "doze":
   "sink_in"}}` (the classic sofa has no `doze`). 1 draw.
 
-The seat cushions' tops are the seat heights (`characters.ts` `SEATS`, content `seat`): 0.44–0.45 m, the designer
+The seat cushions' tops are the seat heights (furniture.json `seats`, content `seat`): 0.44–0.45 m, the designer
 sofa's 0.425 m.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |

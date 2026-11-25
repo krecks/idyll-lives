@@ -3,7 +3,8 @@
 //! and waggles while a resident plays (`joystick`, a loop).
 
 use super::M;
-use super::common::{P, rr};
+use super::common::P;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::math::{Axis, P3, cos, radians, sin, tan};
@@ -97,7 +98,7 @@ pub fn arcade_cabinet() -> Vec<Obj> {
                 &edge,
                 0,
                 M.art_stripe,
-                profile = rr(0.044, 0.006, 0.002, 1),
+                profile = rounded_rect(0.044, 0.006, 0.002, 1),
                 up = (1, 0, 0)
             );
             fcyl!(

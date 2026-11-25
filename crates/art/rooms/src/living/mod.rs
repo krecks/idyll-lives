@@ -13,7 +13,7 @@
 //! The sofa bed is a boxy two-seater against the wall (the old part's size), whose mattress, folded away inside
 //! the base under the seat at rest, pulls out forward over the seat and onto the floor in front (`bed_out`), held
 //! out while the object is open (dozing on it, "Pull out the bed"; "Fold the bed away"). Sleepers lie with their
-//! heads on the seat and the rest on the mattress (characters.ts BEDS['sofaBed']: its top and how far forward).
+//! heads on the seat and the rest on the mattress (furniture.json beds.sofaBed: its top and how far forward).
 //!
 //! The sofas and sectionals copy the old primitive parts, where they stand. Their seat cushions are a part of
 //! their own that sinks 2 cm while sat or dozed on (`sink_in`). The armchairs too, but for the recliner (it
@@ -169,13 +169,13 @@ fn sofa_uses() -> Json {
 }
 
 /// The family, as far as it is built here.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let sit = json!({"uses": {"sit": "sink_in"}});
     let sit_read = json!({"uses": {"sit": "sink_in", "read": "sink_in"}});
     let book_out =
         json!({"uses": {"read": "book_out", "study": "book_out", "homework": "book_out"}});
     let read = json!({"uses": {"read": "book_out"}});
-    Some(Family::new(
+    Family::new(
         "living",
         M.palette(),
         vec![
@@ -424,5 +424,5 @@ pub fn family() -> Option<Family> {
         ],
         "The living room (crates/art/rooms/src/living, built by cargo art). The materials map onto the game's \
          finishes so a model costs one draw call per finish group.",
-    ))
+    )
 }

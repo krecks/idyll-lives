@@ -1,6 +1,6 @@
 //! The home party bar and the conversation sectional.
 
-use super::common::{_bottle, _glass, _m, _stool, BOTTLES, M, WALL};
+use super::common::{_bottle, _glass, _stool, BOTTLES, M, WALL};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
@@ -140,7 +140,7 @@ fn _back_bar(f: &GameFrame) {
             1.635,
             WALL + 0.09,
             0.26 + 0.04 * (i % 3) as f64,
-            _m(BOTTLES[i]),
+            BOTTLES[i],
             i % 3 == 1,
         );
     }

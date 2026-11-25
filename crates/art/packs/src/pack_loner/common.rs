@@ -56,21 +56,17 @@ palette! { M:
     field_b = ("#E3C46E", satin),
 }
 
-/// The puzzle picture's bands, by name.
-pub const BANDS: [(&str, &str); 4] = [
-    ("sky_a", "sky_b"),
-    ("sea_a", "sea_b"),
-    ("hill_a", "hill_b"),
-    ("field_a", "field_b"),
+/// The puzzle picture's bands.
+pub const BANDS: [(Mat, Mat); 4] = [
+    (M.sky_a, M.sky_b),
+    (M.sea_a, M.sea_b),
+    (M.hill_a, M.hill_b),
+    (M.field_a, M.field_b),
 ];
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
-
-pub fn _m(name: &str) -> Mat {
-    M.palette().get(name)
-}
 
 /// A spindle chair facing the front, its seat (top 0.45) centred on (0, z): the resident's seat. A shaped seat with
 /// its pad, back posts swept up from the floor and raked back, tapered front legs, a bowed crest rail over three

@@ -47,7 +47,7 @@ const AT_THE_TIPS: &str =
     "lies on the tips of the lawn's blades, a few centimetres up, not under them";
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let drift = |model: Model| {
         model
             .far_low()
@@ -56,7 +56,7 @@ pub fn family() -> Option<Family> {
             .on_wall()
             .accept("float", AT_THE_TIPS)
     };
-    Some(Family::new(
+    Family::new(
         "ground",
         M.palette(),
         vec![
@@ -96,5 +96,5 @@ pub fn family() -> Option<Family> {
         ],
         "The lawn's wildflowers, the woods' rocks and the selection marker (crates/art/nature/src/ground, \
          built by cargo art).",
-    ))
+    )
 }

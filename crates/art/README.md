@@ -30,7 +30,7 @@ A family is a folder, `crates/art/<group>/src/<family>/` (snake case: `pack_couc
 
 | File | Holds |
 |---|---|
-| `mod.rs` | The palette, the family's constants, and `pub fn family() -> Option<Family>`: every model with its facts |
+| `mod.rs` | The palette, the family's constants, and `pub fn family() -> Family`: every model with its facts |
 | `common.rs` | The family's own helpers |
 | `<group>.rs` | The builds, a file a group of models (`chairs.rs`, `tables.rs`), a `pub fn <model>() -> Vec<Obj>` each |
 | `NOTES.md` | What the models are, the facts they keep, the faults found |
@@ -131,7 +131,7 @@ rewrites the models, the pack and centres.json in the tree.
    `crates/art/<group>/src/<family>/mod.rs`; split the builds into files of their own as it grows. Rename the
    family and its models; `cargo art template --preview` shows what it builds.
 2. **Register it.** `pub mod <family>;` and a row `("<family>", <family>::family())` in `families()` in the group's
-   `src/lib.rs`; `family()` returns `Some(Family::new(..))`. The name is the models' folder
+   `src/lib.rs`; `family()` returns `Family::new(..)`. The name is the models' folder
    (`models/<family>/`), the default key prefix (`model.<family>.<id>`) and the pack's folder
    (`.pack("<name>")` for another).
 3. **The content.** Each model's key must be one a content object or item names, or one a manifest has, or the

@@ -45,8 +45,8 @@ palette! { M:
 const FRAME_PADS: &[(&str, &str)] = &[("body", "Frame"), ("pads", "Pads")];
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "fitness",
         M.palette(),
         vec![
@@ -105,5 +105,5 @@ pub fn family() -> Option<Family> {
          group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; \
          the yoga mat unrolls (`unroll`) for yoga; the sauna's glass door opens (`door_open`) to let the bathers in \
          and out.",
-    ))
+    )
 }

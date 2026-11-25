@@ -3,7 +3,8 @@
 //! half's edge.
 
 use super::M;
-use super::common::{rr, stool, turned};
+use super::common::stool;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::math::{Axis, P3, PI, cosd, sin, sind};
@@ -76,7 +77,7 @@ pub fn puzzle_table() -> Vec<Obj> {
         fextrude!(
             f,
             "top",
-            &rr(0.86, 0.5, 0.02, 2),
+            &rounded_rect(0.86, 0.5, 0.02, 2),
             0.035,
             (0, 0.735, 0.2),
             M.table_wood,
@@ -86,9 +87,9 @@ pub fn puzzle_table() -> Vec<Obj> {
         );
         for sx in [-1, 1] {
             for z in [0.0, 0.4] {
-                turned(
-                    &f,
-                    &format!("leg{sx}{}", r(z)),
+                kit::turned!(
+                    f,
+                    format!("leg{sx}{}", r(z)),
                     sx as f64 * 0.38,
                     0.0,
                     z,
@@ -105,8 +106,7 @@ pub fn puzzle_table() -> Vec<Obj> {
                         (0.0, 0.72),
                     ],
                     M.table_wood,
-                    10,
-                    P3::ONE,
+                    segments = 10
                 );
             }
             fextrude!(

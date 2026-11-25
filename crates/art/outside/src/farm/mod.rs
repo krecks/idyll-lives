@@ -26,8 +26,8 @@ use common::M;
 const TOLERANCE: f64 = 0.03;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "farm",
         M.palette(),
         vec![
@@ -78,7 +78,7 @@ pub fn family() -> Option<Family> {
          the round hay bale, the stack of hay bales, the scarecrow (an ambient sway), the water trough and the chicken \
          coop (its pop-hole hatch shut at night, `close`). Each has a far version (`far`, E7) for the town overview. \
          Listed in the base manifest's packs.",
-    ))
+    )
 }
 
 #[cfg(test)]

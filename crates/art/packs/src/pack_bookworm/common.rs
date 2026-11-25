@@ -158,7 +158,7 @@ pub fn books(
         // a book leaning on the row, on its bottom edge nearest it, its top against the last one
         let (h, t) = (h_max * 0.9, 0.03);
         let s = (x1 - x - t - 0.008) / h;
-        let a = libm::asin(if s < 0.45 { s } else { 0.45 });
+        let a = artkit::math::asin(if s < 0.45 { s } else { 0.45 });
         let px = x + h * sin(a);
         let c = (
             px + t / 2.0 * cos(a) - h / 2.0 * sin(a),

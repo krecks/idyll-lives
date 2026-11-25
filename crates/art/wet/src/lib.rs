@@ -23,7 +23,7 @@ pub mod kitchen_counters;
 pub mod laundry;
 
 /// The group's families by their names on the command line (`cargo art <name>`).
-pub fn families() -> Vec<(&'static str, Option<Family>)> {
+pub fn families() -> Vec<(&'static str, Family)> {
     vec![
         ("kitchen", kitchen::family()),
         ("kitchen_cooking", kitchen_cooking::family()),

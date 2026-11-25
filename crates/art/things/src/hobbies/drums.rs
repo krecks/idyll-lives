@@ -1,7 +1,8 @@
 //! H1: the drum kit's parts: a cymbal, a drum with its heads and lugs, a chrome stand, a foot pedal.
 
 use super::M;
-use super::common::{P, rr, to_euler_degrees};
+use super::common::{P, to_euler_degrees};
+use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, M4, TAU, V3, cos, cosd, radians, sin, sind};
 use artkit::place::GameFrame;
@@ -209,7 +210,7 @@ pub fn pedal(fr: &GameFrame, name: &str, x: f64, z: f64, length: f64) {
         &[(x, 0.016, z0 + 0.05), (x, 0.05, z1 - 0.03)],
         0,
         M.chrome,
-        profile = rr(0.008, 0.065, 0.003, 1),
+        profile = rounded_rect(0.008, 0.065, 0.003, 1),
         scale = [0.85, 1.1]
     );
     fbox!(

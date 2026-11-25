@@ -68,7 +68,7 @@ old part (`catalog.double_vanity`) has none either.
 `model.toiletWallHung`, built 2026-10-14. They sat in Validate › Toilets until checked in play.
 
 - **Against the wall, not centred.** The game sits a resident at the footprint's middle plus the seat's
-  `fwd` (characters.ts `SEATS`, else the content's `seat`), so each toilet is built where the game places it:
+  `fwd` (furniture.json `seats`, else the content's `seat`), so each toilet is built where the game places it:
    the cistern (or the boxed-in cistern) on the wall face at game depth -0.43,
   settled with `centre: false`, and `centre` on its `Model`. The bowl's middle is 8–16 cm in front of the hips.
 - **Seat heights.** The seat's top is the seat height: 0.43 m (`toilet`, `toiletCompact`), 0.44 m

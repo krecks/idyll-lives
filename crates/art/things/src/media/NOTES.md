@@ -42,7 +42,7 @@ against the old part's 1.33.
 
 **The fire's floor cushion.** "Warm up by the fire" sits the resident (`pose: sit`), and with no seat they sat at the
 default 0.45 m in the footprint's middle, in mid-air with their back to the fire. The model has a floor cushion in front
-(0.14 m high, 0.29 m forward) and `characters.ts` `SEATS.fireplaceElectric` (`h: 0.14, fwd: 0.3, back: true`) seats them
+(0.14 m high, 0.29 m forward) and furniture.json `seats.fireplaceElectric` (`h: 0.14, fwd: 0.3, back: true`) seats them
 on it, facing the flames; the old part had the cushion too. The model's depth is 0.92 m (the old part's surround
 0.40; `check-glb` warns).
 

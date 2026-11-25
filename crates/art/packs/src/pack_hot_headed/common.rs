@@ -55,7 +55,6 @@ palette! { M:
     towel = ("#F4EFE2", satin),
     amp = ("#E4E1DA", satin),
     speaker = ("#3A3D41", satin),
-    soil = ("#4A3A2E", matte),       // the cushion's plant pot and the cactus's
     ash = ("#8E8A84", matte),        // the incense's ash
 }
 

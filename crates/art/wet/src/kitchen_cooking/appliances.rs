@@ -140,7 +140,7 @@ pub fn microwave() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    // the door, hinged on its left edge (seen from the front): a frame round its window, a grip by the controls
+    // the door, hinged on its right edge (seen from the front): a frame round its window, a grip by the controls
     let parts = new_parts(|| {
         fextrude!(
             f,

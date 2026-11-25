@@ -2,8 +2,8 @@
 //! face to the front, then leant back onto the stand, a part of its own.
 
 use super::M;
-use super::common::{P, frets, guitar_stand, lean, off_stand, rr, strings, upright};
-use artkit::forms::smooth_outline;
+use super::common::{P, frets, guitar_stand, lean, off_stand, strings};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, asin, cos, cosd, degrees, pow, sin, sind, sqrt};
@@ -186,7 +186,7 @@ fn ukulele_part(fr: &GameFrame) -> Obj {
         fextrude!(
             fr,
             "bridge",
-            &rr(0.07, 0.012, 0.005, 2),
+            &rounded_rect(0.07, 0.012, 0.005, 2),
             0.008,
             (0, 0.07, 0.039),
             M.fretboard,
@@ -254,7 +254,7 @@ fn ukulele_part(fr: &GameFrame) -> Obj {
         }
         strings(fr, 4, 0.0075, 0.0085, 0.072, 0.561, 0.0465, 0.0235);
     });
-    upright(&p, "ukulele")
+    join(&p, "ukulele", Some(P3::ZERO))
 }
 
 pub fn ukulele() -> Vec<Obj> {

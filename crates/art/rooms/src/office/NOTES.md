@@ -13,7 +13,7 @@ at the back. Desk tops are at the content's `surface` height: 0.74 (catalog2), 0
 ## The desks with their own chair
 
 The computer, writing, laptop and gaming desks keep the old part's chair: residents sit in the back half of the
-footprint, 17 cm behind its middle at 0.44 m (`characters.ts` SEATS), facing the desk, so the screen faces the wall
+footprint, 17 cm behind its middle at 0.44 m (furniture.json `seats`), facing the desk, so the screen faces the wall
 and its back the room. The chair is part of the still desk (no swivel) and its back stops short of the wall (leant 7°,
 5° with the gaming chair's headrest).
 

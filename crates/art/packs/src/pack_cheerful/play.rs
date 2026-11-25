@@ -266,7 +266,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
         }
         // the pillow at the left end, lying on the slope
         let u = (-PILLOW - x0) / (x1 - x0);
-        let slope = degrees(libm::atan(
+        let slope = degrees(artkit::math::atan(
             (SLING_END - SLING_LOW) * 4.0 * (2.0 * u - 1.0) / (x1 - x0),
         ));
         soft!(

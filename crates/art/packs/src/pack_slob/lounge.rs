@@ -1,7 +1,7 @@
 //! The crumb-proof beanbag, the snack-stash nightstand and the command-couch gaming recliner, and the controller
 //! lying by two of them.
 
-use super::common::{_bake, _box, _can, _chip_bag, _m, _place, _wrapper, M};
+use super::common::{_bake, _box, _can, _chip_bag, _place, _wrapper, M};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -561,14 +561,14 @@ pub fn gaming_recliner() -> Vec<Obj> {
             resolution = 2
         );
         fbox!(f, "fridge_led", 0.36, 0.02, 0.008, (fx, 0.05, 0.1), M.cyan);
-        for (i, m) in ["pop_red", "pop_blue", "pop_green"].into_iter().enumerate() {
+        for (i, m) in [M.pop_red, M.pop_blue, M.pop_green].into_iter().enumerate() {
             _can(
                 f,
                 &format!("fridge_can{i}"),
                 fx - 0.1 + i as f64 * 0.1,
                 0.06,
                 0.33,
-                _m(m),
+                m,
                 false,
                 0.0,
             );

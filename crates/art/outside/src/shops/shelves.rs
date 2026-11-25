@@ -2,7 +2,7 @@
 //! on its tiles as the game places it.
 
 use super::common::{M, bottle, prism};
-use artkit::math::{Axis, P3};
+use artkit::math::P3;
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
@@ -143,8 +143,6 @@ pub fn grocery_shelf() -> Vec<Obj> {
                             z - 0.035,
                             z + 0.035,
                             M.bread,
-                            Axis::Z,
-                            0.0,
                         );
                     }
                     fbox!(

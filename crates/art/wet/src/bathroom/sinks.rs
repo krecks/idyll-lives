@@ -2,9 +2,10 @@
 //! water (`water_on`).
 
 use super::M;
-use super::common::{LATHE, Lathe, Ring, bottle, drain, gooseneck, lathe, pull, shaker, tube};
+use super::common::{LATHE, Lathe, Ring, bottle, drain, gooseneck, lathe, pull, shaker};
 use crate::common::water;
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
@@ -354,8 +355,8 @@ pub fn sink_pedestal() -> Vec<Obj> {
             M.porcelain,
             Lathe { verts: 16, ..LATHE },
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "brush",
             &[
                 (-0.15, rim + 0.03, -0.41),
@@ -364,9 +365,8 @@ pub fn sink_pedestal() -> Vec<Obj> {
             ],
             0.006,
             M.teal,
-            6,
-            1,
-            1.0,
+            verts = 6,
+            round = 1
         );
         fbox!(
             f,

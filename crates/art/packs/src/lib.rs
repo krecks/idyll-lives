@@ -21,7 +21,7 @@ pub mod pack_romantic;
 pub mod pack_slob;
 
 /// The group's families by their names on the command line (`cargo art <name>`).
-pub fn families() -> Vec<(&'static str, Option<Family>)> {
+pub fn families() -> Vec<(&'static str, Family)> {
     vec![
         ("pack_bookworm", pack_bookworm::family()),
         ("pack_cheerful", pack_cheerful::family()),

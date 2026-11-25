@@ -9,7 +9,7 @@
 //!
 //! Each is built where the game places it (`F`, game axes: x, height, depth; front +depth), then stood on the floor
 //! (`common::place`, `centre` on its `Model`), so seats, mattresses and wall backs stay where the game puts
-//! residents. Seat and mattress heights are the renderer's (characters.ts `SEATS`, `BEDS`; the content's `surface`
+//! residents. Seat and mattress heights are the renderer's (furniture.json `seats`, `beds`; the content's `surface`
 //! and `seat`).
 //!
 //! Built with the forms: mattresses, pillows, duvets and cushions are soft boxes, frames and rails one swept piece,
@@ -173,11 +173,11 @@ palette! { M:
 const F: GameFrame = GameFrame::new(0.0);
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let turn_down = || json!({"uses": {"sleep": "turn_down", "nap": "turn_down"}});
     // open while the child plays (the toys are out), shut when they're done
     let lid = || json!({"uses": {"play": "lid_open"}});
-    Some(Family::new(
+    Family::new(
         "kids",
         M.palette(),
         vec![
@@ -290,5 +290,5 @@ pub fn family() -> Option<Family> {
          high chair, the toys, and the kids' study and art things. Listed in the base manifest's \
          packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group.",
-    ))
+    )
 }

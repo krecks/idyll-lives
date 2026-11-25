@@ -1,6 +1,6 @@
 //! KD1: the crib with its changing table.
 
-use super::common::{heart, mattress, moon, place, star, still, turned};
+use super::common::{heart, mattress, moon, place, star, still};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
@@ -15,11 +15,11 @@ use artkit::{fbox, fextrude, fsphere, fsweep, jitter, slide, soft};
 
 // An oblong cot, a 1.18 x 0.58 m mattress (a 60 x 120 cot's; review M-kids-01: it was 0.80 m square) running
 // across the left of the 2 x 1 tiles, its back on the wall's face, and a changing chest at the right. The baby lies
-// along it (characters/furniture.json `beds.crib` `across`) at slot 0 (game x -0.5), the carers reach in over the
+// along it (furniture.json `beds.crib` `across`) at slot 0 (game x -0.5), the carers reach in over the
 // front rail (characters.ts `CUDDLE.rail`).
 /// Where the baby lies (slot 0 of the 2 x 1).
 const CRIB_X: f64 = -0.5;
-/// The mattress top (characters/furniture.json beds.crib).
+/// The mattress top (furniture.json beds.crib).
 const CRIB_TOP: f64 = 0.56;
 /// The cot's end posts (game x).
 const COT_X: (f64, f64) = (-0.955, 0.275);
@@ -100,9 +100,11 @@ fn crib_rails(name: &str, z: f64) {
 
 /// A turned finial on a post's top at height `y`: a collar, a waist and a ball.
 fn finial(name: &str, x: f64, z: f64, y: f64, material: Mat) -> Obj {
-    turned(
+    kit::turned!(
+        F,
         name,
         x,
+        y,
         z,
         &[
             (0.0, 0.0),
@@ -115,8 +117,7 @@ fn finial(name: &str, x: f64, z: f64, y: f64, material: Mat) -> Obj {
             (0.0, 0.05),
         ],
         material,
-        8,
-        y,
+        segments = 8
     )
 }
 
@@ -262,9 +263,11 @@ fn mobile() -> Obj {
     // over the baby, clear of arms reaching in over the front rail
     let (hx, hy, hz) = (CRIB_X, 0.975, -0.17);
     let parts = new_parts(|| {
-        turned(
+        kit::turned!(
+            F,
             "hub",
             hx,
+            hy - 0.0125,
             hz,
             &[
                 (0.0, 0.0),
@@ -275,8 +278,7 @@ fn mobile() -> Obj {
                 (0.0, 0.028),
             ],
             M.mobile,
-            12,
-            hy - 0.0125,
+            segments = 12
         );
         let toys = [
             ("star", M.mobile),
@@ -387,7 +389,7 @@ pub fn crib() -> Vec<Obj> {
         0.025,
         2,
     );
-    // the blanket folded at the foot end (the baby's head to the left, characters.ts `BEDS` `across`), a band near
+    // the blanket folded at the foot end (the baby's head to the left, furniture.json beds.crib `across`), a band near
     // its fold
     let b = soft!(
         F,

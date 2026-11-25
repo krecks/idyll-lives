@@ -7,7 +7,7 @@
 //! forth while played (`rods`, a loop); the others stay still.
 
 use super::M;
-use super::common::rr;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self};
 use artkit::math::{Axis, P3, cos, radians, sin};
@@ -261,7 +261,7 @@ pub fn foosball() -> Vec<Obj> {
                     &[(sf * 0.6, 0.68, szf * 0.3), (sf * 0.6, 0.03, szf * 0.3)],
                     0,
                     M.foos_trim,
-                    profile = rr(0.08, 0.08, 0.01, 1),
+                    profile = rounded_rect(0.08, 0.08, 0.01, 1),
                     up = (1, 0, 0),
                     scale = [1.0, 0.8]
                 );

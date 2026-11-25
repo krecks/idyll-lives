@@ -1,7 +1,8 @@
 //! The exercise bike: an upright bike, the flywheel at the front, the cranks under the saddle.
 
 use super::M;
-use super::common::{on, rr};
+use super::common::on;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, pow, sin, sind};
@@ -22,7 +23,7 @@ fn console(x: impl Into<N>, y: f64, z: f64) -> (N, f64, f64) {
 
 pub fn exercise_bike() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    let frame = rr(0.06, 0.05, 0.016, 2);
+    let frame = rounded_rect(0.06, 0.05, 0.016, 2);
     let still = new_parts(|| {
         // the base: a beam on two stabilisers with rubber end caps and levelling feet, transport wheels at the front
         fsweep!(
@@ -31,7 +32,7 @@ pub fn exercise_bike() -> Vec<Obj> {
             &[(0, 0.05, -0.43), (0, 0.05, 0.43)],
             0,
             M.body,
-            profile = rr(0.06, 0.12, 0.014, 2)
+            profile = rounded_rect(0.06, 0.12, 0.014, 2)
         );
         for z in [-0.38, 0.38] {
             fsweep!(
@@ -40,7 +41,7 @@ pub fn exercise_bike() -> Vec<Obj> {
                 &[(-0.22, 0.03, z), (0.22, 0.03, z)],
                 0,
                 M.body,
-                profile = rr(0.05, 0.08, 0.016, 2)
+                profile = rounded_rect(0.05, 0.08, 0.016, 2)
             );
             for s in [-1, 1] {
                 soft!(
@@ -304,7 +305,7 @@ pub fn exercise_bike() -> Vec<Obj> {
                 &[(sf * 0.075, CRANK.1, CRANK.2), end],
                 0,
                 M.steel,
-                profile = rr(0.014, 0.034, 0.006, 1),
+                profile = rounded_rect(0.014, 0.034, 0.006, 1),
                 up = (1, 0, 0),
                 scale = [1.0, 0.8]
             );

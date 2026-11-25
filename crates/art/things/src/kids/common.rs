@@ -3,7 +3,6 @@
 use super::{F, M};
 pub use crate::common::P;
 use artkit::forms::{self, Extrude, rounded_rect};
-use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, V3, cos, pow, radians, sin, v3};
 use artkit::motion::{Squash, squash};
@@ -157,19 +156,6 @@ pub fn moon(cx: f64, cy: f64, r: f64, n: usize) -> Vec<(f64, f64)> {
         .collect();
     outer.extend_from_slice(&inner[1..inner.len() - 1]);
     outer
-}
-
-/// A turned part: `profile` [(radius, height over y)] revolved about the upright through game (x, z).
-pub fn turned(
-    name: &str,
-    x: impl Coord,
-    z: impl Coord,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-    y: f64,
-) -> Obj {
-    kit::turned!(F, name, x, y, z, profile, material, segments = segments)
 }
 
 /// Rumples a cover's top: its vertices above height `above` moved up or down by smooth noise, up to `amount`,

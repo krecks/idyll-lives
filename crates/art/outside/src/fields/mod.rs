@@ -24,8 +24,8 @@ palette! { M:
 }
 
 /// The five things that divide and mark the fields.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "fields",
         M.palette(),
         vec![
@@ -49,5 +49,5 @@ pub fn family() -> Option<Family> {
                 .paint(&[("paint", "Paint")]),
         ],
         "Fields and lanes between villages (crates/art/outside/src/fields, built by cargo art fields): dry-stone walls, hedgerows, gates, stiles and fingerposts.",
-    ))
+    )
 }

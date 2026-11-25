@@ -43,14 +43,14 @@ pub fn plain_leaves(p: artkit::materials::Palette) -> artkit::materials::Palette
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let pot = |model: Model| model.tolerance(TOLERANCE).paint(&[("body", "Pot")]);
     let bed = |model: Model, more: &[(&'static str, &'static str)]| {
         let paint = [&[("bed", "Bed")][..], more].concat();
         model.tolerance(TOLERANCE).far_low().paint(&paint)
     };
     let shrub = |model: Model| model.tolerance(TOLERANCE).far_low();
-    Some(Family::new(
+    Family::new(
         "plants",
         BASE.palette(),
         vec![
@@ -300,5 +300,5 @@ pub fn family() -> Option<Family> {
          they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil \
          while they are picked; the crops grow from seedlings to ripe and lose their crop when \
          harvested (`motions.growth`).",
-    ))
+    )
 }

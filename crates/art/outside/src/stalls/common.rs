@@ -131,7 +131,7 @@ pub fn wheel(f: &GameFrame, name: &str, x: f64, z: f64, r: f64, spokes: usize) {
 
 /// Gives a canopy's faces alternate materials round it by the angle of their middles (a parasol's gores); its
 /// underside the second.
-pub fn striped(obj: Obj, gores: usize, _first: Mat, second: Mat) -> Obj {
+pub fn striped(obj: Obj, gores: usize, second: Mat) -> Obj {
     obj.edit(|o| {
         let mesh = &mut o.mesh;
         mesh.mats.push(second);

@@ -562,8 +562,8 @@ fn figure8(
         };
     }
     let yw = (lo + hi) / 2.0;
-    let t1 = degrees(libm::asin(((yw - c1) / b1).clamp(-1.0, 1.0)));
-    let t2 = degrees(libm::asin(((yw - c2) / b2).clamp(-1.0, 1.0)));
+    let t1 = degrees(artkit::math::asin(((yw - c1) / b1).clamp(-1.0, 1.0)));
+    let t2 = degrees(artkit::math::asin(((yw - c2) / b2).clamp(-1.0, 1.0)));
     let mut right: Vec<(f64, f64)> = (0..=n)
         .map(|i| -90.0 + (t1 + 90.0) * i as f64 / n as f64)
         .map(|t| (a1 * cosd(t), c1 + b1 * sind(t)))

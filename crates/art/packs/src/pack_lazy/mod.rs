@@ -23,8 +23,8 @@ mod table;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_lazy",
         M.palette(),
         vec![
@@ -72,5 +72,5 @@ pub fn family() -> Option<Family> {
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves while \
          it is used: the bed's head rises, the pod's hood swings over, the quilt lifts, a locker door opens, the plate \
          shakes and the tablet tilts up.",
-    ))
+    )
 }

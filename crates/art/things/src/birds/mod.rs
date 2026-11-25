@@ -122,8 +122,8 @@ fn facts(s: &Species) -> json::Json {
 /// The family. (wingspan, height, length over the ground: bill to tail tip as it sits) as measured; `centre` its
 /// box's middle (the feet are on the origin, the tail reaches back further than the bill forward); `sink` how far
 /// the tail hangs below the perch.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "birds",
         M.palette(),
         vec![
@@ -165,5 +165,5 @@ pub fn family() -> Option<Family> {
              renderer moves (`body`, `head`, `tail`, `wing.L`, `wing.R`: the wings spread, which it flaps, and hides \
              while perched). `bird`: length (bill to tail tip) and wingspan, the body's middle over the feet \
              (`perchHeight`) and the perched torso's rise from level (`pitch`, degrees), in metres.",
-    ))
+    )
 }

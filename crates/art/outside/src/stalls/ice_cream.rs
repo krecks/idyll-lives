@@ -50,7 +50,6 @@ fn parasol(name: &str, r: f64, h: f64, gores: usize, a: Mat, b: Mat) -> Vec<Obj>
             smooth = false
         ),
         gores,
-        a,
         b,
     );
     // the valance: a band of scallops round the rim, a tongue a gore
@@ -82,7 +81,7 @@ fn parasol(name: &str, r: f64, h: f64, gores: usize, a: Mat, b: Mat) -> Vec<Obj>
         })
         .collect();
     let val = forms_band(&format!("{name}_valance"), &top_o, &out, &inn, &top_i, a);
-    striped(val, gores, a, b);
+    striped(val, gores, b);
     let mut made = vec![canopy, val];
     for i in (0..n).step_by(2) {
         // the ribs under the canopy

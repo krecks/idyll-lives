@@ -16,7 +16,7 @@ pub mod water_edge;
 pub mod yard;
 
 /// The group's families by their names on the command line (`cargo art <name>`).
-pub fn families() -> Vec<(&'static str, Option<Family>)> {
+pub fn families() -> Vec<(&'static str, Family)> {
     vec![
         ("yard", yard::family()),
         ("outdoor", outdoor::family()),

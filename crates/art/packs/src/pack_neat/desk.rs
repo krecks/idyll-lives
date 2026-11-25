@@ -1,6 +1,6 @@
 //! The label-and-sort organizer desk and the tidy entry console.
 
-use super::common::{_flat, _m, M, PASTELS, WALL};
+use super::common::{_flat, M, PASTELS, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -215,7 +215,7 @@ pub fn organizer_desk() -> Vec<Obj> {
                         &format!("bin{r}{i}"),
                         x,
                         y,
-                        _m(PASTELS[(i + r * 2) % PASTELS.len()]),
+                        PASTELS[(i + r * 2) % PASTELS.len()],
                     );
                 }
             }
@@ -353,7 +353,7 @@ pub fn organizer_desk() -> Vec<Obj> {
             material = M.pastel_f,
             segments = 14
         );
-        for (k, m) in ["pastel_d", "ledger", "coral"].into_iter().enumerate() {
+        for (k, m) in [M.pastel_d, M.ledger, M.coral].into_iter().enumerate() {
             let kf = k as f64;
             fsweep!(
                 f,
@@ -363,7 +363,7 @@ pub fn organizer_desk() -> Vec<Obj> {
                     (0.598 + 0.02 * kf, 0.94 - 0.01 * kf, z - 0.08 + 0.016 * kf)
                 ],
                 0.006,
-                _m(m),
+                m,
                 verts = 6,
                 scale = [1.0, 0.9]
             );
@@ -544,10 +544,10 @@ pub fn entry_console() -> Vec<Obj> {
             M.body
         );
         // shoes, neatly paired
-        for (i, m) in ["shoe_a", "shoe_b", "shoe_c"].into_iter().enumerate() {
+        for (i, m) in [M.shoe_a, M.shoe_b, M.shoe_c].into_iter().enumerate() {
             let x = -0.27 + i as f64 * 0.27;
             for ddx in [-0.045, 0.045] {
-                _shoe(f, &format!("shoe{i}{ddx}"), x + ddx, 0.231, -0.27, _m(m));
+                _shoe(f, &format!("shoe{i}{ddx}"), x + ddx, 0.231, -0.27, m);
             }
         }
         // on top: a bowl, a vase of tulips
@@ -610,7 +610,7 @@ pub fn entry_console() -> Vec<Obj> {
                     (0.0, 0.04)
                 ],
                 f.at(x, 1.198, z),
-                _m(["coral", "pastel_b", "pad", "coral", "pastel_e"][k]),
+                [M.coral, M.pastel_b, M.pad, M.coral, M.pastel_e][k],
                 yaw = -a + 90.0,
                 tilt = 10.0,
                 segments = 6

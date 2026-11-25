@@ -5,7 +5,6 @@
 //! (`rollers`, a loop). Its front to the watcher (+z).
 
 use super::common::{F, own_palette};
-use artkit::far::{is_low, low};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::{Mat, Palette};
 use artkit::math::{Axis, atan2, cos, degrees, radians, sin};
@@ -68,7 +67,7 @@ pub fn press_cylinder(
             (0, y, z),
             surface,
             rot = (0, 90, 0),
-            verts = low(sides(r, 16, 32), 10)
+            verts = sides(r, 16, 32)
         );
         fcyl!(
             F,
@@ -78,54 +77,52 @@ pub fn press_cylinder(
             (0, y, z),
             m.steel,
             rot = (0, 90, 0),
-            verts = low(10, 6)
+            verts = 10
         );
-        if !is_low() {
-            for s in [-1, 1] {
-                // its bearers: steel rings at its ends
-                fcyl!(
-                    F,
-                    format!("{name}_bearer{s}"),
-                    r + 0.004,
-                    0.03,
-                    (s as f64 * (PP_FRAME - 0.03), y, z),
-                    m.steel,
-                    rot = (0, 90, 0),
-                    verts = sides(r, 16, 32)
-                );
-            }
-            fbox!(
+        for s in [-1, 1] {
+            // its bearers: steel rings at its ends
+            fcyl!(
                 F,
-                format!("{name}_gap"),
-                l - 0.08,
-                0.012,
+                format!("{name}_bearer{s}"),
+                r + 0.004,
                 0.03,
-                (0, y + r - 0.003, z),
-                m.dark
+                (s as f64 * (PP_FRAME - 0.03), y, z),
+                m.steel,
+                rot = (0, 90, 0),
+                verts = sides(r, 16, 32)
             );
+        }
+        fbox!(
+            F,
+            format!("{name}_gap"),
+            l - 0.08,
+            0.012,
+            0.03,
+            (0, y + r - 0.003, z),
+            m.dark
+        );
+        fbox!(
+            F,
+            format!("{name}_clamp"),
+            l - 0.08,
+            0.01,
+            0.012,
+            (0, y + r - 0.001, z - 0.021),
+            m.steel
+        );
+        for (k, &(a, w, x)) in marks.iter().enumerate() {
+            // print blocks: columns of grey type and a black headline
+            let t = radians(a as f64);
             fbox!(
                 F,
-                format!("{name}_clamp"),
-                l - 0.08,
-                0.01,
-                0.012,
-                (0, y + r - 0.001, z - 0.021),
-                m.steel
+                format!("{name}_mark{k}"),
+                w,
+                0.004,
+                0.05,
+                (x, y + (r + 0.0005) * cos(t), z - (r + 0.0005) * sin(t)),
+                if k % 3 == 0 { m.ink } else { TYPE },
+                rot = (-a, 0, 0)
             );
-            for (k, &(a, w, x)) in marks.iter().enumerate() {
-                // print blocks: columns of grey type and a black headline
-                let t = radians(a as f64);
-                fbox!(
-                    F,
-                    format!("{name}_mark{k}"),
-                    w,
-                    0.004,
-                    0.05,
-                    (x, y + (r + 0.0005) * cos(t), z - (r + 0.0005) * sin(t)),
-                    if k % 3 == 0 { m.ink } else { TYPE },
-                    rot = (-a, 0, 0)
-                );
-            }
         }
     });
     hinged(join(&parts, name, None), F.at(0, y, z))
@@ -145,53 +142,51 @@ pub fn printing_press() -> Vec<Obj> {
             1.12,
             (0, 0.36, -0.1),
             green,
-            bevel = low(0.02, 0.0),
-            bevel_segments = low(2, 1)
+            bevel = 0.02,
+            bevel_segments = 2
         );
-        if !is_low() {
-            for (k, x) in [-0.37, 0.37].into_iter().enumerate() {
+        for (k, x) in [-0.37, 0.37].into_iter().enumerate() {
+            fbox!(
+                F,
+                format!("panel_seam{k}"),
+                0.66,
+                0.42,
+                0.004,
+                (x, 0.36, 0.461),
+                m.dark
+            );
+            fbox!(
+                F,
+                format!("panel{k}"),
+                0.64,
+                0.4,
+                0.006,
+                (x, 0.36, 0.463),
+                green,
+                bevel = 0.002,
+                bevel_segments = 1
+            );
+            for j in 0..5 {
                 fbox!(
                     F,
-                    format!("panel_seam{k}"),
-                    0.66,
-                    0.42,
+                    format!("vent{k}{j}"),
+                    0.3,
+                    0.012,
                     0.004,
-                    (x, 0.36, 0.461),
+                    (x, 0.24 + j as f64 * 0.025, 0.4665),
                     m.dark
                 );
-                fbox!(
-                    F,
-                    format!("panel{k}"),
-                    0.64,
-                    0.4,
-                    0.006,
-                    (x, 0.36, 0.463),
-                    green,
-                    bevel = 0.002,
-                    bevel_segments = 1
-                );
-                for j in 0..5 {
-                    fbox!(
-                        F,
-                        format!("vent{k}{j}"),
-                        0.3,
-                        0.012,
-                        0.004,
-                        (x, 0.24 + j as f64 * 0.025, 0.4665),
-                        m.dark
-                    );
-                }
-                fcyl!(
-                    F,
-                    format!("panel_lock{k}"),
-                    0.012,
-                    0.01,
-                    (x + 0.27, 0.5, 0.468),
-                    m.chrome,
-                    rot = (90, 0, 0),
-                    verts = 8
-                );
             }
+            fcyl!(
+                F,
+                format!("panel_lock{k}"),
+                0.012,
+                0.01,
+                (x + 0.27, 0.5, 0.468),
+                m.chrome,
+                rot = (90, 0, 0),
+                verts = 8
+            );
         }
         fbox!(
             F,
@@ -201,7 +196,7 @@ pub fn printing_press() -> Vec<Obj> {
             1.12,
             (0, 0.655, -0.1),
             m.iron,
-            bevel = low(0.006, 0.0),
+            bevel = 0.006,
             bevel_segments = 1
         );
         // the side frames: cast plates rising over the cylinders, a hole for each axle
@@ -216,7 +211,7 @@ pub fn printing_press() -> Vec<Obj> {
                 (-0.5, 1.4),
                 (-0.62, 1.2),
             ],
-            low(2, 1),
+            2,
             true,
         );
         for s in [-1, 1] {
@@ -229,7 +224,7 @@ pub fn printing_press() -> Vec<Obj> {
                 (sf * (PP_FRAME + 0.035), 0, 0),
                 green,
                 plane = Facing::Side,
-                bevel = low(0.01, 0.0),
+                bevel = 0.01,
                 bevel_segments = 1
             );
             for (k, (y, z, _r)) in [PP_PLATE, PP_BLANKET, PP_IMPRESSION]
@@ -244,7 +239,7 @@ pub fn printing_press() -> Vec<Obj> {
                     (sf * (PP_FRAME + 0.075), y, z),
                     m.iron,
                     rot = (0, 90, 0),
-                    verts = low(14, 6)
+                    verts = 14
                 );
             }
         }
@@ -259,7 +254,7 @@ pub fn printing_press() -> Vec<Obj> {
             (0, y, z),
             m.steel,
             rot = (0, 90, 0),
-            verts = low(sides(r, 16, 32), 10)
+            verts = sides(r, 16, 32)
         );
         for (k, (yy, zz, rr)) in [
             (1.36, -0.08, 0.045),
@@ -279,7 +274,7 @@ pub fn printing_press() -> Vec<Obj> {
                 (0, yy, zz),
                 if k % 2 != 0 { m.steel } else { m.roller },
                 rot = (0, 90, 0),
-                verts = low(14, 6)
+                verts = 14
             );
         }
         fextrude!(
@@ -307,7 +302,7 @@ pub fn printing_press() -> Vec<Obj> {
             m.ink
         );
         // the hood over the ink rollers, open to the front where the cylinders show
-        let steps: Vec<i32> = (0..11).step_by(low(1, 5)).map(|k| 70 + 10 * k).collect();
+        let steps: Vec<i32> = (0..11).map(|k| 70 + 10 * k).collect();
         let mut hood: Vec<(f64, f64)> = steps
             .iter()
             .map(|&a| {
@@ -349,7 +344,7 @@ pub fn printing_press() -> Vec<Obj> {
                 (sf * 0.6, 0, 0),
                 green,
                 plane = Facing::Side,
-                bevel = low(0.008, 0.0),
+                bevel = 0.008,
                 bevel_segments = 1
             );
             fbox!(
@@ -370,7 +365,7 @@ pub fn printing_press() -> Vec<Obj> {
             (0, ry, rz),
             m.paper,
             rot = (0, 90, 0),
-            verts = low(sides(rr, 24, 40), 12)
+            verts = sides(rr, 24, 40)
         );
         fcyl!(
             F,
@@ -380,7 +375,7 @@ pub fn printing_press() -> Vec<Obj> {
             (0, ry, rz),
             m.dark,
             rot = (0, 90, 0),
-            verts = low(12, 6)
+            verts = 12
         );
         fcyl!(
             F,
@@ -390,7 +385,7 @@ pub fn printing_press() -> Vec<Obj> {
             (0, ry, rz),
             m.steel,
             rot = (0, 90, 0),
-            verts = low(10, 6)
+            verts = 10
         );
         fcyl!(
             F,
@@ -400,7 +395,7 @@ pub fn printing_press() -> Vec<Obj> {
             (-0.66, ry, rz),
             m.iron,
             rot = (0, 90, 0),
-            verts = low(16, 8)
+            verts = 16
         );
         // the web: up from the reel over the guide roller at the back of the frames, and out of the cylinders'
         // nip to the cutter at the front
@@ -412,7 +407,7 @@ pub fn printing_press() -> Vec<Obj> {
             (0, 1.16, -0.56),
             m.steel,
             rot = (0, 90, 0),
-            verts = low(12, 6)
+            verts = 12
         );
         let a0 = (rz + rr * 0.15, ry + rr * 0.99);
         let a1 = (-0.56 - 0.03, 1.16 + 0.03);
@@ -438,7 +433,7 @@ pub fn printing_press() -> Vec<Obj> {
             0.14,
             (0, 0.74, 0.5),
             green,
-            bevel = low(0.015, 0.0),
+            bevel = 0.015,
             bevel_segments = 1
         );
         fbox!(F, "cutter_slot", 1.0, 0.01, 0.004, (0, 0.72, 0.571), m.dark);
@@ -450,7 +445,7 @@ pub fn printing_press() -> Vec<Obj> {
             0.36,
             (0, 0.6, 0.75),
             m.steel,
-            bevel = low(0.006, 0.0),
+            bevel = 0.006,
             bevel_segments = 1
         );
         for s in [-1, 1] {
@@ -482,10 +477,10 @@ pub fn printing_press() -> Vec<Obj> {
             0.32,
             (0, 0.6125 + 0.07, 0.75),
             m.paper,
-            bevel = low(0.004, 0.0),
+            bevel = 0.004,
             bevel_segments = 1
         );
-        for k in 0..low(3, 1) {
+        for k in 0..3 {
             let yk = 0.7525 + 0.003 * k as f64;
             let rot = (0, 4 - 5 * k, 0);
             fbox!(
@@ -499,41 +494,39 @@ pub fn printing_press() -> Vec<Obj> {
                 rot = rot
             );
         }
-        if !is_low() {
-            // the top page's front: its headline and columns
+        // the top page's front: its headline and columns
+        fbox!(
+            F,
+            "headline",
+            0.44,
+            0.003,
+            0.05,
+            (0.02, 0.7585, 0.66),
+            m.ink,
+            rot = (0, -6, 0)
+        );
+        for j in 0..4 {
             fbox!(
                 F,
-                "headline",
-                0.44,
-                0.003,
-                0.05,
-                (0.02, 0.7585, 0.66),
-                m.ink,
-                rot = (0, -6, 0)
-            );
-            for j in 0..4 {
-                fbox!(
-                    F,
-                    format!("column{j}"),
-                    0.1,
-                    0.003,
-                    0.2,
-                    (-0.15 + j as f64 * 0.12, 0.7585, 0.8),
-                    TYPE,
-                    rot = (0, -6, 0)
-                );
-            }
-            fbox!(
-                F,
-                "photo",
-                0.12,
-                0.0032,
+                format!("column{j}"),
                 0.1,
-                (0.15, 0.759, 0.74),
-                m.ink,
+                0.003,
+                0.2,
+                (-0.15 + j as f64 * 0.12, 0.7585, 0.8),
+                TYPE,
                 rot = (0, -6, 0)
             );
         }
+        fbox!(
+            F,
+            "photo",
+            0.12,
+            0.0032,
+            0.1,
+            (0.15, 0.759, 0.74),
+            m.ink,
+            rot = (0, -6, 0)
+        );
         // the control panel on the right frame's front: a sloping desk of buttons, a speed dial, the stop
         fbox!(
             F,
@@ -543,7 +536,7 @@ pub fn printing_press() -> Vec<Obj> {
             0.12,
             (-0.78, 0.9, 0.3),
             green,
-            bevel = low(0.01, 0.0),
+            bevel = 0.01,
             bevel_segments = 1
         );
         fbox!(
@@ -555,7 +548,7 @@ pub fn printing_press() -> Vec<Obj> {
             (-0.78, 1.2, 0.33),
             m.plastic,
             rot = (-30, 0, 0),
-            bevel = low(0.01, 0.0),
+            bevel = 0.01,
             bevel_segments = 1
         );
         for (k, (x, mat)) in [(-0.71, m.go), (-0.78, m.amber), (-0.85, m.white)]
@@ -570,7 +563,7 @@ pub fn printing_press() -> Vec<Obj> {
                 (x, 1.22, 0.375),
                 mat,
                 rot = (60, 0, 0),
-                verts = low(10, 6)
+                verts = 10
             );
         }
         fcyl!(
@@ -581,35 +574,23 @@ pub fn printing_press() -> Vec<Obj> {
             (-0.78, 1.14, 0.42),
             m.red_lens,
             rot = (60, 0, 0),
-            verts = low(12, 6)
+            verts = 12
         );
         // the drive's belt guard on the left frame
         fextrude!(
             F,
             "belt_guard",
-            &rounded_rect(0.7, 0.5, 0.18, low(4, 2)),
+            &rounded_rect(0.7, 0.5, 0.18, 4),
             0.1,
             (0.76, 1.0, -0.1),
             m.body,
             plane = Facing::Side,
-            bevel = low(0.01, 0.0),
+            bevel = 0.01,
             bevel_segments = 1
         );
     });
-    join(
-        &still,
-        if is_low() {
-            "printingPress_far"
-        } else {
-            "printingPress"
-        },
-        Some((0, 0, 0).into()),
-    );
-    if is_low() {
-        settle_all();
-        return meshes();
-    }
-    // the plate and blanket cylinders, each turning on its axle (the far version keeps them still, joined)
+    join(&still, "printingPress", Some((0, 0, 0).into()));
+    // the plate and blanket cylinders, each turning on its axle
     let page: Vec<(i32, f64, f64)> = [30, 75, 200, 250, 300]
         .iter()
         .flat_map(|&a| [-0.3, 0.3].map(|x| (a, 0.3, x)))

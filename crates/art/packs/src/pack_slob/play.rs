@@ -1,6 +1,6 @@
 //! The spritz & go station and the pixel-blaster arcade cabinet.
 
-use super::common::{_box, _can, _m, _wrapper, M, POP, WALL};
+use super::common::{_box, _can, _wrapper, M, POP, WALL};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
@@ -144,10 +144,10 @@ pub fn spritz_station() -> Vec<Obj> {
             verts = 32
         );
         for (i, (m, hh)) in [
-            ("pop_blue", 0.22),
-            ("pop_red", 0.18),
-            ("pop_yellow", 0.24),
-            ("pop_green", 0.2),
+            (M.pop_blue, 0.22),
+            (M.pop_red, 0.18),
+            (M.pop_yellow, 0.24),
+            (M.pop_green, 0.2),
         ]
         .into_iter()
         .enumerate()
@@ -159,10 +159,10 @@ pub fn spritz_station() -> Vec<Obj> {
                 -0.3,
                 0.935,
                 hh,
-                _m(m),
+                m,
             );
         }
-        for (i, m) in ["pop_purple", "pop_blue", "pop_red"]
+        for (i, m) in [M.pop_purple, M.pop_blue, M.pop_red]
             .into_iter()
             .enumerate()
         {
@@ -180,7 +180,7 @@ pub fn spritz_station() -> Vec<Obj> {
                     (0.18, 0.4),
                 ],
             );
-            loft!(format!("bottle{i}"), &rings, material = _m(m));
+            loft!(format!("bottle{i}"), &rings, material = m);
             fcyl!(
                 f,
                 format!("bottle_cap{i}"),
@@ -556,7 +556,7 @@ pub fn arcade_cabinet() -> Vec<Obj> {
                     (0.0, 0.023)
                 ],
                 at = f.at(dx, 1.04 + (0.15 - dz) * 0.2, dz),
-                material = _m(POP[i]),
+                material = POP[i],
                 segments = 12,
                 rot = (-12, 0, 0)
             );

@@ -16,8 +16,8 @@ mod mirrors;
 use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "bedroom_dressing",
         M.palette(),
         vec![
@@ -52,5 +52,5 @@ pub fn family() -> Option<Family> {
          mirror, the dressing table, the wall mirror and the standing mirror. Listed in the base manifest's packs. \
          Each mirror's glass maps to a `mirror` material, so the game reflects the room in it live. The dressing \
          table slides its drawer out (`drawer_open`) while a resident gets ready.",
-    ))
+    )
 }
