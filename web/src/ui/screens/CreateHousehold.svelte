@@ -293,6 +293,8 @@
   function removeMember(i: number) {
     if (household.members.length <= 1) return;
     household.members.splice(i, 1);
+    // A member before the one being edited moves it down a place; keep editing the same one.
+    if (i < active) active--;
     active = Math.min(active, household.members.length - 1);
   }
 
