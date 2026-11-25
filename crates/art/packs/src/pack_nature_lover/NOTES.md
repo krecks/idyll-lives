@@ -127,14 +127,15 @@ plants in `ferns.rs`), proved against the last Blender build (`ref/blender`). Le
 ## Gate to zero (2026-11-25)
 
 Every edge the gate's `edges` found showing unbevelled at the play camera is rounded, chamfered or covered (108 to
-0), the terrarium's texels laid even, and the glasshouse and the potting bench at 3 draws and under their triangle
-aims.
+0), the terrarium's texels laid even, the glasshouse under its triangle aim and the potting bench at 3 draws and
+under its.
 - `_pot` (common): a pot 17 cm across or more has its rim's top chamfered 4 mm (each corner cut once); every pot's
   soil is one cone from its rim (a ring fewer).
-- `glasshouse` (49 to 0; 8,366 to 7,980 triangles; 4 to 3 draws): the gutters' outer corner and the bench's back
+- `glasshouse` (49 to 0; 8,366 to 7,980 triangles): the gutters' outer corner and the bench's back
   posts chamfered, the posts' ends eased; the trailing stems shaded round; the palm and basket pots 12 sides, the
-  ferns' fronds 4 rows, the palms' 5, the basket leaves 2, the cushions `resting`. The roof vent is propped open
-  25° on the still body's glass (its own part was the fourth draw): no `vent_open`, the door still opens and shuts.
+  ferns' fronds 4 rows, the palms' 5, the basket leaves 2, the cushions `resting`. Its roof vent opens with `vent_open` again (it
+  was propped open on the still body's glass for a while, to save its draw): the gate now aims a model's draws at 3
+  for its still body and one more for each moving part, so its 4 (body, glass, door, vent) are what it aims for.
 - `birdFeeder` (6 to 0): the bed's stone edge eased; the ridge cap stood upright astride the ridge (it lay on its
   side), its apex cut; the tube's arm chamfered and its ends eased (5,688 to 6,004).
 - `gardenHammock` (14 to 0): the beam's and the arms' ends eased (3,222 to 3,366).

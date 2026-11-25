@@ -194,7 +194,7 @@ The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingB
 `packs/pack_natureLover/manifest.json`) are built by `crates/art/packs/src/pack_nature_lover` on `artkit` and
 exported as `.glb` (glTF, original, CC0). Each moves while it is used: a lettuce is picked from the
 veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower
-runs, the cloche lifts and the glasshouse's door opens (its roof vent propped open). Their edges bevelled,
+runs, the cloche lifts and the glasshouse's door and roof vent open. Their edges bevelled,
 eased or chamfered to the play camera's pixel (2026-11-25).
 
 Rebuilt in the same families (2026-10-21, original, CC0): the entry console, the baking counter and the spritz

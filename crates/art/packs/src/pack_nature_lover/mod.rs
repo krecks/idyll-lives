@@ -71,10 +71,10 @@ pub fn family() -> Family {
             Model::new("glasshouse", glasshouse::glasshouse, (1.887, 2.481, 1.86))
                 .key("model.natureLover.glasshouse")
                 // the door lets the resident in and shuts behind them (`hold`), and opens again to let them out
-                // (`out`)
+                // (`out`); the vent stays open while they're in
                 .motions(json!({"uses": {
-                    "unwind": {"clip": "door_open", "hold": 1.5, "out": 1.5},
-                    "orchids": {"clip": "door_open", "hold": 1.5, "out": 1.5}
+                    "unwind": [{"clip": "door_open", "hold": 1.5, "out": 1.5}, "vent_open"],
+                    "orchids": [{"clip": "door_open", "hold": 1.5, "out": 1.5}, "vent_open"]
                 }}))
                 .paint(&[("cedar", "Wood"), ("frame", "Frame"), ("cushion", "Cushions")]),
         ],
