@@ -286,25 +286,25 @@
       "url": "../../models/plants/bonsai.glb",
       "materials": {
         "body": {
-          "finish": "material.finish.ceramic"
+          "finish": "material.finish.satin"
         },
         "leaf": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "leaf_dark": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "leaf_light": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "moss": {
           "finish": "material.finish.matte"
         },
         "stem": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "wood": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         }
       },
       "motions": {

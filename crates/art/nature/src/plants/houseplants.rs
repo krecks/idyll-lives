@@ -949,8 +949,8 @@ pub fn orchid() -> Vec<Obj> {
 /// it.
 pub fn bonsai() -> Vec<Obj> {
     use artkit::json::float_repr as fr;
-    // (plain leaves, as the other houseplants': with the stand's wood, three draw calls, not four)
-    let p = super::plain_leaves(palette(&[
+    // (the stand and the trunk plain, its pads still the foliage's dapple: three draw calls, not four)
+    let p = super::plain_wood(palette(&[
         ("body", "#3E5A78"),
         ("wood", "#6A4A32"),
         ("bark", "#6E5A4C"),
@@ -1150,7 +1150,7 @@ pub fn bonsai() -> Vec<Obj> {
         }
     }
     let still = join_all("bonsai");
-    // The stray sprig, sticking up out of the top pad: a twig and a tuft, all plain (one draw call).
+    // The stray sprig, sticking up out of the top pad: a twig and a tuft, all on foliage (one draw call).
     let parts = new_parts(|| {
         tube!(
             "sprig_twig",

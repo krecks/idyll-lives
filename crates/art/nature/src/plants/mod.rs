@@ -41,6 +41,15 @@ pub fn plain_leaves(p: artkit::materials::Palette) -> artkit::materials::Palette
     p.with(&changed)
 }
 
+/// `p` with its wood plain (`satin`): the bonsai's stand and trunk, so that with its plain tray and its leafy pads it
+/// draws in two calls, and its sprig in a third.
+pub fn plain_wood(p: artkit::materials::Palette) -> artkit::materials::Palette {
+    p.with(&[artkit::materials::Mat {
+        finish: "satin",
+        ..p.get("wood")
+    }])
+}
+
 /// `p` with the petals `names` on `foliage`: a petal is a leaf's thin sheet (the gate doesn't judge its rims as
 /// edges), and sways with the plant.
 pub fn leafy_petals(p: artkit::materials::Palette, names: &[&str]) -> artkit::materials::Palette {
@@ -117,7 +126,7 @@ pub fn family() -> Family {
             pot(
                 Model::new("bonsai", houseplants::bonsai, (0.62, 1.354, 0.407))
                     .key("model.garden.bonsai")
-                    .palette(plain_leaves(BASE.palette())),
+                    .palette(plain_wood(BASE.palette())),
             )
             .motions(json!({"uses": {"prune": "trim"}})),
             // G2: flowers (with G3 and G4, each with a far version: they stand outside, seen in the town overview)

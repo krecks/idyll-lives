@@ -29,7 +29,9 @@ cacti (gallery, WebGPU). Heights are from the floor (the still part's origin), s
 
 The one moving part: a twig and a tuft of leaves sticking out of the top pad, all on `foliage` (one draw call),
 its origin where it leaves the pad. `trim` squashes it to nothing in 0.8 s; `motions.uses.prune` plays it for the
-whole prune (the game brings it back after). It is the model's fourth draw call (`check-glb` warns: aim for 3).
+whole prune (the game brings it back after). It is the model's third draw call: its stand and trunk are plain
+`satin` (`plain_wood`, 2026-11-25), so the still part draws its plain tray, moss and wood in one call and its pads'
+foliage in another (on `wood` it was four, and `check-glb` warned).
 
 | Model | Size (w × h × d) | Triangles | Draws |
 |---|---|---|---|
@@ -42,7 +44,7 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 | `model.garden.bostonFern` | 0.73 × 1.13 × 0.75 m | 1,968 | 3 |
 | `model.garden.palm` | 0.77 × 0.91 × 0.69 m | 1,926 | 2 |
 | `model.garden.orchid` | 0.43 × 1.23 × 0.38 m | 1,554 | 2 |
-| `model.garden.bonsai` | 0.62 × 1.35 × 0.41 m | 3,144 | 4 |
+| `model.garden.bonsai` | 0.62 × 1.35 × 0.41 m | 3,368 | 3 |
 
 `check-glb`: 10 models, 0 failed; warnings: the bonsai's four draw calls. Khronos validator: 0 errors, 0 warnings
 each.
@@ -295,6 +297,25 @@ play camera too, and as leaves plain. Colours as they were (already dark); one d
 behind it, which plain shows from behind as a whole pale blade), the parlour palm and the fern on its stand (fine
 fronds: plain, they came out paler and faceted, not clearer), and the lumpy crowns (the hanging plant, the bonsai, the
 plant table's pots: plain, a lump reads as a green balloon; the dapple is what makes it leaves).
+
+## The gate's edges and texels (2026-11-25)
+
+The gate judges hard edges on everything but leaves, bark, glass and what glows (by finish), and textured finishes'
+UVs. What changed so each plant prints no warning:
+
+- **Sunflowers:** their petals (`bloom`, `bloom2`) are on `foliage` (`leafy_petals`, the build's palette and the
+  model's): a petal is a leaf's thin sheet, and sways with the plant (144 rims were found as edges). The stalks',
+  petioles' and the heads' green backs' foliage is laid a box a face (`crate::box_uvs`): the backs, turned then tilted,
+  stretched it over 2×.
+- **Pots:** botany's `vessel` cuts a pot's rim square, so the snake plant's, the cacti's, the palm's, the orchid's, the
+  fern's, the geraniums' and the topiary's pots and saucers are chamfered 4 mm (`crate::chamfer`); the orchid's
+  pedestal's top, the succulents' bowl's rim and the bonsai's tray's rim are rounded in their profiles (a bevel on a
+  wood or round-UV part smears its UVs).
+- **Cacti:** the barrel's ribs six points each (rounded ridges, no turn of 60°): 2,840 triangles.
+- **Vegetable patch:** botany's `raised_bed` leaves its boards sharp: chamfered 4 mm.
+- **Topiary cone, pumpkins:** the cone's foliage and the pumpkin flower's laid a box a face (round their axis, the cone
+  stretched it towards its point; the flower is tilted).
+- **Bonsai:** three draw calls (above).
 
 ## True to their species (2026-11-25)
 
