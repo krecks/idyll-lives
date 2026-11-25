@@ -462,7 +462,7 @@ fn sent_back(w: &mut World, k: usize) {
     let s = w.setups.remove(k);
     w.items.version = w.items.version.wrapping_add(1);
     if let Some(h) = w.households.get_mut(s.household as usize) {
-        h.funds += s.paid;
+        h.funds = h.funds.saturating_add(s.paid.max(0));
     }
     if w.sims.get(s.sim as usize).is_some_and(|a| a.here()) {
         w.events

@@ -163,7 +163,8 @@ impl World {
             .iter()
             .filter_map(|o| o.id)
             .max()
-            .map_or(0, |m| m + 1);
+            .map_or(Some(0), |m| m.checked_add(1))
+            .ok_or_else(|| Error::new("corrupt save: an object id is out of range"))?;
         let mut used = HashSet::new();
         let on_top = |o: &ObjectSave| {
             world
@@ -185,7 +186,7 @@ impl World {
                     let value = o
                         .value
                         .unwrap_or(world.content.objects[def].price.unwrap_or(0));
-                    let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
+                    let colors = crate::world::parse_colors(&o.colors, None);
                     // A size the content no longer allows goes back to its kind's.
                     let own = crate::world::kind_size(world.content.objects[def].footprint);
                     let (size, tall) = world
@@ -198,7 +199,7 @@ impl World {
                     };
                     world.place(def, o.x, o.z, o.rot, layout, colors, o.quality, value, keep)
                 }
-                None => world.place_object(&o.def, o.x, o.z, o.rot),
+                None => continue,
             };
             // What can't be placed is left out, and the rest of the game loads: a kind the content
             // no longer has, a thing whose top is gone, or one that doesn't fit where it was any
@@ -230,22 +231,39 @@ impl World {
             }
         }
         world.next_object_id = world.next_object_id.max(save.next_object_id.unwrap_or(0));
-        for s in &save.sims {
-            let spawn = SimSpawn {
+        // Genders, traits and perks the content no longer has are dropped (an unknown gender is
+        // the first one's; with no genders in the content any is kept).
+        let content = &world.content;
+        let gender =
+            |g: &String| content.genders.is_empty() || content.genders.iter().any(|d| &d.id == g);
+        let known = |ids: &[String], list: &[&String]| -> Vec<String> {
+            ids.iter().filter(|id| list.contains(id)).cloned().collect()
+        };
+        let traits: Vec<&String> = content.traits.iter().map(|d| &d.id).collect();
+        let perks: Vec<&String> = content.perks.iter().map(|d| &d.id).collect();
+        let spawns: Vec<SimSpawn> = save
+            .sims
+            .iter()
+            .map(|s| SimSpawn {
                 name: s.name.clone(),
-                gender: s.gender.clone(),
-                attracted_to: s.attracted_to.clone(),
+                gender: s.gender.clone().filter(|g| gender(g)),
+                attracted_to: s
+                    .attracted_to
+                    .as_ref()
+                    .map(|a| a.iter().filter(|g| gender(g)).cloned().collect()),
                 household: s.household,
                 job: None,
                 appearance: s.appearance.clone(),
-                traits: s.traits.clone(),
-                perks: s.perks.clone(),
+                traits: known(&s.traits, &traits),
+                perks: known(&s.perks, &perks),
                 age: s.age.filter(|a| a.is_finite()),
                 skills: Default::default(),
                 x: s.pos[0],
                 z: s.pos[1],
-            };
-            world.spawn_sim(&spawn)?;
+            })
+            .collect();
+        for spawn in &spawns {
+            world.spawn_any(spawn, false)?;
         }
         let n = world.sims.len();
         if let Some(h) = world.households.iter().find(|h| {
@@ -293,6 +311,11 @@ impl World {
                 if let Some(def) = content.feeling_index(&m.id) {
                     let expires = after(m.minutes_left.min(content.feelings[def].minutes));
                     sim.feelings.push(social::ActiveFeeling { def, expires });
+                }
+            }
+            for (a, def) in content.accidents.iter().enumerate() {
+                if let Some(&m) = s.accidents.get(&def.id) {
+                    sim.accident_at[a] = after(m).min(tick.saturating_add(def.cooldown_ticks));
                 }
             }
             for (i, skill) in content.skills.iter().enumerate() {
@@ -440,8 +463,6 @@ impl World {
                             routine: false,
                         }
                     }
-                    // Upgrades used to be a Sim task; they are instant purchases now.
-                    TaskSave::Upgrade { .. } => continue,
                     TaskSave::Cook {
                         recipe,
                         step,
@@ -490,9 +511,6 @@ impl World {
                         ..r.rel
                     };
                     world.relationships.set(a, b, rel);
-                    if let Some(c) = r.chemistry {
-                        world.relationships.set_chemistry(a, b, c);
-                    }
                 }
             }
         }
@@ -607,7 +625,7 @@ impl World {
                 ),
                 // (Gone from the content, or a sim the save doesn't have: the money back. It was
                 // paid at the purchase and the object is only placed when the setup is done.)
-                _ => h.funds += s.paid,
+                _ => h.funds = h.funds.saturating_add(s.paid.max(0)),
             }
         }
         world.make_storeys();

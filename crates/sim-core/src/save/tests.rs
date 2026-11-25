@@ -25,6 +25,24 @@ pub(super) fn a_run_too_long_for_any_lot_is_corrupt() {
     assert_eq!(&*super::expand("~03,1,02").unwrap(), "000100");
 }
 
+/// Chemistry packs and unpacks for any number of residents (every padding base64 has), and a
+/// string no packing writes is refused, not a panic.
+#[test]
+pub(super) fn chemistry_survives_packing() {
+    for n in 0..=6 {
+        let c = |a: usize, b: usize| (a * 10 + b) as f32 / 7.0;
+        let packed = super::pack_chemistry(n, c);
+        let back = super::unpack_chemistry(&packed, n).unwrap();
+        let want: Vec<f32> = (0..n)
+            .flat_map(|a| (a + 1..n).map(move |b| c(a, b)))
+            .collect();
+        assert_eq!(back, want, "{n} residents");
+    }
+    for bad in ["====", "A=AA", "AAA"] {
+        assert!(super::unpack_chemistry(bad, 2).is_err(), "{bad}");
+    }
+}
+
 #[test]
 pub(super) fn round_trip_preserves_state() {
     let mut w = World::from_json(CONTENT, LOT, 3).unwrap();
@@ -130,16 +148,25 @@ pub(super) fn drops_objects_missing_from_content() {
     assert_eq!(loaded.objects.len(), 1);
 }
 
+/// A trait, perk or gender gone from the content is dropped on load, not the whole game: the
+/// resident keeps what is still there, even fewer traits than a new one may have.
 #[test]
-pub(super) fn old_upgrade_tasks_are_dropped_on_load() {
-    let w = World::from_json(CONTENT, LOT, 3).unwrap();
-    let json = w.save_json().replacen(
-        r#""tasks":[]"#,
-        r#""tasks":[{"type":"upgrade","object":1},{"type":"moveTo","x":2.5,"z":2.5,"directed":true}]"#,
-        1,
-    );
-    let loaded = World::from_save_json(CONTENT, &json).unwrap();
-    assert_eq!(loaded.sims[0].queue().count(), 1, "only the move is kept");
+pub(super) fn traits_gone_from_the_content_are_dropped_on_load() {
+    let content = CONTENT.replacen(r#""needs":"#, r#""rules":{"minTraits":1},"needs":"#, 1);
+    let json = edited(|s| {
+        s["sims"][0]["traits"] = serde_json::json!(["lazy", "renamed"]);
+        s["sims"][0]["perks"] = serde_json::json!(["gone"]);
+        s["sims"][0]["attractedTo"] = serde_json::json!(["male", "robot"]);
+        s["sims"][1]["gender"] = "robot".into();
+        s["sims"][1]["traits"] = serde_json::json!(["renamed"]);
+    });
+    let loaded = World::from_save_json(&content, &json).unwrap();
+    assert_eq!(loaded.sims[0].traits, ["lazy"]);
+    assert!(loaded.sims[0].perks.is_empty());
+    assert_eq!(loaded.sims[0].attracted_to, ["male"]);
+    assert!((loaded.sims[0].mods.walk_speed - 0.8).abs() < 1e-6);
+    assert_eq!(loaded.sims[1].gender, "female", "the first gender");
+    assert!(loaded.sims[1].traits.is_empty());
 }
 
 #[test]
@@ -245,8 +272,8 @@ pub(super) fn edited(f: impl FnOnce(&mut serde_json::Value)) -> String {
 }
 
 /// Damaged saves are refused when they're read, not by a panic later: a household on a plot
-/// the town doesn't have, a baby expected by someone who isn't there, an item id past the
-/// last one there can be.
+/// the town doesn't have, a baby expected by someone who isn't there, an object or item id past
+/// the last one there can be.
 #[test]
 pub(super) fn damaged_saves_are_refused_on_loading() {
     let refused = |json: String, why: &str| {
@@ -265,6 +292,10 @@ pub(super) fn damaged_saves_are_refused_on_loading() {
         }),
         "unknown parent",
     );
+    refused(
+        edited(|s| s["objects"][0]["id"] = u32::MAX.into()),
+        "object id with no next one",
+    );
     let item = serde_json::json!([{"id": u32::MAX, "def": "x", "at": "floor", "x": 1, "z": 1, "quality": 1.0, "madeAt": 0, "household": 0}]);
     // (An item the content doesn't know is dropped: give the content one.)
     let content = CONTENT.replacen(
@@ -280,6 +311,9 @@ pub(super) fn damaged_saves_are_refused_on_loading() {
         err.as_deref(),
         Some("corrupt save: an item id is out of range")
     );
+    // (Four `=` would have read as minus one byte.)
+    let json = edited(|s| s["chemistry"] = "====".into());
+    assert!(World::from_save_json(CONTENT, &json).is_err());
     // An expected baby by residents who are there loads.
     let json = edited(|s| {
         s["households"][0]["expecting"] = serde_json::json!({"parents": [0, 1], "due": 3})

@@ -70,7 +70,8 @@ fn with_no_toilet_it_ends_in_a_puddle() {
             .iter()
             .any(|f| w.content.feelings[f.def].id == "hadAccident")
     );
-    // Not again right away.
+    // Not again right away, a reload or not.
+    let mut w = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     w.sims[0].needs[0] = 0.0;
     hours(&mut w, 0.5);
     assert_eq!(
