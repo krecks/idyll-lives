@@ -1,7 +1,6 @@
 //! The fire station's fire pole and hose rack.
 
 use super::common::{F, WALL, own_palette};
-use artkit::far::{is_low, low};
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{TAU, cos, radians, sin};
@@ -34,15 +33,13 @@ pub fn fire_pole() -> Vec<Obj> {
         (0.417, 0.028),
         (0.4, 0.036),
     ];
-    if !is_low() {
-        for r in [0.35, 0.28, 0.21, 0.14] {
-            prof.extend([
-                (r + 0.012, 0.036),
-                (r + 0.006, 0.042),
-                (r - 0.006, 0.042),
-                (r - 0.012, 0.036),
-            ]);
-        }
+    for r in [0.35, 0.28, 0.21, 0.14] {
+        prof.extend([
+            (r + 0.012, 0.036),
+            (r + 0.006, 0.042),
+            (r - 0.006, 0.042),
+            (r - 0.012, 0.036),
+        ]);
     }
     prof.extend([(0.06, 0.036), (0.04, 0.03), (0.04, 0.0)]);
     revolve!(
@@ -50,7 +47,7 @@ pub fn fire_pole() -> Vec<Obj> {
         &prof,
         at = F.at(0, 0, 0),
         material = m.mat,
-        segments = low(44, 16)
+        segments = 44
     );
     // the pole on its floor flange, through the ceiling's collar
     let r = 0.0375;
@@ -66,7 +63,7 @@ pub fn fire_pole() -> Vec<Obj> {
         ],
         at = F.at(0, 0, 0),
         material = m.brass,
-        segments = low(24, 10)
+        segments = 24
     );
     fcyl!(
         F,
@@ -75,7 +72,7 @@ pub fn fire_pole() -> Vec<Obj> {
         CEILING - 0.1,
         (0, 0.05 + (CEILING - 0.1) / 2.0, 0),
         m.body,
-        verts = low(sides(r, 16, 64), 8)
+        verts = sides(r, 16, 64)
     );
     revolve!(
         "collar",
@@ -90,9 +87,9 @@ pub fn fire_pole() -> Vec<Obj> {
         ],
         at = F.at(0, 0, 0),
         material = m.brass,
-        segments = low(24, 10)
+        segments = 24
     );
-    join_all(if is_low() { "firePole_far" } else { "firePole" });
+    join_all("firePole");
     settle_all();
     meshes()
 }
@@ -125,7 +122,7 @@ pub fn coil(
             z0 + 2.05 * r * i as f64 / steps as f64,
         ));
     }
-    fsweep!(F, name, &pts, r, material, verts = low(6, 4));
+    fsweep!(F, name, &pts, r, material, verts = 6);
     (pts[0], pts[pts.len() - 1])
 }
 
@@ -142,7 +139,7 @@ pub fn hose_rack() -> Vec<Obj> {
             0.025,
             (0, 1.62, z + 0.0125),
             m.body,
-            bevel = low(0.006, 0.0),
+            bevel = 0.006,
             bevel_segments = 1
         );
         for s in [-1, 1] {
@@ -173,7 +170,7 @@ pub fn hose_rack() -> Vec<Obj> {
                 0.26,
                 (x, 1.6, z + 0.155),
                 m.body,
-                bevel = low(0.005, 0.0),
+                bevel = 0.005,
                 bevel_segments = 1
             );
             fbox!(
@@ -184,11 +181,11 @@ pub fn hose_rack() -> Vec<Obj> {
                 0.02,
                 (x, 1.63, z + 0.29),
                 m.body,
-                bevel = low(0.005, 0.0),
+                bevel = 0.005,
                 bevel_segments = 1
             );
             let arc: Vec<Point> = (0..181)
-                .step_by(low(30, 90))
+                .step_by(30)
                 .map(|a| {
                     (
                         x + 0.11 * cos(radians(a as f64)),
@@ -222,7 +219,7 @@ pub fn hose_rack() -> Vec<Obj> {
                 r,
                 hose,
                 z + 0.05,
-                low(16, 8),
+                16,
             );
             tops.push((k, (a, b, x, hose)));
         }
@@ -240,8 +237,8 @@ pub fn hose_rack() -> Vec<Obj> {
                 &drop,
                 0.02,
                 hose,
-                verts = low(6, 4),
-                resolution = low(2, 1)
+                verts = 6,
+                resolution = 2
             );
             let (bx, by, bz) = drop[drop.len() - 1];
             if k == 0 {
@@ -259,7 +256,7 @@ pub fn hose_rack() -> Vec<Obj> {
                     ],
                     at = F.at(bx, by, bz),
                     material = m.brass,
-                    segments = low(12, 6)
+                    segments = 12
                 );
                 fbox!(
                     F,
@@ -269,7 +266,7 @@ pub fn hose_rack() -> Vec<Obj> {
                     0.07,
                     (bx, by - 0.1, bz),
                     m.plastic,
-                    bevel = low(0.01, 0.0),
+                    bevel = 0.01,
                     bevel_segments = 1
                 );
             } else {
@@ -285,7 +282,7 @@ pub fn hose_rack() -> Vec<Obj> {
                     ],
                     at = F.at(bx, by, bz),
                     material = m.brass,
-                    segments = low(12, 6)
+                    segments = 12
                 );
                 for j in 0..2 {
                     // its lugs
@@ -302,7 +299,7 @@ pub fn hose_rack() -> Vec<Obj> {
             }
         }
     });
-    join_all(if is_low() { "hoseRack_far" } else { "hoseRack" });
+    join_all("hoseRack");
     settle!(centre = false, floor = false);
     meshes()
 }
