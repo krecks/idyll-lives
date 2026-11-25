@@ -110,8 +110,9 @@ printed double ring), `oven` (the cavity cut out of the carcass (`hollow`: the f
 rack on runners and a lamp: an open door shows an oven, not a dark face), `oven_door`/`oven_face` (a dark frame
 round a black window, an inner pane, a round bar handle on stand-offs in one piece), `strip` (a rounded fascia with a
 clock display), `shaker` and `pull` (shaker fronts and one-piece bar pulls on every cabinet), `stock_pot`,
-the frying pan, `tray`, `cup`, `canister`, `basket` (a dishwasher's wire basket), `fillet` (round a bent tube's
-corners without the Catmull-Rom overshoot `kit::tube!` makes between a long span and a short one).
+the frying pan, `tray`, `cup`, `canister`, `basket` (a dishwasher's wire basket). A bent tube's corners are rounded by
+`kit::fillet` (no Catmull-Rom overshoot between a long span and a short one; its own copy is gone, 2026-11-25:
+the range cooker's and the coffee machine's rails moved under a micrometre).
 
 - **stoveElectric**: printed zones, a rounded splash guard with a vent, a fascia with a clock, a real oven, a drawer
   with a bar pull.

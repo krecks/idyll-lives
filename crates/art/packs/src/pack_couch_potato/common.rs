@@ -1,15 +1,14 @@
 //! What the couch potato pack is built from: its palette, pleated curtains, speaker drivers, screens and snacks.
 
 use artkit::materials::Mat;
-use artkit::math::{PI, V3, atan2, cosd, sind};
-use artkit::parts::{numbered, turn};
+use artkit::math::{PI, atan2, cosd, sind};
+use artkit::parts::numbered;
 use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
 use artkit::scene::Obj;
 use artkit::{fbox, fextrude, fsphere, kit, object_of, palette, revolve};
 
 use artkit::forms::rounded_rect;
-use artkit::math::Axis;
 
 palette! { M:
     // the cinema wall
@@ -139,21 +138,6 @@ pub fn pleats(
         );
     }
     object_of!(name, &verts, &faces, &[mat], sharp = 70)
-}
-
-/// Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
-/// which moves round with it), as pack_bookworm turned the writer's bureau. A part's slides then go the other way.
-pub fn turn_round(objs: &[Obj]) {
-    for &o in objs {
-        turn(o, 180.0, Axis::Z);
-        o.edit(|p| {
-            p.loc = V3 {
-                x: -p.loc.x,
-                y: -p.loc.y,
-                z: p.loc.z,
-            }
-        });
-    }
 }
 
 /// A speaker driver at (x, y) on a face at depth `z`, facing +z (`facing` 1) or -z: its flange, a rolled

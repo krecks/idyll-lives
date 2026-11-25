@@ -1,8 +1,9 @@
 //! The grand cinema wall and the Pixel Arcade console: a screen on the wall, the seats in front of it. Each is
 //! built with the seats at the back and the screen at the front edge facing them, then turned round.
 
-use super::common::{M, cup, driver, pleats, popcorn, screen, turn_round};
+use super::common::{M, cup, driver, pleats, popcorn, screen};
 use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::kit::turn_round;
 use artkit::math::{P3, cos, radians, sin};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
@@ -261,7 +262,7 @@ pub fn cinema_wall() -> Vec<Obj> {
             f.at(s * 0.78, 1.42, zc - 0.012),
         ));
     }
-    turn_round(&meshes());
+    turn_round(&meshes(), 0.0);
     let objs = settle_all(); // on its Model centre: the screen's back on the wall face
     for cur in parts {
         squash(
@@ -583,7 +584,7 @@ pub fn game_console() -> Vec<Obj> {
         );
     });
     let tray = join(&tray, "tray", None);
-    turn_round(&meshes());
+    turn_round(&meshes(), 0.0);
     let objs = settle_all(); // on its Model centre: the screen's back on the wall face
     slide!(tray, "tray", (0, -0.09, 0), seconds = 0.6); // 9 cm towards the players (+Z game, once turned round)
     objs

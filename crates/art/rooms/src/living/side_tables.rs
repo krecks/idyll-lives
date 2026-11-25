@@ -1,9 +1,10 @@
 //! L3 continued: the round and long coffee tables, the nesting tables, the round side table and the console table.
 
-use super::common::{disc, fillet, top};
+use super::common::{disc, top};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, pow, sin};
 use artkit::parts::{join, join_all, new_parts, settle};

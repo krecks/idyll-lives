@@ -1,11 +1,12 @@
 //! The microwave counter and the small appliances: the coffee machine, the breakfast counter and two dishwashers,
 //! each on a base unit under a worktop.
 
-use super::common::{fillet, hollow, knob};
+use super::common::{hollow, knob};
 use super::{M, SECONDS};
 use crate::common::shaker;
 use artkit::forms::rounded_rect;
 use artkit::kit;
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::Axis;
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
