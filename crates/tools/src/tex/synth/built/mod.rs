@@ -108,17 +108,27 @@ fn fbm_free(n: &Noise, x: f64, y: f64, oct: u32) -> f64 {
     0.5 * sum / norm
 }
 
-/// The nearest feature point of a periodic jittered grid: its distance in cell units and its cell.
-struct Worley {
-    f1: f64,
-    cell: (i64, i64),
+/// The nearest and second-nearest feature points of a periodic jittered grid (`nx` x `ny` cells over the
+/// tile): their distances in cell units and the nearest one's cell.
+pub(super) struct Worley {
+    pub(super) f1: f64,
+    pub(super) f2: f64,
+    pub(super) cell: (i64, i64),
 }
 
-fn worley(n: &Noise, u: f64, v: f64, nx: i64, ny: i64, jitter: f64, salt: u32) -> Worley {
+pub(super) fn worley(
+    n: &Noise,
+    u: f64,
+    v: f64,
+    nx: i64,
+    ny: i64,
+    jitter: f64,
+    salt: u32,
+) -> Worley {
     let x = u.rem_euclid(1.0) * nx as f64;
     let y = v.rem_euclid(1.0) * ny as f64;
     let (cx, cy) = (x.floor() as i64, y.floor() as i64);
-    let (mut f1, mut cell) = (f64::INFINITY, (0, 0));
+    let (mut f1, mut f2, mut cell) = (f64::INFINITY, f64::INFINITY, (0, 0));
     for dy in -1..=1 {
         for dx in -1..=1 {
             let (i, j) = (cx + dx, cy + dy);
@@ -127,12 +137,15 @@ fn worley(n: &Noise, u: f64, v: f64, nx: i64, ny: i64, jitter: f64, salt: u32) -
             let py = j as f64 + 0.5 + (n.rand(wi, wj, salt + 1) - 0.5) * jitter;
             let d = ((x - px).powi(2) + (y - py).powi(2)).sqrt();
             if d < f1 {
+                f2 = f1;
                 f1 = d;
                 cell = (wi, wj);
+            } else if d < f2 {
+                f2 = d;
             }
         }
     }
-    Worley { f1, cell }
+    Worley { f1, f2, cell }
 }
 
 /// Small grains (sand, aggregate, pores): 1 inside a grain, fading at its rim, `density` of the cells
@@ -163,7 +176,6 @@ fn paint(
     h: usize,
     tile: f64,
     ao: &[(f64, f64)],
-    grey: bool,
     f: impl Fn(f64, f64) -> Px + Sync,
 ) -> Surface {
     let px = par_map(w, h, |x, y| {
@@ -193,9 +205,8 @@ fn paint(
             ch: 3,
             px: img,
         },
-        rough: Some(rough),
-        ao: Some(ao),
-        grey_from_albedo: grey,
+        rough,
+        ao,
     }
 }
 

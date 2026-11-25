@@ -1,7 +1,7 @@
 //! The few Pillow operations the texture scripts used, computed the way Pillow computes them (libjpeg-turbo's
 //! decoder and encoder, its fixed-point resampling, ITU-R 601 greyscale and extended box blur), so the ports make
 //! the same pixels from the same files. Checked against Pillow 12.2 / libjpeg-turbo on arm64: byte-identical
-//! JPEGs; the bicubic and box-radius maths fuse multiply-adds as clang does there.
+//! JPEGs; the box-radius maths fuse multiply-adds as clang does there.
 
 use super::jpeg::Chroma;
 use std::path::Path;
@@ -15,44 +15,12 @@ pub struct Img {
     pub px: Vec<u8>,
 }
 
-/// Pillow's resampling filters (the two the scripts use).
-#[derive(Clone, Copy, Debug)]
-pub enum Filter {
-    Bicubic,
-    Lanczos,
-}
-
-impl Filter {
-    fn support(self) -> f64 {
-        match self {
-            Filter::Bicubic => 2.0,
-            Filter::Lanczos => 3.0,
-        }
-    }
-
-    /// Pillow's `bicubic_filter` (a = -0.5) and `lanczos_filter`. The bicubic polynomials use fused multiply-adds
-    /// where clang contracts Pillow's C (its arm64 wheels); the difference is in the last bit of a weight.
-    fn weight(self, x: f64) -> f64 {
-        match self {
-            Filter::Bicubic => {
-                let a = -0.5;
-                let x = x.abs();
-                if x < 1.0 {
-                    ((a + 2.0f64).mul_add(x, -(a + 3.0)) * x).mul_add(x, 1.0)
-                } else if x < 2.0 {
-                    (x - 5.0).mul_add(x, 8.0).mul_add(x, -4.0) * a
-                } else {
-                    0.0
-                }
-            }
-            Filter::Lanczos => {
-                if (-3.0..3.0).contains(&x) {
-                    sinc(x) * sinc(x / 3.0)
-                } else {
-                    0.0
-                }
-            }
-        }
+/// Pillow's `lanczos_filter` (support 3).
+fn lanczos(x: f64) -> f64 {
+    if (-3.0..3.0).contains(&x) {
+        sinc(x) * sinc(x / 3.0)
+    } else {
+        0.0
     }
 }
 
@@ -68,10 +36,10 @@ const PRECISION_BITS: u32 = 32 - 8 - 2;
 
 /// Pillow's `precompute_coeffs` + `normalize_coeffs_8bpc`: per output pixel the first input pixel and the
 /// fixed-point weights.
-pub fn coeffs(in_size: usize, out_size: usize, filter: Filter) -> Vec<(usize, Vec<i32>)> {
+pub fn coeffs(in_size: usize, out_size: usize) -> Vec<(usize, Vec<i32>)> {
     let scale = in_size as f32 as f64 / out_size as f64;
     let filterscale = scale.max(1.0);
-    let support = filter.support() * filterscale;
+    let support = 3.0 * filterscale;
     let ss = 1.0 / filterscale;
     (0..out_size)
         .map(|xx| {
@@ -79,7 +47,7 @@ pub fn coeffs(in_size: usize, out_size: usize, filter: Filter) -> Vec<(usize, Ve
             let xmin = ((center - support + 0.5) as i64).max(0) as usize;
             let xmax = ((center + support + 0.5) as i64).min(in_size as i64) as usize - xmin;
             let mut k: Vec<f64> = (0..xmax)
-                .map(|x| filter.weight(((x + xmin) as f64 - center + 0.5) * ss))
+                .map(|x| lanczos(((x + xmin) as f64 - center + 0.5) * ss))
                 .collect();
             let ww: f64 = k.iter().sum();
             if ww != 0.0 {
@@ -188,57 +156,8 @@ impl Img {
         }
     }
 
-    pub fn histogram(&self) -> [u64; 256] {
-        let mut h = [0u64; 256];
-        for &v in &self.px {
-            h[v as usize] += 1;
-        }
-        h
-    }
-
-    /// `point(lut)`, the same table on every channel.
-    pub fn point(&self, lut: &[u8; 256]) -> Img {
-        Img {
-            px: self.px.iter().map(|&v| lut[v as usize]).collect(),
-            ..self.clone()
-        }
-    }
-
-    /// One channel as an L image (`split()[c]`).
-    pub fn channel(&self, c: usize) -> Img {
-        Img {
-            w: self.w,
-            h: self.h,
-            ch: 1,
-            px: self.px.iter().skip(c).step_by(self.ch).copied().collect(),
-        }
-    }
-
-    /// `Image.merge('RGB', (r, g, b))`.
-    pub fn merge(chs: [&Img; 3]) -> Img {
-        let (w, h) = (chs[0].w, chs[0].h);
-        assert!(
-            chs.iter().all(|c| c.ch == 1 && c.w == w && c.h == h),
-            "merge: L images of one size"
-        );
-        let mut px = Vec::with_capacity(w * h * 3);
-        for i in 0..w * h {
-            px.extend(chs.iter().map(|c| c.px[i]));
-        }
-        Img { w, h, ch: 3, px }
-    }
-
     fn row(&self, y: usize) -> &[u8] {
         &self.px[y * self.w * self.ch..(y + 1) * self.w * self.ch]
-    }
-
-    /// `transpose(FLIP_TOP_BOTTOM)`.
-    pub fn flip_tb(&self) -> Img {
-        let px = (0..self.h)
-            .rev()
-            .flat_map(|y| self.row(y).iter().copied())
-            .collect();
-        Img { px, ..self.clone() }
     }
 
     /// `crop((x, y, x + w, y + h))` inside the image.
@@ -272,8 +191,8 @@ impl Img {
         }
     }
 
-    /// `resize((w, h), filter)`: Pillow's two-pass fixed-point convolution, horizontal first.
-    pub fn resize(&self, w: usize, h: usize, filter: Filter) -> Img {
+    /// `resize((w, h), Image.LANCZOS)`: Pillow's two-pass fixed-point convolution, horizontal first.
+    pub fn resize(&self, w: usize, h: usize) -> Img {
         if (w, h) == (self.w, self.h) {
             return self.clone();
         }
@@ -281,7 +200,7 @@ impl Img {
         let ch = self.ch;
         let mut cur = self.clone();
         if w != self.w {
-            let k = coeffs(self.w, w, filter);
+            let k = coeffs(self.w, w);
             let mut px = vec![0u8; w * self.h * ch];
             for (y, out) in px.chunks_exact_mut(w * ch).enumerate() {
                 let row = self.row(y);
@@ -316,7 +235,7 @@ impl Img {
             };
         }
         if h != self.h {
-            let k = coeffs(self.h, h, filter);
+            let k = coeffs(self.h, h);
             let stride = w * ch;
             let mut px = vec![0u8; stride * h];
             let mut acc = vec![0i32; stride];
@@ -502,20 +421,9 @@ mod tests {
 
     #[test]
     fn lanczos_halving_weights_sum_to_one() {
-        for (_, k) in coeffs(1024, 512, Filter::Lanczos) {
+        for (_, k) in coeffs(1024, 512) {
             let s: i32 = k.iter().sum();
             assert!((s - (1 << PRECISION_BITS)).abs() <= k.len() as i32, "{s}");
         }
-    }
-
-    #[test]
-    fn flip() {
-        let tall = Img {
-            w: 1,
-            h: 2,
-            ch: 1,
-            px: vec![1, 2],
-        };
-        assert_eq!(tall.flip_tb().px, [2, 1]);
     }
 }

@@ -4,7 +4,7 @@
 //! breaks one is listed in [`KNOWN`] with its numbers: the test fails on a new break, and on a known one
 //! that is gone (drop its entry), so the list stays the true one.
 
-use super::{SETS, Set, set_of_texture};
+use super::{LEVEL, SETS, Set, UNIT, normal_stats, set_of_texture};
 use crate::colours;
 use crate::content;
 use crate::tex::pil::Img;
@@ -210,12 +210,6 @@ const CAST: f64 = 6.0;
 /// None of the sets is metal: a texel over 5 % metal loses its diffuse colour and mirrors the sky. At most
 /// this share may.
 const METAL: (f64, f64) = (0.05, 0.005);
-/// 8-bit storage keeps a unit normal within 1 % of its length; past 10 % the storage bent its direction too.
-/// At least this share must keep within it.
-const UNIT: (f64, f64) = (0.10, 0.95);
-/// A tiling height's slopes sum to nothing, so its normals average flat; a mean slope over 0.02 (1.1°) tilts
-/// the whole surface's light by about 2 % where it falls at 45°, as much as the eye tells apart.
-const LEVEL: f64 = 0.02;
 /// Under three 8-bit steps (1.35°) even the steepest 1 % of a normal map is its storage's rounding: it carries
 /// nothing.
 const FLAT_DEG: f64 = 1.5;
@@ -411,10 +405,7 @@ fn normals_face_out_of_the_surface() {
 #[test]
 fn normals_are_unit_length() {
     per_set("normal unit", |_, m| {
-        let unit = share(&m.normal, |t| {
-            let [x, y, z] = normal(t);
-            ((x * x + y * y + z * z).sqrt() - 1.0).abs() <= UNIT.0
-        });
+        let (unit, _) = normal_stats(&m.normal.px);
         (unit < UNIT.1).then(|| {
             format!(
                 "{:.1} % of texels within {:.0} % of unit length",
@@ -428,13 +419,7 @@ fn normals_are_unit_length() {
 #[test]
 fn normals_average_level() {
     per_set("normal level", |_, m| {
-        let slopes: Vec<[f64; 2]> = texels(&m.normal)
-            .map(normal)
-            .filter(|n| n[2] > 0.05)
-            .map(|[x, y, z]| [x / z, y / z])
-            .collect();
-        let n = slopes.len().max(1) as f64;
-        let [sx, sy] = [0, 1].map(|i| slopes.iter().map(|s| s[i]).sum::<f64>() / n);
+        let (_, [sx, sy]) = normal_stats(&m.normal.px);
         (sx.abs() > LEVEL || sy.abs() > LEVEL).then(|| format!("mean slope ({sx:+.3}, {sy:+.3})"))
     });
 }

@@ -7,52 +7,45 @@ pub(super) fn floor_wood(n: &Noise, size: usize, look: &Boards) -> Surface {
     let bw = t / rows as f64;
     let px_m = t / size as f64;
     let ng = n.layer(1);
-    paint(
-        size,
-        size,
-        t,
-        &[(0.002, 1.5), (0.02, 0.3)],
-        false,
-        |u0, v0| {
-            let (u, v) = (v0, u0);
-            let b = board_at(n, u, v, rows, 2, 0.3, t, 80);
-            let lg = log_for(n, b.row, b.seg, bw, b.len, 0.25, (0.004, 0.007));
-            let (late, fibre, knot) = grain_at(&ng, &lg, b.x, b.y, px_m);
-            let side = b.y.min(bw - b.y);
-            let joint = smoothstep(0.0003, 0.0011, side) * smoothstep(0.0003, 0.0011, b.end);
-            let bevel = smoothstep(0.0, 0.003, side.min(b.end));
-            let cup = -((b.y / bw - 0.5) * 2.0).powi(2) * 0.04;
-            let h = lerp(
-                0.0,
-                0.8 + 0.2 * bevel + cup + 0.03 * late + 0.02 * fibre - 0.04 * knot,
-                joint,
-            );
-            let tone = lg.tone;
-            let early = mix(look.early.0, look.early.1, tone);
-            let latec = mix(look.late.0, look.late.1, tone);
-            let mut c = mix(early, latec, late * 0.75 * look.figure);
-            let bright = look.bright.0 + look.bright.1 * n.rand(b.row, b.seg, 88);
-            c = mul(
-                c,
-                bright
-                    * (1.0
-                        + 0.16 * look.figure * fibre
-                        + 0.16
-                            * look.figure
-                            * fbm_free(&ng.layer(2), b.x * 2.0 + lg.salt, b.y * 20.0, 3)),
-            );
-            c = mix(c, rgb(156, 94, 46), knot * 0.85 * look.knots);
-            let kring = knot * (1.0 - knot) * 4.0;
-            c = mix(c, rgb(84, 48, 26), kring * 0.8 * look.knots);
-            let col = mix(rgb(70, 48, 30), c, joint);
-            let rough = lerp(0.8, 0.58 + 0.06 * late + 0.06 * fibre, joint);
-            Px {
-                h,
-                c: col,
-                r: rough,
-            }
-        },
-    )
+    paint(size, size, t, &[(0.002, 1.5), (0.02, 0.3)], |u0, v0| {
+        let (u, v) = (v0, u0);
+        let b = board_at(n, u, v, rows, 2, 0.3, t, 80);
+        let lg = log_for(n, b.row, b.seg, bw, b.len, 0.25, (0.004, 0.007));
+        let (late, fibre, knot) = grain_at(&ng, &lg, b.x, b.y, px_m);
+        let side = b.y.min(bw - b.y);
+        let joint = smoothstep(0.0003, 0.0011, side) * smoothstep(0.0003, 0.0011, b.end);
+        let bevel = smoothstep(0.0, 0.003, side.min(b.end));
+        let cup = -((b.y / bw - 0.5) * 2.0).powi(2) * 0.04;
+        let h = lerp(
+            0.0,
+            0.8 + 0.2 * bevel + cup + 0.03 * late + 0.02 * fibre - 0.04 * knot,
+            joint,
+        );
+        let tone = lg.tone;
+        let early = mix(look.early.0, look.early.1, tone);
+        let latec = mix(look.late.0, look.late.1, tone);
+        let mut c = mix(early, latec, late * 0.75 * look.figure);
+        let bright = look.bright.0 + look.bright.1 * n.rand(b.row, b.seg, 88);
+        c = mul(
+            c,
+            bright
+                * (1.0
+                    + 0.16 * look.figure * fibre
+                    + 0.16
+                        * look.figure
+                        * fbm_free(&ng.layer(2), b.x * 2.0 + lg.salt, b.y * 20.0, 3)),
+        );
+        c = mix(c, rgb(156, 94, 46), knot * 0.85 * look.knots);
+        let kring = knot * (1.0 - knot) * 4.0;
+        c = mix(c, rgb(84, 48, 26), kring * 0.8 * look.knots);
+        let col = mix(rgb(70, 48, 30), c, joint);
+        let rough = lerp(0.8, 0.58 + 0.06 * late + 0.06 * fibre, joint);
+        Px {
+            h,
+            c: col,
+            r: rough,
+        }
+    })
 }
 
 /// Oak-print laminate: 23 cm planks running along u, micro-bevelled joints.
@@ -62,7 +55,7 @@ pub(super) fn laminate(n: &Noise, size: usize) -> Surface {
     let bw = t / rows as f64;
     let px_m = t / size as f64;
     let ng = n.layer(1);
-    paint(size, size, t, &[(0.002, 2.0)], false, |u, v| {
+    paint(size, size, t, &[(0.002, 2.0)], |u, v| {
         let b = board_at(n, u, v, rows, LAMINATE_JOINTS, 0.5, t, 90);
         let mut lg = log_for(n, b.row, b.seg, bw, b.len, 0.12, (0.004, 0.008));
         lg.z0 += 0.03;
@@ -117,7 +110,7 @@ pub(super) fn siding(n: &Noise, size: usize) -> Surface {
     let bh = t / rows as f64;
     let px_m = t / size as f64;
     let ng = n.layer(1);
-    paint(size, size, t, &[(0.004, 2.4), (0.03, 0.6)], true, |u, v| {
+    paint(size, size, t, &[(0.004, 2.4), (0.03, 0.6)], |u, v| {
         // Half a board down, so the tile edge falls mid-board rather than on a butt.
         let b = board_at(n, u, v + 0.5 / rows as f64, rows, 1, 0.5, t, 95);
         let mut lg = log_for(n, b.row, b.seg, bh, b.len, 0.3, (0.005, 0.009));
