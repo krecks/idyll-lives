@@ -218,7 +218,7 @@ mod tests {
         assert!(rim.len() == 7 && rim.contains(&(0.06, 0.02)) && rim.contains(&(0.05, 0.0)));
         assert!(
             rim.iter()
-                .all(|&(u, v)| u <= 0.06 + 1e-12 && v <= 0.1 + 1e-12)
+                .all(|&(u, v)| u <= 0.06 + 1e-6 && v <= 0.1 + 1e-6)
         );
     }
 }

@@ -6,6 +6,7 @@ use artkit::family::Family;
 pub mod bedroom;
 pub mod bedroom_dressing;
 pub mod bedroom_storage;
+pub mod common;
 pub mod decor;
 pub mod dining;
 pub mod lighting;
