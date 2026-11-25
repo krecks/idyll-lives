@@ -3,16 +3,16 @@
 use super::common::{_box, _can, _wrapper, M, POP, cut_pocket};
 use artkit::forms::rounded_rect;
 use artkit::kit;
-use artkit::math::P3;
+use artkit::math::{P3, PI, cos, sin};
 use artkit::motion::Ease;
-use artkit::parts::{hinged, join, new_parts, settle};
+use artkit::parts::{aside, hinged, join, new_parts, settle};
 use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsweep, loft, revolve, ring, soft, swing};
+use artkit::{fbox, fcyl, fextrude, fsweep, loft, revolve, ring, soft, swing};
 
 // (x, y, z0, w, h, d)
-const MW: (f64, f64, f64, f64, f64, f64) = (-0.02, 0.815, -0.42, 0.44, 0.29, 0.36);
+const MW: (f64, f64, f64, f64, f64, f64) = (-0.02, 0.875, -0.42, 0.44, 0.29, 0.36);
 
 /// A castor: a swivel plate, a fork and a tyred wheel.
 fn _castor(f: &GameFrame, name: &str, x: f64, z: f64) {
@@ -65,30 +65,33 @@ pub fn microwave_cart() -> Vec<Obj> {
     let (x, y, z0, w, h, d) = MW;
     let (zf, pw) = (z0 + d, 0.12);
     let still = new_parts(|| {
-        for sy in [0.8, 0.42, 0.1] {
+        for sy in [0.86, 0.42, 0.1] {
             // three trays, each with a raised lip
             let (tw, td) = if sy > 0.5 { (0.7, 0.46) } else { (0.66, 0.42) };
             let b = f.at(0, sy - 0.015, -0.22);
-            let sections: Vec<Vec<P3>> = [
-                (0.0, 0.98),
-                (0.006, 1.0),
-                (0.05, 1.0),
-                (0.054, 0.985),
-                (0.012, 0.975),
-                (0.012, 0.0),
-            ]
-            .iter()
-            .map(|&(hh, k)| {
-                ring!(
-                    tw / 2.0 * k,
-                    td / 2.0 * k,
-                    z = b.z + hh,
-                    verts = 20,
-                    square = 8,
-                    at = (b.x, b.y)
-                )
-            })
-            .collect();
+            // the lip's top rounded over in 30° steps, 9 mm thick
+            let mut lip = vec![(0.0, 0.98), (0.006, 1.0)];
+            for i in 0..=6 {
+                let a = PI * i as f64 / 6.0;
+                lip.push((
+                    0.0505 + 0.0045 * sin(a),
+                    1.0 - 0.0045 * (1.0 - cos(a)) / (tw / 2.0),
+                ));
+            }
+            lip.extend([(0.012, 0.975), (0.012, 0.0)]);
+            let sections: Vec<Vec<P3>> = lip
+                .iter()
+                .map(|&(hh, k)| {
+                    ring!(
+                        tw / 2.0 * k,
+                        td / 2.0 * k,
+                        z = b.z + hh,
+                        verts = 20,
+                        square = 8,
+                        at = (b.x, b.y)
+                    )
+                })
+                .collect();
             loft!(format!("tray{sy}"), &sections, material = M.white);
             fbox!(
                 f,
@@ -105,7 +108,7 @@ pub fn microwave_cart() -> Vec<Obj> {
                 fsweep!(
                     f,
                     format!("post{cx}{cz}"),
-                    &[(cx, 0.075, cz), (cx, 0.84, cz)],
+                    &[(cx, 0.075, cz), (cx, 0.9, cz)],
                     0.016,
                     M.body,
                     verts = 10
@@ -118,10 +121,10 @@ pub fn microwave_cart() -> Vec<Obj> {
             "handle",
             &kit::fillet!(
                 &[
-                    (0.33, 0.84, -0.4),
-                    (0.37, 0.95, -0.4),
-                    (0.37, 0.95, -0.04),
-                    (0.33, 0.84, -0.04),
+                    (0.33, 0.9, -0.4),
+                    (0.37, 1.01, -0.4),
+                    (0.37, 1.01, -0.04),
+                    (0.33, 0.9, -0.04),
                 ],
                 0.03
             ),
@@ -133,7 +136,7 @@ pub fn microwave_cart() -> Vec<Obj> {
         fsweep!(
             f,
             "handle_grip",
-            &[(0.37, 0.95, -0.33), (0.37, 0.95, -0.11)],
+            &[(0.37, 1.01, -0.33), (0.37, 1.01, -0.11)],
             0.016,
             M.tyre,
             verts = 10
@@ -163,6 +166,16 @@ pub fn microwave_cart() -> Vec<Obj> {
                 (x - pw / 2.0 - 0.01, y + h / 2.0, zf - cav.2 / 2.0),
                 M.dark
             ),
+        );
+        // the cavity's rolled front flange, lapping the mouth's edge by 4 mm
+        fextrude!(
+            f,
+            "mw_flange",
+            &rounded_rect(cav.0 + 0.012, cav.1 + 0.012, 0.006, 2),
+            0.003,
+            (x - pw / 2.0 - 0.01, y + h / 2.0, zf - 0.0085), // (the case's front is 1 cm behind `zf`)
+            M.gloss_white,
+            holes = [rounded_rect(cav.0 - 0.008, cav.1 - 0.008, 0.003, 1)]
         );
         fbox!(
             f,
@@ -362,8 +375,8 @@ pub fn microwave_cart() -> Vec<Obj> {
             verts = 5,
             resolution = 2
         );
-        _can(f, "can_a", 0.26, -0.05, 0.815, M.pop_red, false, 0.0);
-        _can(f, "can_b", -0.29, -0.08, 0.815, M.pop_green, false, 0.0);
+        _can(f, "can_a", 0.26, -0.05, 0.875, M.pop_red, false, 0.0);
+        _can(f, "can_b", -0.29, -0.08, 0.875, M.pop_green, false, 0.0);
         revolve!(
             "jar",
             &[
@@ -374,7 +387,7 @@ pub fn microwave_cart() -> Vec<Obj> {
                 (0.031, 0.12),
                 (0.0, 0.11)
             ],
-            at = f.at(0.29, 0.815, -0.38),
+            at = f.at(0.29, 0.875, -0.38),
             material = M.gloss_white,
             segments = 10
         );
@@ -382,7 +395,7 @@ pub fn microwave_cart() -> Vec<Obj> {
             fsweep!(
                 f,
                 format!("fork{k}"),
-                &[(0.29 + dx, 0.85, -0.38), (0.29 + 3.0 * dx, 0.97, -0.38)],
+                &[(0.29 + dx, 0.91, -0.38), (0.29 + 3.0 * dx, 1.03, -0.38)],
                 0.0,
                 M.chrome,
                 profile = [
@@ -395,10 +408,14 @@ pub fn microwave_cart() -> Vec<Obj> {
                 scale = [1.0, 1.6]
             );
         }
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the wrappers dropped on the floor in front: drawn, not the cart's size
+    let dropped = new_parts(|| {
         _wrapper(f, "wrapper_a", 0.3, 0.3, M.bag_yellow, 1, 0.0);
         _wrapper(f, "wrapper_b", -0.25, 0.28, M.bag_red, 2, 0.0);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&dropped, "dropped");
     // The door with its window and handle, hinged on its left edge: `door_open` swings it open to the left.
     let dw = w - pw - 0.02;
     let dx0 = x - w / 2.0 + 0.005;

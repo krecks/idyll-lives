@@ -117,20 +117,20 @@ pub fn candle(
         );
         y += 0.006;
     }
+    // its rim rounded over (2.5 mm, in turns of 43°) into the melted hollow
+    let mut profile = vec![(0.0, 0.0), (r, 0.0), (r, h - 0.006)];
+    for k in 0..=3 {
+        let a = 129.0 * k as f64 / 3.0;
+        profile.push((r - 0.0025 + 0.0025 * cosd(a), h - 0.0025 + 0.0025 * sind(a)));
+    }
+    profile.extend([(r * 0.55, h - 0.007), (0.0, h - 0.009)]);
     kit::turned!(
         f,
         numbered("candle"),
         x,
         y,
         z,
-        &[
-            (0.0, 0.0),
-            (r, 0.0),
-            (r, h - 0.006),
-            (r * 0.94, h),
-            (r * 0.55, h - 0.007),
-            (0.0, h - 0.009),
-        ],
+        &profile,
         M.wax,
         segments = 12
     );

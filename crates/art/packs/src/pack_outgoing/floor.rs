@@ -1,6 +1,7 @@
 //! The light-up dance floor and the party photo wall.
 
 use super::common::{_speaker, M, PHOTOS, TILES, WALL};
+use crate::ease::{EASE, eased};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -103,7 +104,17 @@ pub fn dance_floor() -> Vec<Obj> {
         kit::moulding!(
             f,
             "edge",
-            &[(-0.94, -0.94), (0.94, -0.94), (0.94, 0.94), (-0.94, 0.94)],
+            // (its corners cut across 4 mm)
+            &[
+                (-0.936, -0.94),
+                (0.936, -0.94),
+                (0.94, -0.936),
+                (0.94, 0.936),
+                (0.936, 0.94),
+                (-0.936, 0.94),
+                (-0.94, 0.936),
+                (-0.94, -0.936)
+            ],
             &[
                 (0.0, 0.0),
                 (0.03, 0.0),
@@ -153,14 +164,17 @@ pub fn dance_floor() -> Vec<Obj> {
             // a moving-head light on the beam, angled down onto the floor
             revolve!(
                 format!("spot{s}"),
-                &[
-                    (0.0, -0.07),
-                    (0.05, -0.07),
-                    (0.06, 0.04),
-                    (0.068, 0.06),
-                    (0.06, 0.06),
-                    (0.0, 0.05)
-                ],
+                &eased(
+                    &[
+                        (0.0, -0.07),
+                        (0.05, -0.07),
+                        (0.06, 0.04),
+                        (0.068, 0.06),
+                        (0.06, 0.06),
+                        (0.0, 0.05)
+                    ],
+                    EASE
+                ),
                 at = f.at(sf * 0.68, 2.18, 0.0),
                 material = M.dark,
                 segments = 14,
@@ -373,13 +387,16 @@ pub fn photo_wall() -> Vec<Obj> {
             f,
             "board_frame",
             &[(-0.44, 0.685), (0.44, 0.685), (0.44, 1.715), (-0.44, 1.715)],
+            // (its back corners cut across 4 mm)
             &[
-                (0.0, -0.03),
-                (0.05, -0.03),
+                (0.004, -0.03),
+                (0.046, -0.03),
+                (0.05, -0.026),
                 (0.05, 0.02),
                 (0.035, 0.034),
                 (0.008, 0.034),
-                (0.0, 0.02)
+                (0.0, 0.024), // (the inner chamfer under 60°: at 0.02 it turned exactly 60°)
+                (0.0, -0.026)
             ],
             M.wood,
             at = zb
@@ -394,7 +411,7 @@ pub fn photo_wall() -> Vec<Obj> {
                 (x, 0.87, zb),
                 M.wood,
                 bevel = 0.008,
-                bevel_segments = 1
+                bevel_segments = 2 // (one segment lays its wood as lines on two corners)
             );
             soft!(
                 f,

@@ -2,6 +2,7 @@
 //! built with the seats at the back and the screen at the front edge facing them, then turned round.
 
 use super::common::{M, cup, driver, pleats, popcorn, screen};
+use crate::ease::ease_ends;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit::turn_round;
 use artkit::math::{P3, cos, radians, sin};
@@ -40,7 +41,8 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
         M.leather,
         round = 0.035,
         puff = 0.012,
-        flat = 2
+        flat = 2,
+        resting = true
     );
     let a = radians(14.0);
     let (up, back) = ((cos(a), sin(a)), (0.32, -0.23));
@@ -70,7 +72,8 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
             round = 0.05,
             puff = 0.025,
             flat = 2,
-            round_segments = 1
+            round_segments = 1,
+            resting = true
         );
     }
     soft!(
@@ -95,7 +98,8 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
         M.leather,
         round = 0.022,
         flat = 1,
-        round_segments = 1
+        round_segments = 1,
+        resting = true
     );
     fextrude!(
         f,
@@ -104,7 +108,9 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
         0.05,
         (x, 0.025, -0.06),
         M.dark,
-        plane = Facing::Top
+        plane = Facing::Top,
+        bevel = 0.004,
+        bevel_segments = 1
     );
 }
 
@@ -136,7 +142,8 @@ pub fn cinema_wall() -> Vec<Obj> {
             M.leather,
             round = 0.018,
             flat = 1,
-            round_segments = 1
+            round_segments = 1,
+            resting = true
         );
         for z in [0.08, 0.17] {
             torus!(
@@ -430,7 +437,7 @@ pub fn game_console() -> Vec<Obj> {
                 vec![(0.44, s * -0.035)],
             ]
             .concat();
-            fsweep!(
+            let arm = fsweep!(
                 f,
                 numbered("arm"),
                 &[(s * 0.4, 0, -0.39), (s * 0.4, 0, 0.15)],
@@ -439,6 +446,7 @@ pub fn game_console() -> Vec<Obj> {
                 profile = profile,
                 angle = 50
             );
+            ease_ends(arm);
             for lz in [-0.37, 0.13] {
                 let pts = [
                     (s * 0.37, 0.06, lz),

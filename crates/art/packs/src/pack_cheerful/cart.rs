@@ -205,7 +205,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 &pts,
                 0,
                 m,
-                profile = rounded_rect(0.012, 0.142, 0.004, 1),
+                profile = rounded_rect(0.01, 0.142, 0.004, 1), // canvas 1 cm thick: thinner than a hard edge
                 up = (0, 0, 1)
             );
             let mut pts = vec![(-0.07, 1.605), (0.07, 1.605)];
@@ -216,7 +216,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 )
             }));
             let pts: Vec<(f64, f64)> = pts.iter().map(|&(px, py)| (x + px, py)).collect();
-            slab(f, &numbered("scallop"), &pts, 0.218, 0.23, m, 0.0);
+            slab(f, &numbered("scallop"), &pts, 0.22, 0.23, m, 0.0);
         }
         for s in [-1.0, 1.0] {
             for i in 0..4 {
@@ -233,7 +233,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 for j in [1.0, -1.0] {
                     verts.extend(
                         pts.iter()
-                            .map(|&(zz, y)| f.at(s * 0.41 + s * 0.006 * j, y, zz)),
+                            .map(|&(zz, y)| f.at(s * 0.41 + s * 0.005 * j, y, zz)),
                     );
                 }
                 let nn = pts.len() as u32;

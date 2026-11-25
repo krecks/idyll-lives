@@ -104,3 +104,20 @@ The game draws the cook's board, bowl or pan and what they carried in on the sta
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `espressoBar`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate found (42) is gone:
+- **Chef's island:** the tasting plates' rims a 3.5 mm band (too narrow to show hard), the stools' backs eased at
+  their ends; the stock pot is a 12 cm one, so the island with it stands 1.07 m (a kitchen island's height).
+- **Cookbook lectern:** the column's top and the stool's seat chamfered, the open book's page blocks rounded at their
+  fore-edges and eased at their ends; the stool with its cookbooks, the card box and the spoon jar set aside
+  (`aside`): the lectern measures 0.56 × 1.15 × 0.41 m.
+- **Deli pantry:** the crown moulding's top edges chamfered.
+- **Espresso bar:** the saucers' rims rolled over, the drip tray eased, the towel's fold over its rail rolls round.
+- **Herb garden:** the trough's rim chamfered inside too, its liner eased, the basket's rim rolled over; the trough
+  8 cm lower (on 0.54 m legs), so with its herbs it stands 1.21 m; the basket set aside; the trough's posts bevelled
+  in two segments (one smeared their grain).
+- **Pizza oven:** the sauce bowl's rim chamfered; the prep counter beside it set aside (as a desk's chair): it
+  measures 1.57 m wide with the peel on the counter. It keeps 4 draw calls: the door, the peel and the flames move on
+  their own.

@@ -1,12 +1,13 @@
 //! The doorstep delivery locker and the effortless vibration plate.
 
 use super::common::{M, WALL};
+use crate::ease::ease_ends;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::motion::Ease;
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, rock, settle, soft, swing};
@@ -297,6 +298,10 @@ pub fn delivery_locker() -> Vec<Obj> {
             (-0.17, 1.91, FRONT + 0.035),
             M.accent
         );
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the order waiting on the doorstep, drawn, not the locker's size
+    let order = new_parts(|| {
         // the order waiting on the doorstep: a taped parcel with its label, a takeout bag with its top folded and handles
         fbox!(
             f,
@@ -391,7 +396,7 @@ pub fn delivery_locker() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&order, "order");
     // One locker's door, hinged on its left edge: `door_open` swings it open for a takeout.
     let (x, (y, h)) = (COLS[OPEN.0], ROWS[OPEN.1]);
     let door = new_parts(|| _locker_door(f, "locker_door", x, y, h, 1, M.accent));
@@ -460,7 +465,7 @@ pub fn vibe_plate() -> Vec<Obj> {
         // the column at the plate's far end, which the stander faces (they step on from the tile in front and face
         // in), curving up to the console; the handlebar bent from one tube, its arms reaching back to either side of
         // them at waist height, the grips by their hands (2026-10-21: a short bar at the hip, 30 cm ahead: I-packs-04)
-        fsweep!(
+        ease_ends(fsweep!(
             f,
             "column",
             &[
@@ -474,7 +479,7 @@ pub fn vibe_plate() -> Vec<Obj> {
             up = (0, 1, 0),
             resolution = 2,
             scale = [1.15, 1.0, 0.9]
-        );
+        ));
         fcyl!(
             f,
             "column_collar",
@@ -482,7 +487,9 @@ pub fn vibe_plate() -> Vec<Obj> {
             0.02,
             (0, 0.1, -0.236),
             M.lime,
-            verts = 16
+            verts = 16,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         let bar = kit::fillet!(
             &[

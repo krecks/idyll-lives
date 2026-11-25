@@ -1,6 +1,7 @@
 //! The love-letter bureau and the rose-arbour swing.
 
 use super::common::{_candle, _rose, _velvet_chair, M, WALL};
+use crate::ease::ease_ends;
 use artkit::forms::{rect, rounded_rect};
 use artkit::kit;
 use artkit::math::{P3, PI, cos, cosd, pow, sin, sind};
@@ -43,7 +44,9 @@ pub fn letter_bureau() -> Vec<Obj> {
             &apron,
             DESK_D - 0.03,
             (0, 0.63, WALL + (DESK_D - 0.03) / 2.0),
-            M.ivory
+            M.ivory,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         fbox!(
             f,
@@ -135,7 +138,16 @@ pub fn letter_bureau() -> Vec<Obj> {
             )
         }));
         crest.reverse();
-        fextrude!(f, "crest", &crest, 0.11, (0, 1.1625, hz), M.gold);
+        fextrude!(
+            f,
+            "crest",
+            &crest,
+            0.11,
+            (0, 1.1625, hz),
+            M.gold,
+            bevel = 0.004,
+            bevel_segments = 1
+        );
         for x in [-0.2, 0.0, 0.2] {
             fbox!(
                 f,
@@ -374,7 +386,7 @@ fn _climber(f: &GameFrame, name: &str, x: f64, z: f64, y0: f64, y1: f64, k0: i32
                     M.leaf_dark
                 },
                 droop = 0.35,
-                rows = 3,
+                rows = 2,
                 ring = 3
             );
         }
@@ -460,16 +472,17 @@ pub fn rose_arbour_swing() -> Vec<Obj> {
         for z in [-0.36, 0.36] {
             // the arch, a curved rafter each side in one sweep
             let rafter: Vec<(f64, f64, f64)> = arch.iter().map(|&(x, y)| (x, y, z)).collect();
-            fsweep!(
+            let rafter = fsweep!(
                 f,
                 format!("arch{z}"),
                 &rafter,
                 0.0,
                 M.frame,
-                profile = rect(0.05, 0.06),
+                profile = rounded_rect(0.05, 0.06, 0.004, 1),
                 up = (0, 0, 1),
                 resolution = 2
             );
+            ease_ends(rafter);
         }
         for &(x, y) in &arch[1..arch.len() - 1] {
             fbox!(

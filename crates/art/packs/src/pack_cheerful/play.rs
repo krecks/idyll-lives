@@ -2,11 +2,12 @@
 
 use super::common::{M, STRIPES, WALL2, bulb, pleats, slab, tumbler};
 use super::music::tilt;
+use crate::ease::ease_ends;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, PI, TAU, atan2, cosd, degrees, pow, sin, sind, sqrt};
+use artkit::math::{Axis, M4, P3, PI, TAU, V3, atan2, cosd, degrees, pow, sin, sind, sqrt};
 use artkit::motion::{Rock, Squash, rock, squash};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
 use artkit::scene::Obj;
@@ -35,7 +36,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
     let beam = rounded_rect(0.07, 0.09, 0.02, 1);
     let still = new_parts(|| {
         // the base beam, its ends rounded, and the two posts curving up and out from it to the hooks
-        fsweep!(
+        ease_ends(fsweep!(
             f,
             "beam",
             &[(-(POST_X - 0.1), 0.05, 0.0), (POST_X - 0.1, 0.05, 0.0)],
@@ -43,7 +44,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
             M.wood,
             profile = &beam,
             up = (0, 0, 1)
-        );
+        ));
         for s in [-1.0, 1.0] {
             fsweep!(
                 f,
@@ -303,6 +304,20 @@ pub fn rainbow_hammock() -> Vec<Obj> {
 const SUN_C: (f64, f64, f64) = (0.0, 1.25, -0.3); // the frame's middle (x, height, depth)
 const SUN_R: f64 = 0.33; // the scene's radius
 const SUN_RISE: f64 = 0.22;
+/// The lamp's head (case, scene and sun) as drawn: 0.84 of the 78 cm it is built at, 66 cm across (a mood
+/// lamp's is at most 60 cm, ±10 %), about the scene's middle (the content `light`, 1.25 m, stays put).
+const HEAD: f64 = 0.84;
+
+/// Scales `objs` by `k` about `c` (Blender), baking their placing into their meshes.
+fn shrink(objs: &[Obj], c: P3, k: f64) {
+    let c = V3::from(c);
+    let m = M4::translation(c) * M4::diagonal(V3::from((k, k, k))) * M4::translation(-c);
+    for &o in objs {
+        let w = o.matrix_world();
+        o.edit(|p| p.mesh.transform(&(m * w)));
+        o.set_matrix_world(M4::IDENTITY);
+    }
+}
 
 /// The part of a disc of radius `r` (centre height `cy`) below a wavy horizon at `top` (offsets from the centre).
 #[allow(clippy::too_many_arguments)]
@@ -379,7 +394,10 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         kit::tube!(
             f,
             "stem",
-            &[(cx, 0.04, cz - 0.03), (cx, cy - 0.37, cz - 0.03)],
+            &[
+                (cx, 0.04, cz - 0.03),
+                (cx, cy - 0.39 * HEAD + 0.02, cz - 0.03)
+            ],
             0.016,
             M.lamp_metal,
             verts = 10,
@@ -395,7 +413,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
                 (0.018, 0.05),
                 (0.0, 0.05)
             ],
-            at = f.at(cx, cy - 0.41, cz - 0.03),
+            at = f.at(cx, cy - 0.39 * HEAD - 0.02, cz - 0.03),
             material = M.lamp_metal,
             segments = 10
         );
@@ -408,89 +426,97 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             M.lamp_metal,
             verts = 10
         );
-        // the case: a shallow round drum, its edge rolled, the ring round the scene's face
-        revolve!(
-            "case",
-            &[
-                (0.0, -0.06),
-                (0.37, -0.06),
-                (0.384, -0.05),
-                (0.39, -0.03),
-                (0.386, -0.008),
-                (0.37, 0.0),
-                (0.0, 0.0)
-            ],
-            at = f.at(cx, cy, cz),
-            material = M.housing,
-            segments = 40,
-            rot = (90, 0, 0)
-        );
-        torus!(
-            "ring",
-            0.355,
-            0.02,
-            at = f.at(cx, cy, cz + 0.006),
-            material = M.lamp_metal,
-            rot = (90, 0, 0),
-            major_segments = 40,
-            minor_segments = 6
-        );
-        fcyl!(
-            f,
-            "dawn",
-            SUN_R + 0.01,
-            0.006,
-            (cx, cy, cz + 0.003),
-            M.dawn,
-            rot = (90, 0, 0),
-            verts = 40
-        );
-        for (dx, dy, w) in [(-0.14, 0.17, 0.16), (0.12, 0.22, 0.12), (0.2, 0.08, 0.09)] {
-            let cloud = smooth_outline(
+        // the case: a shallow round drum, its edge rolled, the ring round the scene's face; built 78 cm across,
+        // drawn at `HEAD` of that about its middle
+        let head = new_parts(|| {
+            revolve!(
+                "case",
                 &[
-                    (-w / 2.0, 0.0),
-                    (w / 2.0, 0.0),
-                    (w / 2.0, 0.012),
-                    (w * 0.25, 0.03),
-                    (0.0, 0.022),
-                    (-w * 0.2, 0.036),
-                    (-w / 2.0, 0.012),
+                    (0.0, -0.06),
+                    (0.37, -0.06),
+                    (0.384, -0.05),
+                    (0.39, -0.03),
+                    (0.386, -0.008),
+                    (0.37, 0.0),
+                    (0.0, 0.0)
                 ],
-                2,
-                true,
+                at = f.at(cx, cy, cz),
+                material = M.housing,
+                segments = 40,
+                rot = (90, 0, 0)
             );
-            let cloud: Vec<(f64, f64)> = cloud
-                .iter()
-                .map(|&(u, v)| (cx + dx + u, cy + dy + v))
-                .collect();
-            fextrude!(
+            torus!(
+                "ring",
+                0.355,
+                0.02,
+                at = f.at(cx, cy, cz + 0.006),
+                material = M.lamp_metal,
+                rot = (90, 0, 0),
+                major_segments = 40,
+                minor_segments = 6
+            );
+            fcyl!(
                 f,
-                numbered("cloud"),
-                &cloud,
-                0.004,
-                (0.0, 0.0, cz + 0.024),
-                M.cloud
+                "dawn",
+                SUN_R + 0.01,
+                0.006,
+                (cx, cy, cz + 0.003),
+                M.dawn,
+                rot = (90, 0, 0),
+                verts = 40
             );
-        }
-        slab(
-            f,
-            "hills_far",
-            &hills(cy, SUN_R, -0.06, 3.0, 0.03, 0.4, 40),
-            cz + 0.032,
-            cz + 0.038,
-            M.hills_far,
-            0.0,
-        );
-        slab(
-            f,
-            "hills",
-            &hills(cy, SUN_R, -0.12, 2.0, 0.035, 2.2, 40),
-            cz + 0.038,
-            cz + 0.046,
-            M.hills,
-            0.0,
-        );
-        // the yoga mat, its far end rolled up (the layers drawn on its ends), and a cork block on it
+            for (dx, dy, w) in [(-0.14, 0.17, 0.16), (0.12, 0.22, 0.12), (0.2, 0.08, 0.09)] {
+                let cloud = smooth_outline(
+                    &[
+                        (-w / 2.0, 0.0),
+                        (w / 2.0, 0.0),
+                        (w / 2.0, 0.012),
+                        (w * 0.25, 0.03),
+                        (0.0, 0.022),
+                        (-w * 0.2, 0.036),
+                        (-w / 2.0, 0.012),
+                    ],
+                    2,
+                    true,
+                );
+                let cloud: Vec<(f64, f64)> = cloud
+                    .iter()
+                    .map(|&(u, v)| (cx + dx + u, cy + dy + v))
+                    .collect();
+                fextrude!(
+                    f,
+                    numbered("cloud"),
+                    &cloud,
+                    0.004,
+                    (0.0, 0.0, cz + 0.024),
+                    M.cloud
+                );
+            }
+            slab(
+                f,
+                "hills_far",
+                &hills(cy, SUN_R, -0.06, 3.0, 0.03, 0.4, 40),
+                cz + 0.032,
+                cz + 0.038,
+                M.hills_far,
+                0.0,
+            );
+            slab(
+                f,
+                "hills",
+                &hills(cy, SUN_R, -0.12, 2.0, 0.035, 2.2, 40),
+                cz + 0.038,
+                cz + 0.046,
+                M.hills,
+                0.0,
+            );
+        });
+        shrink(&head, f.at(cx, cy, cz), HEAD);
+    });
+    join(&still, "body", Some(P3::ZERO));
+    // the yoga mat, its far end rolled up (the layers drawn on its ends), and a cork block on it: drawn with the
+    // lamp, not part of its size
+    let mat = new_parts(|| {
         fbox!(
             f,
             "mat",
@@ -510,7 +536,9 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             (0, 0.06, 0.38),
             M.yoga_roll,
             rot = (0, 90, 0),
-            verts = 16
+            verts = 16,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         for s in [-1.0, 1.0] {
             spiral(
@@ -539,7 +567,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             bevel_segments = 1
         );
     });
-    join(&still, "body", Some(P3::ZERO));
+    aside(&mat, "mat");
     // The sun, set behind the hills: `sunrise` raises it into the sky, which glows at night (`dawn`'s `glow`).
     let sun = new_parts(|| {
         fcyl!(
@@ -564,9 +592,13 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         )
         .set_scale((1, 1, 0.4));
     });
-    let sun = hinged(join(&sun, "sun", None), f.at(cx, cy - 0.19, cz + 0.011));
+    shrink(&sun, f.at(cx, cy, cz), HEAD);
+    let sun = hinged(
+        join(&sun, "sun", None),
+        f.at(cx, cy - 0.19 * HEAD, cz + 0.011 * HEAD),
+    );
     let objs = settle!(centre = false);
-    slide!(sun, "sunrise", (0.0, 0.0, SUN_RISE), seconds = 1.5);
+    slide!(sun, "sunrise", (0.0, 0.0, SUN_RISE * HEAD), seconds = 1.5);
     objs
 }
 
@@ -599,14 +631,17 @@ fn channels(
                 (x, y0, z0),
                 (x, (y0 + top) / 2.0, (z0 + z1) / 2.0 - 0.01),
                 (x, top - 0.09, z1 + 0.01),
-                (x, top - 0.02, z1 - lean)
+                (x, top - 0.034, z1 - lean + 0.014),
+                (x, top - 0.02, z1 - lean),
+                // its top's seam: a 4 mm chamfer round the end, on straight on from the two before
+                (x, top - 0.016, z1 - lean - 0.004)
             ],
             0,
             mat,
             profile = rounded_rect(cw * 1.02, 0.17, 0.06, 1),
             up = (1, 0, 0),
             resolution = 2,
-            scale = [1.0, 1.04, 0.95, 0.75]
+            scale = [1.0, 1.04, 0.95, 0.79, 0.75, 0.705]
         );
     }
 }
@@ -625,7 +660,8 @@ pub fn party_booth() -> Vec<Obj> {
             M.booth,
             round = 0.05,
             flat = 1,
-            round_segments = 1
+            round_segments = 1,
+            resting = true
         );
         soft!(
             f,
@@ -639,7 +675,8 @@ pub fn party_booth() -> Vec<Obj> {
             puff = 0.012,
             piping = 0.006,
             piping_material = M.piping,
-            flat = 2
+            flat = 2,
+            resting = true
         );
         fbox!(f, "kick", 1.26, 0.04, 0.02, (0, 0.02, 0.27), M.panel);
         // the channelled backrest, its rolled top piped in yellow
@@ -677,7 +714,8 @@ pub fn party_booth() -> Vec<Obj> {
                 piping = 0.008,
                 piping_material = M.piping,
                 flat = 1,
-                round_segments = 1
+                round_segments = 1,
+                resting = true
             );
             fbox!(
                 f,
@@ -817,7 +855,7 @@ pub fn party_booth() -> Vec<Obj> {
             0.035,
             (0.0, 0.72, tz),
             M.white,
-            verts = 32,
+            verts = 24,
             bevel = 0.01,
             bevel_segments = 1
         );
@@ -835,7 +873,7 @@ pub fn party_booth() -> Vec<Obj> {
             ],
             at = f.at(0, 0, tz),
             material = M.brass,
-            segments = 20
+            segments = 16
         );
         fbox!(
             f,
@@ -923,7 +961,7 @@ pub fn party_booth() -> Vec<Obj> {
                 ),
                 M.popcorn,
                 segments = 6,
-                rings = 4
+                rings = 3
             );
         }
         // the left curtain, gathered at the back
@@ -939,7 +977,7 @@ pub fn party_booth() -> Vec<Obj> {
             0.03,
             M.curtain,
             0.01,
-            false,
+            6,
         );
     });
     join(&still, "body", Some(P3::ZERO));
@@ -947,7 +985,7 @@ pub fn party_booth() -> Vec<Obj> {
     let cur = new_parts(|| {
         pleats(
             f,
-            "curtain",
+            "curtain_cloth",
             xr,
             0.77,
             yr - 0.02,
@@ -957,7 +995,7 @@ pub fn party_booth() -> Vec<Obj> {
             0.022,
             M.curtain,
             0.01,
-            false,
+            4,
         );
     });
     let cur = hinged(join(&cur, "curtain", None), f.at(xr, yr, WALL2 + 0.07));

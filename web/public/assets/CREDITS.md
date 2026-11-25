@@ -145,7 +145,7 @@ The bookworm pack models (`models/pack_bookworm/readingNook.glb`, `libraryWall.g
 `teaTrolley.glb`, `firesideLounge.glb`, `bedsideStack.glb`, override pack `packs/pack_bookworm/manifest.json`) are
 built by `crates/art/packs/src/pack_bookworm` on `artkit` and exported as `.glb` (glTF,
 original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
-drops, the teapot pours, the fire grows and the top book opens.
+drops, the teapot pours, the fire grows and the top book opens. Their edges are eased to the gate's 4 mm (2026-11-25).
 
 The outgoing pack models (`models/pack_outgoing/partyBar.glb`, `conversationSectional.glb`, `karaokeStage.glb`,
 `videoCallNook.glb`, `danceFloor.glb`, `photoWall.glb`, override pack `packs/pack_outgoing/manifest.json`) are built by
@@ -158,7 +158,7 @@ The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.g
 `crates/art/packs/src/pack_romantic` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves
 while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
 onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. The candlelit table
-was rebuilt with a chair at each end, its two diners facing each other (2026-10-21).
+was rebuilt with a chair at each end, its two diners facing each other (2026-10-21). Their edges are eased to the gate's 4 mm (2026-11-25).
 
 The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
 `arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built by `crates/art/packs/src/pack_slob` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
@@ -168,7 +168,7 @@ waggles, and the recliner reclines and swings its cup holder out.
 The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
 `packs/pack_example/manifest.json`) are built by `crates/art/packs/src/pack_example` on `artkit`
 and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
-cooks; the tub fills and bubbles while residents soak.
+cooks; the tub fills and bubbles while residents soak. Their edges are eased to the gate's 4 mm (2026-11-25).
 
 The foodie pack models (`models/pack_foodie/herbGarden.glb`, `deliPantry.glb`, `espressoBar.glb`,
 `cookbookLectern.glb`, `pizzaOven.glb`, `chefsIsland.glb`, override pack `packs/pack_foodie/manifest.json`) are built by
@@ -180,20 +180,22 @@ The gloomy pack models (`models/pack_gloomy/recordCabinet.glb`, `cello.glb`, `jo
 `windowSeat.glb`, `soakingTub.glb`, override pack `packs/pack_gloomy/manifest.json`) are built by
 `crates/art/packs/src/pack_gloomy` on `artkit` and exported as `.glb` (glTF, original, CC0). The cabinet's
 lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp over a
-rippling pool, the window seat's cushion sinks and the tub fills.
+rippling pool, the window seat's cushion sinks and the tub fills. Their hard edges eased to the play camera's pixel
+(2026-11-25).
 
 The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `puzzleTable.glb`,
 `bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
 by `crates/art/packs/src/pack_loner` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
-patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens.
+patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens. Their edges are eased to the gate's 4 mm (2026-11-25).
 
 The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingBench.glb`, `birdFeeder.glb`,
 `gardenHammock.glb`, `cedarShower.glb`, `mossTerrarium.glb`, `glasshouse.glb`, override pack
 `packs/pack_natureLover/manifest.json`) are built by `crates/art/packs/src/pack_nature_lover` on `artkit` and
 exported as `.glb` (glTF, original, CC0). Each moves while it is used: a lettuce is picked from the
 veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower
-runs, the cloche lifts and the glasshouse's door and roof vent open.
+runs, the cloche lifts and the glasshouse's door opens (its roof vent propped open). Their edges bevelled,
+eased or chamfered to the play camera's pixel (2026-11-25).
 
 Rebuilt in the same families (2026-10-21, original, CC0): the entry console, the baking counter and the spritz
 station with back panels for their mirrors, hooks and shelves; the organizer desk and the love-letter bureau turned
@@ -206,13 +208,15 @@ The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, 
 `organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
 built by `crates/art/packs/src/pack_neat` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
-slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens.
+slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens. Their hard edges eased
+to the play camera's pixel and the docks, desk and console to their real sizes (2026-11-25).
 
 The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.glb`, `mocktailCart.glb`,
 `rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
 by `crates/art/packs/src/pack_cheerful` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the record swings up, the microphone rises, the shaker tips, the hammock
-sways with its sleeper, the sun rises and the booth's curtain is drawn.
+sways with its sleeper, the sun rises and the booth's curtain is drawn. Their edges bevelled, eased or chamfered
+to the play camera's pixel (2026-11-25).
 
 The couch potato pack models (`models/pack_couchPotato/cinemaWall.glb`, `gameConsole.glb`, `recliner.glb`,
 `snackFridge.glb`, `fitnessGame.glb`, `lavaLamp.glb`, override pack `packs/pack_couchPotato/manifest.json`) are built
@@ -238,12 +242,13 @@ The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `
 built by `crates/art/packs/src/pack_kind` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves while it is used: the oven door drops with the tea towel over its handle, a coin drops into the jar, the rocker rocks, the teapot pours,
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
-narrower, its poufs either side of it facing each other (2026-10-21).
+narrower, its poufs either side of it facing each other (2026-10-21). Their hard edges eased to the play camera's
+pixel (2026-11-25).
 
 The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
 `vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built by `crates/art/packs/src/pack_lazy` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
-plate's deck shakes and the tablet tilts up.
+plate's deck shakes and the tablet tilts up. Their hard edges eased to the play camera's pixel (2026-11-25).
 
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, the cleaning things `vacuumCleaner.glb`, `mopBucket.glb`, `broomDustpan.glb` and

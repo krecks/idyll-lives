@@ -3,7 +3,7 @@
 use super::common::M;
 use artkit::math::{P3, TAU, cos, cosd, sin, sind};
 use artkit::motion::{Grow, Squash, grow, squash};
-use artkit::parts::{join, new_parts, numbered};
+use artkit::parts::{aside, join, new_parts, numbered};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::{boulder, fcyl, fsphere, fsweep, kit, loft, ring, settle, torus};
@@ -256,7 +256,10 @@ pub fn rain_lamp() -> Vec<Obj> {
             M.wick,
             verts = 5
         );
-        // pebbles round the base
+    });
+    join(&still, "body", Some(P3::ZERO));
+    // pebbles round the base: drawn, not the lamp's size
+    let pebbles = new_parts(|| {
         for (i, (x, z, s)) in [
             (0.3, 0.2, 1.0),
             (0.362, 0.08, 0.8),
@@ -281,7 +284,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::ZERO));
+    aside(&pebbles, "pebbles");
     // The rain: lines from the canopy to the pool, built full length and squashed to nothing under the canopy:
     // `rain` runs them down while a resident watches.
     let rain = new_parts(|| {

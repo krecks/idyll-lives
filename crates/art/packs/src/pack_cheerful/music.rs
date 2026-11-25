@@ -18,15 +18,15 @@ const ARCH: f64 = 1.08; // the height of the arch's centre
 
 pub fn jukebox() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let zf = WALL + 0.46; // the cabinet's front
-    let zc = WALL + 0.23;
+    let zf = WALL + 0.52; // the cabinet's front
+    let zc = WALL + 0.26;
     let still = new_parts(|| {
         fextrude!(
             f,
             "plinth",
-            &rounded_rect(0.74, 0.48, 0.04, 2),
+            &rounded_rect(0.74, 0.54, 0.04, 2),
             0.08,
-            (0.0, 0.04, WALL + 0.24),
+            (0.0, 0.04, WALL + 0.27),
             M.chrome,
             plane = Facing::Top,
             bevel = 0.012,
@@ -35,7 +35,7 @@ pub fn jukebox() -> Vec<Obj> {
         fextrude!(
             f,
             "cabinet",
-            &rounded_rect(0.7, 0.46, 0.05, 3),
+            &rounded_rect(0.7, 0.52, 0.05, 3),
             0.8,
             (0.0, 0.48, zc),
             M.cherry,
@@ -47,7 +47,7 @@ pub fn jukebox() -> Vec<Obj> {
             f,
             "belt",
             0.712,
-            0.47,
+            0.53,
             0.055,
             0.865,
             WALL,
@@ -61,7 +61,7 @@ pub fn jukebox() -> Vec<Obj> {
             f,
             "arch",
             &tomb(0.35, 0.88, ARCH, 18),
-            0.46,
+            0.52,
             (0.0, 0.0, zc),
             M.cherry,
             holes = vec![tomb(0.2, 0.9, ARCH, 18)],
@@ -95,7 +95,7 @@ pub fn jukebox() -> Vec<Obj> {
             WALL,
             WALL + 0.04,
             M.window,
-            0.0,
+            0.004,
         );
         for k in 0..9 {
             // rays from behind the record
@@ -744,7 +744,8 @@ pub fn karaoke_machine() -> Vec<Obj> {
                 (0.064, -0.06),
                 (0.064, 0.07),
                 (0.074, 0.082),
-                (0.074, 0.094),
+                (0.074, 0.09),
+                (0.07, 0.094),
                 (0.066, 0.094),
                 (0.062, 0.09),
                 (0.0, 0.09)

@@ -37,7 +37,7 @@ pub fn _fern(
             droop = 0.45,
             fold = 0.1,
             notch = (2usize, 0.35),
-            rows = 5,
+            rows = 4,
             ring = 3
         );
     }
@@ -72,7 +72,7 @@ pub fn _palm(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, s: i32) {
             droop = 0.5,
             fold = 0.15,
             notch = (2usize, 0.3),
-            rows = 6,
+            rows = 5,
             ring = 3
         );
     }

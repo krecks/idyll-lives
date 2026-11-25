@@ -143,8 +143,10 @@ pub fn reading_nook() -> Vec<Obj> {
                 (-0.016, 0.03),
                 (-0.024, 0.05),
                 (-0.03, 0.066),
-                (-0.03, 0.09),
-                (0.02, 0.09),
+                (-0.03, 0.086), // (its top's arrises chamfered 4 mm)
+                (-0.026, 0.09),
+                (0.016, 0.09),
+                (0.02, 0.086),
             ],
             M.body,
             at = 1.62,
@@ -220,7 +222,8 @@ pub fn reading_nook() -> Vec<Obj> {
                 (0.08, 0.05),
                 (0.045, 0.085),
                 (0.02, 0.105),
-                (0.012, 0.13),
+                (0.013, 0.127),
+                (0.009, 0.13),
                 (0.0, 0.13),
                 (0.0, 0.12),
                 (0.016, 0.1),
@@ -230,7 +233,7 @@ pub fn reading_nook() -> Vec<Obj> {
             ],
             at = f.at(0, 1.15, -0.12),
             material = M.lamp_amber,
-            segments = 16
+            segments = 14
         );
         torus!(
             "pendant_rim",
@@ -334,7 +337,8 @@ pub fn reading_nook() -> Vec<Obj> {
                 round = 0.045,
                 puff = 0.03,
                 piping = 0.005,
-                flat = 3
+                flat = 2,
+                resting = true
             );
         }
         soft!(
@@ -383,7 +387,8 @@ pub fn reading_nook() -> Vec<Obj> {
             round = 0.03,
             puff = 0.012,
             piping = 0.005,
-            flat = 3
+            flat = 3,
+            resting = true
         );
         let (t, z0, z1, x) = (0.012, -0.4, 0.172, 0.28);
         let y = 0.45 + t / 2.0;
@@ -528,7 +533,7 @@ fn globe(f: &GameFrame, x: f64, y: f64, z: f64) {
         segments = 16
     );
     let c = (x, y + 0.17, z);
-    fsphere!(f, "globe", 0.1, c, M.globe, segments = 20, rings = 12);
+    fsphere!(f, "globe", 0.1, c, M.globe, segments = 16, rings = 10);
     for (a, b, r) in [
         (30.0, 20.0, 0.04),
         (160.0, -15.0, 0.035),
@@ -607,7 +612,8 @@ pub fn library_wall() -> Vec<Obj> {
                 (-0.03, 0.07),
                 (-0.022, 0.074),
                 (-0.022, 0.08),
-                (0.03, 0.08),
+                (0.026, 0.08), // (its top's inner arris chamfered 4 mm)
+                (0.03, 0.076),
             ],
             M.body,
             at = 2.26,
@@ -625,11 +631,16 @@ pub fn library_wall() -> Vec<Obj> {
         kit::moulding!(
             f,
             "plinth_mould",
+            // (its corners chamfered 4 mm)
             &[
-                (-0.91, WALL + 0.012),
-                (0.91, WALL + 0.012),
-                (0.91, WALL + 0.38),
-                (-0.91, WALL + 0.38),
+                (-0.906, WALL + 0.012),
+                (0.906, WALL + 0.012),
+                (0.91, WALL + 0.016),
+                (0.91, WALL + 0.376),
+                (0.906, WALL + 0.38),
+                (-0.906, WALL + 0.38),
+                (-0.91, WALL + 0.376),
+                (-0.91, WALL + 0.016),
             ],
             &[
                 (0.01, 0.0),

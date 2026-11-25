@@ -54,7 +54,7 @@ pub fn family() -> Family {
                 // the door lets the bather in, shuts behind them and opens again to let them out
                 .motions(json!({"uses": {"sweat": {"clip": "door_open", "hold": 1.5, "out": 1.5}}}))
                 .paint(&[("cedar", "Wood"), ("cedar_dark", "Trim")]),
-            Model::new("deliveryHatch", cabin::delivery_hatch, (0.84, 1.95, 0.84))
+            Model::new("deliveryHatch", cabin::delivery_hatch, (0.84, 1.95, 0.5))
                 .key("model.loner.deliveryHatch")
                 .centre(0.0, -0.01)
                 .motions(json!({"uses": {"order": "hatch", "treat": "hatch"}, "hold": 2}))

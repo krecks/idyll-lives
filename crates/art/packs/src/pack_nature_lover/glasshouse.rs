@@ -2,9 +2,10 @@
 
 use super::common::{_pot, _rosette, M};
 use super::ferns::{_fern, _orchid, _palm};
-use artkit::forms::{rect, smooth_outline};
+use crate::ease::{EASE, ease_ends};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
-use artkit::math::{Axis, P3, atan2, cosd, degrees, sind};
+use artkit::math::{Axis, M4, P3, V3, atan2, cosd, degrees, radians, sind};
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
@@ -80,7 +81,8 @@ fn _glasshouse_frame(f: &GameFrame, hx: f64, hz: f64, slope: f64, run: f64) {
             M.frame,
             profile = vec![
                 (0.0, 0.02),
-                (-0.02, 0.0),
+                (-0.017, 0.003),
+                (-0.017, -0.003),
                 (0.0, -0.02),
                 (0.003, -0.016),
                 (-0.014, 0.0),
@@ -351,15 +353,15 @@ pub fn glasshouse() -> Vec<Obj> {
                 bevel = 0.006,
                 bevel_segments = 1
             );
-            fsweep!(
+            ease_ends(fsweep!(
                 f,
                 format!("bench_back_post{}", float_repr(x)),
                 &[(x, 0.39, -0.21), (x, 0.82, -0.29)],
                 0.0,
                 M.cedar_dark,
-                profile = rect(0.04, 0.04),
+                profile = rounded_rect(0.04, 0.04, EASE, 1),
                 up = (0, 1, 0)
-            );
+            ));
         }
         for x in [-0.36, 0.36] {
             soft!(
@@ -373,7 +375,8 @@ pub fn glasshouse() -> Vec<Obj> {
                 round = 0.014,
                 puff = 0.008,
                 flat = 2,
-                round_segments = 1
+                round_segments = 1,
+                resting = true
             );
         }
         // the back shelf: orchids and ferns
@@ -460,7 +463,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 0.26,
                 None,
                 true,
-                None,
+                Some(12),
             );
             _palm(f, &format!("palm{s}"), s as f64 * 0.64, sy, 0.6, s);
         }
@@ -489,7 +492,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 0.14,
                 None,
                 true,
-                None,
+                Some(12),
             );
             _rosette(
                 f,
@@ -506,7 +509,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 "oval",
                 0.3,
                 None,
-                3,
+                2,
                 3,
                 int(x * 10.0) as i128,
                 0.0,
@@ -529,28 +532,15 @@ pub fn glasshouse() -> Vec<Obj> {
                     M.green_dark,
                     verts = 4,
                     resolution = 2,
-                    scale = [1.0, 0.6]
+                    scale = [1.0, 0.6],
+                    angle = 95.0 // a round stem: its four sides shaded round
                 );
             }
         }
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
-    // The door: a glass leaf hinged on the left post, swinging out; the roof vent: a glass panel hinged at
-    // the ridge, lifting. `door_open` lets the resident in and shuts behind them (and lets them out), `vent_open`
-    // airs it while they're in.
+    // The roof vent: a glass panel hinged at the ridge, propped open 25° (on the still body's glass draw: a part
+    // of its own would be a fourth).
     let (vz, vl) = VENT;
-    let door = new_parts(|| {
-        fbox!(
-            f,
-            "door_glass",
-            DOOR - 0.01,
-            1.86,
-            0.014,
-            (0, 0.06 + 0.93, hz),
-            M.glass
-        );
-    });
-    let door = hinged(join(&door, "door", None), f.at(-DOOR / 2.0, 1.0, hz));
     let vent = new_parts(|| {
         let t = (vl / 2.0) / run; // its middle, from the ridge
         fbox!(
@@ -564,9 +554,30 @@ pub fn glasshouse() -> Vec<Obj> {
             rot = (0, -slope, 0)
         );
     });
-    let vent = hinged(join(&vent, "vent", None), f.at(0.0, HR + 0.01, 0));
+    let hinge = V3::from(f.at(0.0, HR + 0.01, 0));
+    let prop =
+        M4::translation(hinge) * M4::rotation(radians(25.0), Axis::Y) * M4::translation(-hinge);
+    for &o in &vent {
+        let w = o.matrix_world();
+        o.edit(|p| p.mesh.transform(&(prop * w)));
+        o.set_matrix_world(M4::IDENTITY);
+    }
+    join(&[still, vent].concat(), "body", Some(P3::from((0, 0, 0))));
+    // The door: a glass leaf hinged on the left post, swinging out: `door_open` lets the resident in and shuts
+    // behind them (and lets them out).
+    let door = new_parts(|| {
+        fbox!(
+            f,
+            "door_glass",
+            DOOR - 0.01,
+            1.86,
+            0.014,
+            (0, 0.06 + 0.93, hz),
+            M.glass
+        );
+    });
+    let door = hinged(join(&door, "door", None), f.at(-DOOR / 2.0, 1.0, hz));
     let objs = settle!(centre = false);
     swing!(door, "door_open", 70.0, seconds = 0.9, ease = Ease::BackOut);
-    swing!(vent, "vent_open", 25.0, seconds = 0.9, axis = Axis::Y);
     objs
 }
