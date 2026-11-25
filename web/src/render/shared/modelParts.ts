@@ -22,7 +22,8 @@
 
 import type { PrimitivePart, Vec3 } from '../../assets/types';
 import { compose, identity, invert, multiply, quatFromEuler, rotationX, rotationY, rotationZ, scaling, transformNormal, transformPoint, translation, type Mat4, type Quat } from './math';
-import type { ExtraShapes, MaterialOverride, Resize } from './modelEntry';
+import { hash3, type ExtraShapes, type MaterialOverride, type Resize } from './modelEntry';
+import { clamp, smoothstep } from '../../game/noise';
 
 /** Vertex values: a file's (32-bit), or a builder's (64-bit, as the original builders keep theirs: a box-projected UV's axis then ties the same way). */
 export type Floats = Float32Array | Float64Array;
@@ -1032,21 +1033,6 @@ function transpose(m: Mat4): Mat4 {
     }
   }
   return m;
-}
-
-export function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
-
-function smoothstep(a: number, b: number, x: number): number {
-  const t = clamp((x - a) / (b - a), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
-function hash3(x: number, y: number, z: number): number {
-  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1440662683)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 /** Smooth value noise in [0, 1]. */

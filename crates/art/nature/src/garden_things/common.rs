@@ -2,13 +2,11 @@
 
 use artkit::json::{self, Json};
 use artkit::materials::Mat;
-use artkit::math::{V3, cosd, sind};
+use artkit::math::V3;
 use artkit::mesh::Mesh;
 use artkit::palette;
-use artkit::parts::numbered;
 use artkit::place::GameFrame;
 use artkit::scene::{self, Obj};
-use artkit::{fsphere, rod};
 use std::cell::Cell;
 use std::sync::OnceLock;
 
@@ -201,58 +199,6 @@ pub fn _prism(name: &str, outline: &[(f64, f64)], z0: f64, z1: f64, material: Ma
     let obj = _mesh(name, verts, &faces, material, false);
     obj.edit(|o| o.mesh.recalc_normals());
     obj
-}
-
-/// A little bird perched at height `y`, looking to the front (or `turn` degrees round towards +x).
-#[allow(clippy::too_many_arguments)]
-pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
-    let (c, s) = (cosd(turn), sind(turn));
-    fsphere!(
-        F,
-        numbered("bird_body"),
-        0.5,
-        (x, y + 0.03, z),
-        body,
-        scale = (0.055, 0.085, 0.055),
-        rot = (0, 0, -turn),
-        segments = 12,
-        rings = 8
-    );
-    fsphere!(
-        F,
-        numbered("bird_head"),
-        0.023,
-        (x + 0.034 * s, y + 0.072, z + 0.034 * c),
-        body,
-        segments = 10,
-        rings = 7
-    );
-    fsphere!(
-        F,
-        numbered("bird_breast"),
-        0.5,
-        (x + 0.013 * s, y + 0.026, z + 0.016 * c),
-        breast,
-        scale = (0.045, 0.05, 0.05),
-        segments = 10,
-        rings = 6
-    );
-    rod!(
-        numbered("beak"),
-        F.at(x + 0.05 * s, y + 0.074, z + 0.05 * c),
-        F.at(x + 0.068 * s, y + 0.071, z + 0.068 * c),
-        0.006,
-        material = M().beak,
-        verts = 5
-    );
-    rod!(
-        numbered("tail"),
-        F.at(x - 0.035 * s, y + 0.035, z - 0.035 * c),
-        F.at(x - 0.078 * s, y + 0.052, z - 0.078 * c),
-        0.012,
-        material = body,
-        verts = 5
-    );
 }
 
 #[cfg(test)]

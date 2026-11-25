@@ -1,5 +1,5 @@
-// `compose` and `rotationOf` are ported from Babylon.js 9.30 (`Matrix.ComposeToRef`, `Matrix.decompose`,
-// `Quaternion.FromRotationMatrixToRef`). Changed for Idyll Lives: on the rig's own records.
+// `rotationOf` is ported from Babylon.js 9.30 (`Matrix.decompose`, `Quaternion.FromRotationMatrixToRef`).
+// Changed for Idyll Lives: on the rig's own records.
 // Babylon.js: Copyright 2023 The Babylon.js team, under the Apache License 2.0; its licence and notice
 // are in crates/tools/texts/Babylon.js-LICENSE and Babylon.js-NOTICE, and in a build's THIRD-PARTY-LICENSES.txt.
 /**
@@ -18,6 +18,7 @@ import type { Placement } from './pose';
 import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
 import type { Stride } from './stride';
+import { clamp, lerp } from '../../../game/noise';
 
 /**
  * Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds
@@ -419,14 +420,6 @@ export function splitKey(key: string): [string, string] {
   const at = key.indexOf(':');
   return [key.slice(0, at), key.slice(at + 1)];
 }
-export function hash(n: number): number {
-  let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-export function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 /** (x, y, z) made 1 long, into `UNIT`. */
 export function unit(x: number, y: number, z: number): Float32Array {
   const l = Math.hypot(x, y, z) || 1;
@@ -450,9 +443,6 @@ export function setFrame(f: Float32Array, xx: number, xy: number, xz: number, yx
   f[9] = ox;
   f[10] = oy;
   f[11] = oz;
-}
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }
 /** Getting into bed: sitting down on its edge (until the crossfade to lying), as `choose` plays it. */
 export function gettingIn(rig: SimRig): boolean {
@@ -509,90 +499,6 @@ export function alongWay(pl: Placement, ax: number, az: number, bx: number, bz: 
 // The ported matrix maths as the residents' code uses it, number for number (the same float32 matrices, the same
 // order of operations), so residents stand where they did up to 0.3.2: a placement carried by a ride
 // (`Characters.riding`) and a bone's height at rest (`bindY`).
-
-/** The original's `Matrix.ComposeToRef` of scale (`sx`, `sy`, `sz`), rotation (`qx` .. `qw`) and translation into `out`. */
-export function compose(sx: number, sy: number, sz: number, x: number, y: number, z: number, w: number, tx: number, ty: number, tz: number, out: Float32Array): void {
-  const x2 = x + x;
-  const y2 = y + y;
-  const z2 = z + z;
-  const xx = x * x2;
-  const xy = x * y2;
-  const xz = x * z2;
-  const yy = y * y2;
-  const yz = y * z2;
-  const zz = z * z2;
-  const wx = w * x2;
-  const wy = w * y2;
-  const wz = w * z2;
-  out[0] = (1 - (yy + zz)) * sx;
-  out[1] = (xy + wz) * sx;
-  out[2] = (xz - wy) * sx;
-  out[3] = 0;
-  out[4] = (xy - wz) * sy;
-  out[5] = (1 - (xx + zz)) * sy;
-  out[6] = (yz + wx) * sy;
-  out[7] = 0;
-  out[8] = (xz + wy) * sz;
-  out[9] = (yz - wx) * sz;
-  out[10] = (1 - (xx + yy)) * sz;
-  out[11] = 0;
-  out[12] = tx;
-  out[13] = ty;
-  out[14] = tz;
-  out[15] = 1;
-}
-
-/** The original's `a.multiplyToRef(b, out)` (`a` applied first, then `b`; `out` may be `a` or `b`). */
-export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out: Float32Array): void {
-  const a0 = a[0];
-  const a1 = a[1];
-  const a2 = a[2];
-  const a3 = a[3];
-  const a4 = a[4];
-  const a5 = a[5];
-  const a6 = a[6];
-  const a7 = a[7];
-  const a8 = a[8];
-  const a9 = a[9];
-  const a10 = a[10];
-  const a11 = a[11];
-  const a12 = a[12];
-  const a13 = a[13];
-  const a14 = a[14];
-  const a15 = a[15];
-  const b0 = b[0];
-  const b1 = b[1];
-  const b2 = b[2];
-  const b3 = b[3];
-  const b4 = b[4];
-  const b5 = b[5];
-  const b6 = b[6];
-  const b7 = b[7];
-  const b8 = b[8];
-  const b9 = b[9];
-  const b10 = b[10];
-  const b11 = b[11];
-  const b12 = b[12];
-  const b13 = b[13];
-  const b14 = b[14];
-  const b15 = b[15];
-  out[0] = a0 * b0 + a1 * b4 + a2 * b8 + a3 * b12;
-  out[1] = a0 * b1 + a1 * b5 + a2 * b9 + a3 * b13;
-  out[2] = a0 * b2 + a1 * b6 + a2 * b10 + a3 * b14;
-  out[3] = a0 * b3 + a1 * b7 + a2 * b11 + a3 * b15;
-  out[4] = a4 * b0 + a5 * b4 + a6 * b8 + a7 * b12;
-  out[5] = a4 * b1 + a5 * b5 + a6 * b9 + a7 * b13;
-  out[6] = a4 * b2 + a5 * b6 + a6 * b10 + a7 * b14;
-  out[7] = a4 * b3 + a5 * b7 + a6 * b11 + a7 * b15;
-  out[8] = a8 * b0 + a9 * b4 + a10 * b8 + a11 * b12;
-  out[9] = a8 * b1 + a9 * b5 + a10 * b9 + a11 * b13;
-  out[10] = a8 * b2 + a9 * b6 + a10 * b10 + a11 * b14;
-  out[11] = a8 * b3 + a9 * b7 + a10 * b11 + a11 * b15;
-  out[12] = a12 * b0 + a13 * b4 + a14 * b8 + a15 * b12;
-  out[13] = a12 * b1 + a13 * b5 + a14 * b9 + a15 * b13;
-  out[14] = a12 * b2 + a13 * b6 + a14 * b10 + a15 * b14;
-  out[15] = a12 * b3 + a13 * b7 + a14 * b11 + a15 * b15;
-}
 
 /** The 4x4 cofactors of the first row (the original's `determinant`, `InvertMatrixToArray`), into `COFACTORS`. */
 function cofactors(m: ArrayLike<number>): void {

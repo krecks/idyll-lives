@@ -277,7 +277,14 @@ class GameHost {
       // Still loading (prepared behind the menus, or not at all): from now on, the loading screen says so.
       if (!entry.ready) app.loading = entry.progress;
     }
-    const session = await perfTimeAsync('host: prepare (start)', () => pending);
+    let session: GameSession;
+    try {
+      session = await perfTimeAsync('host: prepare (start)', () => pending);
+    } catch (err) {
+      // (A failed warm-up isn't the session's failure, which lets go of the loading screen: take it down here so the error shows.)
+      if (this.current === entry) app.loading = null;
+      throw err;
+    }
     let veiled = false;
     if (this.current === entry) app.loading = null;
     const renderer = await this.renderer;

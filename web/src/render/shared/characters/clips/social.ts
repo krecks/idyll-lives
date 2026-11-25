@@ -12,6 +12,7 @@
 import { cycle, mix, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { bump, hangArms, stand, TAU, type StandOptions } from './idle';
 import { armIK, lerpV, onBody, smooth, wrist, type ArmOptions } from './ik';
+import { lerp } from '../../../../game/noise';
 
 /** A hand placed by IK (`at`: the palm centre, on the body the numbers were written on: `onBody`), weighted `w` (default 1) against the hanging arm. */
 type Hand = ArmOptions & { at: Vec; w?: number };
@@ -54,7 +55,6 @@ function body(p: number, o: StandOptions): PoseSpec {
   return stand({ breath: p, ...o });
 }
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /** Compliment: the right hand opens out to the other, palm up ("you look lovely"), then two light claps of delight. */
 function complimentPose(p: number): PoseSpec {

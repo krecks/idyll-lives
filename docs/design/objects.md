@@ -252,9 +252,9 @@ room has.
   colouring (not drains, water or food). Each combination of colours in use is a template of its own:
   a few more draw calls per combination on a lot, the file still loaded once. Colours never change
   price or quality.
-- **Resizing** is switched off in Buy mode for now (`RESIZING` in `web/src/game/buildmode.ts`): a model's
-  moving parts don't follow a resize well (a fridge stretched wide, a wall bed). It works for files and
-  will come back for the objects it suits, decided per object.
+- **Resizing** isn't offered in Buy mode: a model's moving parts don't follow a resize well (a fridge
+  stretched wide, a wall bed). Things resized before are still drawn at their size, and "Reset size"
+  takes them back to their own; arrows to resize would come back per object, for those it suits.
 - **Quality (★) and wear** change what an object gives, not how it is drawn: nothing to model.
 - **Mirrors:** a material whose `materials` entry has `"mirror": "front"` (or `"back"`) is mirror
   glass: its face reflects the room (the quality's

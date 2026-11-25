@@ -14,6 +14,7 @@
 
 import * as pc from './engine';
 import { GAME_FRONT_FACE } from './materials';
+import { MeshBuffers } from './meshBuffers';
 import type { GhostRoadTone, TownGhosts } from '../types';
 import type { WorldStructure } from '../../core/protocol';
 
@@ -72,62 +73,6 @@ export type Drape = (x: number, z: number) => number;
  */
 export type RoadHeights = (points: readonly (readonly [number, number])[]) => ((s: number) => number) | null;
 
-/** A growing vertex and index buffer, written from the start on every call. */
-class Buffers {
-  pos = new Float32Array(3 * 4096);
-  col = new Uint8Array(4 * 4096);
-  idx = new Uint32Array(6 * 4096);
-  nv = 0;
-  ni = 0;
-
-  reset(): void {
-    this.nv = this.ni = 0;
-  }
-
-  private room(v: number, i: number): void {
-    if ((this.nv + v) * 3 > this.pos.length) {
-      const size = Math.max(this.pos.length * 2, (this.nv + v) * 3);
-      const [pos, col] = [new Float32Array(size), new Uint8Array((size / 3) * 4)];
-      pos.set(this.pos);
-      col.set(this.col);
-      [this.pos, this.col] = [pos, col];
-    }
-    if (this.ni + i > this.idx.length) {
-      const idx = new Uint32Array(Math.max(this.idx.length * 2, this.ni + i));
-      idx.set(this.idx);
-      this.idx = idx;
-    }
-  }
-
-  vertex(x: number, y: number, z: number, rgb: readonly number[], alpha: number): number {
-    const v = this.nv++;
-    this.pos[v * 3] = x;
-    this.pos[v * 3 + 1] = y;
-    this.pos[v * 3 + 2] = z;
-    this.col[v * 4] = rgb[0];
-    this.col[v * 4 + 1] = rgb[1];
-    this.col[v * 4 + 2] = rgb[2];
-    this.col[v * 4 + 3] = Math.round(Math.min(1, Math.max(0, alpha)) * 255);
-    return v;
-  }
-
-  quad(a: number, b: number, c: number, d: number): void {
-    const i = this.ni;
-    this.idx[i] = a;
-    this.idx[i + 1] = b;
-    this.idx[i + 2] = c;
-    this.idx[i + 3] = a;
-    this.idx[i + 4] = c;
-    this.idx[i + 5] = d;
-    this.ni += 6;
-  }
-
-  /** Makes room for `v` more vertices and `q` more quads. */
-  reserve(v: number, q: number): void {
-    this.room(v, q * 6);
-  }
-}
-
 /** A polyline cut into pieces no longer than `step` (m); `closed`: back to its first point. */
 function resample(points: readonly (readonly [number, number])[], step: number, closed = false): [number, number][] {
   const out: [number, number][] = [];
@@ -170,7 +115,7 @@ export class TownGhostDraw {
   private readonly mesh: pc.Mesh;
   private readonly material: pc.StandardMaterial;
   private readonly mi: pc.MeshInstance;
-  private readonly buf = new Buffers();
+  private readonly buf = new MeshBuffers(4096);
   /** Its buffers are made for 32-bit indices. */
   private wide = false;
   /** M a CSS px where the camera looks, in `SCALE_STEP` steps (0: near enough that no ghost is drawn wider for it). */
@@ -280,7 +225,7 @@ export class TownGhostDraw {
   private band(path: readonly [number, number][], ns: readonly [number, number][], a: number, b: number, rgb: readonly number[], alpha: number, drape: Drape, closed: boolean, skip?: (i: number) => boolean, ys?: readonly number[]): void {
     const buf = this.buf;
     const n = path.length;
-    buf.reserve(n * 2 + 2, n);
+    buf.reserve(n * 2 + 2, n * 6);
     const first = buf.nv;
     for (let i = 0; i < n; i++) {
       const [x, z] = path[i];
@@ -302,7 +247,7 @@ export class TownGhostDraw {
   private fill(r: { x: number; z: number; w: number; d: number }, cell: number, rgb: readonly number[], alpha: number, drape: Drape): void {
     const buf = this.buf;
     const [nx, nz] = [Math.max(1, Math.ceil(r.w / cell)), Math.max(1, Math.ceil(r.d / cell))];
-    buf.reserve((nx + 1) * (nz + 1), nx * nz);
+    buf.reserve((nx + 1) * (nz + 1), nx * nz * 6);
     const first = buf.nv;
     for (let j = 0; j <= nz; j++) {
       for (let i = 0; i <= nx; i++) {
@@ -345,7 +290,7 @@ export class TownGhostDraw {
         const [x, z] = [ax + (bx - ax) * f, az + (bz - az) * f];
         const [ux, uz] = [(bx - ax) / l, (bz - az) / l];
         const [nx, nz] = [-uz, ux];
-        buf.reserve(4, 1);
+        buf.reserve(4, 6);
         const corners = [
           [-PLANK / 2, -half + edge],
           [PLANK / 2, -half + edge],
@@ -417,7 +362,7 @@ export class TownGhostDraw {
     const y0 = Math.min(drape(a0, b0), drape(a1, b0), drape(a1, b1), drape(a0, b1)) - 0.2;
     const y1 = drape((a0 + a1) / 2, (b0 + b1) / 2) + top + m;
     const buf = this.buf;
-    buf.reserve(20, 5);
+    buf.reserve(20, 30);
     const v = (x: number, y: number, z: number) => buf.vertex(x, y, z, VEIL.rgb, VEIL.alpha);
     // The four sides and the top.
     for (const [ax, az, bx, bz] of [

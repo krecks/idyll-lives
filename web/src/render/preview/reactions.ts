@@ -7,6 +7,7 @@ import { EXPRESSIONS } from '../shared/characters/expressions';
 import type { Face } from '../shared/characters/face';
 import { addRotation, type Additive } from '../shared/characters/pose';
 import type { StageReaction } from '../types';
+import { smoothstep } from '../../game/noise';
 
 export interface Performance {
   /** Clip played instead of the idle (one-shots play once); none = idle. */
@@ -82,7 +83,3 @@ export function slump(add: Additive, bone: Record<string, number>, t: number, se
   addRotation(add, bone.clavicle_r, 1, 0, 0, 0.12 * k);
 }
 
-function smoothstep(a: number, b: number, x: number): number {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-}

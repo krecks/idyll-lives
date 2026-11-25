@@ -265,10 +265,6 @@ impl RoadPath {
     }
 }
 
-/// The way a trip along the roads sets off and the way it comes in: its first two points and its
-/// last two (as `Graph::path` has them). None for one of fewer than two points.
-pub type PathEnds = Option<([[f32; 2]; 2], [[f32; 2]; 2])>;
-
 impl Graph {
     /// The network of `roads` (see the module notes); empty without any.
     pub fn build(raw: &[RoadRaw]) -> Self {

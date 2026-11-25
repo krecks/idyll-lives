@@ -245,11 +245,6 @@ impl LifeRules {
     pub fn reach(&self, age: f32) -> f32 {
         self.stage_at(age).map_or(ADULT_REACH, LifeStage::reach)
     }
-
-    /// The age adults start at.
-    pub fn adult_age(&self) -> f32 {
-        self.stages.iter().find(|s| s.adult).map_or(0.0, |s| s.from)
-    }
 }
 
 /// A little while of doing it on the spot (sleeping on the floor, eating takeout).

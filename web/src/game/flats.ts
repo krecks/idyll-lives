@@ -191,7 +191,7 @@ const plans = new Map<string, FlatPlan | null>();
 const withFloors = new Map<string, PlaceFloors | null>();
 
 /** `cache`'s value for `key` (`make` makes it if it has none), kept as the latest asked for; `most` kept at most. */
-function kept<V>(cache: Map<string, V>, most: number, key: string, make: () => V): V {
+export function kept<V>(cache: Map<string, V>, most: number, key: string, make: () => V): V {
   if (cache.has(key)) {
     const v = cache.get(key) as V;
     cache.delete(key);

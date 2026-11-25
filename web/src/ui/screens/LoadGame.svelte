@@ -96,7 +96,7 @@
           <b>{s.name}</b>
           <span>{s.members.join(', ')}</span>
           <span class="when">Day {s.day} · {clock(s.minute, settings.clock24h)} · saved {timeAgo(s.savedAt)}</span>
-          {#if !playable(s)}<span class="newer">{s.failedIn ? "This version couldn't open it" : 'Needs a newer version of Idyll Lives'}</span>{/if}
+          {#if !playable(s)}<span class="newer">{s.failedIn ? "This version couldn't open it last time" : 'Needs a newer version of Idyll Lives'}</span>{/if}
         </div>
         <div class="actions">
           {#if confirmDelete === s.id}
@@ -107,7 +107,7 @@
               <Icon name="icon.ui.trash" size={16} />
             </button>
             <button class="btn ghost" title="Download this save as a file" onclick={() => download(s.id)}>Export</button>
-            <button class="btn primary" disabled={!playable(s)} onclick={() => app.start({ kind: 'load', saveId: s.id })}>Load</button>
+            <button class="btn primary" disabled={s.tooNewFor === __APP_VERSION__} onclick={() => app.start({ kind: 'load', saveId: s.id })}>Load</button>
           {/if}
         </div>
       </li>

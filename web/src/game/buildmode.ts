@@ -22,7 +22,7 @@
 
 import type { Content, ObjectDef } from '../content/content';
 import { colorValues } from '../ui/buy/catalog';
-import { colorsKey, flatOf, groundDepth, storeyOfRow, storeyRow, type FlatInfo, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type GarageInfo, type ObjectPlacement, type PartColors, type PlotInfo, type PorchInfo, type PorchPieceInfo, type WorldStructure } from '../core/protocol';
+import { colorsKey, flatOf, groundDepth, storeyOfRow, storeyRow, type FlatInfo, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MIN_DOOR_HEAD, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type GarageInfo, type ObjectPlacement, type PartColors, type PlotInfo, type PorchInfo, type PorchPieceInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle } from '../render/types';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
@@ -81,39 +81,7 @@ type Axis = EdgeEdit['axis'];
 /** A drag counts as diagonal within this angle of 45° (tan 22.5°: halfway to straight). */
 const DIAGONAL_SLOPE = Math.SQRT2 - 1;
 
-/** Resize arrows sit this far (m) outside the edge they move, and the height arrow this far above the top. */
-const HANDLE_OUT = 0.3;
-/**
- * Whether things can be resized in Buy mode (the arrows). Off for now: a model's moving parts
- * (a fridge's doors, a wall bed) don't follow a resize well. It comes back for the objects it suits.
- * Things resized before keep their size, and "Reset size" still takes them back to their own.
- */
-const RESIZING = false;
-
 type Point2 = { x: number; y: number };
-
-/** An owned object being resized by one of its arrows (see `press`). */
-interface Resizing {
-  id: number;
-  def: ObjectDef;
-  handle: string;
-  /** As it was: its middle (tiles) and size along x and z (m), facing, turn and height (cm). */
-  cx: number;
-  cz: number;
-  ex: number;
-  ez: number;
-  rot: number;
-  turn: number;
-  tall: number;
-  lift: number;
-  box: { height: number; bottom: number };
-  /** Its tiles' corner and offset as it was. */
-  was: { x: number; z: number; offset?: [number, number] };
-  /** Height arrow: where the drag started (m above the floor). */
-  from: number | null;
-  /** What letting go now would make it: its middle and size, height, tiles (corner, turned size), offset and own size (cm before turning). */
-  now: { cx: number; cz: number; ex: number; ez: number; tall: number; x: number; z: number; w: number; d: number; offset?: [number, number]; size?: [number, number]; valid: boolean };
-}
 
 /** An object's offset (centimetres off the middle of its footprint) as a key; `0:0` when centred. */
 function offsetKey(offset: [number, number] | undefined): string {
@@ -195,10 +163,9 @@ export class BuildBuyInput {
     if (this.shift === shift) return;
     this.shift = shift;
     if (this.lastHover && this.building() && (game.buildTool === 'paint' || game.buildTool === 'floor')) this.hoverBuild(this.lastHover);
-    // Shift lets go of the quarter-tile snap, and of whole tiles and 10 cm steps while resizing.
+    // Shift lets go of the quarter-tile snap, and of a door's or window's steps while resizing it.
     const held = game.placing && this.content.object(game.placing.def);
     if (held && !held.stairs) this.rehover();
-    if (this.resizing) this.hoverResize(this.lastHover);
     if (this.openingDrag) this.hoverOpening(this.lastHover);
   }
   private lastHover: Point | null = null;
@@ -214,8 +181,6 @@ export class BuildBuyInput {
   private carrying: { tiles: Point[]; at: Point } | null = null;
   /** Buy: an owned object picked up by a click is carried by the point it was clicked at (from its middle). */
   private grab: { id: number; dx: number; dz: number } | null = null;
-  /** Buy: an owned object being resized by an arrow, until release. */
-  private resizing: Resizing | null = null;
   /**
    * What the shown arrows were made from (redrawn only when it changes): `''` none, `null` redraw
    * next time. Kept apart, so arrows whose door went (or whose mode ended) aren't taken for none.
@@ -405,12 +370,8 @@ export class BuildBuyInput {
       if (ground) this.lastHover = ground;
       return this.hoverOpening(ground ?? this.lastHover);
     }
-    if (this.resizing) {
-      if (ground) this.lastHover = ground;
-      return this.hoverResize(ground ?? this.lastHover);
-    }
     // The arrow under the pointer lights up.
-    const picked = (game.furnishing && game.buySelection !== null && !game.placing) || (this.openingTool() && this.openingSel !== null);
+    const picked = this.openingTool() && this.openingSel !== null;
     const hot = screen && picked ? (this.preview.handleAt(screen.x, screen.y) ?? null) : null;
     if (hot !== this.hotHandle) {
       this.hotHandle = hot;
@@ -856,92 +817,17 @@ export class BuildBuyInput {
     return obj.x >= home.x && obj.z >= home.z && obj.x < home.x + home.w && obj.z < home.z + home.d ? obj : null;
   }
 
-  /** The object being resized: it's hidden while its preview shows (null: none). */
-  heldId(): number | null {
-    return this.resizing?.id ?? null;
-  }
-
-  /**
-   * The resize arrows for an object as it is (or as a resize would make it): one per side it
-   * can grow towards (along its wall, for things on a wall; none for things on a top or stairs,
-   * and none at all while `RESIZING` is off)
-   * and one for its height (none for rugs). `f`: its middle (tiles), its size along x and z (m),
-   * facing, and top and bottom (m above its floor).
-   */
-  private handlesFor(def: ObjectDef, f: { cx: number; cz: number; ex: number; ez: number; rot: number; top: number; bottom: number }): ResizeHandle[] {
-    const layer = this.content.layer(def);
-    if (!RESIZING || def.stairs) return [];
-    const out: ResizeHandle[] = [];
-    const [x0, x1, z0, z1] = [f.cx - f.ex / 2, f.cx + f.ex / 2, f.cz - f.ez / 2, f.cz + f.ez / 2];
-    if (layer === 'wall') {
-      // In the wall's plane, a little in front of it, halfway up.
-      const y = (f.top + f.bottom) / 2;
-      const r = f.rot % 4;
-      const front = 0.12;
-      // Its back is on its tile's edge (facing +z: the tile's near edge, -z: its far one).
-      if (r % 2 === 0) {
-        const z = r === 0 ? Math.floor(f.cz) + front : Math.floor(f.cz) + 1 - front;
-        out.push({ id: 'x-', x: x0 - 0.1, y, z, dir: [-1, 0, 0], wall: true }, { id: 'x+', x: x1 + 0.1, y, z, dir: [1, 0, 0], wall: true });
-      } else {
-        const x = r === 1 ? Math.floor(f.cx) + front : Math.floor(f.cx) + 1 - front;
-        out.push({ id: 'z-', x, y, z: z0 - 0.1, dir: [0, 0, -1], wall: true }, { id: 'z+', x, y, z: z1 + 0.1, dir: [0, 0, 1], wall: true });
-      }
-    } else if (layer !== 'surface') {
-      // On the floor around it (from the ceiling: at its underside).
-      const y = layer === 'ceiling' ? f.bottom : 0.04;
-      out.push(
-        { id: 'x-', x: x0 - HANDLE_OUT, y, z: f.cz, dir: [-1, 0, 0] },
-        { id: 'x+', x: x1 + HANDLE_OUT, y, z: f.cz, dir: [1, 0, 0] },
-        { id: 'z-', x: f.cx, y, z: z0 - HANDLE_OUT, dir: [0, 0, -1] },
-        { id: 'z+', x: f.cx, y, z: z1 + HANDLE_OUT, dir: [0, 0, 1] },
-      );
-    }
-    if (layer !== 'rug') {
-      const ceiling = layer === 'ceiling';
-      out.push({ id: 'up', x: f.cx, y: ceiling ? f.bottom - HANDLE_OUT - 0.1 : f.top + HANDLE_OUT, z: f.cz, dir: [0, ceiling ? -1 : 1, 0] });
-    }
-    return out;
-  }
-
-  /** A placed object's middle (tiles) and its size along x and z (m). */
-  private frameOf(o: { x: number; z: number; w: number; d: number; rot: number; offset?: [number, number]; size?: [number, number] }): { cx: number; cz: number; ex: number; ez: number } {
-    const c = objectCentre(o);
-    const [sx, sz] = o.size ? [o.size[0] / 100, o.size[1] / 100] : o.rot % 2 === 0 ? [o.w, o.d] : [o.d, o.w];
-    const [ex, ez] = o.rot % 2 === 0 ? [sx, sz] : [sz, sx];
-    return { cx: c.x, cz: c.z, ex, ez };
-  }
-
-  /**
-   * Shows the resize arrows of the object picked in the catalog (or of the resize in progress),
-   * when what they're made from changed. Cheap enough to call every frame.
-   */
+  /** Shows the arrows of the door or window picked (or being resized); none otherwise. Cheap enough to call every frame. */
   syncHandles(): void {
     if (this.openingTool() || this.openingDrag) return this.syncOpeningHandles();
-    const r = this.resizing;
-    const sel = game.furnishing && !game.placing && game.buySelection !== null ? (game.objects.find((o) => o.id === game.buySelection) ?? null) : null;
-    const n = r?.now;
-    const key = r && n ? `r:${r.id}:${n.cx}:${n.cz}:${n.ex}:${n.ez}:${n.tall}:${r.handle}` : sel ? `s:${sel.id}:${sel.x}:${sel.z}:${sel.w}:${sel.d}:${sel.size}:${sel.tall ?? 0}:${offsetKey(sel.offset)}:${this.hotHandle}` : '';
-    if (key === this.handlesKey) return;
-    this.handlesKey = key;
-    if (r && n) {
-      const top = r.lift + r.box.height + (n.tall - r.tall) / 100;
-      const handles = this.handlesFor(r.def, { cx: n.cx, cz: n.cz, ex: n.ex, ez: n.ez, rot: r.rot, top, bottom: r.lift + r.box.bottom });
-      return this.preview.setResizeHandles(handles, r.handle);
-    }
-    const def = sel && this.content.object(sel.def);
-    const box = sel && this.preview.objectBox(sel.id);
-    if (!sel || !def || !box) {
-      // Picked but not drawn yet (the renderer is still placing the new structure): try again next time.
-      if (sel) this.handlesKey = null;
-      return this.preview.setResizeHandles(null);
-    }
-    const lift = sel.lift ?? 0;
-    this.preview.setResizeHandles(this.handlesFor(def, { ...this.frameOf(sel), rot: sel.rot, top: lift + box.height, bottom: lift + box.bottom }), this.hotHandle);
+    if (this.handlesKey === '') return;
+    this.handlesKey = '';
+    this.preview.setResizeHandles(null);
   }
 
-  /** Before undo or redo (they may move or remove it): an owned object in hand (carried or resized) goes back; a new purchase stays on the cursor. */
+  /** Before undo or redo (they may move or remove it): an owned object in hand goes back; a new purchase stays on the cursor. */
   dropOwned(): void {
-    if (this.resizing || game.placing?.objectId != null) this.cancel();
+    if (game.placing?.objectId != null) this.cancel();
   }
 
   /** A new structure arrived: the picked object's arrows follow it. */
@@ -1212,120 +1098,6 @@ export class BuildBuyInput {
   /** The Porch tool's panel picked another thing to build, or another size: the preview follows. */
   porchChanged(): void {
     if (this.porchTool() && this.lastHover) this.hoverPorch(this.lastHover);
-  }
-
-  /** Buy: pressing on an arrow of the picked object resizes it (things are moved with clicks, not dragged). */
-  private pressBuy(ground: Point | null, screen: Point2 | null): boolean {
-    if (game.placing || this.picking()) return false;
-    const handle = screen && game.buySelection !== null ? (this.preview.handleAt(screen.x, screen.y) ?? null) : null;
-    const sel = handle ? game.objects.find((o) => o.id === game.buySelection) : undefined;
-    const selDef = sel && this.content.object(sel.def);
-    const box = sel && this.preview.objectBox(sel.id);
-    if (handle && sel && selDef && box) {
-      const tall = sel.tall ?? 0;
-      const frame = this.frameOf(sel);
-      this.resizing = {
-        id: sel.id,
-        def: selDef,
-        handle,
-        ...frame,
-        rot: sel.rot,
-        turn: sel.turn ?? 0,
-        tall,
-        lift: sel.lift ?? 0,
-        box,
-        from: null,
-        was: { x: sel.x, z: sel.z, offset: sel.offset },
-        now: { ...frame, tall, x: sel.x, z: sel.z, w: sel.w, d: sel.d, offset: sel.offset, valid: true },
-      };
-      this.preview.setLeftDragCamera(false);
-      this.preview.setHeldObject(sel.id);
-      this.hoverResize(ground);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Resizing: the size or height the arrow has been dragged to, previewed. The edge opposite the
-   * arrow stays where it is; the size snaps to whole tiles and the height to 10 cm, or with
-   * Shift held to the centimetre. The object takes its size's tiles rounded up and stands in
-   * their middle, moved by its offset.
-   */
-  private hoverResize(ground: Point | null): void {
-    const r = this.resizing;
-    if (!r) return;
-    const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-    let [x0, x1, z0, z1] = [r.cx - r.ex / 2, r.cx + r.ex / 2, r.cz - r.ez / 2, r.cz + r.ez / 2];
-    let tall = r.tall;
-    // Things on a wall follow the pointer on the wall's plane (the ground behind it would run away).
-    const layer = this.content.layer(r.def);
-    if (layer === 'wall') {
-      const rr = r.rot % 4;
-      const axis = rr % 2 === 0 ? 'h' : 'v';
-      const line = rr === 0 ? Math.floor(r.cz - r.ez / 2) : rr === 2 ? Math.ceil(r.cz + r.ez / 2) : rr === 1 ? Math.floor(r.cx - r.ex / 2) : Math.ceil(r.cx + r.ex / 2);
-      const hit = this.preview.pickOnWall(axis, line, r.was.z) ?? null;
-      if (hit) ground = axis === 'h' ? { x: hit.along, z: ground?.z ?? r.cz } : { x: ground?.x ?? r.cx, z: hit.along };
-    }
-    const step = this.shift ? 0.01 : 1;
-    const [least, most] = [MIN_SIZE / 100, MAX_SIZE];
-    // The size from the fixed edge to the pointer, in steps.
-    const span = (from: number, to: number) => clampN(Math.round(Math.abs(to - from) / step) * step, least, most);
-    if (ground && r.handle === 'x+') x1 = x0 + span(x0, Math.max(ground.x, x0));
-    if (ground && r.handle === 'x-') x0 = x1 - span(x1, Math.min(ground.x, x1));
-    if (ground && r.handle === 'z+') z1 = z0 + span(z0, Math.max(ground.z, z0));
-    if (ground && r.handle === 'z-') z0 = z1 - span(z1, Math.min(ground.z, z1));
-    if (r.handle === 'up') {
-      const h = this.preview.pickVertical(r.cx, r.cz) ?? null;
-      if (h !== null) {
-        r.from ??= h;
-        const sign = layer === 'ceiling' ? -1 : 1;
-        const cm = this.shift ? 1 : 10;
-        // Not so short that it folds up (the model shrinks above 40% of its height).
-        const lowest = Math.max(-MAX_SHORTER, r.tall - Math.floor((r.box.height - r.box.bottom) * 50));
-        tall = clampN(r.tall + sign * Math.round(((h - r.from) * 100) / cm) * cm, lowest, MAX_TALLER);
-      }
-    }
-    // Its tiles: its size rounded up, around its middle; what's left over is its offset.
-    const [cx, cz, ex, ez] = [(x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0];
-    const w = Math.max(1, Math.ceil(ex - 1e-6));
-    const d = Math.max(1, Math.ceil(ez - 1e-6));
-    const x = Math.round(cx - w / 2);
-    const z = Math.round(cz - d / 2);
-    const cm = (v: number) => clampN(Math.round(v * 100), -MAX_OFFSET, MAX_OFFSET);
-    const offset: [number, number] = [cm(cx - x - w / 2), cm(cz - z - d / 2)];
-    const size: [number, number] = r.rot % 2 === 0 ? [Math.round(ex * 100), Math.round(ez * 100)] : [Math.round(ez * 100), Math.round(ex * 100)];
-    const tiles: [number, number] = r.rot % 2 === 0 ? [w, d] : [d, w];
-    const fit = this.fits(x, z, w, d, r.rot, r.id, r.def, tiles, offset, size);
-    r.now = { cx, cz, ex, ez, tall, x, z, w, d, offset, size, valid: fit === true };
-    const obj = game.objects.find((o) => o.id === r.id);
-    this.preview.setPlacementGhost({ model: r.def.model, def: r.def.id, colors: obj?.colors, x, z, rot: r.rot, turn: r.turn, offset, lift: r.lift, w, d, resize: this.resizeOf(r.def, size, tall), valid: r.now.valid });
-    if (game.placeValid !== r.now.valid) game.placeValid = r.now.valid;
-    const hint = fit === true ? null : (fit ?? "There's no room for it that size");
-    if (game.placeHint !== hint) game.placeHint = hint;
-    this.syncHandles();
-  }
-
-  /** End of a Buy press: makes the resize. True if it was one. */
-  private releaseBuy(): boolean {
-    const r = this.resizing;
-    if (r) {
-      this.resizing = null;
-      this.preview.setLeftDragCamera(true);
-      const n = r.now;
-      const changed = n.size !== undefined && (n.cx !== r.cx || n.cz !== r.cz || n.ex !== r.ex || n.ez !== r.ez || n.tall !== r.tall);
-      if (changed && n.valid && n.size) {
-        this.send({ type: 'moveObject', household: game.home, object: r.id, x: n.x, z: n.z, rot: r.rot, offset: n.offset, size: n.size, tall: n.tall });
-      }
-      this.preview.setHeldObject(null, changed && n.valid);
-      this.preview.setPlacementGhost(null);
-      game.placeHint = null;
-      game.placeValid = true;
-      this.handlesKey = null;
-      this.syncHandles();
-      return true;
-    }
-    return false;
   }
 
   // ---- Doors and windows: resizing -------------------------------------------------
@@ -1989,7 +1761,8 @@ export class BuildBuyInput {
    * gesture belongs to drawing; the camera then doesn't turn until the release.
    */
   press(ground: Point | null, screen: Point2 | null = null): boolean {
-    if (game.furnishing) return this.pressBuy(ground, screen);
+    // (Buy mode: things are moved with clicks, not dragged.)
+    if (game.furnishing) return false;
     if (this.openingTool() && this.pressOpening(ground, screen)) return true;
     if (this.floorTool() && ground) {
       // Floor: a drag covers the rectangle of tiles it spans; a click, one tile (Shift: the room).
@@ -2035,7 +1808,6 @@ export class BuildBuyInput {
   /** End of a drawing press: a drag builds the run; a click without moving only sets the start. */
   release(ground: Point | null, moved: boolean): void {
     if (this.releaseOpening()) return;
-    if (this.releaseBuy()) return;
     if (!this.pressed) return;
     this.pressed = false;
     this.preview.setLeftDragCamera(true);
@@ -2118,18 +1890,16 @@ export class BuildBuyInput {
       this.handlesKey = null;
       this.syncHandles();
     }
-    if (this.resizing) this.cancel();
-    else this.cancelDrawing();
+    this.cancelDrawing();
     this.pressed = this.dropped = false;
   }
 
   /** Escape: drop what's in hand. Returns true if there was something to cancel. */
   cancel(): boolean {
     this.carrying = null;
-    // Something owned in hand (or being resized) goes back where it was, still picked.
-    const held = this.resizing?.id ?? (game.furnishing ? (game.placing?.objectId ?? null) : null);
+    // Something owned in hand goes back where it was, still picked.
+    const held = game.furnishing ? (game.placing?.objectId ?? null) : null;
     if (held !== null) {
-      this.resizing = null;
       this.grab = null;
       game.placing = null;
       this.preview.setHeldObject(null);

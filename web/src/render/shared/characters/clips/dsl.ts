@@ -18,6 +18,7 @@
  */
 
 import type { CharacterSet, Clip } from '../data';
+import { clamp } from '../../../../game/noise';
 
 export type Rot = readonly [x: number, y: number, z: number];
 export type Vec = readonly [x: number, y: number, z: number];
@@ -267,9 +268,6 @@ export function legIK(side: 'l' | 'r', ankle: Vec, move: Vec = [0, 0, 0]): PoseS
   } as PoseSpec;
 }
 
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 
 // --- baking -----------------------------------------------------------------------------------
 

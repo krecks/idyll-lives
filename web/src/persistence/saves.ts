@@ -25,7 +25,7 @@ export interface SaveMeta {
   game?: string;
   /** This version of the game (`__APP_VERSION__`) found the save to be from a newer one: kept, not offered. */
   tooNewFor?: string;
-  /** This version of the game failed while loading the save: kept (it can be exported), not offered; a later version tries again. */
+  /** This version of the game failed while loading the save: kept (it can be exported), not offered to Continue; Load game can try it again. */
   failedIn?: string;
 }
 
@@ -175,11 +175,20 @@ export async function latestSave(): Promise<SaveMeta | undefined> {
   return (await listSaves()).find(playable);
 }
 
-/** Each game keeps its two newest autosaves: the slot to write next is the empty or the older one. */
-export async function nextAutosaveId(game: string): Promise<string> {
+/** Each game keeps its two newest autosaves: the slot to write next (among `saves`) is the empty or the older one. */
+export function nextAutosaveId(game: string, saves: SaveMeta[]): string {
   const slots = [0, 1].map((i) => `autosave:${game}:${i}`);
-  const savedAt = new Map((await listSaves()).map((s) => [s.id, s.savedAt]));
+  const savedAt = new Map(saves.map((s) => [s.id, s.savedAt]));
   return slots.reduce((a, b) => ((savedAt.get(b) ?? 0) < (savedAt.get(a) ?? 0) ? b : a));
+}
+
+/**
+ * The game a loaded save goes on as: its own, unless another of `saves` in that game is newer (an
+ * older save loaded, or the older autosave); then a new one, so its autosaves don't overwrite those.
+ */
+export function gameOnLoading(save: SaveMeta, saves: SaveMeta[]): string {
+  const game = (s: SaveMeta) => s.game ?? s.id;
+  return saves.some((s) => game(s) === game(save) && s.savedAt > save.savedAt) ? crypto.randomUUID() : game(save);
 }
 
 /**
@@ -189,9 +198,9 @@ export async function nextAutosaveId(game: string): Promise<string> {
  */
 export async function refuseSave(save: SaveMeta, problem: SaveProblem): Promise<string> {
   refused.add(save.id);
+  const mark = keptAs(problem);
   try {
-    if (problem === 'tooNew') await run('readwrite', [META], (tx) => tx.objectStore(META).put({ ...metaOf(save as SaveRecord), tooNewFor: __APP_VERSION__ }));
-    else if (problem === 'failed') await run('readwrite', [META], (tx) => tx.objectStore(META).put({ ...metaOf(save as SaveRecord), failedIn: __APP_VERSION__ }));
+    if (mark) await run('readwrite', [META], (tx) => tx.objectStore(META).put({ ...metaOf(save as SaveRecord), [mark]: __APP_VERSION__ }));
     else await deleteSave(save.id);
   } catch (err) {
     console.warn('[saves] could not set aside an unloadable save', err);
@@ -200,10 +209,27 @@ export async function refuseSave(save: SaveMeta, problem: SaveProblem): Promise<
   return problemNotice(problem, save.name);
 }
 
-function problemNotice(problem: SaveProblem, name: string): string {
+/** A save that opened (one set aside earlier tried again from Load game): its details lose the mark, so Continue offers it again. */
+export async function openedSave(save: SaveRecord): Promise<void> {
+  refused.delete(save.id);
+  try {
+    // (The record has no marks: they are only ever put in the details, `refuseSave`.)
+    await run('readwrite', [META], (tx) => tx.objectStore(META).put(metaOf(save)));
+  } catch (err) {
+    console.warn('[saves] could not clear a save\'s failed mark', err);
+  }
+  changed();
+}
+
+/** How an unloadable save is kept (the mark it gets); null: it's removed (too old, or damaged). */
+export function keptAs(problem: SaveProblem): 'tooNewFor' | 'failedIn' | null {
+  return problem === 'tooNew' ? 'tooNewFor' : problem === 'failed' ? 'failedIn' : null;
+}
+
+export function problemNotice(problem: SaveProblem, name: string): string {
   if (problem === 'tooNew') return `“${name}” is from a newer version of Idyll Lives, so this version can't open it. It's been kept.`;
   if (problem === 'tooOld') return `“${name}” is from a version of Idyll Lives too old to open, so it was removed.`;
-  if (problem === 'failed') return `This version of Idyll Lives couldn't open “${name}”. It's been kept: you can export it from Load game.`;
+  if (problem === 'failed') return `This version of Idyll Lives couldn't open “${name}”. It's been kept: you can try it again or export it from Load game.`;
   return `“${name}” is damaged and can't be opened, so it was removed.`;
 }
 
@@ -228,7 +254,9 @@ export async function exportSave(id: string): Promise<{ name: string; text: stri
 
 /**
  * Reads an exported save file into a new record (a new slot, so nothing is overwritten); null if
- * the file isn't one. Whether the game can open it is for the simulation to say.
+ * the file isn't one. It starts a game of its own (its `game` isn't kept): its autosaves never
+ * overwrite those of the game it came from, here or in this browser. Whether the game can open
+ * it is for the simulation to say.
  */
 export function parseSaveFile(text: string): SaveRecord | null {
   let file: Record<string, unknown>;
@@ -251,7 +279,6 @@ export function parseSaveFile(text: string): SaveRecord | null {
     // Only a picture carried in the file itself.
     thumbnail: typeof file.thumbnail === 'string' && file.thumbnail.startsWith('data:image/') ? file.thumbnail : null,
     autosave: false,
-    game: typeof file.game === 'string' ? file.game : undefined,
     data: file.data,
   };
 }

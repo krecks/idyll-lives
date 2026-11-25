@@ -5,7 +5,7 @@
  * generator's passes (the centre, the dense pass, the parking) and the checks of a laid town.
  */
 
-import { centroid, inside, lengths, pointAt, type RoadIndex, type Pt, type RoadPlan } from './roads';
+import { centroid, dist, inside, lengths, pointAt, type RoadIndex, type Pt, type RoadPlan } from './roads';
 import type { Rect } from './town';
 import * as pmath from './pmath';
 
@@ -16,7 +16,6 @@ export const FACING = (15 * Math.PI) / 180;
 export const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
 /** A coordinate rounded to the centimetre, as the town file has it. */
 export const r2 = (v: number) => Math.round(v * 100) / 100;
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 
 /** Twice the signed area of a polygon (x·z' − x'·z summed): negative when it goes counter-clockwise seen from above. */
 export function signedArea2(poly: readonly Pt[]): number {

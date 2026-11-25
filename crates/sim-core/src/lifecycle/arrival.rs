@@ -8,12 +8,13 @@ use super::*;
 /// household now and then. They come in at the street door (a flat's building's).
 pub(super) fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
+        // (The beds last: a pass over the town's objects.)
         if !w.is_home(p)
-            || beds(w, p).most(grown_stage(w)) == 0
             || w.households
                 .iter()
                 .enumerate()
                 .any(|(h, hh)| hh.plot == Some(p) && (hh.player || !members(w, h).is_empty()))
+            || beds(w, p).most(grown_stage(w)) == 0
         {
             continue;
         }

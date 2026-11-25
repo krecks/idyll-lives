@@ -12,6 +12,7 @@
 import type { RoadEnd, RoadPlan } from '../core/protocol';
 import { isSeparated, kindInfo, ROAD_KIND } from '../core/roadKinds';
 import * as pmath from './pmath';
+import { lerp } from './noise';
 
 export type { RoadEnd, RoadPlan };
 type Rand = () => number;
@@ -30,7 +31,6 @@ export interface Box {
   d: number;
 }
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 /** How far apart two points are (m). */
 export const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 /** `v` to the centimetre, as the roads' points are kept. */

@@ -145,6 +145,13 @@ pub(super) fn update(w: &mut World) {
     let mut keep = Vec::with_capacity(w.items.list.len());
     let ats: Vec<ItemAt> = w.items.list.iter().map(|it| it.at).collect();
     let holders = crate::items::holders(content, &w.objects, &ats);
+    // (Which households anyone lives in, once, not a look through the town's residents per item.)
+    let mut lived_in = vec![false; w.households.len()];
+    for s in w.sims.iter().filter(|s| s.here()) {
+        if let Some(l) = lived_in.get_mut(s.household as usize) {
+            *l = true;
+        }
+    }
     for (mut it, holder) in std::mem::take(&mut w.items.list).into_iter().zip(holders) {
         let household = w.households.get(it.household as usize);
         let home = household.and_then(|h| h.plot);
@@ -153,10 +160,7 @@ pub(super) fn update(w: &mut World) {
             ItemAt::Floor { .. } => w.lot.in_bounds(x, z),
             _ => holder.is_some(),
         };
-        let lives_here = w
-            .sims
-            .iter()
-            .any(|s| s.here() && s.household == it.household);
+        let lives_here = lived_in.get(it.household as usize) == Some(&true);
         let on_home = home.is_some_and(|p| w.on_plot(p, x, z));
         if !placed || !lives_here || (!on_home && !eaten.contains(&it.id)) {
             changed = true;

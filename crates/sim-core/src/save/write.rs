@@ -234,6 +234,7 @@ impl World {
                                 .map(|s| s.taken),
                             content.laundry.map_or(1.0, |l| l.most),
                         )
+                        .map(|l| finite(l, 0.0))
                         .to_vec(),
                     ),
                     letters: h.letters.clone(),
@@ -288,10 +289,22 @@ impl World {
             next_event_id: self.events.last_id(),
             former: self.former.clone(),
             // (The households' cars: the work taxis' slots are the runs', `taxis`.)
-            cars: self.cars.iter().filter(|c| !c.taxi).cloned().collect(),
-            taxis: self.taxis.clone(),
-            drives: self.drives.clone(),
-            garages: self.garages.clone(),
+            cars: (self.cars.iter().filter(|c| !c.taxi))
+                .filter_map(car_save)
+                .collect(),
+            taxis: taxis_save(&self.taxis),
+            // (A driveway or garage whose place isn't a number is left out, as a load would.)
+            drives: (self.drives.iter())
+                .filter(|d| all_finite(&[d.x, d.z, d.front, d.front_x, d.street]))
+                .map(|d| crate::cars::Drive {
+                    s: d.s.filter(|s| s.is_finite()),
+                    ..*d
+                })
+                .collect(),
+            garages: (self.garages.iter())
+                .filter(|g| all_finite(&[g.x0, g.z0, g.x1, g.z1]))
+                .copied()
+                .collect(),
             porches: self.porches.clone(),
             porch_pieces: self.porch_pieces.clone(),
             open_world: self.travel.file.clone(),
@@ -462,6 +475,45 @@ fn goal_save(content: &Content, g: &Goal) -> GoalSave {
         progress: finite(g.progress, 0.0),
         history: g.history.map(|h| finite(h, 0.0)),
     }
+}
+
+fn all_finite(v: &[f32]) -> bool {
+    v.iter().all(|v| v.is_finite())
+}
+
+/// A car as saved: one whose place isn't a number is left out (a load would drop it too); on its
+/// way, a way that isn't one is dropped and it starts its drive again.
+fn car_save(c: &crate::cars::Car) -> Option<crate::cars::Car> {
+    if !all_finite(&[c.spot[0], c.spot[1], c.yaw, c.street, c.len, c.wid]) {
+        return None;
+    }
+    let mut c = c.clone();
+    c.drive_spot = c.drive_spot.filter(|s| all_finite(s));
+    c.trip = c.trip.filter(|t| all_finite(&[t.at[0], t.at[1], t.yaw]));
+    c.pass_by = c
+        .pass_by
+        .filter(|p| all_finite(&[p.from, p.out, p.back, p.to, p.off, p.at[0], p.at[1]]));
+    if !(c.progress.is_finite() && c.detour.is_none_or(|d| detour_finite(&d))) {
+        (c.progress, c.detour) = (0.0, None);
+    }
+    Some(c)
+}
+
+/// The taxis' runs as saved: a run whose way isn't a number starts it again.
+fn taxis_save(t: &crate::taxi::Taxis) -> crate::taxi::Taxis {
+    let mut t = t.clone();
+    for run in &mut t.runs {
+        if !(run.progress.is_finite() && run.detour.is_none_or(|d| detour_finite(&d))) {
+            (run.progress, run.detour) = (0.0, None);
+        }
+    }
+    t
+}
+
+fn detour_finite(d: &crate::cars::Detour) -> bool {
+    all_finite(&[d.from, d.back])
+        && d.mouth
+            .is_none_or(|m| all_finite(&[m.s, m.way[0], m.way[1], m.go]))
 }
 
 fn reason_save(content: &Content, r: Reason) -> String {

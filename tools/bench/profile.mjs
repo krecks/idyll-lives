@@ -12,18 +12,12 @@
  *     --preset medium          graphics preset (low, medium, high)
  *     --renderer webgl         WebGL2 instead of WebGPU
  *     --hud 1                  the interface shown
- *     --build                  build the production bundle first (vite preview) instead of the dev server
  *     --out <dir>              default bench-results/profile-<time>/
  */
-import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { quiet } from './quiet.mjs';
+import { benchContext, devServer, launch, ROOT } from './lib/browser.mjs';
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -44,51 +38,11 @@ const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '
 const out = flag('out', join(ROOT, 'bench-results', `profile-${stamp}`));
 mkdirSync(out, { recursive: true });
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  try {
-    return await import(createRequire(WEB + 'package.json').resolve('playwright'));
-  } catch {
-    throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
-  }
-}
+// (Dev server only: `?state=` opens nothing in a production build.)
+const { url: base, stop } = await devServer({ url: flag('url', null), port });
 
-/** Whether a server already answers on the port (reuse it instead of failing). */
-async function running(url) {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-let server = null;
-const base = flag('url', null) ?? `http://localhost:${port}`;
-if (!flag('url', null) && !(await running(base))) {
-  const viteArgs = has('build') ? ['preview'] : [];
-  server = spawn(`${WEB}node_modules/.bin/vite`, [...viteArgs, '--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => server.kill());
-  await new Promise((resolve, reject) => {
-    server.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    server.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-  });
-}
-
-const { chromium } = await playwright();
-const browser = await chromium.launch({
-  headless: !headed,
-  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-  args: [
-    '--enable-unsafe-webgpu',
-    '--enable-webgpu-developer-features',
-    '--disable-backgrounding-occluded-windows',
-    '--disable-renderer-backgrounding',
-    '--disable-background-timer-throttling',
-  ],
-});
-const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-await context.addInitScript(quiet);
+const { browser } = await launch({ headless: !headed });
+const context = await benchContext(browser);
 const page = await context.newPage();
 const cdp = await context.newCDPSession(page);
 if (headed) {
@@ -179,5 +133,5 @@ console.log(md.slice(0, 40).join('\n'));
 console.log(`\nwritten to ${out}`);
 
 await browser.close();
-server?.kill();
+stop();
 process.exit(0);

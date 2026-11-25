@@ -45,10 +45,6 @@ pub struct Object {
 }
 
 impl Object {
-    pub(crate) fn alive_with_tracks(&self) -> bool {
-        self.alive && !self.tracks.is_empty()
-    }
-
     pub(crate) fn new(name: String, data_name: String, mesh: Mesh) -> Object {
         Object {
             name,

@@ -152,6 +152,8 @@ function debugReports(): Plugin {
           };
           const slug = report.note.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
           const name = report.createdAt.replace(/\.\d+Z$/, '').replace(/[:T]/g, '-') + (slug ? `-${slug}` : '');
+          // Any page can post here, so a name that could leave the folder is refused.
+          if (!/^[\w-]+$/.test(name)) return void ((res.statusCode = 400), res.end());
           const dir = join(REPORTS, name);
           await mkdir(dir, { recursive: true });
           await writeFile(join(dir, 'report.json'), JSON.stringify(report, null, 2));
@@ -176,7 +178,10 @@ function debugReports(): Plugin {
           const body = Buffer.concat(chunks).toString('utf8');
           const result = JSON.parse(body) as { startedAt: string; scene: string; label?: string };
           const slug = `${result.scene}-${result.label ?? ''}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
-          const name = `${result.startedAt.replace(/\.\d+Z$/, '').replace(/[:T]/g, '-')}-${slug}.json`;
+          const stem = `${result.startedAt.replace(/\.\d+Z$/, '').replace(/[:T]/g, '-')}-${slug}`;
+          // Any page can post here, so a name that could leave the folder is refused.
+          if (!/^[\w-]+$/.test(stem)) return void ((res.statusCode = 400), res.end());
+          const name = `${stem}.json`;
           await mkdir(BENCH_RESULTS, { recursive: true });
           await writeFile(join(BENCH_RESULTS, name), JSON.stringify(result, null, 2));
           res.setHeader('Content-Type', 'application/json');

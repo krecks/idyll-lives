@@ -13,6 +13,7 @@
 import type { Appearance } from '../../../game/household';
 import type { BodyData, GarmentCut } from './data';
 import { SHIRT } from './layout';
+import { hashInt } from '../../../game/noise';
 
 const TROUSERS = ['#33415C', '#2B2D33', '#4A5568', '#B9A27E', '#6B5A48', '#3E4A3A', '#E8E2D6', '#5C3B3B'];
 const SKIRTS = ['#2B2D33', '#5C3B3B', '#33415C', '#7A6A8E', '#B9A27E', '#3E4A3A'];
@@ -127,12 +128,6 @@ export interface OutfitParams {
   ease: [number, number, number];
 }
 
-function hash(n: number): number {
-  let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
 function pick<T>(list: readonly T[], r: number): T {
   return list[Math.floor(r * list.length) % list.length];
 }
@@ -219,7 +214,7 @@ function spareLook(id: number, gender: string, appearance: Appearance | null | u
   let look = appearance;
   for (let tries = 0; tries < 6; tries++) {
     let k = 0;
-    const rand = () => hash(id * 31 + 100 + outfit * 17 + tries * 5 + k++);
+    const rand = () => hashInt(id * 31 + 100 + outfit * 17 + tries * 5 + k++);
     const top = SPARE_TOPS.filter((c) => c.toLowerCase() !== appearance.body?.toLowerCase());
     look = { ...appearance, ...pickOutfit(gender, rand), body: pick(top, rand()), shoesColor: undefined };
     const parts = dayOutfit(id, gender, look, body, false).parts;
@@ -263,7 +258,7 @@ export function outfitFor(
   const waist = cut('bottom.trousers').waist ?? 1;
   const f = fit ?? { chest: waist + 0.25, hip: waist - 0.15, knee: waist - 0.5 };
   const thigh = f.hip - f.knee;
-  const r = (k: number) => hash(id * 31 + k);
+  const r = (k: number) => hashInt(id * 31 + k);
   const male = gender === 'male';
   if (wear === 'towel') {
     const towel = hexToLinear(pick(TOWELS, r(10)), TOWELS[0]);
@@ -280,7 +275,7 @@ export function outfitFor(
 
 /** Day outfit (or its colours as pyjamas, `sleep`). */
 function dayOutfit(id: number, gender: string, appearance: Appearance | null | undefined, body: BodyData, sleep: boolean, painted = false): OutfitParams {
-  const r = (k: number) => hash(id * 31 + k);
+  const r = (k: number) => hashInt(id * 31 + k);
   const has = (p: string) => p in body.garments;
   const skin = skinColour(appearance?.skin);
   const skinRef = [body.skinRef[0], body.skinRef[1], body.skinRef[2]] as [number, number, number];

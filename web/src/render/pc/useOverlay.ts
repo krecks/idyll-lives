@@ -15,6 +15,7 @@
 
 import * as pc from './engine';
 import { GAME_FRONT_FACE } from './materials';
+import { MeshBuffers } from './meshBuffers';
 import { USE_CELL, USE_COLORS, unpackUses, useOfCode, type UseLayer } from '../../game/uses';
 
 /** How high over the ground the overlay hangs (m): under step 2's ghosts (0.18). */
@@ -124,55 +125,6 @@ for (let code = 1; useOfCode(code); code++) {
   SHADE.push(rgb.map((c) => Math.round(c * STRIPE_SHADE)));
 }
 
-/** A growing vertex and index buffer, written from the start for each tile. */
-class Buffers {
-  pos = new Float32Array(3 * 8192);
-  col = new Uint8Array(4 * 8192);
-  idx = new Uint32Array(6 * 8192);
-  nv = 0;
-  ni = 0;
-
-  reset(): void {
-    this.nv = this.ni = 0;
-  }
-
-  /** Makes room for `v` more vertices and `i` more indices. */
-  reserve(v: number, i: number): void {
-    if ((this.nv + v) * 3 > this.pos.length) {
-      const size = Math.max(this.pos.length * 2, (this.nv + v) * 3);
-      const [pos, col] = [new Float32Array(size), new Uint8Array((size / 3) * 4)];
-      pos.set(this.pos);
-      col.set(this.col);
-      [this.pos, this.col] = [pos, col];
-    }
-    if (this.ni + i > this.idx.length) {
-      const idx = new Uint32Array(Math.max(this.idx.length * 2, this.ni + i));
-      idx.set(this.idx);
-      this.idx = idx;
-    }
-  }
-
-  vertex(x: number, y: number, z: number, rgb: readonly number[], alpha: number): number {
-    const v = this.nv++;
-    this.pos[v * 3] = x;
-    this.pos[v * 3 + 1] = y;
-    this.pos[v * 3 + 2] = z;
-    this.col[v * 4] = rgb[0];
-    this.col[v * 4 + 1] = rgb[1];
-    this.col[v * 4 + 2] = rgb[2];
-    this.col[v * 4 + 3] = Math.round(alpha * 255);
-    return v;
-  }
-
-  tri(a: number, b: number, c: number): void {
-    const i = this.ni;
-    this.idx[i] = a;
-    this.idx[i + 1] = b;
-    this.idx[i + 2] = c;
-    this.ni += 3;
-  }
-}
-
 /** A tile's draw: its mesh, and the vertices its buffers were made for (past 65,535 they are made again, wider). */
 interface Tile {
   entity: pc.Entity;
@@ -184,7 +136,7 @@ export class UseOverlayDraw {
   private readonly root: pc.Entity;
   private readonly material: pc.StandardMaterial;
   private readonly tiles = new Map<number, Tile>();
-  private readonly buf = new Buffers();
+  private readonly buf = new MeshBuffers(8192);
   private readonly runs: UseRun[] = [];
   /** What is drawn: the codes and hatching (copies), the grid's size, the land's key and the scale, and the layer. */
   private codes: Uint8Array | null = null;

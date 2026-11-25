@@ -17,7 +17,7 @@
  */
 
 import { COVER, COVER_CELL, coverSpan, flowCode, flowOf, flowsOf, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from './land';
-import { ridged, smoothstep } from './noise';
+import { clamp01, ridged, smoothstep } from './noise';
 import * as pmath from './pmath';
 
 /**
@@ -172,7 +172,6 @@ export function strokeOf(brush: Brush, land?: Land, base?: StrokeState['base']):
   return { brush, touched: null, stamps: 0, base: base ?? own, path: [], seed: 0 };
 }
 
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** A height or level (cm) kept within an Int16 and off `NONE`. */
 const cmOf = (v: number) => Math.max(-32767, Math.min(32767, Math.round(v)));
 /** The brush's falloff at `r` of radius `R`. */
