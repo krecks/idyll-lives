@@ -112,9 +112,9 @@ const CHAIR_Z: f64 = -0.17; // where a desk's own chair stands (furniture.json `
 const DESK: [(&str, &str); 2] = [("frame", "Frame"), ("drawers", "Drawers")];
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let swivel = json!({"uses": {"sit": "swivel", "write": "swivel", "homework": "swivel"}, "hold": 0.6, "ride": "swivel"});
-    Some(Family::new(
+    Family::new(
         "office",
         M.palette(),
         vec![
@@ -222,5 +222,5 @@ pub fn family() -> Option<Family> {
          costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's \
          drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the \
          chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
-    ))
+    )
 }

@@ -18,8 +18,8 @@ mod play;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_cheerful",
         M.palette(),
         vec![
@@ -71,5 +71,5 @@ pub fn family() -> Option<Family> {
          group. Each has one moving part: the record swings up, the microphone rises, the shaker is taken off the \
          cart, the hammock sways (a loop its sleeper rides), the sun rises (its sky glowing at night) and the \
          curtain is drawn.",
-    ))
+    )
 }

@@ -58,8 +58,8 @@ palette! { M:
 const F: GameFrame = GameFrame::new(0.0);
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "street",
         M.palette(),
         vec![
@@ -88,5 +88,5 @@ pub fn family() -> Option<Family> {
          in the base manifest's packs. Each has a far version for the town overview. Leaves and \
          flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at \
          night.",
-    ))
+    )
 }

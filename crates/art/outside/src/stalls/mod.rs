@@ -23,8 +23,8 @@ use common::M;
 const FAR: f64 = 0.25;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "stalls",
         M.palette(),
         vec![
@@ -77,5 +77,5 @@ pub fn family() -> Option<Family> {
          group. The ice cream cart slides its freezer lid open and the hot dog stand lifts its hot-plate lid \
          (`lid_open`); a snack and a can drop to the machines' trays (`drop`). Each has a far version for the town \
          overview.",
-    ))
+    )
 }

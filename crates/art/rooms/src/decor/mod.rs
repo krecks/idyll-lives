@@ -39,9 +39,9 @@ const CURTAINS_ACCEPT: &str = "the rail runs past the window, its opening plus a
                                curtains stack on the wall beside the glass (decor.md, M-decor-02)";
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let night = || motions(r#"{"night": "close"}"#);
-    Some(Family::new(
+    Family::new(
         "decor",
         M.palette(),
         vec![
@@ -177,5 +177,5 @@ pub fn family() -> Option<Family> {
              rugs. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one \
              draw call per finish group. The clocks' hands tell the game's time (`clock`); the hanging plant sways when \
              watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.",
-    ))
+    )
 }

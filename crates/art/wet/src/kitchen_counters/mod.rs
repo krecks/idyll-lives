@@ -96,10 +96,10 @@ const BASE_PAINT: [(&str, &str); 3] = [
 ];
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
     // its top under its content `surface`.
-    Some(Family::new(
+    Family::new(
         "kitchen_counters",
         M.palette(),
         vec![
@@ -277,5 +277,5 @@ pub fn family() -> Option<Family> {
          and bars (K6) add freestanding islands with their cupboards at the front and a worktop \
          overhanging the back for stools, and slatted bars with a top at 1.06, the kitchen island \
          sliding a drawer out between its stools for a sandwich.",
-    ))
+    )
 }

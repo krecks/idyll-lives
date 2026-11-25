@@ -23,8 +23,8 @@ mod shop;
 use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "civic",
         M.palette(),
         vec![
@@ -108,7 +108,7 @@ pub fn family() -> Option<Family> {
          content/civic.json): front desks and counters, the church's pews, lectern and altar, the pub's bar, \
          school desks, the waiting room's bench, the couch, shop rails and the rest. Listed in the base \
          manifest's packs. Nothing moves.",
-    ))
+    )
 }
 
 #[cfg(test)]

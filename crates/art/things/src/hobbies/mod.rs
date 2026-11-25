@@ -219,7 +219,7 @@ fn after_sitting(clip: &str, every: Option<f64>) -> Json {
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let off_stand = || json!({"uses": {"music": "off_stand"}});
     let pool = || {
         Json::Arr(vec![
@@ -234,7 +234,7 @@ pub fn family() -> Option<Family> {
             after_sitting("handwheel", Some(0.9)),
         ])
     };
-    Some(Family::new(
+    Family::new(
         "hobbies",
         M.palette(),
         vec![
@@ -338,5 +338,5 @@ pub fn family() -> Option<Family> {
          a model costs one draw call per finish group. The piano lifts its fallboard, the drums' \
          cymbals and the foosball rods move while played, the darts, the painting, the jigsaw patch, \
          the pot and the liquid grow, and the other hobbies move a part while a resident uses them.",
-    ))
+    )
 }

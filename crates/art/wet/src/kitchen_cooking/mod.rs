@@ -64,10 +64,10 @@ fn bake() -> Json {
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
     // its top under its content `surface`.
-    Some(Family::new(
+    Family::new(
         "kitchen_cooking",
         M.palette(),
         vec![
@@ -179,5 +179,5 @@ pub fn family() -> Option<Family> {
          below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a knob \
          turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave \
          swings its door (`door_open`) and turns its turntable (`turntable`).",
-    ))
+    )
 }

@@ -26,9 +26,9 @@ const DOOR_HOLD: f64 = 1.4; // and shuts again this long after it opened
 const FAR: f64 = 0.25; // placed on town lots, seen from afar: a quarter of the triangles (E7)
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let door = format!(r#"{{"clip": "door", "delay": {DOOR_DELAY:?}, "hold": {DOOR_HOLD:?}}}"#);
-    Some(Family::new(
+    Family::new(
         "shops",
         M.palette(),
         vec![
@@ -67,7 +67,7 @@ pub fn family() -> Option<Family> {
          Listed in the base manifest's packs. Each has a far version for the town overview. The till's cash drawer \
          slides out (`till`) while a resident buys a treat; the bakery case's back glass door slides aside (`door`) \
          for a pastry.",
-    ))
+    )
 }
 
 #[cfg(test)]

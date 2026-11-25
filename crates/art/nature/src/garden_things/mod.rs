@@ -25,13 +25,13 @@ mod yard;
 use common::{SPEC, palette_of};
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // each model's materials are named in its own palette: the family's colours and its own `body`
     let own = |model: Model| {
         let palette = palette_of(model.id).palette();
         model.palette(palette)
     };
-    Some(Family::new(
+    Family::new(
         "garden_things",
         SPEC.palette(),
         vec![
@@ -102,5 +102,5 @@ pub fn family() -> Option<Family> {
              lands on the feeders for `birdwatch` (`bird`); the lamp's panes and the bulbs glow at night, \
              and the string sways near the camera (`sway`, ambient). The planter box and the lamp post \
              have far versions.",
-    ))
+    )
 }

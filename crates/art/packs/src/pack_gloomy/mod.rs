@@ -19,8 +19,8 @@ mod seat;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_gloomy",
         M.palette(),
         vec![
@@ -62,5 +62,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The \
          cabinet's lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs \
          down the lamp, the window seat's cushion sinks and the tub fills.",
-    ))
+    )
 }

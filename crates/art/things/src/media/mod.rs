@@ -113,8 +113,8 @@ palette! { M:
 const F: GameFrame = GameFrame::new(0.0);
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "media",
         M.palette(),
         vec![
@@ -167,5 +167,5 @@ pub fn family() -> Option<Family> {
         "The living room's media (crates/art/things/src/media, built by cargo art): the TVs, the home cinema, the \
          stereo, the boombox and the electric fireplace. The materials map onto the game's finishes so a model costs \
          one draw call per finish group.",
-    ))
+    )
 }

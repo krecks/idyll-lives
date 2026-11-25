@@ -55,9 +55,8 @@ const F: GameFrame = GameFrame::new(0.0);
 const TOLERANCE: f64 = 0.1;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(
-        Family::new(
+pub fn family() -> Family {
+    Family::new(
             "garden",
             M.palette(),
             vec![
@@ -96,6 +95,4 @@ pub fn family() -> Option<Family> {
              and lights like the rest of the garden.",
         )
         .pack("gardenDecor")
-        ,
-    )
 }

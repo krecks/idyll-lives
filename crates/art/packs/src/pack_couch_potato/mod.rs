@@ -26,8 +26,8 @@ mod lounge;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_couchPotato",
         M.palette(),
         vec![
@@ -88,5 +88,5 @@ pub fn family() -> Option<Family> {
          base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per \
          finish group. The cinema's curtains are drawn apart, the console's tray slides out, the recliner \
          reclines, the fridge door swings, the balance board tilts and the lava lamp's wax rises and drifts.",
-    ))
+    )
 }

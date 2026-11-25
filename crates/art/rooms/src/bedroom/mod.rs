@@ -44,8 +44,8 @@ const TURN_DOWN: &str = r#"{"uses": {"sleep": "turn_down", "nap": "turn_down"}}"
 const BUNK_TURN_DOWN: &str = r#"{"uses": {"sleep": [{"clip": "turn_down", "slot": 0}, {"clip": "turn_down_upper", "slot": 1, "delay": 5.0}], "nap": [{"clip": "turn_down", "slot": 0}, {"clip": "turn_down_upper", "slot": 1, "delay": 5.0}]}}"#;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "bedroom",
         M.palette(),
         vec![
@@ -99,5 +99,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The \
          beds turn their duvet down (`turn_down`) while a resident sleeps or naps; the futon unfolds into a bed \
          (`unfold`) and stays open.",
-    ))
+    )
 }

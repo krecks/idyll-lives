@@ -59,14 +59,14 @@ const O: (f64, f64) = (0.0, 0.0);
 const T: f64 = 0.02;
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     use dishes::*;
     use hand::*;
     use plates::*;
     use quick::*;
     use tools::*;
     use town::*;
-    Some(Family::new(
+    Family::new(
         "held",
         M.palette(),
         vec![
@@ -823,5 +823,5 @@ pub fn family() -> Option<Family> {
          content `items`, the props drawn on a station while cooking and those in the hands while a thing is used. \
          Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw \
          call (the wooden boards two).",
-    ))
+    )
 }

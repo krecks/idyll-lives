@@ -38,8 +38,8 @@ palette! { M:
 const F: artkit::place::GameFrame = artkit::place::GameFrame::new(0.0);
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "water_edge",
         M.palette(),
         vec![
@@ -60,5 +60,5 @@ pub fn family() -> Option<Family> {
         "The water's edge (crates/art/outside/src/water_edge, built by cargo art): a plank jetty on \
          posts, a painted rowing boat, a clump of reeds and bulrushes, a striped beach hut on skids and \
          a slatted bench that faces the water. Listed in the base manifest's packs.",
-    ))
+    )
 }

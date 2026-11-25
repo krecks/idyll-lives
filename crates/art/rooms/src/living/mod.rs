@@ -169,13 +169,13 @@ fn sofa_uses() -> Json {
 }
 
 /// The family, as far as it is built here.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let sit = json!({"uses": {"sit": "sink_in"}});
     let sit_read = json!({"uses": {"sit": "sink_in", "read": "sink_in"}});
     let book_out =
         json!({"uses": {"read": "book_out", "study": "book_out", "homework": "book_out"}});
     let read = json!({"uses": {"read": "book_out"}});
-    Some(Family::new(
+    Family::new(
         "living",
         M.palette(),
         vec![
@@ -424,5 +424,5 @@ pub fn family() -> Option<Family> {
         ],
         "The living room (crates/art/rooms/src/living, built by cargo art). The materials map onto the game's \
          finishes so a model costs one draw call per finish group.",
-    ))
+    )
 }

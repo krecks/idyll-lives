@@ -173,11 +173,11 @@ palette! { M:
 const F: GameFrame = GameFrame::new(0.0);
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let turn_down = || json!({"uses": {"sleep": "turn_down", "nap": "turn_down"}});
     // open while the child plays (the toys are out), shut when they're done
     let lid = || json!({"uses": {"play": "lid_open"}});
-    Some(Family::new(
+    Family::new(
         "kids",
         M.palette(),
         vec![
@@ -290,5 +290,5 @@ pub fn family() -> Option<Family> {
          high chair, the toys, and the kids' study and art things. Listed in the base manifest's \
          packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group.",
-    ))
+    )
 }
