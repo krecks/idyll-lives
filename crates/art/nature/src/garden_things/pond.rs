@@ -390,7 +390,8 @@ pub fn pond() -> Vec<Obj> {
             segments = 8
         );
         _frog(0.0, WATER_Y + 0.006, 0.3, 25.0);
-        // reeds and bulrushes at the back left, rising out of the shallows by the stones
+        // reeds and dwarf reedmace (Typha minima, a garden pond's: under 0.75 m) at the back left, rising out of the
+        // shallows by the stones
         for i in 0..11 {
             let (x, z) = (
                 -0.6 + rng.uniform(-0.12, 0.12),
@@ -399,7 +400,7 @@ pub fn pond() -> Vec<Obj> {
             let (yaw, tilt, length, droop) = (
                 rng.uniform(0.0, 360.0),
                 rng.uniform(70.0, 84.0),
-                rng.uniform(0.45, 0.7),
+                rng.uniform(0.36, 0.56),
                 rng.uniform(0.03, 0.12),
             );
             leaf!(
@@ -420,7 +421,7 @@ pub fn pond() -> Vec<Obj> {
         }
         for i in 0..3 {
             let (x, z) = (-0.62 + i as f64 * 0.07, -0.46 + (i % 2) as f64 * 0.06);
-            let h = 0.6 + i as f64 * 0.06;
+            let h = 0.46 + i as f64 * 0.04;
             fsweep!(
                 F,
                 format!("rush_stem{i}"),
