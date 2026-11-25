@@ -12,7 +12,6 @@
  *     --preset medium          graphics preset (low, medium, high)
  *     --renderer webgl         WebGL2 instead of WebGPU
  *     --hud 1                  the interface shown
- *     --build                  build the production bundle first (vite preview) instead of the dev server
  *     --out <dir>              default bench-results/profile-<time>/
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -39,7 +38,8 @@ const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '
 const out = flag('out', join(ROOT, 'bench-results', `profile-${stamp}`));
 mkdirSync(out, { recursive: true });
 
-const { url: base, stop } = await devServer({ url: flag('url', null), port, mode: has('build') ? 'preview' : 'dev' });
+// (Dev server only: `?state=` opens nothing in a production build.)
+const { url: base, stop } = await devServer({ url: flag('url', null), port });
 
 const { browser } = await launch({ headless: !headed });
 const context = await benchContext(browser);

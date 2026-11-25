@@ -138,6 +138,31 @@ fn grown_children_move_into_a_house_of_their_own_or_leave_town() {
 }
 
 #[test]
+fn a_grown_child_moving_out_takes_their_own_child_along() {
+    // Eve (25, working) lives next door with her mother Di and her son Kit (5); the house for
+    // sale has two beds.
+    let content = CONTENT.replace(
+        r#""life":{"daysPerYear":2,"#,
+        r#""life":{"daysPerYear":2,"stages":[{"id":"child","from":0,"school":true},{"id":"adult","from":18}],"#,
+    );
+    let sims = r#",{"name":"Eve","x":16.5,"z":5.5,"age":25,"household":1,"job":{"career":"press.print","level":0}},
+                 {"name":"Kit","x":16.5,"z":6.5,"age":5,"household":1}"#;
+    let src = town(
+        sims,
+        r#",{"a":3,"b":2,"preset":"parent"},{"a":4,"b":3,"preset":"parent"}"#,
+    )
+    .replace(
+        r#"{"def":"bed","x":22,"z":2}"#,
+        r#"{"def":"bed","x":22,"z":2},{"def":"bed","x":26,"z":2}"#,
+    );
+    let mut w = World::from_json(&content, &src, 1).unwrap();
+    days(&mut w, 1);
+    let h = w.sims[3].household as usize;
+    assert_eq!(w.households[h].plot, Some(2), "Eve moved out");
+    assert_eq!(w.sims[4].household as usize, h, "with Kit");
+}
+
+#[test]
 fn newcomers_move_into_vacant_houses() {
     let content = CONTENT.replace(
         r#""moving":{"#,

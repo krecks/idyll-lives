@@ -233,6 +233,9 @@ pub fn pass_away(w: &mut World, i: usize) {
                 w.sims[p].here()
                     && w.sims[p].adult(&w.content)
                     && w.relationships.kin(j, p) == Kin::Parent
+                    // (Not past a household's most: then to family out of town too.)
+                    && members(w, w.sims[p].household as usize).len()
+                        < w.content.rules.max_household
             });
             if let Some(p) = parent {
                 let to = w.sims[p].household as usize;

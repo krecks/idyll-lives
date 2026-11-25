@@ -324,8 +324,9 @@ impl World {
         for car in &mut self.cars {
             if car.driver == Some(id) {
                 car.driver = None;
-                // (Loading for them: those in it have gone on, as for a driver called away.)
-                if car.state == crate::cars::CarState::Boarding {
+                // (Loading for them: those in it have gone on, as for a driver called away. Not on
+                // a trip: `cars::trip_update` lets those in it out, which an emptied car can't.)
+                if car.state == crate::cars::CarState::Boarding && car.trip.is_none() {
                     car.state = crate::cars::CarState::Parked;
                     car.aboard.clear();
                 }
