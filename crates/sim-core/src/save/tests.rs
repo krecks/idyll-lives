@@ -25,6 +25,24 @@ pub(super) fn a_run_too_long_for_any_lot_is_corrupt() {
     assert_eq!(&*super::expand("~03,1,02").unwrap(), "000100");
 }
 
+/// Chemistry packs and unpacks for any number of residents (every padding base64 has), and a
+/// string no packing writes is refused, not a panic.
+#[test]
+pub(super) fn chemistry_survives_packing() {
+    for n in 0..=6 {
+        let c = |a: usize, b: usize| (a * 10 + b) as f32 / 7.0;
+        let packed = super::pack_chemistry(n, c);
+        let back = super::unpack_chemistry(&packed, n).unwrap();
+        let want: Vec<f32> = (0..n)
+            .flat_map(|a| (a + 1..n).map(move |b| c(a, b)))
+            .collect();
+        assert_eq!(back, want, "{n} residents");
+    }
+    for bad in ["====", "A=AA", "AAA"] {
+        assert!(super::unpack_chemistry(bad, 2).is_err(), "{bad}");
+    }
+}
+
 #[test]
 pub(super) fn round_trip_preserves_state() {
     let mut w = World::from_json(CONTENT, LOT, 3).unwrap();
@@ -280,6 +298,9 @@ pub(super) fn damaged_saves_are_refused_on_loading() {
         err.as_deref(),
         Some("corrupt save: an item id is out of range")
     );
+    // (Four `=` would have read as minus one byte.)
+    let json = edited(|s| s["chemistry"] = "====".into());
+    assert!(World::from_save_json(CONTENT, &json).is_err());
     // An expected baby by residents who are there loads.
     let json = edited(|s| {
         s["households"][0]["expecting"] = serde_json::json!({"parents": [0, 1], "due": 3})

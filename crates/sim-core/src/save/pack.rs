@@ -87,12 +87,22 @@ pub(super) fn base64(bytes: &[u8]) -> String {
 
 pub(super) fn unbase64(s: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(s.len() / 4 * 3);
-    let digit = |c: u8| BASE64.iter().position(|&d| d == c).map(|v| v as u32);
+    let digit = |c: u8| {
+        Some(u32::from(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        }))
+    };
     for chunk in s.as_bytes().chunks(4) {
-        if chunk.len() != 4 {
+        let pad = chunk.iter().rev().take_while(|&&c| c == b'=').count();
+        // (Three or four `=` stand for no byte at all: corrupt, not a chunk to read.)
+        if chunk.len() != 4 || pad > 2 {
             return None;
         }
-        let pad = chunk.iter().rev().take_while(|&&c| c == b'=').count();
         let mut n = 0u32;
         for &c in &chunk[..4 - pad] {
             n = n << 6 | digit(c)?;
