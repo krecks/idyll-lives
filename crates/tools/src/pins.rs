@@ -48,9 +48,12 @@ fn word(c: char) -> bool {
 }
 
 /// Whether a `/` after `before` starts a regex literal rather than dividing: at the start, after an operator or
-/// an opening bracket, or after `return`.
+/// an opening bracket, or after `return`; after `++`/`--` (a value) it divides.
 fn regex_may_start(before: &str) -> bool {
     let before = before.trim_end();
+    if before.ends_with("++") || before.ends_with("--") {
+        return false;
+    }
     before.is_empty()
         || before.ends_with([
             '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '<', '>', '+', '-', '*',
@@ -363,6 +366,11 @@ mod tests {
         whole(r"export const T = (x) => /\)/.test(x);", "T");
         // A `/` after a value divides.
         whole("export const V = f(a) / 2 / (b[0] / 3);", "V");
+        // Each `/` divides; read as a regex it would swallow `g(2))` and leave `f(` open.
+        for v in ["i++", "j--", "f(a)", "b[0]", "x", "7"] {
+            whole(&format!("export const W = f({v} / g(2)) / 4;"), "W");
+        }
+        whole("export const X = (n) => /[(]/.test(n);", "X");
         whole("export const N = `a ${x ? `(${y})` : '}'} b`;", "N");
         whole("export const M = `${{ a: 1 }.a}`;", "M");
         assert!(
