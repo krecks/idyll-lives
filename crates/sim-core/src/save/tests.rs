@@ -263,8 +263,8 @@ pub(super) fn edited(f: impl FnOnce(&mut serde_json::Value)) -> String {
 }
 
 /// Damaged saves are refused when they're read, not by a panic later: a household on a plot
-/// the town doesn't have, a baby expected by someone who isn't there, an item id past the
-/// last one there can be.
+/// the town doesn't have, a baby expected by someone who isn't there, an object or item id past
+/// the last one there can be.
 #[test]
 pub(super) fn damaged_saves_are_refused_on_loading() {
     let refused = |json: String, why: &str| {
@@ -282,6 +282,10 @@ pub(super) fn damaged_saves_are_refused_on_loading() {
             s["households"][0]["expecting"] = serde_json::json!({"parents": [0, 9], "due": 3})
         }),
         "unknown parent",
+    );
+    refused(
+        edited(|s| s["objects"][0]["id"] = u32::MAX.into()),
+        "object id with no next one",
     );
     let item = serde_json::json!([{"id": u32::MAX, "def": "x", "at": "floor", "x": 1, "z": 1, "quality": 1.0, "madeAt": 0, "household": 0}]);
     // (An item the content doesn't know is dropped: give the content one.)

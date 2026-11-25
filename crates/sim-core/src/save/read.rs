@@ -163,7 +163,8 @@ impl World {
             .iter()
             .filter_map(|o| o.id)
             .max()
-            .map_or(0, |m| m + 1);
+            .map_or(Some(0), |m| m.checked_add(1))
+            .ok_or_else(|| Error::new("corrupt save: an object id is out of range"))?;
         let mut used = HashSet::new();
         let on_top = |o: &ObjectSave| {
             world
@@ -607,7 +608,7 @@ impl World {
                 ),
                 // (Gone from the content, or a sim the save doesn't have: the money back. It was
                 // paid at the purchase and the object is only placed when the setup is done.)
-                _ => h.funds += s.paid,
+                _ => h.funds = h.funds.saturating_add(s.paid.max(0)),
             }
         }
         world.make_storeys();
