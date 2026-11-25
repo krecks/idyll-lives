@@ -690,6 +690,7 @@ pub fn make(kind: &str, rate: f64) -> Option<Stereo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsp::check::steps;
     use std::collections::HashSet;
 
     const RATE: f64 = 48000.0;
@@ -855,15 +856,6 @@ mod tests {
         assert_eq!(hz(79), 783.9908719634985);
         assert_eq!(exp2(11.0 / 12.0), 1.8877486253633868);
         assert_eq!(exp2(-2.0), 0.25);
-    }
-
-    /// The biggest step between neighbouring samples, and the step from the last sample round to the first.
-    fn steps(ch: &[f32]) -> (f64, f64) {
-        let inside = ch
-            .windows(2)
-            .map(|w| (w[1] as f64 - w[0] as f64).abs())
-            .fold(0.0, max);
-        (inside, (ch[0] as f64 - ch[ch.len() - 1] as f64).abs())
     }
 
     #[test]

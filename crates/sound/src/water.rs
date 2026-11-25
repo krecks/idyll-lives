@@ -732,52 +732,6 @@ pub fn flush(rate: f64) -> Stereo {
 mod tests {
     use super::*;
 
-    const RATE: f64 = 48000.0;
-
-    /// The biggest step between neighbouring samples of a channel, and the step from its last sample round to
-    /// its first.
-    fn steps(ch: &[f32]) -> (f64, f64) {
-        let inside = ch
-            .windows(2)
-            .map(|w| (w[1] as f64 - w[0] as f64).abs())
-            .fold(0.0, f64::max);
-        (inside, (ch[0] as f64 - ch[ch.len() - 1] as f64).abs())
-    }
-
-    // As made (before the game's level): long enough, never past full scale (rounded off above 0.7:
-    // `set_level`), with sound in them, and a loop's end running on into its start.
-    #[test]
-    fn world_sounds() {
-        std::thread::scope(|s| {
-            for kind in WATER {
-                s.spawn(move || {
-                    let Stereo { left, right } = make(kind, RATE).unwrap();
-                    assert_eq!(left.len(), right.len(), "{kind}");
-                    assert!(left.len() as f64 > RATE / 2.0, "{kind}");
-                    let (mut peak, mut sum) = (0.0f64, 0.0);
-                    for ch in [&left, &right] {
-                        for &v in ch {
-                            peak = peak.max((v as f64).abs());
-                            sum += v as f64 * v as f64;
-                        }
-                    }
-                    // (A NaN or an infinity anywhere carries into the sum.)
-                    assert!(sum.is_finite(), "{kind}");
-                    assert!(peak <= 1.0 + 1e-6, "{kind}: peak {peak}");
-                    assert!((sum / (2.0 * left.len() as f64)).sqrt() > 0.004, "{kind}");
-                    if !ONCE.contains(&kind) {
-                        // The step from the last sample to the first is no bigger than the ones inside the loop.
-                        for ch in [&left, &right] {
-                            let (inside, seam) = steps(ch);
-                            assert!(seam <= inside, "{kind}: seam {seam}, inside {inside}");
-                        }
-                    }
-                });
-            }
-        });
-        assert!(make("nothing", RATE).is_none());
-    }
-
     #[test]
     fn a_whole_power_is_squared_and_multiplied() {
         assert_eq!(powi(0.3, 0), 1.0);

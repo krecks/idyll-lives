@@ -375,24 +375,13 @@ pub fn make(surface: &str, wear: &str, version: u32, rate: f64) -> Option<Vec<f3
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsp::check::brightness;
 
     const RATE: f64 = 48000.0;
 
-    /// How bright a sound is: the root mean square of its sample-to-sample change over that of its samples, as
-    /// a frequency (Hz).
-    fn brightness(d: &[f32]) -> f64 {
-        let (mut change, mut level) = (0.0, 0.0);
-        for i in 1..d.len() {
-            let (a, b) = (d[i - 1] as f64, d[i] as f64);
-            change += (b - a) * (b - a);
-            level += b * b;
-        }
-        (change / level).sqrt() * RATE / (2.0 * PI)
-    }
-
     fn bright(surface: &str, wear: &str) -> f64 {
         (0..STEP_VERSIONS)
-            .map(|v| brightness(&make(surface, wear, v, RATE).unwrap()))
+            .map(|v| brightness(&make(surface, wear, v, RATE).unwrap(), RATE))
             .sum::<f64>()
             / STEP_VERSIONS as f64
     }
