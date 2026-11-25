@@ -201,6 +201,20 @@ pub(super) fn barn_doors(z: f64, s: i32, detail: bool) {
                 major_segments = 12,
                 minor_segments = 6
             );
+        } else {
+            // from afar the hay beam, and a block as far out as the pulley, so it stands where the barn does
+            cube!(
+                "hay_beam",
+                (0.14, 0.24, 0.14),
+                at = F.at(0, 4.4, z + 0.11),
+                material = M.barn_trim
+            );
+            cube!(
+                "hay_pulley",
+                (0.032, 0.152, 0.152),
+                at = F.at(0, 4.27, z + 0.17),
+                material = M.iron
+            );
         }
     } else {
         let z0 = z - 0.06;

@@ -17,16 +17,19 @@ Every model has a `<id>.far.glb` for the town overview (the menus' town, the new
 - **Built by hand** where decimation looked bad (the detail pass of 2026-10-22 left them as they were, but the coop's
   and the hay stack's, new):
   - the barn: walls, roof, plinth, corner boards, the doors' white X, the windows as flat panels, the cupola and
-    vane (596 triangles);
-  - the silo: pad, a plain drum, the cap and vent, the ladder a flat strip (556);
-  - the tractor: plain cylinder tyres without lugs, plain fenders and roll frames, no grille, vents, weights or levers
-    (1,352). Decimated, it lost its lowest lug vertices and floated 1.7 cm;
+    vane, the hay beam and a block for its pulley (908 triangles);
+  - the silo: pad, a plain drum, the cap and vent, the ladder a flat strip, the hopper (632);
+  - the tractor: plain cylinder tyres without lugs, plain fenders and roll frames, the front weights one block, no
+    grille, vents or levers (1,556). Decimated, it lost its lowest lug vertices and floated 1.7 cm;
   - the round bale: a coarser roll, one dark ring on each end, flat twine bands (396). Decimated, the twine
     turned to shards;
   - the hay stack: three plain bales and their twine (108);
-  - the trough: plain sides and rim, no corrugations (208). Decimated, the corrugations made spikes;
+  - the trough: plain sides and rim, no corrugations, the feed pipe and tap (288). Decimated, the corrugations made spikes;
   - the coop: house, roof, legs, one-piece ramp, trims, the hatch up over the dark pop hole, the windows as dark
     panels in frames, the nest box (264). Decimated, its legs and ramp went to spikes.
+  Each reaches as far as its model, so `settle` stands it where the model stands (the hopper, the weights, the
+  pulley and the feed pipe were left out until 2026-11-25, and the far barn, silo, tractor and trough stood 2–5 cm
+  off; a test checks it).
 - **Decimated** (`.far_ratio(0.25)`): the scarecrow.
 
 ## The models
@@ -101,13 +104,13 @@ The table says Paint, Roof. The barn, silo and coop take those with their real m
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
-| `model.farm.barn` | 6.04 × 6.00 × 5.94 m | 7,446 | 596 | 1 |
-| `model.farm.silo` | 2.80 × 6.90 × 2.72 m | 9,396 | 556 | 1 |
-| `model.farm.tractor` | 1.62 × 2.51 × 3.30 m | 9,240 | 1,352 | 1 |
+| `model.farm.barn` | 6.04 × 6.00 × 5.94 m | 8,406 | 908 | 1 |
+| `model.farm.silo` | 2.80 × 6.90 × 2.72 m | 9,396 | 632 | 1 |
+| `model.farm.tractor` | 1.62 × 2.51 × 3.30 m | 9,688 | 1,556 | 1 |
 | `model.farm.hayBale` | 1.23 × 1.23 × 1.23 m | 3,168 | 396 | 2 (hay fabric + plain) |
 | `model.farm.hayStack` | 1.91 × 0.93 × 0.90 m | 3,588 | 108 | 2 |
 | `model.farm.scarecrow` | 1.00 × 2.12 × 0.55 m | 4,034 | 999 | 3 (post wood, clothes fabric, plain) |
-| `model.farm.trough` | 1.88 × 0.66 × 0.75 m | 2,700 | 208 | 1 |
+| `model.farm.trough` | 1.88 × 0.66 × 0.75 m | 2,700 | 288 | 1 |
 | `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 2,624 | 264 | 3 (walls wood + plain, the hatch) |
 
 Before the detail pass (2026-10-22): barn 2,842, silo 4,348, tractor 5,680, round bale 2,144, hay stack 468,
