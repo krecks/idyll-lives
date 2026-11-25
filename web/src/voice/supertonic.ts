@@ -42,7 +42,7 @@ interface Line {
   free(): void;
 }
 export interface Phonemizer {
-  line(text: string, speed: number, pitch: number, depth: number): Line;
+  line(text: string, pitch: number, depth: number): Line;
 }
 
 /** `tts.json`, the parts used here. */
@@ -149,7 +149,7 @@ export interface LineTiming {
  */
 export async function synthesizeLine(engine: Engine, text: string, voice: VoiceParams): Promise<{ samples: Float32Array; visemes: Float32Array; finishMs: number; timing: LineTiming }> {
   // The model speaks at the voice's speed itself; our WASM gives the pitch and size.
-  const line = engine.phonemizer.line(text, 1, voice.pitch, voice.depth);
+  const line = engine.phonemizer.line(text, voice.pitch, voice.depth);
   try {
     const plain = line.text;
     if (!plain) return { samples: new Float32Array(0), visemes: Float32Array.of(0, 0), finishMs: 0, timing: { duration: 0, text: 0, vector: 0, vocoder: 0, finish: 0 } };
