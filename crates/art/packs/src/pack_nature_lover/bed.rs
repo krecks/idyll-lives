@@ -1,7 +1,7 @@
 //! The raised veggie bed (2x1): a cedar box of lettuces, carrots, a courgette and staked tomatoes.
 
-use crate::ease::{EASE, ease_ends};
 use super::common::{_flower, _rosette, M};
+use crate::ease::{EASE, ease_ends};
 use artkit::forms::{rect, rounded_rect};
 use artkit::json::float_repr;
 use artkit::kit;

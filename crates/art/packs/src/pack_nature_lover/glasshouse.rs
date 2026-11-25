@@ -555,7 +555,8 @@ pub fn glasshouse() -> Vec<Obj> {
         );
     });
     let hinge = V3::from(f.at(0.0, HR + 0.01, 0));
-    let prop = M4::translation(hinge) * M4::rotation(radians(25.0), Axis::Y) * M4::translation(-hinge);
+    let prop =
+        M4::translation(hinge) * M4::rotation(radians(25.0), Axis::Y) * M4::translation(-hinge);
     for &o in &vent {
         let w = o.matrix_world();
         o.edit(|p| p.mesh.transform(&(prop * w)));

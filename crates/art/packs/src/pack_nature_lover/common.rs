@@ -1,9 +1,9 @@
 //! What the nature lover pack is built from: its palette, flower pots, leaf rosettes and flower faces.
 
 use crate::ease::EASE;
-use artkit::py::hypot;
 use artkit::materials::Mat;
 use artkit::place::GameFrame;
+use artkit::py::hypot;
 use artkit::rand::Random;
 use artkit::{fsphere, leaf, palette, revolve, star};
 
@@ -134,11 +134,7 @@ pub fn _pot(
     if soil {
         revolve!(
             format!("{name}_soil"),
-            &[
-                (r * 0.9, h * 0.8),
-                (r * 0.88, h * 0.86),
-                (0.0, h * 0.9)
-            ],
+            &[(r * 0.9, h * 0.8), (r * 0.88, h * 0.86), (0.0, h * 0.9)],
             at = f.at(x, y, z),
             material = M.soil,
             segments = seg

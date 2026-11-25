@@ -1,8 +1,8 @@
 //! The rainbow hammock, the sunrise stretch lamp and the confetti party booth.
 
 use super::common::{M, STRIPES, WALL2, bulb, pleats, slab, tumbler};
-use crate::ease::ease_ends;
 use super::music::tilt;
+use crate::ease::ease_ends;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, atan2, cosd, degrees, pow, sin, sind, sqrt};
@@ -394,7 +394,10 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         kit::tube!(
             f,
             "stem",
-            &[(cx, 0.04, cz - 0.03), (cx, cy - 0.39 * HEAD + 0.02, cz - 0.03)],
+            &[
+                (cx, 0.04, cz - 0.03),
+                (cx, cy - 0.39 * HEAD + 0.02, cz - 0.03)
+            ],
             0.016,
             M.lamp_metal,
             verts = 10,
@@ -426,87 +429,87 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         // the case: a shallow round drum, its edge rolled, the ring round the scene's face; built 78 cm across,
         // drawn at `HEAD` of that about its middle
         let head = new_parts(|| {
-        revolve!(
-            "case",
-            &[
-                (0.0, -0.06),
-                (0.37, -0.06),
-                (0.384, -0.05),
-                (0.39, -0.03),
-                (0.386, -0.008),
-                (0.37, 0.0),
-                (0.0, 0.0)
-            ],
-            at = f.at(cx, cy, cz),
-            material = M.housing,
-            segments = 40,
-            rot = (90, 0, 0)
-        );
-        torus!(
-            "ring",
-            0.355,
-            0.02,
-            at = f.at(cx, cy, cz + 0.006),
-            material = M.lamp_metal,
-            rot = (90, 0, 0),
-            major_segments = 40,
-            minor_segments = 6
-        );
-        fcyl!(
-            f,
-            "dawn",
-            SUN_R + 0.01,
-            0.006,
-            (cx, cy, cz + 0.003),
-            M.dawn,
-            rot = (90, 0, 0),
-            verts = 40
-        );
-        for (dx, dy, w) in [(-0.14, 0.17, 0.16), (0.12, 0.22, 0.12), (0.2, 0.08, 0.09)] {
-            let cloud = smooth_outline(
+            revolve!(
+                "case",
                 &[
-                    (-w / 2.0, 0.0),
-                    (w / 2.0, 0.0),
-                    (w / 2.0, 0.012),
-                    (w * 0.25, 0.03),
-                    (0.0, 0.022),
-                    (-w * 0.2, 0.036),
-                    (-w / 2.0, 0.012),
+                    (0.0, -0.06),
+                    (0.37, -0.06),
+                    (0.384, -0.05),
+                    (0.39, -0.03),
+                    (0.386, -0.008),
+                    (0.37, 0.0),
+                    (0.0, 0.0)
                 ],
-                2,
-                true,
+                at = f.at(cx, cy, cz),
+                material = M.housing,
+                segments = 40,
+                rot = (90, 0, 0)
             );
-            let cloud: Vec<(f64, f64)> = cloud
-                .iter()
-                .map(|&(u, v)| (cx + dx + u, cy + dy + v))
-                .collect();
-            fextrude!(
+            torus!(
+                "ring",
+                0.355,
+                0.02,
+                at = f.at(cx, cy, cz + 0.006),
+                material = M.lamp_metal,
+                rot = (90, 0, 0),
+                major_segments = 40,
+                minor_segments = 6
+            );
+            fcyl!(
                 f,
-                numbered("cloud"),
-                &cloud,
-                0.004,
-                (0.0, 0.0, cz + 0.024),
-                M.cloud
+                "dawn",
+                SUN_R + 0.01,
+                0.006,
+                (cx, cy, cz + 0.003),
+                M.dawn,
+                rot = (90, 0, 0),
+                verts = 40
             );
-        }
-        slab(
-            f,
-            "hills_far",
-            &hills(cy, SUN_R, -0.06, 3.0, 0.03, 0.4, 40),
-            cz + 0.032,
-            cz + 0.038,
-            M.hills_far,
-            0.0,
-        );
-        slab(
-            f,
-            "hills",
-            &hills(cy, SUN_R, -0.12, 2.0, 0.035, 2.2, 40),
-            cz + 0.038,
-            cz + 0.046,
-            M.hills,
-            0.0,
-        );
+            for (dx, dy, w) in [(-0.14, 0.17, 0.16), (0.12, 0.22, 0.12), (0.2, 0.08, 0.09)] {
+                let cloud = smooth_outline(
+                    &[
+                        (-w / 2.0, 0.0),
+                        (w / 2.0, 0.0),
+                        (w / 2.0, 0.012),
+                        (w * 0.25, 0.03),
+                        (0.0, 0.022),
+                        (-w * 0.2, 0.036),
+                        (-w / 2.0, 0.012),
+                    ],
+                    2,
+                    true,
+                );
+                let cloud: Vec<(f64, f64)> = cloud
+                    .iter()
+                    .map(|&(u, v)| (cx + dx + u, cy + dy + v))
+                    .collect();
+                fextrude!(
+                    f,
+                    numbered("cloud"),
+                    &cloud,
+                    0.004,
+                    (0.0, 0.0, cz + 0.024),
+                    M.cloud
+                );
+            }
+            slab(
+                f,
+                "hills_far",
+                &hills(cy, SUN_R, -0.06, 3.0, 0.03, 0.4, 40),
+                cz + 0.032,
+                cz + 0.038,
+                M.hills_far,
+                0.0,
+            );
+            slab(
+                f,
+                "hills",
+                &hills(cy, SUN_R, -0.12, 2.0, 0.035, 2.2, 40),
+                cz + 0.038,
+                cz + 0.046,
+                M.hills,
+                0.0,
+            );
         });
         shrink(&head, f.at(cx, cy, cz), HEAD);
     });

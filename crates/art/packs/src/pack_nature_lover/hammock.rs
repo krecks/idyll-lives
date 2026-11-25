@@ -1,8 +1,8 @@
 //! The garden hammock (3x1): a canvas sling 2 m long hung from a curved cedar stand, rocking for the resident
 //! (2026-10-21: 2x1, its sling 1.44 m, grown-ups lying in it with the knees up: M-packs-06, Q-07).
 
-use crate::ease::ease_ends;
 use super::common::M;
+use crate::ease::ease_ends;
 use artkit::forms::{rect, rounded_rect};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, atan, degrees, pow};

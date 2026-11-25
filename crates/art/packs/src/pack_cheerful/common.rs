@@ -227,14 +227,33 @@ pub fn pleats(
         (y1 - 0.06, 0.4, 1.15, 0.42),
         (y1, 0.36, 1.15, 0.42),
     ];
-    let (verts, faces) = kit::pleats!(f, &rows, z0, z1, x, folds, amp, t, per_fold = per_fold, along_x = false);
+    let (verts, faces) = kit::pleats!(
+        f,
+        &rows,
+        z0,
+        z1,
+        x,
+        folds,
+        amp,
+        t,
+        per_fold = per_fold,
+        along_x = false
+    );
     // its side hems: a cord down each end, where the cloth's end is (the folds end where they start)
     for z in [z0, z1] {
         let down: Vec<(f64, f64, f64)> = rows
             .iter()
             .map(|&(y, af, _, phase)| (x + amp * af * sin(phase), y, z))
             .collect();
-        kit::tube!(f, numbered("side_hem"), &down, 0.0065, mat, verts = 6, round = 1);
+        kit::tube!(
+            f,
+            numbered("side_hem"),
+            &down,
+            0.0065,
+            mat,
+            verts = 6,
+            round = 1
+        );
     }
     object_of!(name, &verts, &faces, &[mat], sharp = 70)
 }

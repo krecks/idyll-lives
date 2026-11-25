@@ -1,7 +1,7 @@
 //! The potting bench (2x1): a sage bench against the wall, pots and seedlings, tools on the back board.
 
-use crate::ease::{EASE, eased};
 use super::common::{_flower, _pot, _rosette, M, WALL};
+use crate::ease::{EASE, eased};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::kit;
