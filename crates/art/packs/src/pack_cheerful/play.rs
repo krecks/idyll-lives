@@ -1,12 +1,12 @@
 //! The rainbow hammock, the sunrise stretch lamp and the confetti party booth.
 
-use super::common::{M, STRIPES, WALL2, bulb, pleats, slab, tumbler};
+use super::common::{M, STRIPES, WALL2, bulb, ease_ends, pleats, slab, tumbler};
 use super::music::tilt;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, PI, TAU, atan2, cosd, degrees, pow, sin, sind, sqrt};
+use artkit::math::{Axis, M4, P3, PI, TAU, V3, atan2, cosd, degrees, pow, sin, sind, sqrt};
 use artkit::motion::{Rock, Squash, rock, squash};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
 use artkit::scene::Obj;
@@ -35,7 +35,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
     let beam = rounded_rect(0.07, 0.09, 0.02, 1);
     let still = new_parts(|| {
         // the base beam, its ends rounded, and the two posts curving up and out from it to the hooks
-        fsweep!(
+        ease_ends(fsweep!(
             f,
             "beam",
             &[(-(POST_X - 0.1), 0.05, 0.0), (POST_X - 0.1, 0.05, 0.0)],
@@ -43,7 +43,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
             M.wood,
             profile = &beam,
             up = (0, 0, 1)
-        );
+        ));
         for s in [-1.0, 1.0] {
             fsweep!(
                 f,
@@ -303,6 +303,20 @@ pub fn rainbow_hammock() -> Vec<Obj> {
 const SUN_C: (f64, f64, f64) = (0.0, 1.25, -0.3); // the frame's middle (x, height, depth)
 const SUN_R: f64 = 0.33; // the scene's radius
 const SUN_RISE: f64 = 0.22;
+/// The lamp's head (case, scene and sun) as drawn: 0.84 of the 78 cm it is built at, 66 cm across (a mood
+/// lamp's is at most 60 cm, ±10 %), about the scene's middle (the content `light`, 1.25 m, stays put).
+const HEAD: f64 = 0.84;
+
+/// Scales `objs` by `k` about `c` (Blender), baking their placing into their meshes.
+fn shrink(objs: &[Obj], c: P3, k: f64) {
+    let c = V3::from(c);
+    let m = M4::translation(c) * M4::diagonal(V3::from((k, k, k))) * M4::translation(-c);
+    for &o in objs {
+        let w = o.matrix_world();
+        o.edit(|p| p.mesh.transform(&(m * w)));
+        o.set_matrix_world(M4::IDENTITY);
+    }
+}
 
 /// The part of a disc of radius `r` (centre height `cy`) below a wavy horizon at `top` (offsets from the centre).
 #[allow(clippy::too_many_arguments)]
@@ -379,7 +393,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         kit::tube!(
             f,
             "stem",
-            &[(cx, 0.04, cz - 0.03), (cx, cy - 0.37, cz - 0.03)],
+            &[(cx, 0.04, cz - 0.03), (cx, cy - 0.39 * HEAD + 0.02, cz - 0.03)],
             0.016,
             M.lamp_metal,
             verts = 10,
@@ -395,7 +409,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
                 (0.018, 0.05),
                 (0.0, 0.05)
             ],
-            at = f.at(cx, cy - 0.41, cz - 0.03),
+            at = f.at(cx, cy - 0.39 * HEAD - 0.02, cz - 0.03),
             material = M.lamp_metal,
             segments = 10
         );
@@ -408,7 +422,9 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             M.lamp_metal,
             verts = 10
         );
-        // the case: a shallow round drum, its edge rolled, the ring round the scene's face
+        // the case: a shallow round drum, its edge rolled, the ring round the scene's face; built 78 cm across,
+        // drawn at `HEAD` of that about its middle
+        let head = new_parts(|| {
         revolve!(
             "case",
             &[
@@ -490,7 +506,13 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             M.hills,
             0.0,
         );
-        // the yoga mat, its far end rolled up (the layers drawn on its ends), and a cork block on it
+        });
+        shrink(&head, f.at(cx, cy, cz), HEAD);
+    });
+    join(&still, "body", Some(P3::ZERO));
+    // the yoga mat, its far end rolled up (the layers drawn on its ends), and a cork block on it: drawn with the
+    // lamp, not part of its size
+    let mat = new_parts(|| {
         fbox!(
             f,
             "mat",
@@ -510,7 +532,9 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             (0, 0.06, 0.38),
             M.yoga_roll,
             rot = (0, 90, 0),
-            verts = 16
+            verts = 16,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         for s in [-1.0, 1.0] {
             spiral(
@@ -539,7 +563,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             bevel_segments = 1
         );
     });
-    join(&still, "body", Some(P3::ZERO));
+    aside(&mat, "mat");
     // The sun, set behind the hills: `sunrise` raises it into the sky, which glows at night (`dawn`'s `glow`).
     let sun = new_parts(|| {
         fcyl!(
@@ -564,9 +588,13 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         )
         .set_scale((1, 1, 0.4));
     });
-    let sun = hinged(join(&sun, "sun", None), f.at(cx, cy - 0.19, cz + 0.011));
+    shrink(&sun, f.at(cx, cy, cz), HEAD);
+    let sun = hinged(
+        join(&sun, "sun", None),
+        f.at(cx, cy - 0.19 * HEAD, cz + 0.011 * HEAD),
+    );
     let objs = settle!(centre = false);
-    slide!(sun, "sunrise", (0.0, 0.0, SUN_RISE), seconds = 1.5);
+    slide!(sun, "sunrise", (0.0, 0.0, SUN_RISE * HEAD), seconds = 1.5);
     objs
 }
 
