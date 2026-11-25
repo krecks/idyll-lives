@@ -77,3 +77,15 @@ content `surface`: a stove's hob isn't a top things are put on, as the other coo
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `chefStove`, `whirlpoolTub`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate's `edges` found is eased now (stove 50 → 0, tub 9 → 0): the grates' bars and fingers are
+chamfered 4 mm at their arrises, the chimney's top steps in 8 mm under the ceiling, the frying pan's lip is rolled; the
+tub's rim rolls into the basin in four steps, its foot rail's corners and top arris are chamfered, and its posts take a
+4 mm two-step bevel (their 6 mm one-step corners had UVs of no area: the `texels` finding). The stove's splashback,
+utensil rail and hood, and the towels, candles and plant on the tub's rim, are `aside` (drawn, not the piece's own
+size; no draw call more): the range measures 1.62 × 1.22 × 0.66 m and the tub 1.86 × 0.81 × 1.86 m, in their kinds
+(`cargo review sizes`). Triangles 11,188 and 7,824. Both still take 4 draw calls: the stove's knob and flame each move
+by their own clip, and the tub's water and bubbles each scale by their own; fewer means dropping a moving part or the
+surround's wood grain (open, the owner's call).

@@ -3,7 +3,7 @@
 use super::common::M;
 use artkit::kit;
 use artkit::math::{P3, cos, radians, sin};
-use artkit::parts::{join, new_parts};
+use artkit::parts::{aside, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
@@ -30,7 +30,9 @@ fn _shell(f: &GameFrame) {
             ring(0.918, RIM - 0.002, 12),
             ring(0.9, RIM, 12),
             ring(IN + 0.03, RIM, 7),
-            ring(IN + 0.004, RIM - 0.01, 7),
+            ring(IN + 0.014, RIM - 0.002, 7),
+            ring(IN + 0.006, RIM - 0.007, 7),
+            ring(IN + 0.002, RIM - 0.016, 7),
             ring(IN, RIM - 0.04, 7),
             ring(IN - 0.004, FLOOR + 0.06, 7),
             ring(IN - 0.03, FLOOR + 0.006, 7),
@@ -138,21 +140,32 @@ fn _cladding(f: &GameFrame) {
                 0.08,
                 (sx as f64 * (OUT - 0.03), 0.35, sz as f64 * (OUT - 0.03)),
                 M.wood_dark,
-                bevel = 0.006,
-                bevel_segments = 1
+                bevel = 0.004,
+                bevel_segments = 2
             );
         }
     }
     kit::moulding!(
         f,
         "foot_rail",
-        &[(-0.92, -0.92), (0.92, -0.92), (0.92, 0.92), (-0.92, 0.92)],
+        // (its corners and its top's outer arris chamfered 4 mm)
+        &[
+            (-0.916, -0.92),
+            (0.916, -0.92),
+            (0.92, -0.916),
+            (0.92, 0.916),
+            (0.916, 0.92),
+            (-0.916, 0.92),
+            (-0.92, 0.916),
+            (-0.92, -0.916),
+        ],
         &[
             (0.0, 0.0),
             (0.03, 0.0),
             (0.03, 0.04),
             (0.012, 0.055),
-            (0.0, 0.055),
+            (0.004, 0.055),
+            (0.0, 0.051),
         ],
         M.wood_dark,
         at = 0.05,
@@ -161,7 +174,7 @@ fn _cladding(f: &GameFrame) {
     fbox!(f, "plinth", 1.78, 0.05, 1.78, (0, 0.025, 0), M.plinth);
 }
 
-/// Headrests on the back rim, the control panel, towels, candles and a plant on the rim's corners.
+/// Headrests on the back rim and the control panel.
 fn _tub_things(f: &GameFrame) {
     for x in [-0.5, 0.5] {
         soft!(
@@ -200,6 +213,10 @@ fn _tub_things(f: &GameFrame) {
             verts = 10
         );
     }
+}
+
+/// What stands on the rim's corners: folded towels, pillar candles and a little potted plant.
+fn _rim_things(f: &GameFrame) {
     soft!(
         f,
         "towel_a",
@@ -318,6 +335,9 @@ pub fn whirlpool_tub() -> Vec<Obj> {
         _tub_things(f);
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
+    // drawn with it, not the tub's own size
+    let things = new_parts(|| _rim_things(f));
+    aside(&things, "rim_things");
     // The water: the basin's inside up to WATER, its origin just under the footwell's floor; scaled flat there at
     // rest, `fill` raises it while residents soak.
     let water = new_parts(|| {

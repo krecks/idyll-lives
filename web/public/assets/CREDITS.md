@@ -163,7 +163,7 @@ waggles, and the recliner reclines and swings its cup holder out.
 The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
 `packs/pack_example/manifest.json`) are built by `crates/art/packs/src/pack_example` on `artkit`
 and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
-cooks; the tub fills and bubbles while residents soak.
+cooks; the tub fills and bubbles while residents soak. Their edges are eased to the gate's 4 mm (2026-11-25).
 
 The foodie pack models (`models/pack_foodie/herbGarden.glb`, `deliPantry.glb`, `espressoBar.glb`,
 `cookbookLectern.glb`, `pizzaOven.glb`, `chefsIsland.glb`, override pack `packs/pack_foodie/manifest.json`) are built by
