@@ -313,7 +313,7 @@ fn plate_target(
     let at = s.slot_position(content, slot);
     // (The way they face in it: across the table from a place of their own, `places`.)
     let a = if def.places.is_empty() {
-        angle(s)
+        s.angle()
     } else {
         s.slot_yaw(content, slot)
     };
