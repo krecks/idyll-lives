@@ -117,21 +117,25 @@ fn load_save(content_json: &str, save_json: &str) -> Result<World, LoadError> {
 }
 
 /// What's wrong with a save the simulation refused (`error`): its version (newer than this
-/// game, or older than it reads); damaged (it doesn't read as a save file, "invalid JSON …", or
-/// the loader's own checks found it so: "corrupt …", "saved lot …"); else this version failed to
-/// load something in it, which is no reason to remove it. `None` when the game's own data is what
-/// failed. (Errors are told apart by their words: parsing the save again here would put a second
-/// copy of its whole reader into the wasm.)
+/// game, or older than it reads); damaged (its text isn't JSON at all, or the loader's own checks
+/// found it so: "corrupt …", "saved lot …"); else this version failed to load something in it,
+/// which is no reason to remove it. A value of the wrong type (a number saved as `null`, a field
+/// this version doesn't know) is such a failure, not damage, though serde words both as "invalid
+/// JSON". `None` when the game's own data is what failed. (The loader's checks are told apart by
+/// their words: parsing the save again as a save here would put a second copy of its whole reader
+/// into the wasm.)
 fn save_problem(content_json: &str, save_json: &str, error: &str) -> Option<SaveProblem> {
     if Content::from_json(content_json).is_err() {
         return None;
     }
-    let version = serde_json::from_str::<serde_json::Value>(save_json)
-        .ok()
+    let json = serde_json::from_str::<serde_json::Value>(save_json).ok();
+    let version = json
+        .as_ref()
         .and_then(|v| v.get("version").and_then(serde_json::Value::as_u64));
-    let damaged = ["invalid JSON", "corrupt", "saved "]
-        .iter()
-        .any(|start| error.starts_with(start));
+    let damaged = json.is_none()
+        || ["corrupt", "saved "]
+            .iter()
+            .any(|start| error.starts_with(start));
     Some(match version {
         Some(v) if v > u64::from(SAVE_VERSION) => SaveProblem::TooNew,
         Some(v) if v < OLDEST_SAVE_VERSION => SaveProblem::TooOld,
@@ -594,17 +598,25 @@ mod tests {
         );
         assert_eq!(problem(&content, ""), Some(SaveProblem::Corrupt));
         assert_eq!(problem(&content, &good[..5000]), Some(SaveProblem::Corrupt));
+        // Text that reads as JSON but not as this version's save is kept: a type this version
+        // can't read is no proof the save is damaged.
         assert_eq!(
             problem(&content, &format!("{{{now}}}")),
-            Some(SaveProblem::Corrupt)
+            Some(SaveProblem::Failed)
         );
         assert_eq!(
             problem(&content, &with_version("-3")),
-            Some(SaveProblem::Corrupt)
+            Some(SaveProblem::Failed)
         );
         assert_eq!(
             problem(&content, &with_version("\"17\"")),
-            Some(SaveProblem::Corrupt)
+            Some(SaveProblem::Failed)
+        );
+        let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
+        odd["sims"][0]["traits"] = serde_json::json!(null);
+        assert_eq!(
+            problem(&content, &odd.to_string()),
+            Some(SaveProblem::Failed)
         );
         // A whole save this version fails to load (here a trait it doesn't know) isn't damaged: kept.
         let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
