@@ -174,12 +174,7 @@ pub fn dogHouse() -> Vec<Obj> {
         &trim,
         0.0,
         m.plate,
-        profile = [
-            (-0.006, -0.018),
-            (0.006, -0.018),
-            (0.006, 0.018),
-            (-0.006, 0.018)
-        ],
+        profile = rounded_rect(0.012, 0.036, 0.004, 1),
         up = (0, -1, 0)
     );
     fbox!(
@@ -254,11 +249,12 @@ pub fn dogHouse() -> Vec<Obj> {
                     continue;
                 }
                 let tilt = rng.uniform(-1.2, 1.2);
+                // (a cedar shingle's butt, 11 mm: too thin to show an edge, and no chamfer needed)
                 fbox!(
                     F,
                     format!("shingle{i}{k}{n}"),
                     0.17,
-                    0.016,
+                    0.011,
                     b - a - 0.006,
                     (x, y, zc + (a + b) / 2.0),
                     m.roof,
@@ -305,7 +301,10 @@ pub fn dogHouse() -> Vec<Obj> {
             (0.0, 0.0),
             (0.055, 0.0),
             (0.065, 0.04),
-            (0.058, 0.045),
+            // (its lip rolled: no turn of 60°)
+            (0.063, 0.044),
+            (0.0595, 0.0452),
+            (0.0565, 0.0435),
             (0.05, 0.012),
             (0.0, 0.012)
         ],
@@ -344,6 +343,8 @@ pub fn dogHouse() -> Vec<Obj> {
             );
         }
     }
+    // the ridge cap's sawn ends eased
+    crate::chamfer(&["ridge"]);
     join_all("dogHouse");
     settle_with(
         &meshes(),

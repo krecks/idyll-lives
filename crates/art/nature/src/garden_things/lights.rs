@@ -261,6 +261,8 @@ pub fn stringLights() -> Vec<Obj> {
                     (0.127, 0.29),
                     (0.121, 0.3),
                     (0.108, 0.3),
+                    // (its rim's inner arris rolled: no turn of 60°)
+                    (0.106, 0.297),
                     (0.104, 0.28),
                     (0.0, 0.28)
                 ],
@@ -378,6 +380,8 @@ pub fn stringLights() -> Vec<Obj> {
             fsweep!(F, format!("hook{i}"), &hook, 0.004, m.wire, verts = 5);
         }
     });
+    // (the chamfers laid with their own grain)
+    crate::bevel_first(&["post", "collar"]);
     join(&still, "posts", Some(p3(0, 0, 0)));
     let string = new_parts(|| {
         let x0 = POST_X - 0.04;

@@ -43,6 +43,18 @@ pub fn chamfer(names: &[&str]) {
     }
 }
 
+/// Rounds the parts whose names start with one of `names` now, before they are joined, so their textured finish
+/// is laid on the rounded mesh a box a face: a one-strip chamfer joined as asked has its UVs carried from the faces
+/// it cut, and its strips' have no area (the texture smeared along them).
+pub fn bevel_first(names: &[&str]) {
+    for part in artkit::scene::meshes() {
+        let name = part.name();
+        if names.iter().any(|n| name.starts_with(n)) {
+            artkit::bevel::apply(part);
+        }
+    }
+}
+
 /// The group's families by their names on the command line (`cargo art <name>`).
 pub fn families() -> Vec<(&'static str, Family)> {
     vec![
