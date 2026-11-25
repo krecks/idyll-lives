@@ -5,8 +5,9 @@
 //! slide shut on the plank while a resident tinkers (`vice`).
 
 use super::M;
-use super::common::{P, flat_quads, rr};
+use super::common::{P, flat_quads};
 use super::workbench_board::tool_board;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
 use artkit::math::{P3, PI, cos, sin};
@@ -216,11 +217,11 @@ pub fn workbench() -> Vec<Obj> {
             fextrude!(
                 f,
                 format!("crate_grip{s}"),
-                &rr(0.4, 0.06, 0.004, 1),
+                &rounded_rect(0.4, 0.06, 0.004, 1),
                 0.012,
                 (-0.4 + sf * 0.194, 0.37, cz),
                 M.toolbox,
-                holes = vec![rr(0.1, 0.022, 0.01, 2)],
+                holes = vec![rounded_rect(0.1, 0.022, 0.01, 2)],
                 plane = Facing::Side,
                 bevel = 0.002,
                 bevel_segments = 1
@@ -363,7 +364,7 @@ pub fn workbench() -> Vec<Obj> {
             &[(0.495, 0.89 + u, -0.16), (0.51, 0.82 + u, -0.16)],
             0,
             M.foot,
-            profile = rr(0.045, 0.035, 0.012, 2),
+            profile = rounded_rect(0.045, 0.035, 0.012, 2),
             up = (1, 0, 0)
         );
         fbox!(
@@ -422,7 +423,7 @@ pub fn workbench() -> Vec<Obj> {
             &[(-0.37, 0.791 + u, -0.033), (-0.19, 0.793 + u, 0.033)],
             0,
             M.plank,
-            profile = rr(0.022, 0.03, 0.008, 1),
+            profile = rounded_rect(0.022, 0.03, 0.008, 1),
             scale = [0.9, 1.0]
         );
         fsweep!(

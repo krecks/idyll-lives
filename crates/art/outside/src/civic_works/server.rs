@@ -1,7 +1,6 @@
 //! The server rack: 1x1, a tall glass-doored cabinet of servers with blinking lights.
 
 use super::common::{F, WALL, own_palette};
-use artkit::far::{is_low, low};
 use artkit::forms::{Holes, rounded_rect};
 use artkit::motion::{Ease, Path, keys};
 use artkit::parts::{Settle, join, new_parts, settle_with};
@@ -49,14 +48,10 @@ pub fn server(
         0.03,
         (0, yc, SR_FACE - 0.015),
         if kind != "blank" { m.unit } else { m.dark },
-        bevel = if kind != "blank" && !is_low() {
-            0.002
-        } else {
-            0.0
-        },
+        bevel = if kind != "blank" { 0.002 } else { 0.0 },
         bevel_segments = 1
     );
-    if kind == "blank" || is_low() {
+    if kind == "blank" {
         return;
     }
     let face = SR_FACE;
@@ -222,7 +217,7 @@ pub fn server_rack() -> Vec<Obj> {
                 SR_D,
                 (sf * (SR_W / 2.0 - 0.01), (SR_H + 0.06) / 2.0, zc),
                 black,
-                bevel = low(0.004, 0.0),
+                bevel = 0.004,
                 bevel_segments = 1
             );
             fbox!(
@@ -234,7 +229,7 @@ pub fn server_rack() -> Vec<Obj> {
                 (sf * 0.25, SR_H / 2.0, SR_FACE - 0.01),
                 m.steel
             );
-            for k in 0..low(40, 0) {
+            for k in 0..40 {
                 fbox!(
                     F,
                     format!("rail_hole{s}{k}"),
@@ -254,7 +249,7 @@ pub fn server_rack() -> Vec<Obj> {
             SR_D,
             (0, SR_H - 0.015, zc),
             black,
-            bevel = low(0.004, 0.0),
+            bevel = 0.004,
             bevel_segments = 1
         );
         fbox!(
@@ -275,29 +270,27 @@ pub fn server_rack() -> Vec<Obj> {
             (0, SR_H / 2.0, z0 + 0.3),
             m.dark
         );
-        if !is_low() {
-            for k in 0..6 {
-                // the roof's vents and its cable brush
-                fbox!(
-                    F,
-                    format!("roof_vent{k}"),
-                    0.4,
-                    0.004,
-                    0.012,
-                    (0, SR_H + 0.0005, zc + 0.2 - k as f64 * 0.03),
-                    m.dark
-                );
-            }
+        for k in 0..6 {
+            // the roof's vents and its cable brush
             fbox!(
                 F,
-                "brush",
-                0.3,
+                format!("roof_vent{k}"),
+                0.4,
                 0.004,
-                0.06,
-                (0, SR_H + 0.0005, z0 + 0.1),
-                m.plastic
+                0.012,
+                (0, SR_H + 0.0005, zc + 0.2 - k as f64 * 0.03),
+                m.dark
             );
         }
+        fbox!(
+            F,
+            "brush",
+            0.3,
+            0.004,
+            0.06,
+            (0, SR_H + 0.0005, z0 + 0.1),
+            m.plastic
+        );
         // the units, from the floor up: a UPS, storage, servers, a switch and a patch panel, blanks between
         let mut y = 0.08;
         for (k, (units, kind)) in [
@@ -340,7 +333,7 @@ pub fn server_rack() -> Vec<Obj> {
         // the door: a frame round its glass, hinged on the left, a swing handle on the right
         let dz = z1 - 0.012;
         let frame = rounded_rect(SR_W, SR_H - 0.07, 0.01, 1);
-        let hole: Vec<(f64, f64)> = rounded_rect(SR_W - 0.1, SR_H - 0.26, 0.02, low(2, 1))
+        let hole: Vec<(f64, f64)> = rounded_rect(SR_W - 0.1, SR_H - 0.26, 0.02, 2)
             .into_iter()
             .collect();
         fextrude!(
@@ -358,7 +351,7 @@ pub fn server_rack() -> Vec<Obj> {
                     .map(|&(u, v)| (u, v + SR_H / 2.0 + 0.06))
                     .collect()
             ]),
-            bevel = low(0.004, 0.0),
+            bevel = 0.004,
             bevel_segments = 1
         );
         fbox!(
@@ -378,7 +371,7 @@ pub fn server_rack() -> Vec<Obj> {
             0.01,
             (-0.255, 1.05, z1 + 0.005),
             m.plastic,
-            bevel = low(0.004, 0.0),
+            bevel = 0.004,
             bevel_segments = 1
         );
         fbox!(
@@ -389,7 +382,7 @@ pub fn server_rack() -> Vec<Obj> {
             0.022,
             (-0.255, 1.05, z1 + 0.018),
             m.chrome,
-            bevel = low(0.006, 0.0),
+            bevel = 0.006,
             bevel_segments = 1
         );
         for (k, y) in [0.25, 1.75].into_iter().enumerate() {
@@ -403,44 +396,26 @@ pub fn server_rack() -> Vec<Obj> {
                 m.steel
             );
         }
-        if !is_low() {
-            fbox!(
-                F,
-                "label",
-                0.12,
-                0.03,
-                0.002,
-                (0, SR_H - 0.06, z1 + 0.001),
-                m.white
-            );
-        }
+        fbox!(
+            F,
+            "label",
+            0.12,
+            0.03,
+            0.002,
+            (0, SR_H - 0.06, z1 + 0.001),
+            m.white
+        );
     });
-    let body: Vec<Obj> = if !is_low() {
-        still
-            .iter()
-            .copied()
-            .filter(|o| !blink.contains(o))
-            .collect()
-    } else {
-        still
-    };
-    join(
-        &body,
-        if is_low() {
-            "serverRack_far"
-        } else {
-            "serverRack"
-        },
-        Some((0, 0, 0).into()),
-    );
+    let body: Vec<Obj> = still
+        .iter()
+        .copied()
+        .filter(|o| !blink.contains(o))
+        .collect();
+    join(&body, "serverRack", Some((0, 0, 0).into()));
     let back_on_the_wall = Settle {
         centre: false,
         floor: true,
     };
-    if is_low() {
-        settle_with(&meshes(), back_on_the_wall);
-        return meshes();
-    }
     let lights = join(&blink, "leds", Some(F.at(0, 1.0, SR_FACE)));
     settle_with(&meshes(), back_on_the_wall);
     // the blinking LEDs: back into their bezels for a moment, now and then

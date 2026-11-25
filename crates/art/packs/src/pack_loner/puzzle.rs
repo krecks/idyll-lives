@@ -1,6 +1,6 @@
 //! The jigsaw puzzle table and the bonsai potting bench.
 
-use super::common::{_chair, _desk, _m, _mug, BANDS, M, WALL};
+use super::common::{_chair, _desk, _mug, BANDS, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -57,11 +57,11 @@ fn _piece(
 ) -> Obj {
     let m = colour.unwrap_or_else(|| {
         let band = BANDS[j];
-        _m(if (i + j).is_multiple_of(2) {
+        if (i + j).is_multiple_of(2) {
             band.0
         } else {
             band.1
-        })
+        }
     });
     let (x, z) = at.unwrap_or((PX0 + i as f64 * PW, PZ0 - j as f64 * PD));
     let o = fextrude!(
@@ -105,11 +105,11 @@ pub fn puzzle_table() -> Vec<Obj> {
             }
         }
         for (k, (x, z, r, m)) in [
-            (0.38, 0.19, 20, "sky_a"),
-            (0.34, 0.14, -35, "hill_b"),
-            (0.4, 0.12, 60, "field_a"),
-            (-0.37, 0.16, 10, "sea_a"),
-            (-0.33, 0.13, -50, "field_b"),
+            (0.38, 0.19, 20, M.sky_a),
+            (0.34, 0.14, -35, M.hill_b),
+            (0.4, 0.12, 60, M.field_a),
+            (-0.37, 0.16, 10, M.sea_a),
+            (-0.33, 0.13, -50, M.field_b),
         ]
         .into_iter()
         .enumerate()
@@ -122,7 +122,7 @@ pub fn puzzle_table() -> Vec<Obj> {
                 "loose",
                 Some(r as f64),
                 Some((x, z)),
-                Some(_m(m)),
+                Some(m),
                 (0.056, 0.046, 0.008),
             );
         }

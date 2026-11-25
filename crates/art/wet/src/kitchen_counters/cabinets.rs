@@ -3,9 +3,10 @@
 
 use super::common::{pull, shaker};
 use super::storage::{WALL, case, shelf};
-use super::turned::{bowl, jug, lathe, mug, plates};
+use super::turned::{bowl, jug, lathe, plates};
 use super::{M, WALL_DOOR_SECONDS};
 use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::kit;
 use artkit::motion::Ease;
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
@@ -73,7 +74,7 @@ pub fn wall_cabinet() -> Vec<Obj> {
             );
         }
         for (i, x) in [-0.3, -0.16, 0.12, 0.26].into_iter().enumerate() {
-            mug(
+            kit::mug!(
                 f,
                 &format!("mug{i}"),
                 x,
@@ -83,7 +84,7 @@ pub fn wall_cabinet() -> Vec<Obj> {
                 0.09,
                 M.porcelain,
                 (-60 + 40 * i as i32) as f64,
-                10,
+                segments = 10
             );
         }
         strip_light(f, 0.9, 1.45, WALL + 0.07);
@@ -376,7 +377,7 @@ pub fn wall_cabinet_corner() -> Vec<Obj> {
             14,
         );
         for (i, x) in [-0.36, -0.22, -0.08].into_iter().enumerate() {
-            mug(
+            kit::mug!(
                 f,
                 &format!("mug{i}"),
                 x,
@@ -386,7 +387,7 @@ pub fn wall_cabinet_corner() -> Vec<Obj> {
                 0.09,
                 M.porcelain,
                 (-40 + 50 * i as i32) as f64,
-                12,
+                segments = 12
             );
         }
         // the open end: three shelves rounded at their outer front corner, between the case and a side panel

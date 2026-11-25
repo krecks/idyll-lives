@@ -30,8 +30,8 @@ macro_rules! model {
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "lighting",
         M.palette(),
         vec![
@@ -187,5 +187,5 @@ pub fn family() -> Option<Family> {
         "The lamps (crates/art/rooms/src/lighting, built by cargo art). Listed in the base manifest's packs. The \
          materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers \
          and bulbs glow at night (`glow`); the ceiling fan's blades turn while it is on, near the camera (`idle`).",
-    ))
+    )
 }

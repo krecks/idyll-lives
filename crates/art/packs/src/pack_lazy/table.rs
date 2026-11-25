@@ -1,6 +1,6 @@
 //! The heated quilt table and the smart-home command hub.
 
-use super::common::{_mug, M, WALL};
+use super::common::{M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, sind};
@@ -218,9 +218,9 @@ pub fn quilt_table() -> Vec<Obj> {
         );
         for s in [-1, 1] {
             let x = s as f64 * 0.5;
-            _mug(
+            kit::mug!(
                 f,
-                &numbered("mug"),
+                numbered("mug"),
                 x + s as f64 * 0.12,
                 ty,
                 0.12,
@@ -228,6 +228,8 @@ pub fn quilt_table() -> Vec<Obj> {
                 0.09,
                 M.porcelain,
                 (90 - 70 * s) as f64,
+                segments = 14,
+                verts = 5
             );
             // the pouf, its seat cushion (top 0.45) and a back cushion against the wall
             soft!(

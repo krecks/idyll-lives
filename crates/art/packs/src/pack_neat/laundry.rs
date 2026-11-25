@@ -1,6 +1,7 @@
 //! The stacked laundry centre and the rainfall steam shower.
 
-use super::common::{_bottle, _box, _m, _towels, M, TOWELS, WALL};
+use super::common::{_bottle, _towels, M, TOWELS, WALL};
+use crate::pack_slob::common::_box;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
@@ -77,6 +78,7 @@ fn _appliance(f: &GameFrame, name: &str, y0: f64, hh: f64, zf: f64, door: bool) 
         M.appliance,
         10.0,
         24,
+        0.006,
     );
     soft!(
         f,
@@ -408,7 +410,7 @@ pub fn laundry_center() -> Vec<Obj> {
             3,
             0.26,
             0.2,
-            &["towel_w", "towel_c", "towel_w"],
+            &[M.towel_w, M.towel_c, M.towel_w],
         );
         for (x, m) in [(CX - 0.22, M.wicker), (CX + 0.22, M.wicker_b)] {
             _basket(
@@ -433,7 +435,7 @@ pub fn laundry_center() -> Vec<Obj> {
             3,
             0.3,
             0.22,
-            &["towel_w", "towel_a", "towel_w"],
+            &[M.towel_w, M.towel_a, M.towel_w],
         );
         _bottle(
             f,
@@ -561,7 +563,7 @@ pub fn laundry_center() -> Vec<Obj> {
                 verts = 12
             );
         }
-        for (i, m) in ["towel_c", "towel_w", "towel_b", "towel_f"]
+        for (i, m) in [M.towel_c, M.towel_w, M.towel_b, M.towel_f]
             .into_iter()
             .enumerate()
         {
@@ -571,7 +573,7 @@ pub fn laundry_center() -> Vec<Obj> {
                 CX - 0.27 + i as f64 * 0.18,
                 1.72,
                 -0.29,
-                _m(m),
+                m,
             );
         }
     });
@@ -611,6 +613,7 @@ pub fn rain_shower_tower() -> Vec<Obj> {
             M.body,
             12.0,
             24,
+            0.006,
         );
         soft!(
             f,
@@ -973,7 +976,7 @@ pub fn rain_shower_tower() -> Vec<Obj> {
             2,
             0.24,
             0.2,
-            &["pad", "pastel_a"],
+            &[M.pad, M.pastel_a],
         ); // satin: no fabric draw
         _bottle(
             f,

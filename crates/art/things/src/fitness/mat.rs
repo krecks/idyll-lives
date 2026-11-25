@@ -1,7 +1,7 @@
 //! The yoga mat: rolled up at the back with a block and a bottle; it unrolls to the front.
 
 use super::M;
-use super::common::rr;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::math::{Axis, TAU, cos, sin};
 use artkit::parts::{aside, hinged, join, new_parts};
@@ -155,7 +155,7 @@ pub fn yoga_mat() -> Vec<Obj> {
         fextrude!(
             f,
             "mat",
-            &rr(MAT_W - 0.01, MAT_L, 0.02, 2),
+            &rounded_rect(MAT_W - 0.01, MAT_L, 0.02, 2),
             MAT_T - lift,
             (0, (MAT_T + lift) / 2.0, BACK + MAT_L / 2.0),
             M.mat,

@@ -1,9 +1,10 @@
 //! K7: dining tables.
 
-use super::common::{apron, board, finish, slab, sq_leg, turned};
+use super::common::{apron, finish, slab, sq_leg, turned};
 use super::{F, M, TT};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{PI, sin};
 use artkit::place::Facing;
@@ -543,7 +544,8 @@ pub fn table_farmhouse6() -> Vec<Obj> {
         );
         for s in [-1, 1] {
             let sf = f64::from(s);
-            board(
+            kit::board(
+                &F,
                 &format!("brace{xs}{s}"),
                 (x, 0.07, sf * 0.3),
                 (x, 0.32, sf * 0.05),
@@ -553,7 +555,8 @@ pub fn table_farmhouse6() -> Vec<Obj> {
                 (1, 0, 0),
                 0.008,
             );
-            board(
+            kit::board(
+                &F,
                 &format!("brace_top{xs}{s}"),
                 (x, TT - 0.12, sf * 0.3),
                 (x, 0.5, sf * 0.05),

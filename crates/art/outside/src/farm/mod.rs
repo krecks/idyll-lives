@@ -26,8 +26,8 @@ use common::M;
 const TOLERANCE: f64 = 0.03;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "farm",
         M.palette(),
         vec![
@@ -78,5 +78,58 @@ pub fn family() -> Option<Family> {
          the round hay bale, the stack of hay bales, the scarecrow (an ambient sway), the water trough and the chicken \
          coop (its pop-hole hatch shut at night, `close`). Each has a far version (`far`, E7) for the town overview. \
          Listed in the base manifest's packs.",
-    ))
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use artkit::family::{Far, make, make_far};
+    use artkit::json::Json;
+
+    /// The hay stack's seat is the one the content names: its two slots spread across the width (x = ±0.5), in
+    /// front of the top bale.
+    #[test]
+    fn content_facts() {
+        let o = crate::content_object("community.json", "farm.hayStack");
+        let seat = o.get("seat").expect("a seat");
+        let (height, forward) = super::hay::STACK_SEAT;
+        assert_eq!(
+            seat.get("height").and_then(Json::num),
+            Some(height),
+            "hayStack: seat moved"
+        );
+        assert_eq!(
+            seat.get("forward").and_then(Json::num),
+            Some(forward),
+            "hayStack: seat moved"
+        );
+        assert_eq!(
+            o.get("slots").and_then(Json::num),
+            Some(2.0),
+            "hayStack: slots moved"
+        );
+        assert!(
+            o.get("places").is_none(),
+            "hayStack: places now name the seats"
+        );
+    }
+
+    /// A far version built by hand stands where its model stands. Each is settled (centred on its own box) as
+    /// one part whose origin is its build's first part's, the same in both, so their places after settle agree
+    /// only if their boxes' middles did: a far version leaving out an outermost part (the silo's hopper) is off.
+    #[test]
+    fn far_versions_stand_where_the_models_do() {
+        for model in super::family().models {
+            let Some(far @ Far::Own(_)) = model.far else {
+                continue;
+            };
+            let at = make(&model).expect("builds")[0].location();
+            let far_at = make_far(&model, far).expect("far builds")[0].location();
+            assert!(
+                (at.x - far_at.x).abs() < 0.005 && (at.y - far_at.y).abs() < 0.005,
+                "{}: far at {far_at:?}, model at {at:?}",
+                model.id
+            );
+        }
+    }
 }

@@ -17,6 +17,7 @@ pub const STRICT: &[(&str, &str)] = &[
     ),
     ("sweep", "a part that goes round sweeps past its footprint"),
     ("wall", "it reaches into the wall"),
+    ("opened", "opened or used, it reaches into the wall"),
     (
         "thin",
         "on the floor, it or a moving part is lower than the floor drawn over it",
@@ -61,7 +62,7 @@ pub const STRICT: &[(&str, &str)] = &[
 /// it finds, so a model's findings up to its count in tools/art/gate-baseline.json are warnings, and more, or any
 /// in a model the file doesn't have, fail. Some run only when asked (`--validate`) or outside the gate (`cargo
 /// review sizes`), so an `accept` of one is unused only where it ran.
-pub const COUNTED: [&str; 5] = ["validator", "reference", "edges", "texels", "pbr"];
+pub const COUNTED: [&str; 6] = ["validator", "reference", "edges", "texels", "pbr", "opened"];
 
 /// Marks a finding of the strict check `kind` (`STRICT`), carried among the warnings until `strictly` sorts it.
 const TAG: char = '\u{1f}';

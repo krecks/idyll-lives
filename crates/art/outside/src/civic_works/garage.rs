@@ -1,7 +1,6 @@
 //! The garage's tyre rack and tool chest.
 
 use super::common::{F, WALL, own_palette, tyre};
-use artkit::far::{is_low, low};
 use artkit::forms::Holes;
 use artkit::math::{Axis, TAU, atan2, cos, degrees, pow, radians, sin, sqrt};
 use artkit::parts::{join_all, new_parts};
@@ -41,7 +40,7 @@ pub fn tyre_rack() -> Vec<Obj> {
                     0.07,
                     (x, 1.0, z),
                     m.body,
-                    bevel = low(0.004, 0.0),
+                    bevel = 0.004,
                     bevel_segments = 1
                 );
                 fbox!(
@@ -53,18 +52,16 @@ pub fn tyre_rack() -> Vec<Obj> {
                     (x, 0.006, z + (if k == 0 { 0.015 } else { -0.015 })),
                     m.iron
                 );
-                if !is_low() {
-                    for j in 0..24 {
-                        fbox!(
-                            F,
-                            format!("slot{s}{k}{j}"),
-                            0.004,
-                            0.025,
-                            0.012,
-                            (x - s as f64 * 0.031, 0.2 + j as f64 * 0.075, z),
-                            m.dark
-                        );
-                    }
+                for j in 0..24 {
+                    fbox!(
+                        F,
+                        format!("slot{s}{k}{j}"),
+                        0.004,
+                        0.025,
+                        0.012,
+                        (x - s as f64 * 0.031, 0.2 + j as f64 * 0.075, z),
+                        m.dark
+                    );
                 }
             }
             for (j, y) in [0.3, 0.9, 1.5, 1.95].into_iter().enumerate() {
@@ -110,22 +107,20 @@ pub fn tyre_rack() -> Vec<Obj> {
                     0.05,
                     (0, y, z),
                     m.beam,
-                    bevel = low(0.004, 0.0),
+                    bevel = 0.004,
                     bevel_segments = 1
                 );
             }
-            if !is_low() {
-                for t in 0..3 {
-                    fbox!(
-                        F,
-                        format!("tag{lv}{t}"),
-                        0.08,
-                        0.04,
-                        0.003,
-                        (-0.6 + t as f64 * 0.6, y, z0 + TR_D - 0.034),
-                        m.label3
-                    );
-                }
+            for t in 0..3 {
+                fbox!(
+                    F,
+                    format!("tag{lv}{t}"),
+                    0.08,
+                    0.04,
+                    0.003,
+                    (-0.6 + t as f64 * 0.6, y, z0 + TR_D - 0.034),
+                    m.label3
+                );
             }
             let (r, w) = (0.31, 0.205);
             let n = 8;
@@ -141,25 +136,23 @@ pub fn tyre_rack() -> Vec<Obj> {
                     w,
                     m.rubber,
                     None,
-                    Some(low(20, 10)),
+                    Some(20),
                     Axis::X,
                 );
-                if !is_low() {
-                    // the tread's label, on its crown to the front
-                    fbox!(
-                        F,
-                        format!("label{lv}{t}"),
-                        0.12,
-                        0.16,
-                        0.004,
-                        (x, ty, zc + r + 0.001),
-                        labels[(t + lv) % 3]
-                    );
-                }
+                // the tread's label, on its crown to the front
+                fbox!(
+                    F,
+                    format!("label{lv}{t}"),
+                    0.12,
+                    0.16,
+                    0.004,
+                    (x, ty, zc + r + 0.001),
+                    labels[(t + lv) % 3]
+                );
             }
         }
     });
-    join_all(if is_low() { "tyreRack_far" } else { "tyreRack" });
+    join_all("tyreRack");
     settle!(centre = false);
     meshes()
 }
@@ -179,7 +172,7 @@ pub fn drawer_front(name: &str, y0: f64, h: f64, z: f64, m: &CHEST, out: f64) {
         0.018,
         (0, y0 + h / 2.0, z + out + 0.009),
         m.body,
-        bevel = low(0.003, 0.0),
+        bevel = 0.003,
         bevel_segments = 1
     );
     fbox!(
@@ -190,7 +183,7 @@ pub fn drawer_front(name: &str, y0: f64, h: f64, z: f64, m: &CHEST, out: f64) {
         0.022,
         (0, y0 + h - 0.018, z + out + 0.029),
         m.steel,
-        bevel = low(0.004, 0.0),
+        bevel = 0.004,
         bevel_segments = 1
     );
 }
@@ -285,7 +278,7 @@ pub fn tool_chest() -> Vec<Obj> {
             TC_D,
             (0, 0.13 + 0.42, zc),
             m.body,
-            bevel = low(0.008, 0.0),
+            bevel = 0.008,
             bevel_segments = 1
         );
         fbox!(
@@ -296,7 +289,7 @@ pub fn tool_chest() -> Vec<Obj> {
             TC_D + 0.005,
             (0, 0.98, zc + 0.0025),
             m.rubber,
-            bevel = low(0.004, 0.0),
+            bevel = 0.004,
             bevel_segments = 1
         );
         fbox!(
@@ -349,28 +342,26 @@ pub fn tool_chest() -> Vec<Obj> {
             (0, y2 + 0.04, front + out / 2.0 - 0.01),
             m.foam
         );
-        if !is_low() {
-            for (k, (l, t)) in [
-                (0.12, 0),
-                (0.14, 0),
-                (0.16, 0),
-                (0.18, 0),
-                (0.2, 0),
-                (0.22, 0),
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                spanner(
-                    &format!("spanner{k}"),
-                    -0.23 + k as f64 * 0.09,
-                    y2 + 0.049,
-                    front + out / 2.0 - 0.02,
-                    l,
-                    m,
-                    (90 + t) as f64,
-                );
-            }
+        for (k, (l, t)) in [
+            (0.12, 0),
+            (0.14, 0),
+            (0.16, 0),
+            (0.18, 0),
+            (0.2, 0),
+            (0.22, 0),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            spanner(
+                &format!("spanner{k}"),
+                -0.23 + k as f64 * 0.09,
+                y2 + 0.049,
+                front + out / 2.0 - 0.02,
+                l,
+                m,
+                (90 + t) as f64,
+            );
         }
         // castors under it: a swivel plate, a fork and a wheel each, brakes on the front pair
         for sx in [-1, 1] {
@@ -405,7 +396,7 @@ pub fn tool_chest() -> Vec<Obj> {
                     (cx, 0.045, cz - 0.02),
                     m.plastic,
                     rot = (0, 90, 0),
-                    verts = low(14, 6)
+                    verts = 14
                 );
                 if sz > 0 {
                     fbox!(
@@ -431,7 +422,7 @@ pub fn tool_chest() -> Vec<Obj> {
             ],
             0.012,
             m.chrome,
-            round = low(2, 1)
+            round = 2
         );
         // the top box: drawers under a lid, its back to the wall, a hasp and handles on its ends
         let tb = 0.34;
@@ -444,7 +435,7 @@ pub fn tool_chest() -> Vec<Obj> {
             tb,
             (0, 0.99 + 0.18, tz),
             m.body,
-            bevel = low(0.008, 0.0),
+            bevel = 0.008,
             bevel_segments = 1
         );
         fbox!(
@@ -469,8 +460,8 @@ pub fn tool_chest() -> Vec<Obj> {
             tb + 0.003,
             (0, 1.39, tz + 0.0015),
             m.body,
-            bevel = low(0.012, 0.0),
-            bevel_segments = low(2, 1)
+            bevel = 0.012,
+            bevel_segments = 2
         );
         fbox!(
             F,
@@ -480,7 +471,7 @@ pub fn tool_chest() -> Vec<Obj> {
             0.012,
             (0, 1.39, z0 + tb + 0.008),
             m.steel,
-            bevel = low(0.004, 0.0),
+            bevel = 0.004,
             bevel_segments = 1
         );
         fbox!(
@@ -505,7 +496,7 @@ pub fn tool_chest() -> Vec<Obj> {
                 ],
                 0.008,
                 m.chrome,
-                round = low(2, 1)
+                round = 2
             );
         }
         // on the cabinet's top in front of the box: a socket set's case and a spanner left out
@@ -517,18 +508,12 @@ pub fn tool_chest() -> Vec<Obj> {
             0.1,
             (0.12, 1.015, front - 0.06),
             m.plastic,
-            bevel = low(0.01, 0.0),
+            bevel = 0.01,
             bevel_segments = 1
         );
-        if !is_low() {
-            spanner("loose", -0.18, 0.993, front - 0.06, 0.2, m, 20.0);
-        }
+        spanner("loose", -0.18, 0.993, front - 0.06, 0.2, m, 20.0);
     });
-    join_all(if is_low() {
-        "toolChest_far"
-    } else {
-        "toolChest"
-    });
+    join_all("toolChest");
     settle!(centre = false);
     meshes()
 }

@@ -41,6 +41,7 @@ runs it again in `ll-tools`' tests: the tree has 0 errors.
 | `footprint` | indoors, it reaches over 2 cm past its footprint (or its content `overhang`) |
 | `sweep` | a part a loop or ambient clip spins sweeps over 1 cm past its footprint |
 | `wall` | its back reaches over 1 cm into the wall |
+| `opened` | the same, opened or used: at any key of a clip a use, `open` or `night` plays (a door swung back, a lid tipped past upright, a `BackOut`'s overshoot), measured on the vertices (a part built turned reaches as far as its mesh, not its box's corners); not where content `staff.at` stands someone behind it (a shop counter). Counted against the baseline |
 | `thin` | on the floor, it or a moving part is lower than the floor drawn 1 cm up (not a held `tool.*`) |
 | `float` | a floor thing floats above its origin (one on a wall or the ceiling hangs at its height) |
 | `centre` | a model `cargo art` builds is over 2 cm off its `Model`'s `centre` (`centres.json`) |

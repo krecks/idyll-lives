@@ -3,7 +3,7 @@
 
 use artkit::forms;
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, PI, TAU, V3, cos, radians, sin, v3};
+use artkit::math::{P3, PI, TAU, V3, cos, radians, sin, v3};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::shapes::SHARP;
@@ -53,35 +53,11 @@ palette! { M:
     cane = ("#D9C7A7", fabric),      // its woven seat
 }
 
-/// A slab from a0 to a1 along game x (its side the convex polygon `profile` [(depth, height)], in order: the
-/// bakery case's end panels) or along the depth (`Axis::Z`, its face [(x, height)]: a sandwich pack). `shift`
-/// moves it back as a GameFrame's does.
-pub fn prism(
-    name: &str,
-    profile: &[(f64, f64)],
-    a0: f64,
-    a1: f64,
-    material: Mat,
-    axis: Axis,
-    shift: f64,
-) -> Obj {
-    let (a, b): (Vec<V3>, Vec<V3>) = if axis == Axis::X {
-        (
-            profile
-                .iter()
-                .map(|&(z, y)| v3(-a0, -z - shift, y))
-                .collect(),
-            profile
-                .iter()
-                .map(|&(z, y)| v3(-a1, -z - shift, y))
-                .collect(),
-        )
-    } else {
-        (
-            profile.iter().map(|&(x, y)| v3(-x, -a0, y)).collect(),
-            profile.iter().map(|&(x, y)| v3(-x, -a1, y)).collect(),
-        )
-    };
+/// A slab from game depth a0 to a1, its face the convex polygon `profile` [(x, height)], in order (a sandwich
+/// pack).
+pub fn prism(name: &str, profile: &[(f64, f64)], a0: f64, a1: f64, material: Mat) -> Obj {
+    let a: Vec<V3> = profile.iter().map(|&(x, y)| v3(-x, -a0, y)).collect();
+    let b: Vec<V3> = profile.iter().map(|&(x, y)| v3(-x, -a1, y)).collect();
     let n = profile.len() as u32;
     let mut faces: Vec<Vec<u32>> = vec![(0..n).collect(), (n..2 * n).rev().collect()];
     for i in 0..n {

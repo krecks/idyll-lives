@@ -96,7 +96,7 @@ palette! { M:
     flame = ("#FF9A3C", gloss, glow("#FFB25C")),
     flame_core = ("#FFD27A", gloss, glow("#FFE0A0")),
     candle = ("#EFE5D3", gloss),
-    hearth_cushion = ("#B5653F", matte), // the floor cushion residents warm up on (characters.ts SEATS)
+    hearth_cushion = ("#B5653F", matte), // the floor cushion residents warm up on (furniture.json `seats`)
     hearth_piping = ("#9A5433", matte),
     picture = ("#2B2C2E", satin),
     art_print = ("#C9B79C", matte),
@@ -113,8 +113,8 @@ palette! { M:
 const F: GameFrame = GameFrame::new(0.0);
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "media",
         M.palette(),
         vec![
@@ -167,5 +167,5 @@ pub fn family() -> Option<Family> {
         "The living room's media (crates/art/things/src/media, built by cargo art): the TVs, the home cinema, the \
          stereo, the boombox and the electric fireplace. The materials map onto the game's finishes so a model costs \
          one draw call per finish group.",
-    ))
+    )
 }

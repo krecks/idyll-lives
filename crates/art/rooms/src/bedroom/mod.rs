@@ -4,7 +4,7 @@
 //! and the daybed (`model.bedDaybed`). Notes: NOTES.md.
 //!
 //! Each bed's mattress is centred on its footprint, its top at the height the renderer lays sleepers at
-//! (characters.ts `BEDS`; `BUNKS` for the bunk's two). Its head end stands on the wall's face (depth -0.93, `WALL`):
+//! (furniture.json `beds`; `bunks` for the bunk's two). Its head end stands on the wall's face (depth -0.93, `WALL`):
 //! headboards, posts and rails stop there, thinner or a few cm forward, so the bed's bounds stand a little forward
 //! of the middle (the Model's `centre`). The game lays its own quilt over each sleeper on the beds in
 //! `BLANKET_BEDS`, so a bed's duvet isn't a second cover over them: its top third (`duvet_flap`) folds back over the
@@ -44,8 +44,8 @@ const TURN_DOWN: &str = r#"{"uses": {"sleep": "turn_down", "nap": "turn_down"}}"
 const BUNK_TURN_DOWN: &str = r#"{"uses": {"sleep": [{"clip": "turn_down", "slot": 0}, {"clip": "turn_down_upper", "slot": 1, "delay": 5.0}], "nap": [{"clip": "turn_down", "slot": 0}, {"clip": "turn_down_upper", "slot": 1, "delay": 5.0}]}}"#;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "bedroom",
         M.palette(),
         vec![
@@ -99,5 +99,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The \
          beds turn their duvet down (`turn_down`) while a resident sleeps or naps; the futon unfolds into a bed \
          (`unfold`) and stays open.",
-    ))
+    )
 }

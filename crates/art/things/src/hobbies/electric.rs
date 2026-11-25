@@ -1,7 +1,7 @@
 //! H1: the electric guitar on its stand, the practice amp behind.
 
 use super::M;
-use super::common::{frets, guitar_stand, lean, off_stand, strings, upright};
+use super::common::{frets, guitar_stand, lean, off_stand, strings};
 use super::guitars::{dots, neck};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
@@ -297,7 +297,7 @@ fn electric(fr: &GameFrame) -> Obj {
         );
         strings(fr, 6, 0.009, 0.0075, 0.087, nut + 0.001, 0.033, 0.0215);
     });
-    upright(&p, "guitar")
+    join(&p, "guitar", Some(P3::ZERO))
 }
 
 pub fn guitar_electric() -> Vec<Obj> {

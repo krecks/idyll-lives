@@ -100,7 +100,7 @@ sideways; the grill food, which stands off its middle, takes its measured `centr
 | `tool.shaker` | the bar cart's cocktail shaker, 22 cm, chrome (the cart's own is hidden while it is in the hands) | 320 | 320 |
 | `tool.wateringCan` | a green plastic watering can, 5 litres: a round body, a hoop handle over it (held at its middle, 26 cm up), a spout to a rose 35 cm out | 336 | 336 |
 | `tool.secateurs` | bypass secateurs, 17.5 cm, closed: red grips, a steel blade over an iron anvil, the pivot bolt | 220 | 220 |
-| `tool.iron` | a steam iron, 26 cm, on its steel soleplate, the point ahead: a white shell, the handle arched over it (held at its middle, 13.8 cm up: grip `level`), a teal water window and dial. Drawn while a resident irons at the ironing board (`ACTIONS.clean.prop`), whose own iron is hidden then (2026-11-19) | 676 | 676 |
+| `tool.iron` | a steam iron, 26 cm, on its steel soleplate, the point ahead: a white shell, the handle arched over it (held at its middle, 13.8 cm up: grip `level`), a teal water window and a 3.2 cm dial. Drawn while a resident irons at the ironing board (`ACTIONS.clean.prop`), whose own iron is hidden then (2026-11-19); both are `kit::steam_iron` (2026-11-25: the dial was 1.6 cm here, 3.2 cm on the board) | 676 | 676 |
 | `tool.paintbrush` | an artist's brush, 25 cm: a lacquered wooden handle, a steel ferrule, bristles dipped in blue | 192 | 192 |
 | `tool.chalk` | a stick of white chalk, 8 cm, its tip worn down | 44 | 36 |
 | `tool.babyBottle` | a baby's bottle, 17 cm: a clear body two thirds full of milk, a blue screw ring, a teat | 380 | 380 |

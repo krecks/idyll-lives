@@ -16,7 +16,7 @@ Each is built where the old part stood (`F`, game axes), its back on the wall's 
   them 2 cm in 0.6 s (`squash`), held while the use lasts: `motions: {"uses": {"relax": "sink_in", "doze":
   "sink_in"}}` (the classic sofa has no `doze`). 1 draw.
 
-The seat cushions' tops are the seat heights (`characters.ts` `SEATS`, content `seat`): 0.44–0.45 m, the designer
+The seat cushions' tops are the seat heights (furniture.json `seats`, content `seat`): 0.44–0.45 m, the designer
 sofa's 0.425 m.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -128,8 +128,8 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
   (it has no back).
 - **Display cabinet**: walnut, solid sides, a pale back, glass-look shelves (plain `gloss`, so the door is its only
   glass), ornaments; a brass-framed glass door with a brass knob, a node of its own (`door`, its origin on the hinge
-  at its left, `DOOR_HINGE`) with no clip yet: the (+use) swing needs only `swing!(door, "door_open", ..)` and a use.
-  Still, it counts 3 draws; with a clip the door's brass and glass draw on their own (4).
+  at its left, `DOOR_HINGE`), swinging +100° to the front (`door_open`); with the clip the door's brass and glass
+  draw on their own (4 draws).
 - Plants on the shelves are plain satin spheres, not `foliage`, so they cost no draw; the cube shelf's bins are
   `fabric` (its second draw), the ladder shelf's basket too.
 
@@ -201,13 +201,13 @@ tables above. The helpers (common.rs):
   more triangles (the table above), the armchair (4,556) and the lounge chair (4,028) a little over their aim of
   4,000. The designer chair's arm pads, crossed in one step, are not pinched (they were, for a day, and the chair
   7 mm narrower).
-- **`leg`** (a turned leg: collar, taper, splay), **`throw`** (a throw swept over a seat's front edge,
-  wobbled), **`rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`press`** (tufts
+- **`leg`** (a turned leg: collar, taper, splay), **`rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`press`** (tufts
   pressed into a top), **`round_rings`**/**`disc`** (turned things lofted from (height, radius) rows: table
   tops with moulded edges, feet, vases, finials), **`shell`** (a dished plywood shell), **`top`** (a table top
-  with rounded corners and eased edges), **`turned_leg`**, **`knob`** (a turned knob), **`fillet`** (a polyline
-  with its corners rounded, for bent tube: a Catmull-Rom sweep through close corner points bulges past them, which
-  stood the console table 1.3 cm taller), **`basket`**, **`plant_bowl`**.
+  with rounded corners and eased edges), **`turned_leg`**, **`knob`** (a turned knob), **`basket`**, **`plant_bowl`**.
+  The throw over a seat's front edge (`kit::throw!`) and the bent tube's rounded corners (`kit::fillet`: a
+  Catmull-Rom sweep through close corner points bulges past them, which stood the console table 1.3 cm taller) are
+  the kit's.
 
 What each has now:
 
@@ -260,8 +260,8 @@ The leather armchair's cushions (`leather`), the designer chair's (`hide`) and t
 ## Built in Rust (2026-11-18)
 
 Built in Rust since 2026-11-18 (`cargo art living`), proved against the last Blender build (`ref/blender`). The cabriole legs are the
-kit's (`kit::cabriole!`). Kept as the Blender script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
-sofa bed's leg, the nesting and console tables' frames); its `_legs4` was never called and is not ported.
+kit's (`kit::cabriole!`). Its own `fillet` is gone for the kit's (the same bytes: the bed's handle, the sofa bed's leg, the nesting and console
+tables' frames); its `_legs4` was never called and is not ported.
 
 ## The bookshelf's hardbacks (2026-11-18)
 

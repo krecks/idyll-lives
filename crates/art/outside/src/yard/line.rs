@@ -1,8 +1,9 @@
 //! The washing line, whose washing is pegged out line by line, and the log store.
 
-use super::common::{F, M, bent, board};
+use super::common::{F, M, bent};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, sin, sind};
 use artkit::motion::grow_in_turn;
@@ -219,6 +220,7 @@ pub fn clothesline() -> Vec<Obj> {
                 0.06,
                 low(6, 4),
                 3,
+                1.0,
             );
         }
         revolve!(
@@ -430,6 +432,7 @@ pub fn firewood_stack() -> Vec<Obj> {
             0.03,
             low(8, 4),
             3,
+            1.0,
         );
         fbox!(
             F,
@@ -466,7 +469,8 @@ pub fn firewood_stack() -> Vec<Obj> {
     }
     // the shelter: a pent roof of corrugated iron, sloping to the back, on two bearers
     for x in [-0.44, 0.44] {
-        board(
+        kit::board(
+            &F,
             &numbered("bearer"),
             (x, 1.06, LS_Z + 0.17),
             (x, 1.0, LS_Z - 0.17),
@@ -479,7 +483,8 @@ pub fn firewood_stack() -> Vec<Obj> {
     }
     let n = low(14, 1);
     if is_low() {
-        board(
+        kit::board(
+            &F,
             "roof_sheet",
             (0, 1.088, LS_Z + 0.185),
             (0, 1.03, LS_Z - 0.185),

@@ -625,12 +625,13 @@ pub fn fire_engine() -> Vec<Obj> {
         (0, FE_ROOF + 0.005, (FE_BODY + FE_BACK) / 2.0),
         m.steel
     );
+    // the gantries stop short of the suction hoses beside them (the nearer at x -0.82)
     for z in [0.55, -2.55] {
         let zs = float_repr(z);
         fbox!(
             F,
             format!("gantry{zs}"),
-            1.3,
+            1.0,
             0.04,
             0.08,
             (-0.2, 2.97, z),
@@ -643,7 +644,7 @@ pub fn fire_engine() -> Vec<Obj> {
                 0.05,
                 0.12,
                 0.06,
-                (-0.2 + s as f64 * 0.6, 2.9, z),
+                (-0.2 + s as f64 * 0.45, 2.9, z),
                 m.iron
             );
         }

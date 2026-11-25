@@ -2,7 +2,7 @@
 
 use super::common::{M, WALL, candle, leg, open_book, vase};
 use artkit::forms::{rounded_rect, smooth_outline};
-use artkit::math::{Axis, P3, PI, TAU, cos, cosd, degrees, pow, sin, sind, sqrt};
+use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, sin, sind, sqrt};
 use artkit::motion::{Spin, spin};
 use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
@@ -481,8 +481,8 @@ pub fn record_cabinet() -> Vec<Obj> {
         );
     });
     let plat = hinged(join(&plat, "platter", None), f.at(-0.225, 0.606, zc));
-    // The lid over the well, hinged along its back: a walnut frame round a sunk panel, a finger lip at the front;
-    // `lid_open` lifts it.
+    // The lid over the well, hinged along its back's top edge (as a piano hinge, so its back edge tips forward, not
+    // into the wall): a walnut frame round a sunk panel, a finger lip at the front; `lid_open` lifts it.
     let lid = new_parts(|| {
         fextrude!(
             f,
@@ -519,7 +519,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             bevel_segments = 1
         );
     });
-    let lid = hinged(join(&lid, "lid", None), f.at(-0.225, TOP + 0.0125, WALL));
+    let lid = hinged(join(&lid, "lid", None), f.at(-0.225, TOP + 0.025, WALL));
     let objs = settle!(centre = false);
     swing!(lid, "lid_open", -80.0, seconds = 0.9, axis = Axis::X);
     spin(
@@ -538,55 +538,12 @@ pub fn record_cabinet() -> Vec<Obj> {
 const REST: (f64, f64, f64) = (0.22, 0.02, 0.36); // the end pin's foot on the stand
 const PLAY: (f64, f64, f64) = (0.0, 0.02, 0.3); // and played
 
-/// An instrument's body outline (game x, height), its lower and upper bouts the ellipses `lower` and `upper`
-/// (middle height, half-width, half-height) meeting at a rounded waist; from the foot round.
-fn figure8(
-    lower: (f64, f64, f64),
-    upper: (f64, f64, f64),
-    n: usize,
-    passes: usize,
-) -> Vec<(f64, f64)> {
-    let ((c1, a1, b1), (c2, a2, b2)) = (lower, upper);
-    let half = |c: f64, a: f64, b: f64, y: f64| {
-        let t = (y - c) / b;
-        let q = 1.0 - t * t;
-        a * sqrt(if q > 0.0 { q } else { 0.0 })
-    };
-    let (mut lo, mut hi) = (c1, c2);
-    for _ in 0..40 {
-        let m = (lo + hi) / 2.0;
-        (lo, hi) = if half(c1, a1, b1, m) > half(c2, a2, b2, m) {
-            (m, hi)
-        } else {
-            (lo, m)
-        };
-    }
-    let yw = (lo + hi) / 2.0;
-    let t1 = degrees(libm::asin(((yw - c1) / b1).clamp(-1.0, 1.0)));
-    let t2 = degrees(libm::asin(((yw - c2) / b2).clamp(-1.0, 1.0)));
-    let mut right: Vec<(f64, f64)> = (0..=n)
-        .map(|i| -90.0 + (t1 + 90.0) * i as f64 / n as f64)
-        .map(|t| (a1 * cosd(t), c1 + b1 * sind(t)))
-        .collect();
-    right.extend(
-        (0..=n)
-            .map(|i| t2 + (90.0 - t2) * i as f64 / n as f64)
-            .map(|t| (a2 * cosd(t), c2 + b2 * sind(t))),
-    );
-    let left: Vec<(f64, f64)> = right[1..right.len() - 1]
-        .iter()
-        .rev()
-        .map(|&(x, y)| (-x, y))
-        .collect();
-    smooth_outline(&[right, left].concat(), passes, true)
-}
-
 /// The cello, upright with its end pin's foot at REST, its face to the front: a body lofted from its outline, the
 /// plates arched over the ribs, f-holes, a tailpiece and a carved bridge, the neck, fingerboard, pegbox and scroll,
 /// four strings.
 fn cello_body(f: &GameFrame) {
     let (x, y0, z) = REST;
-    let out = figure8((0.43, 0.233, 0.22), (0.75, 0.177, 0.19), 9, 1);
+    let out = kit::figure8((0.43, 0.233, 0.22), (0.75, 0.177, 0.19), 9, 1);
     let cy = 0.58;
     let secs = [
         (0.35, -0.071),

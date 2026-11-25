@@ -1,11 +1,12 @@
 //! The cookers: the electric cooker, the gas range, the oven tower, the range cooker and the hob counter.
 
-use super::common::{burner, fillet, flame, hob_ring, hot_ring, knob, knob_obj, light};
+use super::common::{burner, flame, hob_ring, hot_ring, knob, knob_obj, light};
 use super::ovens::{drawer_front, oven, oven_door, oven_face, stock_pot, strip, tray};
 use super::{COUNTER66, M, SECONDS};
 use crate::common::shaker;
 use artkit::forms::rounded_rect;
 use artkit::kit;
+use artkit::kit::fillet;
 use artkit::math::{Axis, cos, radians, sin};
 use artkit::parts::{join, new_parts, set_origin, settle_all};
 use artkit::place::{Facing, GameFrame};

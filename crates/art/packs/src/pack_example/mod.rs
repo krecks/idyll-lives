@@ -24,8 +24,8 @@ mod tub;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_example",
         M.palette(),
         vec![
@@ -46,5 +46,5 @@ pub fn family() -> Option<Family> {
          manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group. The stove's oven door drops and its front burner lights; the tub fills and bubbles while residents \
          soak.",
-    ))
+    )
 }

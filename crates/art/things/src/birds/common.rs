@@ -198,12 +198,19 @@ pub fn ease(xs: &[f64], ys: &[f64], x: f64) -> f64 {
         + m1 * (pow(f, 3.0) - pow(f, 2.0))
 }
 
-/// `_reach`: how far from `base` along `d` (unit) is `length` from `a`.
+/// `_reach`: how far from `base` along `d` (unit) is `length` from `a`; panics where no point ahead of `base` is
+/// (a bird too short for its bill and body: its tail would run back through it).
 pub fn reach(a: V3, base: V3, d: V3, length: f64) -> f64 {
     let w = base - a;
     let bq = 2.0 * w.dot(d);
     let cq = w.dot(w) - length * length;
-    (-bq + sqrt(0.0f64.max(bq * bq - 4.0 * cq))) / 2.0
+    let disc = bq * bq - 4.0 * cq;
+    let t = (-bq + sqrt(disc)) / 2.0;
+    assert!(
+        disc >= 0.0 && t > 0.0,
+        "{length} m is too short: no tail reaches it from its base ({t} m)"
+    );
+    t
 }
 
 /// `_tube`: a three-sided rod (a leg).

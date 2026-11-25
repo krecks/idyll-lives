@@ -309,7 +309,8 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         bevel = if detail { 0.03 } else { 0.0 }
     );
     if !detail {
-        // from afar: the lamps, exhaust and canopy; no grille bars, vents, weights or levers
+        // from afar: the lamps, exhaust and canopy, the front weights one block (as far out as they are, so it
+        // stands where the tractor does); no grille bars, vents or levers
         cylinder!(
             "exhaust",
             0.045,
@@ -319,6 +320,7 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
             verts = 6
         );
         fbox!(F, "canopy", 1.32, 0.08, 1.38, (0, 2.42, -0.52), green);
+        fbox!(F, "weights", 0.64, 0.22, 0.13, (0, 0.6, 1.69), M.iron);
         return settle(&[join_all("tractor_far")]);
     }
     soft!(
@@ -633,8 +635,8 @@ pub fn tractor() -> Vec<Obj> {
     tractor_detail(true)
 }
 
-/// The tractor from afar: plain cylinder tyres without lugs, plain fenders and roll frames, no grille, vents,
-/// weights or levers.
+/// The tractor from afar: plain cylinder tyres without lugs, plain fenders and roll frames, the weights one block, no
+/// grille, vents or levers.
 pub fn tractor_far() -> Vec<Obj> {
     tractor_detail(false)
 }

@@ -1,6 +1,6 @@
 //! The raised vegetable bed, the garden shed, the compost bin and the rain barrel.
 
-use super::common::{F, M, blob, board, ground, pot, prism, rod};
+use super::common::{F, M, blob, ground, pot, prism, rod};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::kit;

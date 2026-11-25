@@ -1,11 +1,12 @@
 //! The street-name sign, the taxi rank's sign and the car park's P sign.
 
-use super::common::{_band, _box, _lettering, _post, _post_turned};
+use super::common::{_band, _box, _lettering, _post_turned};
 use super::{F, M};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit::{Chequer, TaxiWord, chequer, taxi_word};
+use artkit::math::{cos, sin};
 use artkit::parts::{Settle, join_all, settle_all, settle_with};
 use artkit::place::Facing;
 use artkit::rand::Random;
@@ -16,7 +17,7 @@ use std::f64::consts::{FRAC_PI_2, PI};
 pub fn sign() -> Vec<Obj> {
     let mut rng = Random::new(7);
     let full = !is_low();
-    _post(&F, 2.585, 0.075, 0.035);
+    _post_turned(&F, 2.585, 0.075, 0.035, 6);
     revolve!(
         "finial",
         &[
@@ -88,7 +89,7 @@ pub fn sign() -> Vec<Obj> {
 pub fn taxi_sign() -> Vec<Obj> {
     let full = !is_low();
     // the post up into the sign's case
-    _post(&F, 2.3, 0.0375, 0.035);
+    _post_turned(&F, 2.3, 0.0375, 0.035, 6);
     _band(&F, "collar", 2.18, 0.037, 0.04);
     // the sign: a yellow case, a light box lettered TAXI on both faces (lit at night), the chequers under it
     _box(&F, "case", 0.5, 0.3, 0.07, (0, 2.42, 0), M.taxi, 0.012);
@@ -272,7 +273,7 @@ fn letter_p(segments: usize) -> (Outline, Outline) {
         (0..=segments)
             .map(|k| {
                 let a = -FRAC_PI_2 + PI * k as f64 / segments as f64;
-                (cx + r * a.cos(), cy + r * a.sin())
+                (cx + r * cos(a), cy + r * sin(a))
             })
             .collect()
     };

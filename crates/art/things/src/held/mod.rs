@@ -15,8 +15,6 @@
 //! budget of a thing under 35 cm), 2,000 for the few 35-40 cm across (the pot, the boards, trays and
 //! platters). Turned things are `lathe`s (fluted, lobed or bent where the thing is); crusts, rims, handles,
 //! straws and piped icing are sweeps; boards, leaves, cutlery and smears are outlines extruded.
-//!
-//! `HELD_MEASURE=1 cargo art held --preview` prints where each is built and its size, to copy into its `i(...)` line.
 
 use artkit::family::{Build, Family, Model};
 
@@ -42,11 +40,6 @@ fn i(
     code: bool,
     tolerance: f64,
 ) -> Model {
-    let tolerance = if std::env::var_os("HELD_MEASURE").is_some() {
-        3.0
-    } else {
-        tolerance
-    };
     let model = Model::new(id, build, size)
         .key(key)
         .centre(centre.0, centre.1)
@@ -59,14 +52,14 @@ const O: (f64, f64) = (0.0, 0.0);
 const T: f64 = 0.02;
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     use dishes::*;
     use hand::*;
     use plates::*;
     use quick::*;
     use tools::*;
     use town::*;
-    Some(Family::new(
+    Family::new(
         "held",
         M.palette(),
         vec![
@@ -813,5 +806,5 @@ pub fn family() -> Option<Family> {
          content `items`, the props drawn on a station while cooking and those in the hands while a thing is used. \
          Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw \
          call (the wooden boards two).",
-    ))
+    )
 }

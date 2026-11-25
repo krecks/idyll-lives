@@ -1,6 +1,6 @@
 //! The potting bench (2x1): a sage bench against the wall, pots and seedlings, tools on the back board.
 
-use super::common::{_flower, _m, _pot, _rosette, M, WALL};
+use super::common::{_flower, _pot, _rosette, M, WALL};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::kit;
@@ -451,7 +451,7 @@ pub fn potting_bench() -> Vec<Obj> {
             21,
             0.0,
         );
-        for (k, m) in ["pink", "yellow", "pink", "lilac", "yellow", "lilac"]
+        for (k, m) in [M.pink, M.yellow, M.pink, M.lilac, M.yellow, M.lilac]
             .into_iter()
             .enumerate()
         {
@@ -475,8 +475,8 @@ pub fn potting_bench() -> Vec<Obj> {
                 sy + 0.17 + 0.03 * (k % 2) as f64,
                 fz,
                 0.035,
-                _m(m),
-                Some(if m != "yellow" { M.yellow } else { M.carrot }),
+                m,
+                Some(if m != M.yellow { M.yellow } else { M.carrot }),
                 5,
                 20.0,
                 -a + 90.0,
@@ -612,10 +612,10 @@ pub fn potting_bench() -> Vec<Obj> {
             );
         }
         for (k, (dx, dy, dz, m)) in [
-            (0.12, 0.03, -0.03, "pink"),
-            (0.135, 0.045, 0.005, "yellow"),
-            (0.115, 0.032, 0.035, "lilac"),
-            (0.1, 0.05, -0.005, "pink"),
+            (0.12, 0.03, -0.03, M.pink),
+            (0.135, 0.045, 0.005, M.yellow),
+            (0.115, 0.032, 0.035, M.lilac),
+            (0.1, 0.05, -0.005, M.pink),
         ]
         .into_iter()
         .enumerate()
@@ -627,7 +627,7 @@ pub fn potting_bench() -> Vec<Obj> {
                 TOP + dy,
                 bz + dz,
                 0.03,
-                _m(m),
+                m,
                 Some(M.yellow),
                 6,
                 70.0,

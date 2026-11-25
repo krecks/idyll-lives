@@ -1,8 +1,9 @@
 //! The child's scooter and the electric scooter.
 
-use crate::yard::common::{F, M, arc_points, board};
+use crate::yard::common::{F, M, arc_points};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::{P3, cosd, sind};
 use artkit::parts::{Settle, join, join_all, new_parts, numbered, settle_with};
 use artkit::place::Facing;
@@ -177,7 +178,8 @@ fn sc_frame() {
     }
     // the back fork: a plate either side from the deck's tail to the axle; the fender over the wheel, a light at its end
     for s in [-1.0, 1.0] {
-        board(
+        kit::board(
+            &F,
             &numbered("rear_fork"),
             (x0 + 0.03, top - 0.03, s * 0.042),
             (SC_REAR, SC_R, s * 0.042),

@@ -27,8 +27,8 @@ use common::M;
 const SLATS: [(&str, &str); 2] = [("iron", "Frame"), ("park_slats", "Slats")];
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "outdoor",
         M.palette(),
         vec![
@@ -114,5 +114,25 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The \
          parasol's canopy stirs in the wind (`stir`, ambient); the lounger reclines, the hammock and the swings \
          sway with whoever is on them, and the hot tub's cover folds back for a soak.",
-    ))
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use artkit::json::Json;
+
+    /// The porch swing's cushion top is the content's seat height.
+    #[test]
+    fn content_facts() {
+        let o = crate::content_object("catalog2/outdoor.json", "porchSwing");
+        let height = o
+            .get("seat")
+            .and_then(|s| s.get("height"))
+            .and_then(Json::num);
+        assert_eq!(
+            height,
+            Some(super::leisure::PORCH_SEAT),
+            "porchSwing: seat moved"
+        );
+    }
 }

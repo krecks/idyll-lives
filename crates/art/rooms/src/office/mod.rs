@@ -5,7 +5,7 @@
 //! The parts are placed in game axes (`F`, no shift), where the game places it; a desk's top is the content's
 //! `surface` height (`DT`, 0.75 for the plain desks, 1.05 standing). Backs against the wall stop at its face (game
 //! depth -0.43, -0.93 two tiles deep). The computer, writing, laptop and gaming desks keep the old part's chair in
-//! the back half (`characters.ts` SEATS: seat 0.44, 17 cm back), facing the desk, as residents sit there. Moving
+//! the back half (furniture.json `seats`: seat 0.44, 17 cm back), facing the desk, as residents sit there. Moving
 //! parts:
 //! - the standing and computer desks' keyboard shelf slides out to the resident while they type (`tray_out`);
 //! - the writing desk's drawer slides out as they sit down to write (`drawer_open`, shut after 2.5 s);
@@ -104,17 +104,17 @@ palette! { M:
 }
 
 const F: GameFrame = GameFrame::new(0.0);
-const WALL: f64 = -0.43; // the wall's face, game depth (one tile deep)
+use artkit::kit::WALL;
 const DT: f64 = 0.74; // the second catalogue's desk top
 const FT: f64 = 0.7525; // the plain desks' top (content surface 0.75)
-const CHAIR_Z: f64 = -0.17; // where a desk's own chair stands (characters.ts SEATS fwd)
+const CHAIR_Z: f64 = -0.17; // where a desk's own chair stands (furniture.json `seats` fwd)
 
 const DESK: [(&str, &str); 2] = [("frame", "Frame"), ("drawers", "Drawers")];
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let swivel = json!({"uses": {"sit": "swivel", "write": "swivel", "homework": "swivel"}, "hold": 0.6, "ride": "swivel"});
-    Some(Family::new(
+    Family::new(
         "office",
         M.palette(),
         vec![
@@ -222,5 +222,5 @@ pub fn family() -> Option<Family> {
          costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's \
          drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the \
          chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
-    ))
+    )
 }

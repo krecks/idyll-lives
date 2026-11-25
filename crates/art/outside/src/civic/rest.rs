@@ -714,7 +714,7 @@ pub fn vault_door() -> Vec<Obj> {
                 format!("bolt{k}"),
                 0.022,
                 0.02,
-                (0.66 * cos(a), c + 0.66 * sin(a), WALL + 0.21 - 0.03 + 0.01),
+                (0.66 * cos(a), c + 0.66 * sin(a), WALL + 0.215), // standing 1.5 cm off the face (WALL + 0.21)
                 M.bell,
                 rot = (90, 0, 0),
                 verts = 10

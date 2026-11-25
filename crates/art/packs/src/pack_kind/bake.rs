@@ -5,7 +5,6 @@ use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, sin, sind, sqrt};
 use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
-use artkit::rand::Random;
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, settle, slide, swing, torus};
 
@@ -846,7 +845,6 @@ fn heart(s: f64) -> Vec<(f64, f64)> {
 pub fn giving_jar() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let (jx, jz) = JAR;
-    let _rnd = Random::new(5); // (the script makes it and draws nothing from it)
     let still = new_parts(|| {
         kit::turned!(
             f,

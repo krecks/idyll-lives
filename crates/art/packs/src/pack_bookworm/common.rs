@@ -64,7 +64,7 @@ pub const BOOKS: [Mat; 7] = [
     M.book_a, M.book_b, M.book_c, M.book_d, M.book_e, M.book_f, M.book_g,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 // --- books, china and lamps, shared by the six -------------------------------------------------------------------
 
@@ -158,7 +158,7 @@ pub fn books(
         // a book leaning on the row, on its bottom edge nearest it, its top against the last one
         let (h, t) = (h_max * 0.9, 0.03);
         let s = (x1 - x - t - 0.008) / h;
-        let a = libm::asin(if s < 0.45 { s } else { 0.45 });
+        let a = artkit::math::asin(if s < 0.45 { s } else { 0.45 });
         let px = x + h * sin(a);
         let c = (
             px + t / 2.0 * cos(a) - h / 2.0 * sin(a),

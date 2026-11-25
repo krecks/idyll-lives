@@ -242,7 +242,7 @@ pub fn bed_single() -> Vec<Obj> {
 
 // ---------------------------------------------------------------- the bunk bed
 
-const LOWER: f64 = 0.44; // characters.ts BUNKS['bedBunk']
+const LOWER: f64 = 0.44; // furniture.json bunks.bedBunk
 const UPPER: f64 = 1.38;
 
 /// The depths of the posts and end boards: the head end's backs on the wall's face.
@@ -747,7 +747,7 @@ pub fn bed_king() -> Vec<Obj> {
 
 // ---------------------------------------------------------------- the oak double
 
-const DOUBLE_TOP: f64 = 0.52; // the old part's mattress top (characters.ts BEDS['bedDouble'])
+const DOUBLE_TOP: f64 = 0.52; // the old part's mattress top (furniture.json beds.bedDouble)
 
 /// The oak double.
 pub fn bed_double() -> Vec<Obj> {
@@ -1222,7 +1222,7 @@ pub fn bed_canopy() -> Vec<Obj> {
 
 // ---------------------------------------------------------------- the daybed
 
-const DAYBED_TOP: f64 = 0.51; // the old part's mattress top (characters.ts BEDS['bedDaybed'])
+const DAYBED_TOP: f64 = 0.51; // the old part's mattress top (furniture.json beds.bedDaybed)
 
 /// A turned spindle from y0 up to y1: a bead at each end, swelling in the middle.
 fn spindle(name: &str, x: f64, y0: f64, y1: f64, z: f64, material: artkit::materials::Mat) -> Obj {

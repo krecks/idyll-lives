@@ -1,11 +1,7 @@
 //! What the garden decor is built from.
 
-use crate::ground::rock::{_cut, _cut_own, _lump};
-use artkit::boulder;
 use artkit::bvh::Rays;
-use artkit::materials::Mat;
-use artkit::math::{M4, P3, PI, TAU, V3, cos, p3, radians, sin, v3};
-use artkit::scene::Obj;
+use artkit::math::{P3, PI, TAU, V3, cos, p3, radians, sin, v3};
 
 /// Loft rings for a turned body whose rim is scalloped: `rows` (radius, height), each ring's radius waving by
 /// `depth` (a fraction) round `lobes` lobes, fading in from rows at or above `scallop_from` height.
@@ -77,56 +73,6 @@ pub fn _petals(r0: f64, r1: f64, z0: f64, z1: f64, n: usize, depth: f64) -> Vec<
         out
     };
     vec![ring(r0, z0), ring(r1, z1)]
-}
-
-/// A weathered stone `top` high: a boulder roughened (as the woods' rock, the ground's), faces split off flat by
-/// `fractures` (direction, depth in from its outside, metres), and its foot cut off flat where it goes into the
-/// lawn, so it sits broad and heavy in it, not on it.
-#[allow(clippy::too_many_arguments)]
-pub fn _stone(
-    name: &str,
-    radius: f64,
-    at: (f64, f64),
-    material: Mat,
-    scale: (f64, f64, f64),
-    seed: f64,
-    top: f64,
-    fractures: &[((f64, f64, f64), f64)],
-    subdivisions: usize,
-) -> Obj {
-    let o = boulder!(
-        name,
-        radius,
-        at = (at.0, at.1, 0),
-        material = material,
-        scale = (1, 1, 1),
-        seed = seed,
-        noise = 0.3,
-        subdivisions = subdivisions
-    );
-    _lump(o, 0.1, 4.0, seed);
-    o.edit(|p| p.mesh.transform(&M4::diagonal(scale.into())));
-    for &(direction, depth) in fractures {
-        let n = V3::from(direction).normalized();
-        let reach = o.read(|p| {
-            p.mesh
-                .verts
-                .iter()
-                .map(|v| v.dot(n))
-                .fold(f64::NEG_INFINITY, f64::max)
-        });
-        _cut_own(o, n * (reach - depth), n);
-    }
-    o.edit(|p| {
-        let highest = p
-            .mesh
-            .verts
-            .iter()
-            .map(|v| v.z)
-            .fold(f32::NEG_INFINITY, f32::max);
-        p.loc.z = (top - highest as f64) as f32;
-    });
-    _cut(o, (0, 0, 0), (0, 0, -1))
 }
 
 /// Where lines straight down through `points` (x, y) first meet what is built so far, `sink` below it.

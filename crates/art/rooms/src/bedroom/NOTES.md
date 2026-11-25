@@ -7,7 +7,7 @@ The module builds the nine beds of BR1 into `web/public/assets/models/bedroom/` 
 ## Shared
 
 - **Mattresses centred, at the renderer's mattress heights.** The game lays sleepers centred on the footprint (head about
-  0.84 m behind the middle, feet 0.86 m in front) at characters.ts `BEDS` (`BUNKS` for the bunk's two). Each
+  0.84 m behind the middle, feet 0.86 m in front) at furniture.json `beds` (`bunks` for the bunk's two). Each
   mattress top is that height: `bed` 0.58, `bedSingle` 0.5, `bedBunk` 0.44 and 1.38, `bedFuton` 0.4, `bedKing`
   0.59. The oak double, the queen and the four-poster are 0.52 and the daybed 0.51, as the old parts were: they
   got `BEDS` entries with those tops. Headboard faces stay behind depth -0.87, so heads don't go into them.
@@ -18,7 +18,7 @@ The module builds the nine beds of BR1 into `web/public/assets/models/bedroom/` 
 - **The duvet turns down (`turn_down`).** The game lays its own quilt over each sleeper on `BLANKET_BEDS` (now
   also `bedDouble`, `bedQueenUpholstered`, `bedCanopy`), so the bed's duvet isn't a second cover over them. It is
   two parts: the lower two thirds (`duvet`, one soft, puffed box draped down the sides and the foot, still) and
-  the top third (`duvet_flap`, flat on the mattress with the sheet turned down over its head edge), hinged
+  the top third (`kit::duvet_flap`, flat on the mattress with the sheet turned down over its head edge), hinged
   across the fold on the duvet's top 3 mm up. `turn_down` turns the flap 180° about X in 1 s, laying it over the
   rest toward the foot, and flattens it as it goes (`turn_down`); half way over it is gathered to a fifth of its
   length (`ROLL`, a scale along the bed there and back, 2026-10-21), so it rolls over its fold as cloth, a low

@@ -1,7 +1,8 @@
 //! The fold-down wall bed and the sofa bed.
 
-use super::common::{Cushion, book, cushion, fillet, leg, panel, pillow, plain};
+use super::common::{Cushion, book, cushion, leg, panel, pillow, plain};
 use super::{F, M};
+use artkit::kit::fillet;
 use artkit::math::{Axis, P3, PI, cos, sin};
 use artkit::motion::{Grow, grow};
 use artkit::parts::{hinged, join, new_parts, turn};
@@ -15,7 +16,7 @@ const CAB_FRONT: f64 = -0.94; // the cabinet's sides end here
 const HINGE: (f64, f64) = (0.12, -0.96); // (height, depth) of the bed's hinge, along x: the folded bed clears the back
 const LENGTH: f64 = 1.98; // the bed, head end to foot end
 const BED_W: f64 = 1.56; // the bed panel's width, inside the cabinet's sides
-const MATTRESS_TOP: f64 = 0.46; // characters.ts BEDS['wallBed']
+const MATTRESS_TOP: f64 = 0.46; // furniture.json beds.wallBed
 const INNER_TOP: f64 = 2.14; // the cabinet's opening: the folded bed reaches HINGE height + LENGTH
 const SECONDS: f64 = 1.0; // the bed turns down this fast, as the use that opens it starts
 
@@ -363,7 +364,7 @@ const SB_BACK: f64 = -0.43;
 const SB_FRONT: f64 = 0.40;
 const SB_W: f64 = 1.86;
 const SB_SEAT: f64 = 0.45; // the seat cushion's top (content seat height 0.44)
-const SB_MATTRESS: f64 = 0.44; // the pulled-out mattress's top: characters.ts BEDS['sofaBed'].h
+const SB_MATTRESS: f64 = 0.44; // the pulled-out mattress's top: furniture.json beds.sofaBed.h
 const SB_HEAD: f64 = -0.26; // the mattress out, head end (under the back cushion)
 const SB_FOOT: f64 = 1.52; // to foot end
 const SB_TUCKED: f64 = 0.2; // its share of its length at rest: tucked into the base under the seat, its leg too

@@ -6,7 +6,8 @@
 //! players' hands (held `tool.cue`, one each), not on the cloth.
 
 use super::M;
-use super::common::{P, rr, turned};
+use super::common::P;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
 use artkit::math::{P3, TAU, cos, exp, pow, sqrt};
@@ -176,8 +177,8 @@ pub fn pool_table() -> Vec<Obj> {
                 } else {
                     format!("pocket{s}{}", r(x))
                 };
-                turned(
-                    &f,
+                kit::turned!(
+                    f,
                     &name,
                     x,
                     RAIL_TOP - 0.002,
@@ -192,8 +193,7 @@ pub fn pool_table() -> Vec<Obj> {
                         (0.0, 0.003),
                     ],
                     M.pocket,
-                    14,
-                    P3::ONE,
+                    segments = 14
                 );
             }
             // the sights: mother-of-pearl diamonds on the rails' tops
@@ -229,9 +229,9 @@ pub fn pool_table() -> Vec<Obj> {
             }
             // turned legs, heavy, on square feet
             for sz in [-1, 1] {
-                turned(
-                    &f,
-                    &format!("leg{s}{sz}"),
+                kit::turned!(
+                    f,
+                    format!("leg{s}{sz}"),
                     sf * 1.08,
                     0.02,
                     sz as f64 * 0.5,
@@ -251,8 +251,7 @@ pub fn pool_table() -> Vec<Obj> {
                         (0.0, BED - 0.265),
                     ],
                     M.pool_frame,
-                    10,
-                    P3::ONE,
+                    segments = 10
                 );
                 fbox!(
                     f,
@@ -356,7 +355,7 @@ pub fn pool_table() -> Vec<Obj> {
             &lp,
             0,
             M.rack,
-            profile = rr(0.03, t, 0.004, 1),
+            profile = rounded_rect(0.03, t, 0.004, 1),
             closed = true
         );
     });

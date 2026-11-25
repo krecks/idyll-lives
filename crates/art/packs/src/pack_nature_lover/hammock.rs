@@ -1,7 +1,7 @@
 //! The garden hammock (3x1): a canvas sling 2 m long hung from a curved cedar stand, rocking for the resident
 //! (2026-10-21: 2x1, its sling 1.44 m, grown-ups lying in it with the knees up: M-packs-06, Q-07).
 
-use super::common::{_m, M};
+use super::common::M;
 use artkit::forms::{rect, rounded_rect};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, atan, degrees, pow};
@@ -102,7 +102,7 @@ pub fn garden_hammock() -> Vec<Obj> {
     // to a ring at each end and on to the hooks, a pillow at one end.
     let sling = new_parts(|| {
         let width = 0.62;
-        let stripes = ["canvas", "stripe", "canvas", "canvas", "stripe", "canvas"];
+        let stripes = [M.canvas, M.stripe, M.canvas, M.canvas, M.stripe, M.canvas];
         let zw = width / stripes.len() as f64;
         let xs: Vec<f64> = (0..17).map(|i| -XS + 2.0 * XS * i as f64 / 16.0).collect();
         for (j, m) in stripes.into_iter().enumerate() {
@@ -113,7 +113,7 @@ pub fn garden_hammock() -> Vec<Obj> {
                 format!("sling{j}"),
                 &pts,
                 0.0,
-                _m(m),
+                m,
                 profile = rect(0.012, zw + 0.002),
                 up = (0, 0, 1)
             );

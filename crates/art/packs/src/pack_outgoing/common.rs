@@ -67,20 +67,16 @@ palette! { M:
     pin_b = ("#3E8EDE", gloss),
 }
 
-// By name: as the palette's own names.
-pub const TILES: [&str; 6] = ["tile_a", "tile_b", "tile_c", "tile_d", "tile_e", "tile_f"];
-pub const BOTTLES: [&str; 8] = [
-    "bottle_a", "bottle_b", "bottle_c", "bottle_d", "bottle_e", "bottle_f", "magenta", "turq",
+// Colours in turn.
+pub const TILES: [Mat; 6] = [M.tile_a, M.tile_b, M.tile_c, M.tile_d, M.tile_e, M.tile_f];
+pub const BOTTLES: [Mat; 8] = [
+    M.bottle_a, M.bottle_b, M.bottle_c, M.bottle_d, M.bottle_e, M.bottle_f, M.magenta, M.turq,
 ];
-pub const PHOTOS: [&str; 8] = [
-    "coral", "turq", "sunny", "magenta", "photo_b", "photo_a", "photo_c", "beer",
+pub const PHOTOS: [Mat; 8] = [
+    M.coral, M.turq, M.sunny, M.magenta, M.photo_b, M.photo_a, M.photo_c, M.beer,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
-
-pub fn _m(name: &str) -> Mat {
-    M.palette().get(name)
-}
+pub use artkit::kit::WALL;
 
 /// A spirit bottle standing on `y`: a body (round, or square as a whisky's), its label, a shoulder, neck and cap.
 #[allow(clippy::too_many_arguments)]

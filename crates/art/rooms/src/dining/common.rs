@@ -3,52 +3,18 @@
 use super::F;
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
-use artkit::math::{M4, P3, PI, TAU, V3, cos, pow, sin, tan};
+use artkit::math::{P3, PI, TAU, V3, cos, pow, sin, tan};
 use artkit::mesh::Mesh;
 use artkit::parts::join_all;
 use artkit::place::{Facing, Spot};
 use artkit::scene::{Obj, meshes};
 use artkit::shapes::recalc_normals;
-use artkit::{cube, fextrude, fsweep, loft, revolve, solidify};
+use artkit::{fextrude, fsweep, loft, revolve, solidify};
 use artkit::{kit, scene, settle};
 
 /// A game position or direction as a Blender vector.
 pub fn v(p: impl Spot) -> V3 {
     p.through(&F).into()
-}
-
-/// A board from game point `a` to `b`, `w` wide and `t` thick, its broad face turned towards game direction
-/// `face`: slats, rails and legs at any angle.
-#[allow(clippy::too_many_arguments)]
-pub fn board(
-    name: &str,
-    a: (f64, f64, f64),
-    b: (f64, f64, f64),
-    w: f64,
-    t: f64,
-    material: Mat,
-    face: (i32, i32, i32),
-    bevel: f64,
-) -> Obj {
-    let (a, b) = (v(a), v(b));
-    let z = (b - a).normalized();
-    let x = v(face).cross(z).normalized();
-    let y = z.cross(x);
-    let obj = cube!(
-        name,
-        (w, t, (b - a).length()),
-        material = material,
-        bevel = bevel
-    );
-    // (the translation times the turn: its columns x, y, z and its place the middle)
-    let mid = (a + b) / 2;
-    let m = M4([
-        [x.x, x.y, x.z, 0.0],
-        [y.x, y.y, y.z, 0.0],
-        [z.x, z.y, z.z, 0.0],
-        [mid.x, mid.y, mid.z, 1.0],
-    ]);
-    obj.set_matrix_world(m)
 }
 
 /// Game points of a polyline whose corners are bent round, about `bend` in radius (a curve through each corner,

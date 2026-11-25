@@ -78,8 +78,8 @@ fn machine() -> Json {
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "laundry",
         M.palette(),
         vec![
@@ -164,5 +164,5 @@ pub fn family() -> Option<Family> {
          turn their drum (`drum_spin`) while they run on their own (`running`). The vacuum cleaner, the \
          mop, the broom and the iron leave their place (`*_off`) while a resident has them in hand. The \
          basket of washing and the piece held up to fold are carried (content `items`).",
-    ))
+    )
 }

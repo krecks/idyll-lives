@@ -27,8 +27,8 @@ pub use common::M;
 /// The family.
 // (0.318: the console's depth, not 1/pi)
 #[allow(clippy::approx_constant)]
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_neat",
         M.palette(),
         vec![
@@ -69,5 +69,5 @@ pub fn family() -> Option<Family> {
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves one \
          part while it is used: the mop leaves its dock for the resident's hands, the washer's door opens, the rain \
          falls, a bin slides out, the robot rolls out and the key tray drawer opens.",
-    ))
+    )
 }

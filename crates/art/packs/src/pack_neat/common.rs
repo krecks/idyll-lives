@@ -2,8 +2,7 @@
 
 use artkit::materials::Mat;
 use artkit::math::P3;
-use artkit::place::{Coord, GameFrame};
-use artkit::scene::Obj;
+use artkit::place::GameFrame;
 use artkit::{fcyl, loft, palette, ring, soft};
 
 palette! { M:
@@ -61,19 +60,15 @@ palette! { M:
     bottle_c = ("#F2C6A0", gloss),
 }
 
-/// The towels' colours, by name.
-pub const TOWELS: [&str; 6] = [
-    "towel_a", "towel_b", "towel_c", "towel_d", "towel_e", "towel_f",
+/// The towels' colours.
+pub const TOWELS: [Mat; 6] = [
+    M.towel_a, M.towel_b, M.towel_c, M.towel_d, M.towel_e, M.towel_f,
 ];
-pub const PASTELS: [&str; 6] = [
-    "pastel_a", "pastel_b", "pastel_c", "pastel_d", "pastel_e", "pastel_f",
+pub const PASTELS: [Mat; 6] = [
+    M.pastel_a, M.pastel_b, M.pastel_c, M.pastel_d, M.pastel_e, M.pastel_f,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
-
-pub fn _m(name: &str) -> Mat {
-    M.palette().get(name)
-}
+pub use artkit::kit::WALL;
 
 /// `n` folded towels stacked on `y`, each plump with its fold rounded; returns the stack's top.
 #[allow(clippy::too_many_arguments)]
@@ -86,7 +81,7 @@ pub fn _towels(
     n: usize,
     w: f64,
     d: f64,
-    names: &[&str],
+    colours: &[Mat],
 ) -> f64 {
     for i in 0..n {
         soft!(
@@ -96,7 +91,7 @@ pub fn _towels(
             0.044,
             d,
             (x + 0.004 * (i % 2) as f64, y + 0.022 + i as f64 * 0.046, z),
-            _m(names[i % names.len()]),
+            colours[i % colours.len()],
             round = 0.018,
             puff = (0, 0.004, 0),
             flat = 1,
@@ -104,39 +99,6 @@ pub fn _towels(
         );
     }
     y + n as f64 * 0.046
-}
-
-/// A rounded-cornered box lofted upright (an appliance's cabinet, a dock): `r`-ish corners in plan (`sq`), its top
-/// and bottom edges eased.
-#[allow(clippy::too_many_arguments)]
-pub fn _box<X: Coord, Z: Coord>(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    d: f64,
-    at: (X, f64, Z),
-    material: Mat,
-    sq: f64,
-    verts: usize,
-) -> Obj {
-    let (x, y, z) = at;
-    let b = f.at(x, y - h / 2.0, z);
-    let rings = [(0.0, -0.006), (0.006, 0.0), (h - 0.006, 0.0), (h, -0.006)];
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(hh, e)| {
-            ring!(
-                w / 2.0 + e,
-                d / 2.0 + e,
-                z = b.z + hh,
-                verts = verts,
-                square = sq,
-                at = (b.x, b.y)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
 }
 
 /// A bottle: a rounded-square body, its shoulder, a neck and a cap.

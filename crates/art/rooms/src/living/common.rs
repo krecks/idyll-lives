@@ -4,14 +4,14 @@
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, V3, cos, exp, pow, radians, sin, tan};
+use artkit::math::{P3, PI, V3, cos, exp, pow, sin};
 use artkit::mesh::Mesh;
 use artkit::motion::{Squash, squash};
 use artkit::parts::{join, new_parts, settle};
 use artkit::place::{Coord, Facing};
 use artkit::scene::{self, Obj, meshes};
 use artkit::soft::{Puff, Sag, SoftBox};
-use artkit::{fbox, fextrude, fsweep, jitter, loft, ring, soft};
+use artkit::{fbox, fextrude, fsweep, loft, ring, soft};
 
 pub const SINK: f64 = 0.02;
 const SEAT_SAG: f64 = 0.014; // how far a seat cushion's top sinks towards its front edge, where legs go over it
@@ -146,46 +146,6 @@ pub fn leg(
     )
 }
 
-/// A throw folded over a seat cushion: lying on its top (`top`) from depth z0 to its front edge z1, rolling over it
-/// and hanging `hang` down its front, with a soft wobble.
-#[allow(clippy::too_many_arguments)]
-pub fn throw(
-    name: &str,
-    x: f64,
-    w: f64,
-    top: f64,
-    z0: f64,
-    z1: f64,
-    mat: Mat,
-    hang: f64,
-    turn: f64,
-    seed: f64,
-) -> Obj {
-    let t = 0.012;
-    let y = top + t / 2.0;
-    let pts = [
-        (x, y, z0),
-        (x, y + 0.006, (z0 + z1) / 2.0),
-        (x, y + 0.002, z1 - 0.035),
-        (x, y - 0.012, z1 - 0.004),
-        (x, y - 0.04, z1 + t / 2.0 - 0.004),
-        (x, y - hang, z1 + t / 2.0 - 0.006),
-    ];
-    let obj = fsweep!(
-        F,
-        name,
-        &pts,
-        0.0,
-        mat,
-        profile = rounded_rect(w, t, t / 2.0, 1),
-        up = (1, 0, 0),
-        resolution = 3
-    );
-    jitter!(obj, 0.004, size = 0.12, seed = seed, up = 0.6);
-    obj.edit(|o| o.rot.z = radians(-turn) as f32);
-    obj
-}
-
 /// The seat cushions `cushions()` makes (returning their top), joined into the part `seat`, with the clip that
 /// sinks them: (the seat, how thick it is).
 pub fn seat(cushions: impl FnOnce() -> f64, bottom: f64, mid: impl Coord) -> (Obj, f64) {
@@ -306,34 +266,6 @@ pub fn disc(name: &str, rows: &[(f64, f64)], mat: Mat, x: f64, z: f64, verts: us
         &round_rings(&rows, verts, 2.0, (-x, -z)),
         material = mat
     )
-}
-
-/// A polyline (game points) with each inner corner rounded by an arc of radius `r` (`steps` segments): a bent rod
-/// or tube that keeps to its corners, where a curve through the points would bulge past them.
-pub fn fillet(points: &[(f64, f64, f64)], r: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, b, c) = (w[0], w[1], w[2]);
-        let (u, v) = ((a - b).normalized(), (c - b).normalized());
-        let half = u.angle(v) / 2.0;
-        if half < 1e-3 || (half - PI / 2.0).abs() < 1e-3 {
-            out.push(b);
-            continue;
-        }
-        let cut = (r / tan(half))
-            .min((a - b).length() / 2.0)
-            .min((c - b).length() / 2.0);
-        let (p0, p1) = (b + u * cut, b + v * cut);
-        for i in 0..=steps {
-            let t = i as f64 / steps as f64; // a quadratic Bezier through the corner, close to the arc
-            out.push(p0 * pow(1.0 - t, 2.0) + b * 2 * t * (1.0 - t) + p1 * t * t);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
 }
 
 /// A table top `w` × `d`, its corners rounded by `r`, `t` thick, its top at `y`; its edges eased (`bevel`).

@@ -10,7 +10,7 @@ chair, the window seat's cushion top); the tub keeps `SEATS`/`BEDS` 0.25 (its in
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `recordCabinet` | the lid over the turntable's well, hinged along its back: `lid_open` lifts it 80° (0.9 s) | `listen`, `newAlbum` |
+| `recordCabinet` | the lid over the turntable's well, hinged along its back's top edge (its back edge tips forward, clear of the wall): `lid_open` lifts it 80° (0.9 s) | `listen`, `newAlbum` |
 | `recordCabinet` | the platter and record, origin on the spindle: `platter_spin`, one turn clockwise in 1.8 s (33 rpm), a loop | `listen`, `newAlbum` (loop) |
 | `cello` | the cello, built upright on its stand, origin on the end pin's foot: `off_stand` (0.9 s) moves it across to between the player's knees and leans it back 14° | `practise`, `lament` |
 | `journalDesk` | the tall candle's flame, built full size on its wick and scaled to nothing: `candle` lights it (0.6 s); its material glows at night. Its top is at 0.75 (2026-10-21: 0.78, over a desk's 0.72–0.76: M-packs-08), everything on it 3 cm lower with it | `journal`, `poetry` |

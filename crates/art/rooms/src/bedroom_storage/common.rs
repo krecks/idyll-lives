@@ -59,7 +59,7 @@ palette! { M:
 
 /// Game numbers as they are: the models stand where the game places them.
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, the back of anything against it
+pub use artkit::kit::WALL;
 
 pub const DRAWER_SECONDS: f64 = 0.9; // a drawer slides out 30 cm in this long
 // seconds the nightstand's drawer stays out (the dressers' and wardrobes' stay open while the resident changes,
@@ -71,38 +71,6 @@ pub const PULL: f64 = 0.30; // how far a drawer slides out
 /// The clothes' colours, in turn.
 fn clothes(i: i64) -> Mat {
     [M.cloth1, M.cloth2, M.cloth3, M.cloth4][py::imod(i, 4) as usize]
-}
-
-/// A bar pull on two stand-offs, out from a front at game depth `face`.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-) -> Obj {
-    kit::pull!(
-        F,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        r = r,
-        out = out,
-        upright = upright
-    )
-}
-
-/// A turned knob, its rose on the front at game depth `at.2`.
-pub fn knob(name: &str, r: f64, at: (impl Coord, f64, f64), material: Mat) -> Obj {
-    kit::knob!(F, name, at.0, at.1, at.2, r, material)
 }
 
 /// A top `w` x `d`, `t` thick, its surface at `y`, its edges and corners rounded.

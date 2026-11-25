@@ -27,8 +27,8 @@ mod yard;
 use common::S;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "civic_works",
         S.palette(),
         vec![
@@ -104,5 +104,5 @@ pub fn family() -> Option<Family> {
          overview. The press's plate and blanket cylinders turn while a resident watches it run (`rollers`); the \
          server rack's LEDs blink (`blink`) and the flag sways at the top of its pole (`flutter`), both ambient; \
          the server rack's LEDs and its UPS's screen glow at night.",
-    ))
+    )
 }

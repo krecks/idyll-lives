@@ -817,7 +817,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             8,
         );
         let bars: Vec<(f64, f64, f64)> = s.bars.iter().map(|&(x, h, dz)| (x, h, bz + dz)).collect();
-        bent("bars", &bars, 0.011 * k, M.rim, s.bend, low(8, 5), 3);
+        bent("bars", &bars, 0.011 * k, M.rim, s.bend, low(8, 5), 3, 1.0);
         for &(a, b) in &s.grips {
             rod(
                 &numbered("grip"),
@@ -950,6 +950,7 @@ pub fn bike_rack() -> Vec<Obj> {
                 0.15,
                 low(10, 6),
                 low(5, 2),
+                1.0,
             );
             for e in [-1.0, 1.0] {
                 fbox!(

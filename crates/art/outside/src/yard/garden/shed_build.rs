@@ -182,7 +182,8 @@ pub fn shed_small() -> Vec<Obj> {
                 t_hinge(&numbered("hinge"), x0 + 0.02, y, dz + 0.0365, 0.32, M.iron);
             }
         }
-        board(
+        kit::board(
+            &F,
             "brace",
             (x0 + 0.08, 0.36, dz + 0.024),
             (x0 + DOOR_W - 0.08, 1.21, dz + 0.024),

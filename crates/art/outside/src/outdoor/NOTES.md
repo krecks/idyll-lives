@@ -8,8 +8,8 @@ stay where the game has them; models that stand off the middle of their footprin
 ends and bent tubes in one piece, shaped and rounded boards, soft piped cushions, lofted cups, jugs, bottles and a
 basket, a parasol canopy sagging between its ribs, a mosaic of proud tiles, extruded stones and wedges. The common
 pieces (chairs, benches, tables, the parasol) keep to about half their size class's target: the town overview draws
-every lot's outdoor objects whole, and these have no far version. Helpers (`common.rs`): `bent` (`kit::fillet!` + `kit::tube!`), `bar` (a
-rounded-rect section swept), `plank` (an outline placed like a board), `side_slab`, `slab`, `cup`, `jug`,
+every lot's outdoor objects whole, and these have no far version. Helpers (`common.rs`, `rod` and `bent` the yard's and the civic family's too): `bent` (`kit::fillet!` +
+`kit::tube!`), `bar` (a rounded-rect section swept), `plank` (an outline placed like a `kit::board`), `side_slab`, `slab`, `cup`, `jug`,
 `bottle`, and `jitter`, which wobbles with `noise()` so a jittered model is the same on every run (in Blender the
 shared jitter was not: the fire pit's centre moved 2 mm and failed the size check); `mosaic` (`tables.rs`),
 `cast_end` (`seats.rs`), `flame` and `log` (`fire.rs`).
@@ -107,7 +107,7 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
   on the pillow and the feet inside the spreader bar. A changed sling needs those numbers changed too; the two pack
   hammocks have theirs.
 - **Porch swing** (`porchSwing`): an A-frame; the slatted seat with arms, cushion (its top 0.52 m, the content's
-  `seat`; 5 cm lower than it was) and chains swings from the beam,
+  `seat`, `PORCH_SEAT`, a test holds them together; 5 cm lower than it was; until 2026-11-25 the top was 0.505) and chains swings from the beam,
   `swing` ±10° in 2 s while sat in, ridden. Chains are plain satin, so the seat stays one draw call.
 - **Swing set** (`swingSet`): a round-timber A-frame, its legs splayed ±0.72 m at the foot (2 × 2 tiles; it was
   ±0.42 on 2 × 1, too upright for seats swinging 20°); both seats and their chains are one part, `swing` ±20° in

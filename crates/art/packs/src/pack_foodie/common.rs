@@ -88,7 +88,6 @@ palette! { M:
     hob = ("#22262B", gloss),
     ring = ("#7E848B", gloss),       // the hob's printed rings, grey (red, the cook's ring at rest looked lit)
     heat = ("#D2402A", gloss),       // the hob's ring glowing hot under the pan while it cooks
-    carrot = ("#E2832E", satin),
     plate = ("#F6F3EA", gloss),
     // added with the detail pass
     crust = ("#D9A35A", matte),      // bread crusts, the pizza's rim
@@ -96,7 +95,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A body standing on `y` at (x, z), lofted through rings (height, radius) from its foot up.
 #[allow(clippy::too_many_arguments)]

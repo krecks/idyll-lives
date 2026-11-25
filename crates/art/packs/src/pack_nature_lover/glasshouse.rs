@@ -1,6 +1,6 @@
 //! The fern glasshouse (2x2): a white-framed glass room, a bench for two, ferns, orchids and palms.
 
-use super::common::{_m, _pot, _rosette, M};
+use super::common::{_pot, _rosette, M};
 use super::ferns::{_fern, _orchid, _palm};
 use artkit::forms::{rect, smooth_outline};
 use artkit::json::float_repr;
@@ -420,7 +420,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 x,
                 sy,
                 -0.66,
-                _m(["orchid", "white", "orchid_b"][i]),
+                [M.orchid, M.white, M.orchid_b][i],
             );
         }
         for (k, x) in [-0.6, -0.07, 0.43].into_iter().enumerate() {

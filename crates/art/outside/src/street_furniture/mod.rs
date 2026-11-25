@@ -28,14 +28,14 @@ mod statue;
 use common::{FAR, SF, own};
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // each model's materials are named in its own palette: the shared colours and its own `body`
     let mine = |model: Model| {
         let palette = own(model.id).palette();
         model.palette(palette)
     };
-    Some(
-        Family::new(
+
+    Family::new(
             "street_furniture",
             SF.palette(),
             vec![
@@ -109,8 +109,5 @@ pub fn family() -> Option<Family> {
              night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for \
              `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water \
              runs near the camera (`water_run`, ambient).",
-        )
-        .pack("street_furniture")
-        ,
     )
 }

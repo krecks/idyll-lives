@@ -71,11 +71,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
-
-pub fn _m(name: &str) -> Mat {
-    M.palette().get(name)
-}
+pub use artkit::kit::WALL;
 
 /// A flower pot standing on `y`, `d` across its rim: a tapered wall under a rolled rim, open below the soil (never
 /// seen), and its soil a little mound inside the rim; returns the soil's height.

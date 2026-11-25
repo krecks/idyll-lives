@@ -1283,77 +1283,16 @@ pub fn basketball() -> Vec<Obj> {
 
 /// A steam iron, 26 cm long, standing on its soleplate, its point to the front (+depth): the steel plate, the white
 /// shell over it, the handle arched over the back half (held by its middle, 13.8 cm up: actions.ts `PROPS.iron`,
-/// grip `level`), a teal water window and dial. The ironing board's own (crates/art/wet/src/laundry) rests at its
-/// end and is hidden while this one is in the hand.
+/// grip `level`), a teal water window and dial: `kit::steam_iron`, as the ironing board's (crates/art/wet/src/laundry)
+/// that rests at its end and is hidden while this one is in the hand.
 pub fn steam_iron() -> Vec<Obj> {
-    // the soleplate: square at the heel, curving to the point
-    let mut sole: Vec<(f64, f64)> = vec![(-0.055, -0.1), (0.055, -0.1)];
-    for k in 0..=10 {
-        let a = PI / 2.0 * (1.0 - 2.0 * k as f64 / 10.0);
-        sole.push((0.055 * sin(a), 0.04 + 0.12 * cos(a).powf(1.6)));
-    }
-    fextrude!(
-        F,
-        "iron_sole",
-        &sole,
-        0.012,
-        (0, 0, 0),
+    artkit::kit::steam_iron(
+        &F,
+        (0.0, 0.0, 0.0),
+        (0.0, 1.0),
         M.steel,
-        plane = Facing::Top,
-        bevel = 0.003,
-        bevel_segments = 1
-    );
-    let shell: Vec<(f64, f64)> = sole
-        .iter()
-        .map(|p| (p.0 * 0.9, p.1 * 0.92 - 0.004))
-        .collect();
-    fextrude!(
-        F,
-        "iron_shell",
-        &shell,
-        0.05,
-        (0, 0.012, 0),
         M.iron_shell,
-        plane = Facing::Top,
-        bevel = 0.016,
-        bevel_segments = 2
-    );
-    fsweep!(
-        F,
-        "iron_handle",
-        &fillet(
-            &[
-                (0.0, 0.06, -0.085),
-                (0.0, 0.125, -0.07),
-                (0.0, 0.125, 0.08),
-                (0.0, 0.06, 0.1)
-            ],
-            0.03,
-            3
-        ),
-        0.0,
-        M.iron_shell,
-        profile = rounded_rect(0.022, 0.03, 0.009, 2),
-        up = (1, 0, 0)
-    );
-    fbox!(
-        F,
-        "iron_window",
-        0.004,
-        0.03,
-        0.07,
-        (0.047, 0.045, 0.04),
         M.iron_trim,
-        bevel = 0.002,
-        bevel_segments = 1
-    );
-    disc!(
-        "iron_dial",
-        0.016,
-        0.012,
-        (0.0, 0.06, -0.035),
-        M.iron_trim,
-        verts = 12
     );
     done("iron")
 }

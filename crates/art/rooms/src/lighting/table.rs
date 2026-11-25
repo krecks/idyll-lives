@@ -2,7 +2,6 @@
 
 use super::common::{
     Drum, F, Lathe, M, bulb, check_at, drum, lathe, loft_at, near_light, ring_at, socket, trough,
-    turn,
 };
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -99,8 +98,12 @@ pub fn table_lamp() -> Vec<Obj> {
                 );
             }
         }
-        turn(
+        kit::turned!(
+            F,
             "foot",
+            -0.12,
+            0.5,
+            0,
             &[
                 (0.0, 0.0),
                 (0.052, 0.0),
@@ -108,9 +111,8 @@ pub fn table_lamp() -> Vec<Obj> {
                 (0.05, 0.01),
                 (0.0, 0.01),
             ],
-            (-0.12, 0.5, 0),
             M.brass,
-            24,
+            segments = 24
         );
         lathe(
             "base",
@@ -124,8 +126,12 @@ pub fn table_lamp() -> Vec<Obj> {
                 ..Lathe::default()
             },
         );
-        turn(
+        kit::turned!(
+            F,
             "neck",
+            -0.12,
+            0.695,
+            0,
             &[
                 (0.0, 0.0),
                 (0.024, 0.0),
@@ -133,9 +139,8 @@ pub fn table_lamp() -> Vec<Obj> {
                 (0.014, 0.014),
                 (0.0, 0.014),
             ],
-            (-0.12, 0.695, 0),
             M.brass,
-            14,
+            segments = 14
         );
         socket("socket", 0.02, 0.05, (-0.12, 0.71, 0), M.brass, 12);
         bulb(
@@ -180,8 +185,12 @@ pub fn table_lamp() -> Vec<Obj> {
 /// drum shade bound at its edges.
 pub fn lamp_table_round() -> Vec<Obj> {
     new_parts(|| {
-        turn(
+        kit::turned!(
+            F,
             "plinth",
+            0,
+            0,
+            0,
             &[
                 (0.0, 0.0),
                 (0.07, 0.0),
@@ -190,9 +199,8 @@ pub fn lamp_table_round() -> Vec<Obj> {
                 (0.058, 0.018),
                 (0.0, 0.018),
             ],
-            (0, 0, 0),
             M.brass,
-            28,
+            segments = 28
         );
         lathe(
             "jar",
@@ -209,8 +217,12 @@ pub fn lamp_table_round() -> Vec<Obj> {
         for (k, (y, r)) in [(0.06, 0.084), (0.2, 0.084)].into_iter().enumerate() {
             ring_at(&format!("jar_band{k}"), r, (0, y, 0), 0.003, M.jar, 32, 4);
         }
-        turn(
+        kit::turned!(
+            F,
             "cap",
+            0,
+            0.258,
+            0,
             &[
                 (0.0, 0.0),
                 (0.03, 0.0),
@@ -219,9 +231,8 @@ pub fn lamp_table_round() -> Vec<Obj> {
                 (0.012, 0.02),
                 (0.0, 0.02),
             ],
-            (0, 0.258, 0),
             M.brass,
-            16,
+            segments = 16
         );
         kit::tube!(
             F,
@@ -259,8 +270,12 @@ pub fn lamp_table_round() -> Vec<Obj> {
             verts = 6,
             round = 3
         );
-        turn(
+        kit::turned!(
+            F,
             "finial",
+            0,
+            0.55,
+            0,
             &[
                 (0.0, 0.0),
                 (0.005, 0.0),
@@ -270,9 +285,8 @@ pub fn lamp_table_round() -> Vec<Obj> {
                 (0.004, 0.026),
                 (0.0, 0.027),
             ],
-            (0, 0.55, 0),
             M.brass,
-            12,
+            segments = 12
         );
         drum(
             "shade",
@@ -408,8 +422,12 @@ pub fn lamp_banker() -> Vec<Obj> {
             M.brass,
             24,
         );
-        turn(
+        kit::turned!(
+            F,
             "foot",
+            -0.06,
+            0.02,
+            0,
             &[
                 (0.0, 0.0),
                 (0.024, 0.0),
@@ -418,9 +436,8 @@ pub fn lamp_banker() -> Vec<Obj> {
                 (0.012, 0.02),
                 (0.0, 0.02),
             ],
-            (-0.06, 0.02, 0),
             M.brass,
-            14,
+            segments = 14
         );
         kit::tube!(
             F,
@@ -498,8 +515,12 @@ pub fn lamp_banker() -> Vec<Obj> {
                 rings = 4
             );
         }
-        turn(
+        kit::turned!(
+            F,
             "pull",
+            0.08,
+            0.228,
+            0.07,
             &[
                 (0.0, 0.0),
                 (0.003, 0.0),
@@ -508,9 +529,8 @@ pub fn lamp_banker() -> Vec<Obj> {
                 (0.002, 0.018),
                 (0.0, 0.018),
             ],
-            (0.08, 0.228, 0.07),
             M.brass,
-            10,
+            segments = 10
         );
     });
     join_all("lampBanker");
@@ -532,8 +552,12 @@ const MUSHROOM: [(f64, f64); 8] = [
 /// A white porcelain foot rising into a slim stem that flares under a coral glass cap with a rolled lip.
 pub fn lamp_mushroom() -> Vec<Obj> {
     new_parts(|| {
-        turn(
+        kit::turned!(
+            F,
             "base",
+            0,
+            0,
+            0,
             &[
                 (0.0, 0.0),
                 (0.07, 0.0),
@@ -543,12 +567,15 @@ pub fn lamp_mushroom() -> Vec<Obj> {
                 (0.024, 0.026),
                 (0.0, 0.026),
             ],
-            (0, 0, 0),
             M.porcelain,
-            32,
+            segments = 32
         );
-        turn(
+        kit::turned!(
+            F,
             "stem",
+            0,
+            0.02,
+            0,
             &[
                 (0.0, 0.0),
                 (0.02, 0.0),
@@ -559,9 +586,8 @@ pub fn lamp_mushroom() -> Vec<Obj> {
                 (0.022, 0.19),
                 (0.0, 0.19),
             ],
-            (0, 0.02, 0),
             M.porcelain,
-            16,
+            segments = 16
         );
         lathe(
             "cap",
@@ -664,8 +690,12 @@ pub fn lamp_lantern() -> Vec<Obj> {
             M.iron,
             16,
         );
-        turn(
+        kit::turned!(
+            F,
             "knob",
+            0,
+            0.316,
+            0,
             &[
                 (0.0, 0.0),
                 (0.014, 0.0),
@@ -673,9 +703,8 @@ pub fn lamp_lantern() -> Vec<Obj> {
                 (0.008, 0.014),
                 (0.0, 0.016),
             ],
-            (0, 0.316, 0),
             M.iron,
-            10,
+            segments = 10
         );
         torus!(
             "ring",
@@ -698,8 +727,12 @@ pub fn lamp_lantern() -> Vec<Obj> {
             bevel = 0.002,
             bevel_segments = 1
         );
-        turn(
+        kit::turned!(
+            F,
             "candle",
+            0,
+            0.02,
+            0,
             &[
                 (0.0, 0.0),
                 (0.025, 0.0),
@@ -708,9 +741,8 @@ pub fn lamp_lantern() -> Vec<Obj> {
                 (0.004, 0.102),
                 (0.0, 0.102),
             ],
-            (0, 0.02, 0),
             M.candle,
-            16,
+            segments = 16
         );
         kit::tube!(
             F,

@@ -78,8 +78,9 @@ shared parts, in `common.rs`:
   old front-most point (the worktop's nose on a counter), so no bounding box, centre or wall gap moved.
 - `drawer`: the shaker drawer front, its box, and a cutlery tray (spoons, forks, knives, a serving spoon as flat
   outlines) in the front of the box, which shows when it slides out; the butcher block's drawer holds a knife insert.
-- `_lathe` and what is turned with it: stacked plates, bowls, mugs with handles, jugs, canisters with lids, cans, a
-  crock, pans, a saucepan, ladles, jars (glass with what is in them); `basket`, a ribbed, hollow woven basket.
+- `_lathe` and what is turned with it: stacked plates, bowls, jugs, canisters with lids, cans, a
+  crock, pans, a saucepan, ladles, jars (glass with what is in them); `basket`, a ribbed, hollow woven basket. The
+  mugs with handles are the kit's (`kit::mug!`, 2026-11-25: revolved, not lofted, the same shape in fewer vertices).
 
 Doors on the 1 m counters are now 4 mm apart and line up with the drawer above (they were 3 cm apart). A counter's
 fronts (2 cm behind the worktop's nose) and plinth line up with its neighbours' in a run: checked by importing the
@@ -112,8 +113,8 @@ What each model has now:
   handle, two ladles.
 - **kitchenShelfWall**: curved corbels under both shelves, glass jars, plates, a canister, a mug, a pilea in a pot
   with stems and two trailing vines.
-- **trashCan**: a tapering drum with a rolled bead, a plastic foot, a rounded pedal on its hinge, a domed lid with a
-  lip, the inner bucket seen when it lifts.
+- **trashCan**: a tapering drum with a rolled bead, a plastic foot, a rounded pedal on its hinge, a hinge housing
+  standing up at the back, a domed lid with a lip, the inner bucket seen when it lifts.
 - **recyclingBins**: tapering, hollow tubs with a rolled rim, a dark foot, the recycling triangle on the front, a
   hand grip; lids with a front lip and hinge knuckles.
 - **kitchenIsland, islandSmall, islandLong**: a worktop rounded in plan with eased edges, shaker doors (and the
@@ -146,7 +147,10 @@ counter, a wall cabinet over a counter before the counter (cooking `putAwayAt`),
 0.8 s while they are (`fetch`, `hold` 1.5 s), onto plates, bowls and mugs. The glazed cabinet opens only its right
 door, as each glazed door is two draw calls (frame and glass). The recycling bins' three lids lift one after another
 (0.6 s apart, each 80° in 0.5 s, held 0.9 s) for the content's "Sort the recycling" (`sortRecycling`, `clean`, 4
-minutes, comfort, chores; not autonomous, so generated houses play as before).
+minutes, comfort, chores; not autonomous, so generated houses play as before). Each lid turns about its top back
+edge, where its knuckles are, so its back swings forward off the wall (about its bottom edge, the gate had it 4.9 cm
+into the wall). The pedal bin's lid lifts 75° about a pin up in the hinge housing behind it (2 cm in from the back,
+near the dome's top); about the rim's back edge, the gate had its dome 6.2 cm into the wall.
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|

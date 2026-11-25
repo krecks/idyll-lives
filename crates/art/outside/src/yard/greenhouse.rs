@@ -1,8 +1,9 @@
 //! The greenhouse (2x3): a white frame on a dwarf wall, glazed; staging and tomatoes inside; its door and its roof
 //! vent open (`door_open`). Built in the script's order, its one long build split where its comments part it.
 
-use super::common::{F, M, blob, board, pot, prism, rod};
+use super::common::{F, M, blob, pot, prism, rod};
 use artkit::far::{is_low, low};
+use artkit::kit;
 use artkit::math::{Axis, atan2, degrees};
 use artkit::motion::{Ease, Swing, swing};
 use artkit::parts::numbered;
@@ -191,7 +192,8 @@ fn frame() {
                 (s * (hx - 0.025), (GH_EAVE + WALL_TOP) / 2.0, z),
                 M.gh_frame
             );
-            board(
+            kit::board(
+                &F,
                 &numbered("rafter"),
                 (s * 0.03, GH_RIDGE, z),
                 (s * (hx - 0.02), GH_EAVE + 0.01, z),
@@ -288,7 +290,8 @@ fn frame() {
     // the vent's frame on the left slope (the vent's glass is its own part)
     let (vz0, vz1) = VENT_Z;
     for z in [vz0, vz1] {
-        board(
+        kit::board(
+            &F,
             &numbered("vent_rafter"),
             (-0.03, GH_RIDGE, z),
             (-(hx - 0.02), GH_EAVE + 0.01, z),

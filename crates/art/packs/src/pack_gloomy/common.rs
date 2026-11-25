@@ -16,7 +16,6 @@ palette! { M:
     plum = ("#6B4A6E", satin), // cushions and upholstery
     mauve = ("#9C7FA0", satin),
     slate = ("#5E6F8C", metal), // the rain lamp's base and canopy; its main part
-    smoke = ("#A7A9B4", satin),
     lamp_light = ("#DDE6F2", satin, glow("#CFE0FF")), // the rain lamp's light under its canopy: it glows at night
     chrome = ("#D0D3D6", chrome),
     brass = ("#B8925A", metal),
@@ -71,7 +70,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
 

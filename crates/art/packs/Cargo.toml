@@ -11,4 +11,3 @@ path = "src/lib.rs"
 
 [dependencies]
 artkit = { path = "../../artkit" }
-libm = "0.2"

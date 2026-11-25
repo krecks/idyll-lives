@@ -26,8 +26,8 @@ mod rides;
 use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "playground",
         M.palette(),
         vec![
@@ -83,5 +83,28 @@ pub fn family() -> Option<Family> {
          draw call per finish group. The seesaw's plank, the spring rider's horse and the merry-go-round's \
          platform go round while played on, carrying their riders (`ride`); the hoop's net swishes after a shot \
          and a pawn moves on the chess table. Each has a far version for the town overview.",
-    ))
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use artkit::json::Json;
+
+    /// The seesaw's seats are where the content's places put its riders.
+    #[test]
+    fn content_facts() {
+        let o = crate::content_object("community.json", "seesaw");
+        let Some(Json::Arr(places)) = o.get("places") else {
+            panic!("seesaw: no places")
+        };
+        let xs: Vec<Option<f64>> = places
+            .iter()
+            .map(|p| match p.get("at") {
+                Some(Json::Arr(at)) => at[0].num(),
+                _ => None,
+            })
+            .collect();
+        let x = super::rides::SEAT_X;
+        assert_eq!(xs, [Some(-x), Some(x)], "seesaw: places moved");
+    }
 }

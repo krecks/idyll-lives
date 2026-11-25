@@ -1075,11 +1075,17 @@ fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
     // Over every model, a key that is no model is stale, and taken out.
     set("{\"edges\": {\"model.gone\": 2}}\n");
     let none: &[(&'static str, FileCheck)] = &[("edges", nothing)];
-    // (A stub check finds nothing, so a model that accepts `edges` fails for its accept being unused: counted
-    // apart, each with that one error.)
-    let unused = |t: &str| t.matches("error: `accept.edges` is unused").count();
+    // (A stub check finds nothing, so a model that accepts `edges` fails for its accept being unused; and this
+    // baseline has no `opened` section, strict for every model, so the models it finds fail too.)
+    let expected = |t: &str| {
+        t.lines().filter(|l| l.contains("error: ")).all(|l| {
+            l.contains("`accept.edges` is unused")
+                || l.contains("error: opened (")
+                || l.contains("no model the gate checked")
+        })
+    };
     let r = run_gate(&paths, &[], none, &[]);
-    assert_eq!(r.failed, 1 + unused(&r.text), "{}", r.text);
+    assert!(expected(&r.text), "{}", r.text);
     assert!(
         r.text.contains(
             "FAIL gate-baseline.json\n       error: edges: model.gone is no model the gate checked"
@@ -1098,7 +1104,11 @@ fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
     // The built world's sections are its own gate's to judge (`built::CHECKS`): left as they are.
     set("{\"built.edges\": {\"house.cottage\": 3}}\n");
     let r = run_gate(&paths, &[], none, &[]);
-    assert_eq!(r.failed, unused(&r.text), "{}", r.text);
+    assert!(
+        expected(&r.text) && !r.text.contains("FAIL gate-baseline.json"),
+        "{}",
+        r.text
+    );
     assert!(update_with(&paths, &[], none, &[]).unwrap().is_empty());
     assert_eq!(read(), "{\"built.edges\": {\"house.cottage\": 3}}\n");
     // A baseline that can't be read fails the gate.
@@ -1117,4 +1127,78 @@ fn an_argument_it_does_not_know_is_a_usage_error() {
         let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
         assert_eq!(main(&args), 2, "{args:?}");
     }
+}
+
+/// A door that opens back into the wall: at rest its back is clear of the wall's face, but opened it isn't (a display
+/// cabinet's door swung -100° about its hinge). The same door swung forward is fine.
+#[test]
+fn a_door_opened_into_the_wall_fails() {
+    let opened = |degrees: f32| {
+        // a panel 0.9 wide hinged at the front's left (glTF x -0.25, depth 0.25), turned about y
+        let json = r#"{"asset": {"version": "2.0"}, "scenes": [{"nodes": [0]}],
+            "nodes": [{"name": "door", "mesh": 0, "translation": [-0.25, 0, 0.25]}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+            "animations": [{"name": "door_open", "channels": [{"sampler": 0, "target": {"node": 0, "path": "rotation"}}],
+                "samplers": [{"input": 1, "output": 2}]}],
+            "bufferViews": [{"byteOffset": 0, "byteLength": 36}, {"byteOffset": 36, "byteLength": 8},
+                {"byteOffset": 44, "byteLength": 32}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [0.9, 0.8, 0]},
+                {"bufferView": 1, "componentType": 5126, "type": "SCALAR", "count": 2},
+                {"bufferView": 2, "componentType": 5126, "type": "VEC4", "count": 2}]}"#;
+        let half = (degrees / 2.0).to_radians();
+        let bin: Vec<u8> = [
+            0f32,
+            0.0,
+            0.0,
+            0.9,
+            0.0,
+            0.0,
+            0.0,
+            0.8,
+            0.0, // the panel
+            0.0,
+            1.0, // the clip's times
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            half.sin(),
+            0.0,
+            half.cos(),
+        ]
+        .iter()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+        let g = parse_glb(&glb::tests::glb(json, &bin)).unwrap();
+        let entry = j(r#"{"motions": {"uses": {"openDoor": "door_open"}}}"#);
+        let facts = Facts {
+            id: J::Str("cabinet".into()),
+            footprint: j("[1, 1]"),
+            layer: J::Str("floor".into()),
+            outside: false,
+            stairs: false,
+            radius: 0.12,
+            object: J::Obj(Vec::new()),
+        };
+        let pose = HashMap::new();
+        let ((lo, hi), parts) = bounds(&g.gltf, &pose, &HashSet::new()).unwrap();
+        let w = content_warnings(
+            Some(&facts),
+            &lo,
+            &(lo, hi),
+            &parts,
+            Num::I(1),
+            &g,
+            &pose,
+            &entry,
+            false,
+        )
+        .unwrap();
+        w.into_iter()
+            .filter(|w| w.contains("opened ('door_open', use 'openDoor')"))
+            .count()
+    };
+    assert_eq!(opened(100.0), 1, "swung back into the wall");
+    assert_eq!(opened(-100.0), 0, "swung forward");
 }

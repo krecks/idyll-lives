@@ -5,9 +5,10 @@
 //! a three-octave keyboard on an X-stand). Still.
 
 use super::M;
-use super::common::{P, flat_quads, sheet_music, turn_round};
-use artkit::forms::smooth_outline;
+use super::common::{P, flat_quads, sheet_music};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
+use artkit::kit::turn_round;
 use artkit::kit::{self, fillet};
 use artkit::math::{PI, cos, sin};
 use artkit::parts::{Settle, join_all, settle_with};
@@ -365,7 +366,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
             ],
             0,
             M.brass,
-            profile = super::common::rr(0.008, 0.024, 0.003, 1),
+            profile = rounded_rect(0.008, 0.024, 0.003, 1),
             resolution = 2,
             scale = [0.8, 0.9, 1.15, 1.1]
         );

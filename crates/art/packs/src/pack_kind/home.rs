@@ -1,6 +1,7 @@
 //! The gift-knitting rocker, the welcome tea table and the hearthside quilted settee.
 
-use super::common::{M, cup, fluted, teapot};
+use super::common::{M, cup, teapot};
+use crate::pack_hot_headed::common::fluted;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, radians, sin, sind};
@@ -23,17 +24,11 @@ pub fn knitting_rocker() -> Vec<Obj> {
         // the yarn basket beside it: a woven body with a rim and a handle, balls of wool, needles in the work
         let P3 { x: bx, y: by, .. } = f.at(0.35, 0, 0.334);
         let mut secs = vec![ring!(0.075, 0.075, z = 0.0, verts = 24, at = (bx, by))];
-        secs.extend([0.0, 0.33, 0.66, 1.0].iter().map(|&t| {
-            fluted(
-                0.08 + 0.02 * t,
-                0.012 + 0.168 * t,
-                24,
-                (bx, by),
-                12,
-                0.04,
-                1.0,
-            )
-        }));
+        secs.extend(
+            [0.0, 0.33, 0.66, 1.0]
+                .iter()
+                .map(|&t| fluted(0.08 + 0.02 * t, 0.012 + 0.168 * t, 24, (bx, by), 12, 0.04)),
+        );
         secs.push(ring!(0.09, 0.09, z = 0.18, verts = 24, at = (bx, by)));
         secs.push(ring!(0.085, 0.085, z = 0.03, verts = 24, at = (bx, by)));
         loft!("basket", &secs, material = M.wicker);
@@ -440,10 +435,10 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 numbered("pouf"),
                 &[
                     ring!(0.18, 0.18, z = 0.0, verts = 40, at = (bx, by)),
-                    fluted(0.198, 0.02, 40, (bx, by), 10, 0.035, 1.0),
-                    fluted(0.205, 0.12, 40, (bx, by), 10, 0.045, 1.0),
-                    fluted(0.205, 0.25, 40, (bx, by), 10, 0.045, 1.0),
-                    fluted(0.198, 0.35, 40, (bx, by), 10, 0.035, 1.0),
+                    fluted(0.198, 0.02, 40, (bx, by), 10, 0.035),
+                    fluted(0.205, 0.12, 40, (bx, by), 10, 0.045),
+                    fluted(0.205, 0.25, 40, (bx, by), 10, 0.045),
+                    fluted(0.198, 0.35, 40, (bx, by), 10, 0.035),
                     ring!(0.185, 0.185, z = 0.37, verts = 40, at = (bx, by))
                 ],
                 material = m

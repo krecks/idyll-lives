@@ -18,17 +18,17 @@ use artkit::json;
 
 mod bag;
 mod calm;
-mod common;
+pub(crate) mod common;
 mod drums;
 
 pub use common::M;
 
 /// The wall's face in a 1-deep footprint, game depth.
-const WALL: f64 = -0.43;
+use artkit::kit::WALL;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_hotHeaded",
         M.palette(),
         vec![
@@ -73,5 +73,5 @@ pub fn family() -> Option<Family> {
          group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock \
          while the kit is played, the zafu sinks, the desk drawer slides out and the plunge tub's slatted cover \
          rolls back.",
-    ))
+    )
 }

@@ -100,6 +100,9 @@ impl From<P3> for Size {
     }
 }
 
+/// A function's options, as artkit's own are written: a struct with defaults, `options! { Name { field: Type =
+/// default, ... } }`. Exported for the families' own helpers.
+#[macro_export]
 macro_rules! options {
     ($(#[$doc:meta])* $name:ident { $($field:ident : $ty:ty = $default:expr),* $(,)? }) => {
         $(#[$doc])*
