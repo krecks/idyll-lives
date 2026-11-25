@@ -11,7 +11,7 @@ use artkit::parts::{join, new_parts, settle};
 use artkit::place::{Coord, Facing};
 use artkit::scene::{self, Obj, meshes};
 use artkit::soft::{Puff, Sag, SoftBox};
-use artkit::{fbox, fextrude, fsweep, loft, ring, soft};
+use artkit::{fbox, fextrude, loft, ring, soft};
 
 pub const SINK: f64 = 0.02;
 const SEAT_SAG: f64 = 0.014; // how far a seat cushion's top sinks towards its front edge, where legs go over it
@@ -129,22 +129,108 @@ pub fn leg(
     verts: usize,
 ) -> Obj {
     let (sx, sz) = splay;
-    fsweep!(
-        F,
+    let pts = [
+        (x, h, z),
+        (x, h - 0.003, z), // its top eased
+        (x, h - 0.012, z),
+        (x + sx * 0.12, h - 0.02, z + sz * 0.12),
+        (x + sx, 0.006, z + sz),
+        (x + sx, 0.0, z + sz),
+    ]
+    .map(|(x, y, z)| V3::from(F.at(x, y, z)));
+    tube(
         name,
-        &[
-            (x, h, z),
-            (x, h - 0.003, z), // its top eased
-            (x, h - 0.012, z),
-            (x + sx * 0.12, h - 0.02, z + sz * 0.12),
-            (x + sx, 0.006, z + sz),
-            (x + sx, 0.0, z + sz)
-        ],
+        &pts,
         r,
+        &[0.86, 1.0, 1.0, 0.86, 0.66, 0.6],
+        verts,
         mat,
-        verts = verts,
-        scale = [0.86, 1.0, 1.0, 0.86, 0.66, 0.6]
     )
+}
+
+/// `kit::cabriole`'s leg (out by (sx, sz) at the knee, slim at the ankle, flaring into a pad foot) from the frame
+/// at height `h` to the floor, its top eased, as a `tube`: the kit's sweep shears its wood where the ankle flares.
+#[allow(clippy::too_many_arguments)]
+pub fn cabriole(name: &str, x: f64, z: f64, h: f64, mat: Mat, sx: f64, sz: f64, r: f64) -> Obj {
+    let given = [
+        (x, h, z),
+        (x + sx, h * 0.62, z + sz),
+        (x + sx * 0.4, 0.06, z + sz * 0.4),
+        (x + sx * 0.55, 0.02, z + sz * 0.55),
+        (x + sx * 0.55, 0.0, z + sz * 0.55),
+    ]
+    .map(|(x, y, z)| V3::from(F.at(x, y, z)));
+    let (curve, wher) = artkit::forms::catmull(&given, 2, false);
+    // its top eased, as `leg`'s
+    let mut pts = vec![curve[0], V3::from(F.at(x, h - 0.003, z))];
+    pts.extend(&curve[1..]);
+    let mut scales = vec![0.86, 1.0];
+    scales.extend(
+        wher[1..]
+            .iter()
+            .map(|&w| listed(&[1.0, 1.05, 0.7, 1.1, 1.15], w)),
+    );
+    tube(name, &pts, r, &scales, 10, mat)
+}
+
+/// `list`'s value `w` of the way along it (0 to 1), linear between its entries: a sweep's `Scale::List`.
+pub fn listed(list: &[f64], w: f64) -> f64 {
+    let f = w * (list.len() - 1) as f64;
+    let i = (f as usize).min(list.len() - 2);
+    list[i] + (list[i + 1] - list[i]) * (f - i as f64)
+}
+
+/// A round tube `verts` round through `pts` (Blender), `r` times each point's scale: `swept`.
+pub fn tube(name: &str, pts: &[V3], r: f64, scales: &[f64], verts: usize, mat: Mat) -> Obj {
+    let angle = artkit::shapes::round_angle(verts);
+    swept(
+        name,
+        pts,
+        &artkit::forms::circle(r, verts),
+        scales,
+        V3::Z,
+        angle,
+        mat,
+    )
+}
+
+/// `profile` ((u, v) about the path, u towards `up`) swept through `pts` (Blender), times each point's scale, its
+/// ends capped flat, smooth but for edges turning over `angle`; laid with a sweep's UVs as if it kept one scale. A
+/// sweep's UVs grow round it with its scale, so they shear where it thickens fast (an eased top, an ankle flaring
+/// into a foot, a chamfered end).
+pub fn swept(
+    name: &str,
+    pts: &[V3],
+    profile: &[(f64, f64)],
+    scales: &[f64],
+    up: V3,
+    angle: f64,
+    mat: Mat,
+) -> Obj {
+    let n = pts.len();
+    let tangent = |i: usize| (pts[(i + 1).min(n - 1)] - pts[i.saturating_sub(1)]).normalized();
+    let t0 = tangent(0);
+    let mut normal = up - t0 * up.dot(t0);
+    if normal.length() < 1e-6 {
+        normal = t0.orthogonal();
+    }
+    let (mut along, mut normal) = (t0, normal.normalized());
+    let rings: Vec<Vec<P3>> = (0..n)
+        .map(|i| {
+            // carried along as the sweep's frames are, so it doesn't twist
+            let t = tangent(i);
+            normal = along.rotation_difference(t) * normal;
+            normal = (normal - t * normal.dot(t)).normalized();
+            along = t;
+            let bi = t.cross(normal);
+            profile
+                .iter()
+                .map(|&(u, v)| (pts[i] + (normal * u + bi * v) * scales[i]).into())
+                .collect()
+        })
+        .collect();
+    let body = loft!(name, &rings, material = mat, angle = angle);
+    artkit::uv::along(body, n, profile, &vec![1.0; n], pts, false)
 }
 
 /// The seat cushions `cushions()` makes (returning their top), joined into the part `seat`, with the clip that
