@@ -2,15 +2,14 @@
 //! material, as the shapes' builders are. A profile swept along a path (`sweep`: rails, piping, bent tube, a
 //! cabriole leg, a branch), rings lofted into a body (`loft`, `ring`: a bottle, a lamp base, a rounded cabinet),
 //! an outline with holes extruded into a slab (`extrude`: a shaped apron, a headboard, a door with a window),
-//! outlines (`rounded_rect`, `smooth_outline`, `circle`), and what is done to a part after (`bisect`, `mirrored`,
-//! `jitter`).
+//! outlines (`rounded_rect`, `smooth_outline`, `circle`), and what is done to a part after (`bisect`, `jitter`).
 //!
 //! Smooth forms are shaded smooth with their edges over `angle` degrees kept sharp, so a cap or a square
 //! profile stays crisp without a bevel.
 
 use crate::bevel::{EdgeOrder, bevel_edges};
 use crate::materials::Mat;
-use crate::math::{self, Axis, M4, Num, P3, TAU, V3, v3};
+use crate::math::{self, Num, P3, TAU, V3, v3};
 use crate::mesh::{Mesh, UvWay};
 use crate::noise::noise;
 use crate::scene::{self, Obj};
@@ -684,33 +683,6 @@ pub fn jitter(obj: Obj, amount: f64, o: Jitter) -> Obj {
         }
     });
     obj
-}
-
-/// A copy of `obj` mirrored across the world's plane through the origin normal to `axis` (the model's middle): build
-/// one side, mirror it for the other. `name`: by default the part's own with `_mirror`.
-pub fn mirrored(obj: Obj, axis: Axis, name: Option<&str>) -> Obj {
-    let (mesh, way, bevel) = obj.read(|o| (o.mesh.clone(), o.uv, o.bevel.clone()));
-    let name = name.map_or_else(|| format!("{}_mirror", obj.name()), str::to_string);
-    // (a copy of the part with a copy of its mesh: each under the next free name after its own)
-    let copy = scene::add_as(&name, &obj.data_name(), mesh);
-    let mut k = [1.0_f32; 3];
-    k[axis.index()] = -1.0;
-    let flip = M4::diagonal(V3::new(k[0], k[1], k[2]));
-    // set as the copy's world matrix, Blender takes it apart into a place, a turn and a scale (the mirror a
-    // negative scale) and puts it back together
-    let (loc, rot, scale) = crate::motion::decompose(&(flip * obj.matrix_world()));
-    let mw = math::object_matrix(loc, rot, scale);
-    // a mirroring matrix turns the faces inside out: bake it into the mesh and turn them back; the copy's world
-    // matrix set to the identity, taken apart as Blender takes it (its turn about y a negative zero)
-    let (loc, rot, scale) = crate::motion::decompose(&M4::IDENTITY);
-    copy.edit(|o| {
-        // (the copy has the bevel the part is still to be given, as it had its modifiers)
-        (o.uv, o.bevel) = (way, bevel);
-        o.mesh.transform(&mw);
-        o.mesh.flip_normals();
-        (o.loc, o.rot, o.scale) = (loc, rot, scale);
-    });
-    copy
 }
 
 // ---- objects ------------------------------------------------------------------------------------------

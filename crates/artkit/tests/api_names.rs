@@ -5,10 +5,8 @@
 
 mod common;
 
-use artkit::forms::mirrored;
 use artkit::glb;
 use artkit::materials::{Finish, Finishes, Mat};
-use artkit::math::Axis;
 use artkit::parts::{join, join_all, new_parts};
 use artkit::scene::{self, Obj, meshes};
 use artkit::{
@@ -226,20 +224,6 @@ fn names_in_use_get_blenders_numbers_and_the_file_has_its_nodes_by_name() {
         verts = 6
     );
     same("parts kinds", names(&meshes()));
-
-    // a mirrored copy, and what it is called
-    scene::reset();
-    let arm = cube!(
-        "arm",
-        (0.1, 0.4, 0.1),
-        at = (0.3, 0, 0.5),
-        material = BODY,
-        bevel = 0
-    );
-    mirrored(arm, Axis::X, None);
-    mirrored(arm, Axis::X, None);
-    mirrored(arm, Axis::X, Some("arm"));
-    same("mirror made", names(&meshes()));
 
     // the file's nodes come by name, however the parts were made or given
     scene::reset();

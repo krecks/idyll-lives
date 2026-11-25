@@ -10,14 +10,14 @@ use std::collections::BTreeMap;
 options! {
     /// The options of bisect_plane, Blender's own defaults: dist is how near the plane a vertex counts as on
     /// it (0: only the points the cut makes); clear_outer takes out what lies in front of the plane (the side its
-    /// normal points to), clear_inner what lies behind.
-    Bisect { dist: f64 = 0.0, clear_outer: bool = false, clear_inner: bool = false }
+    /// normal points to).
+    Bisect { dist: f64 = 0.0, clear_outer: bool = false }
 }
 
-/// bmesh.ops.bisect_plane(bm, geom=everything, plane_co, plane_no, dist, clear_outer, clear_inner) on the mesh of
-/// obj as it is (in its own frame: a script that cuts in the world moves the mesh there first, as with
-/// bm.transform): every edge that crosses the plane gets a point where it does, every face is split along the
-/// plane, and what lies in front of it or behind it is taken out. Returns the cut's edges (geom_cut), each
+/// bmesh.ops.bisect_plane(bm, geom=everything, plane_co, plane_no, dist, clear_outer) on the mesh of obj as it is
+/// (in its own frame: a script that cuts in the world moves the mesh there first, as with bm.transform): every edge
+/// that crosses the plane gets a point where it does, every face is split along the plane, and what lies in front
+/// of it is taken out. Returns the cut's edges (geom_cut), each
 /// its two points, for holes_fill.
 ///
 /// The points are Blender's (a crossing is the edge's lower-numbered end plus the way to the other times
@@ -119,14 +119,9 @@ fn bisected(mesh: &Mesh, co: V3, no: V3, o: &Bisect) -> (Mesh, Vec<(u32, u32)>) 
             faces.extend(parts);
         }
     }
-    // what lies in front of the plane, or behind it, goes: the points the cut made stay
+    // what lies in front of the plane goes: the points the cut made stay
     let outer = plane_d - eps;
-    let inner = plane_d + eps;
-    let gone = |i: usize| {
-        i < old
-            && ((o.clear_outer && side_of(mesh.verts[i], outer) > 0.0)
-                || (o.clear_inner && side_of(mesh.verts[i], inner) < 0.0))
-    };
+    let gone = |i: usize| i < old && o.clear_outer && side_of(mesh.verts[i], outer) > 0.0;
     let mut kept = vec![u32::MAX; verts.len()];
     let mut out = Mesh {
         mats: mesh.mats.clone(),

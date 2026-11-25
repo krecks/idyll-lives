@@ -1,4 +1,4 @@
-//! Normals through a join, a move, a turn and a mirror, against Blender 5.2 (tests/golden/normals_joined.txt, written by
+//! Normals through a join, a move and a turn, against Blender 5.2 (tests/golden/normals_joined.txt, written by
 //! a script outside the repo that builds the same parts with gamekit and writes each mesh after each step: its points,
 //! faces, smooth flags, sharp edges, the normal at every corner as \`mesh.corner_normals\` gives it and at every point).
 //!
@@ -9,12 +9,11 @@
 //! they were at the join but worked out again on the mesh as it is, after its origin is set too.
 //!
 //! The others: a smooth tube joined onto a flat part and flat parts onto a tube, then hinged; parts with sharp edges
-//! and a ball smooth all over joined after a bevelled box, then hinged, turned twice and moved back; parts mirrored
-//! and joined with their copies; and the fireside lounge's rug with the rings of its log basket, scaled unevenly.
+//! and a ball smooth all over joined after a bevelled box, then hinged, turned twice and moved back; and the
+//! fireside lounge's rug with the rings of its log basket, scaled unevenly.
 
 mod common;
 
-use artkit::forms::mirrored;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, V3};
@@ -175,38 +174,6 @@ fn build(case: &str, snap: &mut dyn FnMut(&str, Obj)) {
             snap("turned_z", turn(body, 37.0, Axis::Z));
             snap("turned_x", turn(body, -90.0, Axis::X));
             snap("origin", hinged(body, (0, 0, 0)));
-        }
-        "mirrored" => {
-            let side = fbox!(
-                f,
-                "side",
-                0.02,
-                0.3,
-                0.2,
-                (0.3, 0.2, 0.05),
-                TOP,
-                bevel = 0.004,
-                bevel_segments = 1
-            );
-            let leg = pin(&f, "pin", 0.78, 0.0);
-            let drum = cylinder!(
-                "drum",
-                0.03,
-                0.2,
-                at = (0.25, -0.1, 0.3),
-                material = METAL,
-                verts = 8,
-                rot = (20, 40, 0)
-            );
-            let copies = [
-                mirrored(side, Axis::X, None),
-                mirrored(leg, Axis::X, None),
-                mirrored(drum, Axis::Y, None),
-            ];
-            snap("pin_mirror", copies[1]);
-            snap("drum_mirror", copies[2]);
-            let all = [side, leg, drum, copies[0], copies[1], copies[2]];
-            snap("joined", artkit::join!(&all, "body", origin = (0, 0, 0)));
         }
         "torus" => {
             let p = new_parts(|| {
@@ -421,5 +388,5 @@ fn joined_parts_have_blenders_normals() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 13, "every step of the golden");
+    assert_eq!(checked, 10, "every step of the golden");
 }
