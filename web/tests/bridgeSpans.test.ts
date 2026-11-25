@@ -261,7 +261,7 @@ describe("a drawn street's bridges (`crossWater`)", () => {
     const wet = river(200, 230);
     const pts = line(100, 120, 100, 280);
     const span = wetSpans(pts, wet, W, D)[0];
-    for (const north of [340, 340, 700]) {
+    for (const north of [340, 700]) {
       const land = blankLand(W, D);
       for (let j = 0; j < land.rows; j++) {
         for (let i = 0; i < land.cols; i++) {

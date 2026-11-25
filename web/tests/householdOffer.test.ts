@@ -92,19 +92,23 @@ describe("step 3's households from the world code", async () => {
     const pages = [0, 1, 2, 3, 4, 5].map((p) => offerPage(lived, streams, p));
     expect([0, 1, 2, 3, 4, 5].map((p) => offerPage(lived, streams, p))).toEqual(pages);
     const seen = new Set<string>();
+    let fresh = 0;
     for (const homes of pages) {
       // (A household by its home: a house's lot, or a flat of a building, whose households share its lot.)
       const page = homes.map(homeKey);
       expect(page.length).toBeGreaterThan(0);
       expect(page.length).toBeLessThanOrEqual(30);
       expect(new Set(page).size).toBe(page.length);
-      const fresh = page.filter((s) => !seen.has(s));
       // (Each press shows only households not shown yet, until fewer than ten are left: then all again.)
-      if (seen.size + 10 <= all) expect(fresh).toEqual(page);
-      else seen.clear();
+      if (seen.size + 10 <= all) {
+        expect(page.filter((s) => !seen.has(s))).toEqual(page);
+        fresh++;
+      } else seen.clear();
       for (const s of page) seen.add(s);
       for (const s of page) expect(lived.households.some((h) => homeKey(h) === s)).toBe(true);
     }
+    // (Checked on more than the first page: the town has households enough for that.)
+    expect(fresh).toBeGreaterThan(1);
   });
 
   test('the Neighbours slider ends where the first wave stops', () => {

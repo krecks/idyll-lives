@@ -6,7 +6,7 @@
 // back the land as shaped. `bun test tests/landMode.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import { mergeShapeLand, type Rle, type ShapeLandCommand, type WorldMeta, type WorldStructure } from '../src/core/protocol';
-import { blankLand, decodeLand, LAND_CELL, tilesOf, type Land } from '../src/game/land';
+import { blankLand, decodeLand, tilesOf, type Land } from '../src/game/land';
 import type { LandPrices } from '../src/game/landEdit';
 import { rle, unrle } from '../src/game/landMasks';
 import { landCommand, LandMode, refusal, wetChanged, type LandModeHost } from '../src/game/landMode';
@@ -178,7 +178,6 @@ describe('the command for a change', () => {
     expect(c.meta.land!.cover).toBeUndefined();
     const painted = landCommand({ land, patch: { rect, cover: { rect: { i0: 35, j0: 5, i1: 40, j1: 10 }, data: new Uint8Array(25) } }, whole: false, household: 0, cost: 0 });
     expect(painted.meta.land!.cover).toEqual([land.cover.length, 0]);
-    expect(LAND_CELL).toBe(2);
   });
 
   test("a river's way goes with its tiles where it was laid or taken away, and not otherwise", () => {

@@ -6,7 +6,7 @@
 // smallest homes when the cap is near; a smaller tier is the same people in fewer homes; each
 // neighbour knows about 35 others, likelier those living near; the town file says the most
 // residents the town grows to; and the houses furnished ahead are the ones Move in finds made.
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -73,12 +73,11 @@ describe('seeded people', async () => {
   /** A small generated world (a hamlet, no villages), for the town file. */
   const hamlet = generateWorld(content, t, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'none' });
 
-  // From here on nothing may roll Creation's dice.
-  beforeAll(() => {
-    Math.random = () => {
-      throw new Error('Math.random was called');
-    };
-  });
+  // From here on nothing may roll Creation's dice: set now, not in a beforeAll, so the towns built while the
+  // tests are collected (the big one below) are held to it too.
+  Math.random = () => {
+    throw new Error('Math.random was called');
+  };
 
   /** Both waves of a town's people from `seed`, the player moving into the first home left, and whom step 3 offers. */
   const people = (town: NeighbourhoodDraft, seed: number, cap = FILL_CAP) => {

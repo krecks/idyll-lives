@@ -93,8 +93,9 @@ describe('the motorway, before the villages', async () => {
           let d: Draft;
           try {
             d = make();
-          } catch {
-            // (A small lakeside's or river's land with no room for its town: no world, as before.)
+          } catch (e) {
+            // (A small lakeside's or river's land with no room for its town: no world, as before. Anything else fails.)
+            if (!String((e as Error)?.message).startsWith('There is no dry land big enough for the town')) throw e;
             continue;
           }
           const w = judged(d);

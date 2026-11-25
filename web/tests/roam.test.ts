@@ -27,7 +27,6 @@ describe('roaming', () => {
     const r = streamRadius(30);
     // A chunk just inside the radius behind the camera (it looks along -x: alpha 0), then the camera moves a little away from it.
     const behindX = 500 + r - 1;
-    const behind = chunkAt(behindX + CHUNK / 2, 500);
     const edge = Math.floor((behindX + 1) / CHUNK) * CHUNK;
     const near = new Roam();
     near.update(cam(edge - r + 1, 500), 0, none, take);
@@ -37,7 +36,6 @@ describe('roaming', () => {
     expect(near.chunks.has(chunkAt(edge + 1, 500))).toBe(true);
     near.update(cam(edge - r - HYSTERESIS - 4, 500), 32, none, take);
     expect(near.chunks.has(chunkAt(edge + 1, 500))).toBe(false);
-    expect(behind).toBeGreaterThan(0);
   });
 
   test("a preset's share of the stream radius streams fewer chunks", () => {

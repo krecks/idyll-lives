@@ -10,7 +10,7 @@
 // steep refused up front, its climb measured as `measureLand` measures it; the hint on bare land. The road hierarchy: an
 // avenue's live checks, a one-way street drawn with arrows along it the way cars go (flipped on the card), the
 // motorway not crossed. `bun test`.
-import { afterAll, describe, expect, mock, test } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
@@ -26,8 +26,12 @@ import type { TownGhosts } from '../src/render/types';
 import type { Picked } from '../src/ui/townedit/pick';
 import type { TownEditor } from '../src/ui/townedit/tools';
 
-// (The card and its runes are the page's: the tool reads its choices from a plain object here.)
-const choice = { kind: 'auto' as string, oneway: false, flip: false, clear: true, along: 'homes' as string, shown: 'street' as string, shownArea: -1, drawn: [] as { road: number; name: string }[] };
+// (The card and its runes are the page's: the tool reads its choices from a plain object here. Nothing along the
+// streets drawn: these templates have no houses to fill them with.)
+const CHOICE = { kind: 'auto' as string, oneway: false, flip: false, clear: true, along: 'none' as string, shown: 'street' as string, shownArea: -1, drawn: [] as { road: number; name: string }[] };
+const choice = { ...CHOICE };
+// Every test starts from the card as the page opens it, whichever ran before.
+beforeEach(() => Object.assign(choice, CHOICE, { drawn: [] }));
 mock.module('../src/ui/townedit/StreetCard.svelte', () => ({ default: {} }));
 mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   streetChoice: choice,
@@ -352,7 +356,6 @@ describe('the hint names what the street will be', () => {
 
 describe('the tool', () => {
   test('clicks set points; the one on a road ends the street, which is drawn and picked', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.hover(87, MAIN_Z + 12);
@@ -441,7 +444,6 @@ describe('the tool', () => {
   });
 
   test('Enter ends the street where the pointer rests, as the hint says: the last click over the water, the pointer on the far bank', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.down(87, MAIN_Z + 8);
@@ -555,7 +557,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test('a click 20 m off a road starts the street on it; with the ground ten times nearer (zoomed in), not', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.hover(120, 80);
@@ -575,7 +576,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test('a corner set near a road stays where it is set when the street pulled there would be refused', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.down(100, MAIN_Z - 8);
@@ -592,7 +592,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, async () => {
-    choice.along = 'none';
     const ask = { kind: 'street' as const, asked: false, clear: true };
     // (From Far Lane north towards the high street, ended 20 m short of its middle.)
     const pts: Pt[] = [
@@ -623,7 +622,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test('a street asked for on the card stays a street out of town, with no area', () => {
-    choice.along = 'none';
     const draft = hillTown();
     draft.open!.land = blankLand(W, D);
     const editor = fakeEditor(draft);
@@ -786,7 +784,6 @@ describe('avenues, one-way streets and the motorway', () => {
   });
 
   test('a one-way street drawn: open till it ends on a road, arrows along it; drawn one-way the way the card says', () => {
-    choice.along = 'none';
     for (const flip of [false, true]) {
       const editor = fakeEditor(town());
       const tool = streetTool.stage(editor);

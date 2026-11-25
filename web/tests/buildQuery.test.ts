@@ -9,6 +9,7 @@ type Build = typeof import('../src/assets/build');
 let build: Build;
 const realLocation = globalThis.location;
 const site = 'https://example.org/game/';
+const HASHES = { 'assets/opt/models/chair.glb': '0123456789ab', 'content/talk/en.json': 'ba9876543210', 'assets/a%20b.png': 'aaaaaaaaaaaa' };
 
 beforeAll(async () => {
   // As Vite defines it in a build (the module reads it once, when first imported).
@@ -23,12 +24,13 @@ afterAll(() => {
 describe('data URLs', () => {
   test("by the build's id until the bundle's hashes are known, and for files without one", () => {
     expect(build.withBuild(`${site}assets/models/chair.glb`)).toBe(`${site}assets/models/chair.glb?v=abc1234`);
-    build.useHashes({ 'assets/opt/models/chair.glb': '0123456789ab', 'content/talk/en.json': 'ba9876543210', 'assets/a%20b.png': 'aaaaaaaaaaaa' }, new URL(site));
+    build.useHashes(HASHES, new URL(site));
     expect(build.withBuild(`${site}assets/models/sofa.glb`)).toBe(`${site}assets/models/sofa.glb?v=abc1234`);
     expect(build.withBuild(`${site}bundle.json`)).toBe(`${site}bundle.json?v=abc1234`);
   });
 
   test('by content hash where the build has one, relative or absolute, once', () => {
+    build.useHashes(HASHES, new URL(site));
     expect(build.withBuild(`${site}assets/opt/models/chair.glb`)).toBe(`${site}assets/opt/models/chair.glb?h=0123456789ab`);
     expect(build.withBuild('/game/content/talk/en.json')).toBe('/game/content/talk/en.json?h=ba9876543210');
     expect(build.withBuild(`${site}assets/a b.png`)).toBe(`${site}assets/a b.png?h=aaaaaaaaaaaa`);

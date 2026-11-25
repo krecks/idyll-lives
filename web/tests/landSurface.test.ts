@@ -259,10 +259,6 @@ describe('the renderer on a land the town follows', () => {
       expect(g.y).toBeCloseTo(14.25 - datum, 5);
       expect(g.z).toBeCloseTo(-20, 5);
     }
-    // A camera's target on the land shifted by the old datum less the new keeps where it looks: game = engine + datum.
-    const [old, next, engineY] = [12.5, 30, 1.75];
-    const shifted = engineY + old - next;
-    expect(shifted + next).toBeCloseTo(engineY + old, 9);
     app.destroy();
   });
 });

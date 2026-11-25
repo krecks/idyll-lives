@@ -36,10 +36,9 @@ describe('floorings', async () => {
   const finishOf = (id: string) => content.floorCoverings.find((c) => c.id === id)!.finish;
   const classes = [undefined, ...Object.values(t.gen!.classes).map((c) => c.label)];
 
-  test('the content has a covering of every finish, and at least ten new ones', () => {
+  test('the content has a covering of every finish', () => {
     const finishes = new Set(content.floorCoverings.map((c) => c.finish));
     for (const f of FLOOR_FINISHES) expect(finishes.has(f)).toBe(true);
-    expect(FLOOR_FINISHES.length - 5).toBeGreaterThanOrEqual(10);
   });
 
   test('every covering the floorings name is one the content has', () => {

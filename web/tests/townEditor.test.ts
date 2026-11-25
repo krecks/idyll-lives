@@ -525,11 +525,9 @@ describe('the Problems list and picking, on a generated town', async () => {
     expect(g.roads).toEqual([]);
     // A road removed with what stands on it.
     const road = hamlet.roads.findIndex((r, i) => r.kind === 'lane' && 'draft' in removeRoad(hamlet, t, i));
-    if (road >= 0) {
-      const without = made(removeRoad(hamlet, t, road));
-      const r = editGhosts(hamlet, without, t)!;
-      expect(r.roads.some((q) => q.tone === 'bad')).toBe(true);
-    }
+    expect(road).toBeGreaterThanOrEqual(0);
+    const without = made(removeRoad(hamlet, t, road));
+    expect(editGhosts(hamlet, without, t)!.roads.some((q) => q.tone === 'bad')).toBe(true);
     expect(editGhosts(hamlet, { ...hamlet, name: 'Elsewhere' }, t)).toBeNull();
     // A road drawn shows as the road it will be at once (laid), its deck as a bridge.
     const drawn = { points: [[10, 10], [60, 10]] as [number, number][], width: 7, ends: ['join', 'dead'] as RoadPlan['ends'], kind: 'street' as const };

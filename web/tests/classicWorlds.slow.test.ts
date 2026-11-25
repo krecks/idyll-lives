@@ -43,6 +43,7 @@ const GOLDEN: [ClassicKind, number, string][] = [
   ['forest', 11, 'aa808aea1ec3997e'],
   ['forest', 22, '30aa17736a4fbcee'],
   ['dense', 808114082, 'aa74853331500d77'],
+  ['dense', 45, '2d7c25d568b427de'],
   ['small', 199762, '9186dab0bfb29a75'],
   ['forest', 223520, '97cd228b1512578e'],
   ['medium', 104735, '4b8e73cb8e477a0b'],

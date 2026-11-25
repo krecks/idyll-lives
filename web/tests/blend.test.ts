@@ -594,6 +594,7 @@ describe('residents crossfade continuity', async () => {
       });
       if (process.env.TURN_TABLE) console.log(slides, missed.map((r) => ((r * 180) / Math.PI).toFixed(1)));
       for (const { who, frames } of slides.slice(0, 2)) expect(frames, `${who}: frames turning on the spot`).toBeGreaterThan(120);
+      expect(missed.length, 'steps ended while turning').toBeGreaterThan(0);
       expect(Math.max(...missed), 'off the way wanted at the end of a step (rad)').toBeLessThan(0.02);
       for (const { who, cm } of slides.slice(0, 2)) expect(cm, `${who}: planted feet's slide (cm)`).toBeLessThan(12);
       // A change of mood eases in: standing, no bone turns further in a frame than the idle's own fidgets do (3.7°, a

@@ -2,10 +2,9 @@
 // `continued`): the two meet end to end, one street on through, and a country road from there ran
 // on along the other street a few metres off before turning away across it, a junction knotted
 // into two a few metres apart (Canalside's Queen'ston Lane, from Foundry Street's end by Union
-// Street, the dense world of the play-test, meta.seed 808114082). Nor a T off one of the streets there
-// (`sideT`): since the motorway went down before the villages (2026-11-24) Canalside's villages are others,
-// and in Station Square (dense, seed 14) Station Square Lane came into a street where another village's
-// street's end comes up to it; King's Row (dense, seed 45) has two such streets.
+// Street, the dense world of the play-test, meta.seed 808114082). Since the motorway went down before the
+// villages (2026-11-24) Canalside's villages are others; King's Row (dense, seed 45) has two such streets, the
+// world checked here. (A T off one of the streets there, `sideT`, isn't checked here.)
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { nearest } from '../src/game/roads';

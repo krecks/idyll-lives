@@ -33,7 +33,7 @@ describe('moving in', async () => {
   const { homesOf, keepForSale, peopleStreams, populate, FILL_CAP } = await import('../src/game/people');
   const { homeKey, homesForSale, sameHome } = await import('../src/ui/homes');
   const { mulberry32 } = await import('../src/game/noise');
-  const { householdsAhead, moveInRequest, peopleSeedOf, startCode, townOnMoveIn } = await import('../src/ui/newGame');
+  const { householdsAhead, moveInRequest, townOnMoveIn } = await import('../src/ui/newGame');
   const { residentsOf } = await import('../src/game/household');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
@@ -85,13 +85,6 @@ describe('moving in', async () => {
     Math.random = () => {
       throw new Error('Math.random was called');
     };
-  });
-
-  test("the people seed is the code's own, else drawn from its town's seed (or its land's)", () => {
-    const code = startCode('river', 1234);
-    expect(peopleSeedOf({ ...code, peopleSeed: 5 })).toBe(5);
-    expect(peopleSeedOf({ ...code, townSeed: 77 })).toBe(peopleSeedOf({ ...code, townSeed: 77 }));
-    expect(peopleSeedOf({ ...code, townSeed: 77 })).not.toBe(peopleSeedOf(code));
   });
 
   test('a household made in Creation moves into the home chosen, as it stands or on an empty lot', () => {

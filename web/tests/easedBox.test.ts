@@ -28,6 +28,7 @@ for (const sx of SIZES) {
         for (const skip of SKIPS) {
           const g = new Geo().easing(EASE).box(0, 0, 0, sx, sy, sz, skip);
           const tris = triangles(g);
+          expect(tris.length).toBeGreaterThan(0);
           const centre: V3 = [sx / 2, sy / 2, sz / 2];
           // Each edge of a triangle runs the other way in exactly one other triangle, but round the faces left out.
           const directed = new Map<string, number>();

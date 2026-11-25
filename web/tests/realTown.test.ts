@@ -1,10 +1,9 @@
 // The real town's contracts (`core/protocol.ts`): a household's plot may be a flat, past the ground
 // lots; `flatOf` and `lotOf` take it to its flat and its building's lot, and a ground lot to itself.
-// The renderer's paving reads the fixture's town: its centre, court and car park paved, its bays drawn.
+// (Its paving is checked in paving.test.ts.)
 import { describe, expect, test } from 'bun:test';
 import { flatOf, lotOf } from '../src/core/protocol';
-import { townPaving } from '../src/render/shared/townPaving';
-import { BUILDING, FLATS, realTown, STOREY, W } from './fixtures/realTown';
+import { BUILDING, FLATS, realTown, STOREY } from './fixtures/realTown';
 
 describe('the real town', () => {
   test('a home in a flat goes to its flat and its building', () => {
@@ -29,13 +28,5 @@ describe('the real town', () => {
     expect(Math.min(...FLATS)).toBe(t.plots.length);
     for (const f of t.flats!) expect(Math.floor(f.door[1] / STOREY)).toBe(f.storey);
     expect(t.parking!.every((b) => b.park === 0)).toBe(true);
-  });
-
-  test('its centre, court and car park are paved; its bays are drawn with the car park’s P sign', () => {
-    const p = townPaving(realTown());
-    expect(p.pieces.map((q) => q.kind).sort()).toEqual(['carpark', 'centre', 'court', 'square']);
-    expect(p.mask(W, STOREY).some((v) => v === 1)).toBe(true);
-    expect(p.bays).toHaveLength(4);
-    expect(p.signs).toHaveLength(1);
   });
 });

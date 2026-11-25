@@ -27,6 +27,7 @@ describe('roads as drawn', () => {
     // The lane begins at the road's kerb (its first point past it; they're a metre apart).
     expect(lane.points[0][1]).toBeGreaterThanOrEqual(50 + 3.5 - SIDEWALK);
     expect(lane.points[0][1]).toBeLessThan(50 + 3.5 - SIDEWALK + 1);
+    expect(walk.pos.length).toBeGreaterThan(0);
     for (let i = 0; i < walk.pos.length; i += 3) {
       const [x, y, z] = [walk.pos[i], walk.pos[i + 1], walk.pos[i + 2]];
       if (y < WALK_Y - 0.001) continue;

@@ -106,17 +106,24 @@ describe('game speed', () => {
   });
 
   test('super speed starting and ending on its own: the speed shown follows, nothing is sent back', () => {
-    const { speed: s, sent } = speed();
-    s.choose(2);
-    s.hold('loading', false);
-    // (A view from just after the speed was sent is from before it: not followed.)
-    s.follow(4, performance.now());
-    expect(s.chosen).toBe(2);
-    s.follow(4, performance.now() + 1000);
-    expect(s.chosen).toBe(4);
-    s.follow(2, performance.now() + 2000);
-    expect(s.chosen).toBe(2);
-    expect(sent).toEqual([2]);
+    // (The clock stands still: a slow machine can't age the view past the settle.)
+    const [realNow, t] = [performance.now, performance.now()];
+    performance.now = () => t;
+    try {
+      const { speed: s, sent } = speed();
+      s.choose(2);
+      s.hold('loading', false);
+      // (A view from just after the speed was sent is from before it: not followed.)
+      s.follow(4, t);
+      expect(s.chosen).toBe(2);
+      s.follow(4, t + 1000);
+      expect(s.chosen).toBe(4);
+      s.follow(2, t + 2000);
+      expect(s.chosen).toBe(2);
+      expect(sent).toEqual([2]);
+    } finally {
+      performance.now = realNow;
+    }
   });
 
   test('super speed picked while the simulation is at it by itself is sent, so it stays the player\'s', () => {
