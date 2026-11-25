@@ -2107,7 +2107,7 @@ async function openSession(
     bridge.sync(now);
     const frame = (shown = bridge.frame(now));
     renderer.update(frame);
-    renderer.setHeldObject(game.placing?.objectId ?? buildBuy.heldId());
+    renderer.setHeldObject(game.placing?.objectId ?? null);
     buildBuy.syncHandles();
     if (!revealed) return;
     voices.update(frame);

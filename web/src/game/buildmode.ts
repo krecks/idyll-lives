@@ -817,11 +817,6 @@ export class BuildBuyInput {
     return obj.x >= home.x && obj.z >= home.z && obj.x < home.x + home.w && obj.z < home.z + home.d ? obj : null;
   }
 
-  /** An object hidden while its preview shows, besides one in hand: none (things aren't resized in Buy mode). */
-  heldId(): number | null {
-    return null;
-  }
-
   /** Shows the arrows of the door or window picked (or being resized); none otherwise. Cheap enough to call every frame. */
   syncHandles(): void {
     if (this.openingTool() || this.openingDrag) return this.syncOpeningHandles();
