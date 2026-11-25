@@ -116,6 +116,29 @@ branch was checked with the CI's own first two steps — `cargo fmt --all --chec
 `cargo clippy --workspace --all-targets --locked -- -D warnings` — both clean; `audit/bugs` and
 `audit/split` each carry one extra style-only commit for the formatting those checks caught.
 
+### Measured: `audit/performance` before and after
+
+`cargo run --release --example tickbench` (starter lot, 4 sims, one day, three runs each):
+1.004–1.013 µs/tick on `audit/report`, 1.008–1.025 µs/tick on `audit/performance` — no change beyond
+noise. `tickbench`'s lot has no roads, no trails and no cars, so it reaches none of P1–P4.
+
+A throwaway example (a counting `GlobalAlloc`, not committed) over one day of the real save
+`crates/sim-core/tests/saves/v035_normal.json` (57 sims, 1904 objects, 13 cars):
+
+| | `audit/report` | `audit/performance` |
+| --- | --- | --- |
+| per tick | 18.14 µs | 18.07–18.11 µs |
+| allocations over the day | 1,454,594 (13.47/tick) | 1,454,594 (13.47/tick) |
+| `snapshot::write` (tools, tests) | 1.07 µs, 1 alloc/call | 1.04–1.69 µs, 1 alloc/call |
+| `snapshot::write_with` (the wasm path) | — | 1.66 µs, 0 allocs/call |
+| `cars::hidden` | 20 ns, 1.00 allocs/call | `hidden_into`, 10 ns, 0.00 allocs/call |
+
+So P4 halves the call's time and allocates nothing per frame on the wasm path, and P1–P3 change
+nothing measurable on these two workloads: neither routes a trail walk nor changes an object during
+the measured day, so `trail_step`, `rescore_things` and `refresh_index`'s rebuild never run. Their
+wins stand on the code (no allocation, and no O(roads) projection per walk) and are unmeasured; a
+town with trails, and a lot with heavy object churn, would be needed to show them.
+
 ## Proposals
 
 ### P1 — what a save with two items of one id should do (B1, B6)
