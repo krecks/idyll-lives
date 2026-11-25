@@ -185,6 +185,36 @@ fn a_file_cut_short_or_not_a_glb_is_an_error_not_a_panic() {
     assert!(glb::read(&odd).is_err());
 }
 
+#[test]
+fn an_empty_primitive_or_channel_is_encoded_without_infinite_bounds() {
+    let model = glb::Model {
+        roots: vec![0],
+        nodes: vec![glb::Node {
+            mesh: Some(0),
+            clips: vec![0],
+            ..Default::default()
+        }],
+        meshes: vec![glb::Mesh {
+            name: "empty".into(),
+            primitives: vec![glb::Primitive::default()],
+        }],
+        animations: vec![glb::Animation {
+            name: "still".into(),
+            channels: vec![glb::Channel {
+                node: 0,
+                target: Target::Scale,
+                interpolation: Interpolation::Linear,
+                times: Vec::new(),
+                values: Vec::new(),
+            }],
+        }],
+        ..Default::default()
+    };
+    let bytes = glb::encode(&model);
+    assert!(!String::from_utf8_lossy(&bytes).contains("Infinity"));
+    assert_eq!(glb::read(&bytes).unwrap(), model);
+}
+
 /// A .glb of one primitive, its POSITION accessor 0 and its indices 1, and a BIN of 4 bytes.
 fn with_accessors(accessors: [&str; 2]) -> Vec<u8> {
     let mut json = format!(
