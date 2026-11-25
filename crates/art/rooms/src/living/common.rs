@@ -429,19 +429,6 @@ pub fn mesh(name: &str, verts: &[(f64, f64, f64)], faces: &[Vec<u32>], material:
     scene::add(name, m)
 }
 
-/// The faces of a prism of two loops of `k` points: the first loop's, the second's (reversed), the sides.
-pub fn prism_faces(k: usize) -> Vec<Vec<u32>> {
-    let k32 = k as u32;
-    let mut faces = vec![
-        (0..k32).collect::<Vec<u32>>(),
-        (k32..2 * k32).rev().collect(),
-    ];
-    for i in 0..k32 {
-        faces.push(vec![i, (i + 1) % k32, k32 + (i + 1) % k32, k32 + i]);
-    }
-    faces
-}
-
 /// A hardback seen end on, as an outline (across, out) about the crown of its spine (0, 0), counter-clockwise: two
 /// boards `b` thick running `depth` back from the crown, and the spine between them, rounded `bulge` proud of where
 /// the boards' edges end and `sp` thick (the page block stands behind it), in `n` steps round.

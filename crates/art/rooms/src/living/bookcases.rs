@@ -392,7 +392,14 @@ pub fn ladder_shelf() -> Vec<Obj> {
         (ladder_back(LADDER_H), LADDER_H),
     ];
     for x in [-0.3, 0.3] {
-        eased_bar("rail", &outline, (x - 0.0175, x + 0.0175), 0.004, M.oak);
+        eased_bar(
+            "rail",
+            &outline,
+            (x - 0.0175, x + 0.0175),
+            0.004,
+            M.oak,
+            true,
+        );
     }
     let mut tops = Vec::new();
     for (i, y) in [0.36, 0.76, 1.14, 1.5].into_iter().enumerate() {

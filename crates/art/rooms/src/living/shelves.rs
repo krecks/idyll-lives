@@ -6,7 +6,6 @@
 
 use super::common::{
     BOARD, PAGES_IN, SPINE, SPINE_STEPS, book, bulge, disc, hardback, hardback_end, knob, mesh,
-    prism_faces,
 };
 use super::{F, M};
 use artkit::forms::{Holes, rounded_rect};
@@ -367,34 +366,15 @@ pub(super) fn frame_photo(x: f64, y: f64, z: f64, mat: Mat, w: f64, h: f64) {
 }
 
 /// The game outline `outline` [(p, q)] extruded: (x, depth) points from height a0 to a1 (`along_x` false); (depth,
-/// height) points from x = a0 to a1 (a ladder's rail).
-pub(super) fn prism(
-    name: &str,
-    outline: &[(f64, f64)],
-    a0: f64,
-    a1: f64,
-    material: Mat,
-    along_x: bool,
-) -> Obj {
-    let mut verts: Vec<(f64, f64, f64)> = Vec::new();
-    for a in [a0, a1] {
-        verts.extend(
-            outline
-                .iter()
-                .map(|&(p, q)| if along_x { (a, q, p) } else { (p, a, q) }),
-        );
-    }
-    mesh(name, &verts, &prism_faces(outline.len()), material)
-}
-
-/// `prism`, the edges round its two end faces chamfered `c` (the outline set in at each end, all of it `c` in): a
-/// rail's arrises eased.
+/// height) points from x = a0 to a1 (a ladder's rail); the edges round its two end faces chamfered `c` (the outline
+/// set in at each end, all of it `c` in): a board's arrises eased.
 pub(super) fn eased_bar(
     name: &str,
     outline: &[(f64, f64)],
     (a0, a1): (f64, f64),
     c: f64,
     material: Mat,
+    along_x: bool,
 ) -> Obj {
     let small = crate::common::inset(outline, c);
     let k = outline.len() as u32;
@@ -405,7 +385,10 @@ pub(super) fn eased_bar(
         (a1 - c, &outline.to_vec()),
         (a1, &small),
     ] {
-        verts.extend(o.iter().map(|&(p, q)| (a, q, p)));
+        verts.extend(
+            o.iter()
+                .map(|&(p, q)| if along_x { (a, q, p) } else { (p, a, q) }),
+        );
     }
     let mut faces = vec![(0..k).collect::<Vec<u32>>(), (3 * k..4 * k).rev().collect()];
     for r in 0..3 {
@@ -417,7 +400,7 @@ pub(super) fn eased_bar(
     mesh(name, &verts, &faces, material)
 }
 
-/// A quarter-round board from y0 to y1: its corner on (cx, cz), round from +x (along the wall) to the front.
+/// A quarter-round board from y0 to y1, its edges eased: its corner on (cx, cz), round from +x (along the wall) to the front.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn quarter(
     name: &str,
@@ -434,7 +417,7 @@ pub(super) fn quarter(
         let a = PI / 2.0 * f64::from(i) / f64::from(segments);
         (cx + r * cos(a), cz + r * sin(a))
     }));
-    prism(name, &pts, y0, y1, material, false)
+    eased_bar(name, &pts, (y0, y1), 0.004, material, false)
 }
 
 /// An open bookcase w × h × d at x, its back on the wall's face: two sides, a top, a bottom board on a recessed kick,
