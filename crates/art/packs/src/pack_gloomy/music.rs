@@ -481,8 +481,8 @@ pub fn record_cabinet() -> Vec<Obj> {
         );
     });
     let plat = hinged(join(&plat, "platter", None), f.at(-0.225, 0.606, zc));
-    // The lid over the well, hinged along its back: a walnut frame round a sunk panel, a finger lip at the front;
-    // `lid_open` lifts it.
+    // The lid over the well, hinged along its back's top edge (as a piano hinge, so its back edge tips forward, not
+    // into the wall): a walnut frame round a sunk panel, a finger lip at the front; `lid_open` lifts it.
     let lid = new_parts(|| {
         fextrude!(
             f,
@@ -519,7 +519,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             bevel_segments = 1
         );
     });
-    let lid = hinged(join(&lid, "lid", None), f.at(-0.225, TOP + 0.0125, WALL));
+    let lid = hinged(join(&lid, "lid", None), f.at(-0.225, TOP + 0.025, WALL));
     let objs = settle!(centre = false);
     swing!(lid, "lid_open", -80.0, seconds = 0.9, axis = Axis::X);
     spin(
