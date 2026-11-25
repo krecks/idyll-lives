@@ -363,7 +363,8 @@ pub(crate) fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], 
 }
 
 /// About how many minutes `sim` would take to get to `plot` from where they are now, the way
-/// they'd go (`leisure_way`: the car, a bike of theirs, the taxi, else on foot).
+/// they'd go (`leisure_way`: the car, a bike of theirs or the one they're on, the taxi, else on
+/// foot).
 pub(crate) fn leisure_eta(
     sim: &Sim,
     ctx: &Ctx,
@@ -382,15 +383,21 @@ pub(crate) fn leisure_eta(
             ctx.cars,
             sim,
         ),
-        bike: crate::ride::leisure_bike(
-            content,
-            ctx.index,
-            ctx.briefs,
-            ctx.households,
-            objects,
-            sim,
-        )
-        .map(|(_, speed, min)| (speed, min)),
+        // (On one already, it, however short the ride: `leisure_bike` offers one at home only.)
+        bike: sim
+            .riding
+            .map(|_| (crate::ride::speed(content, sim, objects), 0.0))
+            .or_else(|| {
+                crate::ride::leisure_bike(
+                    content,
+                    ctx.index,
+                    ctx.briefs,
+                    ctx.households,
+                    objects,
+                    sim,
+                )
+                .map(|(_, speed, min)| (speed, min))
+            }),
     };
     let door = p.arrival_point();
     let taxi = ctx
