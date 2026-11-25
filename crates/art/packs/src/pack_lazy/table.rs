@@ -171,6 +171,8 @@ pub fn quilt_table() -> Vec<Obj> {
             0.012,
             0.026,
         );
+    });
+    let set = new_parts(|| {
         // a bowl of mandarins, two mugs, a plate of biscuits on the quilt's top
         let ty = TOP_Y + 0.067;
         kit::turned!(
@@ -314,6 +316,9 @@ pub fn quilt_table() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the poufs behind it (where residents sit) and the bowl, mugs and biscuits on its top: drawn with it, not the
+    // table's own size
+    aside(&set, "set");
     // The quilt's back edge, hung from the table top: `quilt` lifts it over the sitters' laps.
     let flap = new_parts(|| {
         soft!(

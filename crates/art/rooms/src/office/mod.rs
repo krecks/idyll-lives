@@ -122,7 +122,7 @@ pub fn family() -> Family {
                 .key("model.deskSimple")
                 .centre(0.0, -0.085)
                 .paint(&[("oak", "Top"), DESK[0], DESK[1]]),
-            Model::new("deskCorner", catalog_desks::desk_corner, (1.86, 1.009, 1.86))
+            Model::new("deskCorner", catalog_desks::desk_corner, (1.86, 0.742, 1.86))
                 .key("model.deskCorner")
                 .paint(&[
                     ("laminate", "Top"),
@@ -130,7 +130,7 @@ pub fn family() -> Family {
                     ("drawers", "Drawers"),
                     ("chair", "Chair"),
                 ]),
-            Model::new("deskStanding", catalog_desks::desk_standing, (0.96, 1.54, 0.63))
+            Model::new("deskStanding", catalog_desks::desk_standing, (0.96, 1.05, 0.63))
                 .key("model.deskStanding")
                 .centre(0.0, -0.115)
                 .motions(json!({"uses": {"browse": "tray_out", "code": "tray_out"}}))

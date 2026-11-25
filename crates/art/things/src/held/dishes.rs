@@ -7,10 +7,11 @@ use super::plates::{_cookie, _cupcake};
 use artkit::forms::rounded_rect;
 use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
-use artkit::math::{TAU, V3, cos, pow, radians, sin};
+use artkit::math::{P3, TAU, V3, cos, pow, radians, sin};
+use artkit::parts::{Settle, aside, join, new_parts, settle_with};
 use artkit::place::Facing;
 use artkit::py;
-use artkit::scene::Obj;
+use artkit::scene::{Obj, meshes};
 use artkit::{cylinder, fextrude, fsweep, jitter};
 
 /// A ring of the paper bag at height `y`: its front and back flat, each side folded in by `pinch` at its
@@ -1056,34 +1057,45 @@ fn _tray() {
 /// in their pleated cases, each with a cherry.
 pub fn baking_tray() -> Vec<Obj> {
     _tray();
-    for (i, (x, z)) in [
-        (-0.12, -0.085),
-        (0.0, -0.085),
-        (0.12, -0.085),
-        (-0.12, 0.0),
-        (0.0, 0.0),
-        (0.12, 0.0),
-        (-0.12, 0.085),
-        (0.0, 0.085),
-        (0.12, 0.085),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        if [0, 4, 8].contains(&i) {
-            _cupcake(&format!("cupcake{i}"), (x, 0.006, z));
-        } else {
-            _cookie(
-                &format!("cookie{i}"),
-                (x, 0.006, z),
-                (0.0, 0.0),
-                i as f64 * 1.3,
-                2,
-                (40 * i) as f64,
-            );
+    let tray = meshes();
+    // the cookies and cupcakes on it: drawn, not the tray's size
+    let bakes = new_parts(|| {
+        for (i, (x, z)) in [
+            (-0.12, -0.085),
+            (0.0, -0.085),
+            (0.12, -0.085),
+            (-0.12, 0.0),
+            (0.0, 0.0),
+            (0.12, 0.0),
+            (-0.12, 0.085),
+            (0.0, 0.085),
+            (0.12, 0.085),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if [0, 4, 8].contains(&i) {
+                _cupcake(&format!("cupcake{i}"), (x, 0.006, z));
+            } else {
+                _cookie(
+                    &format!("cookie{i}"),
+                    (x, 0.006, z),
+                    (0.0, 0.0),
+                    i as f64 * 1.3,
+                    2,
+                    (40 * i) as f64,
+                );
+            }
         }
-    }
-    super::common::done("bakingTray")
+    });
+    let bakes = aside(&bakes, "bakes");
+    settle_with(
+        &[join(&tray, "bakingTray", Some(P3::ZERO)), bakes],
+        Settle {
+            centre: false,
+            floor: true,
+        },
+    )
 }
 
 /// The tray after the cookies and cupcakes: a greasy stain with burnt patches, cookie crumbs, smudges of melted

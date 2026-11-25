@@ -144,3 +144,7 @@ nothing while the kettle's lid flipped up. Each now has one moving part (two dra
 No change to the models' code: their soft boxes take the shared form's new shape (rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `monitor`; the same triangles.
 
 - **No hard edges (2026-11-25, gate zero).** Rims and lips rounded (`round_at`: the cake stand), the spice rack's ends and the toaster's toast chamfered, the bananas five-sided with soft ridges, the cactus's ribs rounder (35 points), the mixer's base rolled over, the photo frame's back edge chamfered. Sizes true to their kinds: the stand mixer is turned to face the front (20 × 30 cm, its base 20 cm across), the monitor's set is under 33 cm deep (its space bar row back on the keyboard), the candlesticks stand on 8 cm feet.
+
+## Measured as the piece (2026-11-25)
+
+`cuttingBoard`: the loaf, the tomatoes and the knife on the board are set aside (`parts::aside`, `food_aside`): drawn as before, not the board's size; `cargo review sizes` measures the board 0.022 m thick (was 0.10 with the loaf).

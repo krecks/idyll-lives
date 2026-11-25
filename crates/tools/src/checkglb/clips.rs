@@ -351,11 +351,17 @@ pub(super) fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
                     continue;
                 }
                 if path == Some(&J::Str("translation".into())) && even(g, s)? {
-                    let moved = dist(&first, &last);
-                    warnings.push(format!(
-                        "loop {clip} ends {node} moved {} cm from where it starts: right only if it looks the same moved (a belt's slats one slat on, its ends hidden)",
-                        fixed(moved * 100.0, 0)
-                    ));
+                    // A scroll (G.scroll: a belt's slats one slat on, its ends hidden) looks the same moved.
+                    let part = node_index(nodes, key(target, "node")?)?;
+                    if let Some(landed) = lands_on_itself(g, part, &first, &last)?
+                        && landed < SCROLLED
+                    {
+                        errors.push(format!(
+                            "loop {clip} ends {node} moved {} cm from where it starts, and only {} of it lands where it was: a scroll moves by whole repeats (a belt's slats one slat on, its ends hidden)",
+                            fixed(dist(&first, &last) * 100.0, 0),
+                            percent(landed)
+                        ));
+                    }
                     continue;
                 }
             }
@@ -453,4 +459,42 @@ pub(super) fn flipped_faces(g: &Glb) -> R<Vec<(String, usize)>> {
         }
     }
     Ok(out)
+}
+
+/// The share of a scroll's part that must land where some of it was, moved from its first key to its last (a belt of
+/// N slats one slat on: all but one of them, (N - 1) / N).
+const SCROLLED: f64 = 0.5;
+
+/// The share of part `node`'s corners (the meshes it moves) that land within a millimetre of one of its corners at
+/// rest, moved from translation `first` to `last`; None where its positions can't be read here (compressed).
+pub(super) fn lands_on_itself(g: &Glb, node: usize, first: &[f64], last: &[f64]) -> R<Option<f64>> {
+    let corners = |t: &[f64]| -> R<Option<Vec<[f64; 3]>>> {
+        let pose: Pose = HashMap::from([(
+            (node, "translation"),
+            t.iter().map(|v| Num::F(*v)).collect(),
+        )]);
+        let placed: Vec<Placed> = node_matrices(&g.gltf, Some(&pose), None)?
+            .into_iter()
+            .filter(|p| p.part == Some(node))
+            .collect();
+        let add = |a: [f64; 3], e: [f64; 3]| [a[0] + e[0], a[1] + e[1], a[2] + e[2]];
+        Ok(triangles(g, &placed, &|_| Ok(true))?.map(|tris| {
+            tris.iter()
+                .flat_map(|t| [t.a, add(t.a, t.e1), add(t.a, t.e2)])
+                .collect()
+        }))
+    };
+    let (Some(rest), Some(moved)) = (corners(first)?, corners(last)?) else {
+        return Ok(None);
+    };
+    if moved.is_empty() {
+        return Ok(None);
+    }
+    let cell = |p: &[f64; 3]| p.map(|v| (v * 1000.0).round() as i64);
+    let at: HashSet<[i64; 3]> = rest.iter().map(cell).collect();
+    let near = |[x, y, z]: [i64; 3]| {
+        (-1..=1).any(|i| (-1..=1).any(|j| (-1..=1).any(|k| at.contains(&[x + i, y + j, z + k]))))
+    };
+    let landed = moved.iter().filter(|p| near(cell(p))).count();
+    Ok(Some(landed as f64 / moved.len() as f64))
 }

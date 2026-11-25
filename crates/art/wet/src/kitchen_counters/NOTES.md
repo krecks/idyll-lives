@@ -227,3 +227,7 @@ eased and the cans' lids too. The glazed and the corner wall cabinets' pulls sta
 wall cabinet's). The corner counter is a corner unit in docs/review/reference.json (as deep as the run it turns into),
 the butcher block an island (it stands on legs, free); the corner counter's crock of utensils stands to 1.26 m, over a
 base unit's height (reported).
+
+## Measured as the piece (2026-11-25)
+
+`counterCorner`: the utensil crock on the worktop is set aside (`parts::aside`, `crock_aside`): drawn as before, not the counter's size, so `cargo review sizes` measures the counter (1.00 × 0.95 × 0.93 m; it was 1.26 m high with the crock).

@@ -8,7 +8,7 @@ use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{P3, cos, radians, sin};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsweep, settle, soft, squash, torus};
@@ -482,7 +482,10 @@ pub fn dumbbells() -> Vec<Obj> {
             M.frame,
             profile = rounded_rect(0.03, 0.03, 0.006, 1)
         );
-        // the rubber floor mat in front, in tiles
+    });
+    join(&parts, "body", Some(P3::ZERO));
+    // the rubber floor mat in front, in tiles: drawn, not the rack's size
+    let mat = new_parts(|| {
         let mat = GameFrame::new(0.0);
         fbox!(
             mat,
@@ -513,7 +516,7 @@ pub fn dumbbells() -> Vec<Obj> {
             M.plate
         );
     });
-    join(&parts, "body", Some(P3::ZERO));
+    aside(&mat, "mat");
     // The lifted pair, each its own part with its origin at its middle: hidden while lifted (`pair_off`), the
     // game drawing one in each hand (content `held`).
     let (k, p) = LIFTED;

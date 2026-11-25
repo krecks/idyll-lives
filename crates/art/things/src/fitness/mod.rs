@@ -73,7 +73,7 @@ pub fn family() -> Family {
                 .centre(0.025, mat::BACK + 0.135)
                 .motions(json!({"uses": {"yoga": "unroll"}}))
                 .paint(&[("mat", "Mat")]),
-            Model::new("dumbbells", weights::dumbbells, (0.77, 0.717, 0.93))
+            Model::new("dumbbells", weights::dumbbells, (0.77, 0.717, 0.44))
                 .key("model.dumbbells")
                 .centre(0.0, 0.035)
                 .motions(json!({"uses": {"lift": "pair_off"}}))

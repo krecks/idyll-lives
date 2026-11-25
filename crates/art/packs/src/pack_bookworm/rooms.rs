@@ -4,7 +4,7 @@ use super::common::{M, WALL, books, knob, mug};
 use artkit::forms::rounded_rect;
 use artkit::math::{P3, cos, cosd, pow, radians, sin, sind};
 use artkit::motion::{Squash, squash};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{ASIDE, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
@@ -912,7 +912,8 @@ pub fn library_wall() -> Vec<Obj> {
             }
         }
     });
-    let ladder = join(&ladder, "ladder", None);
+    // (set aside: rolled along the rail in front of the shelves, it is drawn with them but not their depth)
+    let ladder = join(&ladder, &format!("ladder{ASIDE}"), None);
     let objs = settle!(centre = false);
     slide!(ladder, "ladder", (0.4, 0, 0), seconds = 1.2); // 40 cm along the rail, towards the middle
     objs

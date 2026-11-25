@@ -209,7 +209,7 @@ pub fn family() -> Family {
                 .motions(motions(r#"{"uses": {"espresso": {"clip": "brew", "hold": 2.5}}}"#)),
             t("knifeBlock", "model.knifeBlock", knife_block, (0.12, 0.297, 0.232), &[("knife_block", BODY), ("dark", "Handles")]),
             t("utensilCrock", "model.utensilCrock", utensil_crock, (0.132, 0.316, 0.124), &[("crock", BODY)]),
-            t("cuttingBoard", "model.cuttingBoard", cutting_board, (0.34, 0.106, 0.23), &[("board", BODY)]),
+            t("cuttingBoard", "model.cuttingBoard", cutting_board, (0.34, 0.022, 0.23), &[("board", BODY)]),
             t("breadBin", "model.breadBin", bread_bin, (0.34, 0.206, 0.202), &[("bread_bin", BODY), ("wood", "Ends & handle")])
                 .motions(motions(r#"{"uses": {"sandwich": {"clip": "roll_open", "hold": 2.4}}}"#)),
             t("spiceJars", "model.spiceJars", spice_jars, (0.3, 0.112, 0.12), &[("rack", BODY)]),

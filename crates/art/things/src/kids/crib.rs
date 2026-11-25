@@ -164,9 +164,9 @@ fn changing_table() {
         F,
         "chest",
         w - 0.02,
-        0.73,
+        0.74,
         0.5,
-        (x, 0.415, z),
+        (x, 0.42, z),
         M.crib,
         bevel = 0.01,
         bevel_segments = 2
@@ -200,7 +200,7 @@ fn changing_table() {
         w + 0.02,
         0.025,
         0.52,
-        (x, 0.7925, z),
+        (x, 0.8025, z),
         M.crib_wood,
         bevel = 0.008,
         bevel_segments = 2
@@ -212,7 +212,7 @@ fn changing_table() {
         w - 0.1,
         0.035,
         0.42,
-        (x, 0.825, z + 0.01),
+        (x, 0.835, z + 0.01),
         M.crib_bedding,
         round = 0.014,
         puff = 0.006,
@@ -225,7 +225,7 @@ fn changing_table() {
             0.075,
             0.06,
             0.42,
-            (x + s as f64 * (w / 2.0 - 0.085), 0.838, z + 0.01),
+            (x + s as f64 * (w / 2.0 - 0.085), 0.848, z + 0.01),
             M.crib_bedding,
             round = 0.026,
             flat = 1
@@ -239,10 +239,10 @@ fn changing_table() {
     );
     let pts = fillet(
         &[
-            (gx0, 0.845, gz1),
-            (gx0, 0.845, gz0),
-            (gx1, 0.845, gz0),
-            (gx1, 0.845, gz1),
+            (gx0, 0.855, gz1),
+            (gx0, 0.855, gz0),
+            (gx1, 0.855, gz0),
+            (gx1, 0.855, gz1),
         ],
         0.04,
         3,

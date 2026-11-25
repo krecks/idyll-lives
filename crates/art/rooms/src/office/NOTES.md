@@ -141,3 +141,7 @@ The gate's `edges` and `texels` find none left in the office:
 - **Computer and writing desks:** their tops are 0.5 m deep (were 0.38 and 0.42), from 5 cm behind the tile's middle
   to its front, over the knees of the resident at the desk's own chair as a real desk is; the computer desk's
   keyboard tray slides 20 cm (was 15) to clear the deeper top, and its monitor stands 1 cm lower (its top 1.205 m).
+
+## Measured as the piece (2026-11-25)
+
+`deskCorner` and `deskStanding`: what they carry is set aside (`parts::aside`, `carried_aside`, as the other desks): the corner desk's chair, laptop, mug, paper tray, cactus and notebook, the standing desk's monitor with its cable, mug and cactus. Drawn as before; `cargo review sizes` measures the desks: the corner desk 0.74 m high as a table (was 1.01 with the chair's back and the laptop), the standing desk 1.05 m (was 1.54 with the monitor).

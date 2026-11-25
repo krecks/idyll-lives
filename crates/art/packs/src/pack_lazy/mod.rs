@@ -45,7 +45,7 @@ pub fn family() -> Family {
                 .centre(0.0, 0.0243)
                 .motions(json!({"uses": {"powerNap": "hood", "curlUp": "hood"}}))
                 .paint(&[("shell", "Body"), ("seat", "Upholstery"), ("hood", "Hood")]),
-            Model::new("quiltTable", table::quilt_table, (1.81, 0.77, 0.929))
+            Model::new("quiltTable", table::quilt_table, (1.82, 0.673, 0.56))
                 .key("model.lazy.quiltTable")
                 .centre(0.0, 0.0343)
                 .motions(json!({"uses": {"tuckIn": "quilt", "doze": "quilt"}}))

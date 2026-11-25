@@ -116,5 +116,6 @@ Every hard edge the gate found (41) is gone:
   0.26 × 1.16 × 0.26 m. It keeps 4 draw calls: the rising wax (played by a use) and the drifting wax (always) are
   parts of their own, besides the glass vessel on the still body.
 
-The workout game keeps its size row: `tvOnStand` (its label: "incl. console or workout game") is 0.30–0.55 deep, the
-stand's, and the balance board that rocks on the mat before it is a moving part of the model.
+The workout game's step mat and kettlebell on the floor before it are `aside` (`floor`), and so is the balance board
+that rocks on the mat, a moving part (`board_aside`, still tilted by `board`): it measures 0.80 × 1.16 × 0.30 m, the
+stand (`tvOnStand`, 0.30–0.55 deep). No draw call more (2026-11-25).

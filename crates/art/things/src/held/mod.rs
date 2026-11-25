@@ -130,7 +130,7 @@ pub fn family() -> Family {
             i(
                 "bakingTray",
                 baking_tray,
-                (0.38, 0.07, 0.28),
+                (0.38, 0.025, 0.28),
                 "item.bakingTray",
                 O,
                 false,

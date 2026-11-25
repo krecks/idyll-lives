@@ -110,3 +110,8 @@ stack 3,918 (4,396), the bureau 7,840 (8,168).
 The bedside stack's lamp and the pile on the floor in front of it are `aside` (drawn, not the chest's own size; no
 draw call more): it measures 0.60 × 0.66 × 0.45 m, a nightstand. The bureau keeps 4 draw calls (the body plain and
 wood, the flap wood and plain: its brass pull and key and leather lining move with it).
+
+The library wall's rolling ladder is `aside` too, a moving part (`ladder_aside`, still rolled by `ladder`): the wall
+measures 1.88 × 2.34 × 0.43 m, the shelves. The fireside lounge's rug, wing chairs, tripod table, low bookcase and log
+basket are `aside` (`lounge`): its own size is the hearth, the fire basket and the hood on its flue, 0.60 × 2.80 ×
+0.60 m (the chairs are still where residents sit). No draw call more (2026-11-25).

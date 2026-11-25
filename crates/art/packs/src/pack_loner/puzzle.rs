@@ -5,7 +5,7 @@ use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, acos, cos, cosd, degrees, radians, sin, sind};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{ASIDE, aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
@@ -405,6 +405,8 @@ pub fn bonsai_bench() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 1
         );
+    });
+    let bonsai = new_parts(|| {
         // the bonsai: a glazed tray pot on feet, soil and moss, roots gripping it, a twisting tapered trunk with its
         // branches, pads of leaves
         kit::lathe!(
@@ -521,6 +523,8 @@ pub fn bonsai_bench() -> Vec<Obj> {
         _pad(f, 0.18, 1.14, -0.2, 0.18, 0.15, 2);
         _pad(f, 0.08, 1.26, -0.2, 0.22, 0.18, 3);
         _pad(f, -0.04, 1.19, -0.16, 0.14, 0.12, 4);
+    });
+    let tools = new_parts(|| {
         // tools: a coil of copper wire, a mister, a pair of shears
         let coil: Vec<(f64, f64, f64)> = (0..37)
             .map(|k| {
@@ -671,7 +675,9 @@ pub fn bonsai_bench() -> Vec<Obj> {
             rings = 5
         );
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    join(&[still, tools].concat(), "body", Some(P3::from((0, 0, 0))));
+    // the bonsai in its pot on the top: drawn on the bench, not the bench's own size
+    aside(&bonsai, "bonsai");
     // The leggy twig the gardener trims: a shoot and a tuft, origin where it leaves the pad: `trim` shrinks it away.
     let twig = new_parts(|| {
         fsweep!(
@@ -701,7 +707,11 @@ pub fn bonsai_bench() -> Vec<Obj> {
             jitter!(o, 0.004, size = 0.03, seed = k as f64);
         }
     });
-    let twig = hinged(join(&twig, "twig", None), f.at(TWIG.0, TWIG.1, TWIG.2));
+    // (set aside too, as the tree it grows on)
+    let twig = hinged(
+        join(&twig, &format!("twig{ASIDE}"), None),
+        f.at(TWIG.0, TWIG.1, TWIG.2),
+    );
     let objs = settle!(centre = false);
     squash!(twig, "trim", 0.001, seconds = 0.7);
     rock!(twig, "mist", 10.0, seconds = 1.2, axis = Axis::Y); // nodding under the mister while it is misted and fed

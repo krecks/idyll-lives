@@ -107,6 +107,9 @@ Every hard edge the gate's `edges` found is eased (13 → 0): the chairs' crest 
 ends (`artkit::bevel::ease` at 60°), the bonsai pot's rim (`eased`), the hatch frame's inner arris. The bonsai's leaf pads have their
 scale in their meshes before their UVs are made (a `boulder!` is scaled so), so the foliage is laid at its own size (it was 3,578 px a
 metre and stretched on 18 %: `texels`). The hatch's mat is `aside` (drawn, not the hatch's own size): it measures
-0.84 × 1.95 × 0.50 m. The sauna keeps 4 draw calls (the door's glass is its own); the bonsai bench (its trimmed twig
-is a moving part at 1.2 m) and the radio desk (its antenna's inner section, a moving part, stands to 1.33 m at rest)
-stay over their kinds' heights.
+0.84 × 1.95 × 0.50 m. The sauna keeps 4 draw calls (the door's glass is its own). The radio set on the radio
+desk, with its antenna's swivel and tube, the microphone, headphones, logbook and mug, is `aside` (`on_desk`), and so
+are its moving dial and antenna (`dial_aside`, `antenna_aside`, still played by `dial` and `antenna`): it measures 0.84
+× 0.93 × 0.68 m, the desk and chair. The bonsai on the bonsai bench is `aside` (`bonsai`), its trimmed twig too
+(`twig_aside`, still played by `trim` and `mist`): the bench measures 0.86 × 1.11 × 0.75 m, its back board's rail at
+1.11 m. No draw call more (2026-11-25).

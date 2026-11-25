@@ -105,3 +105,12 @@ drapes' ends eased, the bowl's and plate's rims rounded, the plate's column ends
 pays with plainer mandarins, mugs and poufs (7,972 triangles), the bed with plainer feet under its base (7,900).
 The locker's doorstep order and the hub's robot are drawn `aside`. The quilt table stays a `lowTable` it doesn't
 match (its poufs at 0.45, its top at 0.635): no kind in docs/review/reference.json is a raised kotatsu.
+
+## Audit (2026-11-25)
+
+`napPod`: its bevels take their angles from the kernel's Blender arc sine (artkit `bevel`; a hair of shape at most,
+towards Blender's build).
+
+The quilt table's poufs (where residents sit), their back cushions and the bowl, mugs and biscuits on its top are
+`aside` (`set`): it measures 1.82 × 0.67 × 0.56 m, the table under its quilt, its top at chair height (0.63 m), a
+high kotatsu sat at from poufs. No draw call more (2026-11-25).

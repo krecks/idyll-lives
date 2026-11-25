@@ -296,7 +296,7 @@ pub fn family() -> Family {
             Model::new(
                 "bathtubClawfoot",
                 baths::bathtub_clawfoot,
-                (1.73, 1.02, 0.829),
+                (1.73, 0.717, 0.829),
             )
             .key("model.bathtubClawfoot")
             .motions(bath())
@@ -309,7 +309,7 @@ pub fn family() -> Family {
             Model::new(
                 "bathtubFreestanding",
                 baths::bathtub_freestanding,
-                (1.895, 0.919, 0.837),
+                (1.79, 0.597, 0.83),
             )
             .key("model.bathtubFreestanding")
             .motions(bath())

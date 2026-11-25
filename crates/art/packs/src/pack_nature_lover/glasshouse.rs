@@ -4,7 +4,7 @@ use super::common::{_pot, _rosette, M};
 use super::ferns::{_fern, _orchid, _palm};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
-use artkit::math::{Axis, M4, P3, V3, atan2, cosd, degrees, radians, sind};
+use artkit::math::{Axis, P3, atan2, cosd, degrees, sind};
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
@@ -542,9 +542,23 @@ pub fn glasshouse() -> Vec<Obj> {
             }
         }
     });
-    // The roof vent: a glass panel hinged at the ridge, propped open 25° (on the still body's glass draw: a part
-    // of its own would be a fourth).
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // The door: a glass leaf hinged on the left post, swinging out; the roof vent: a glass panel hinged at
+    // the ridge, lifting. `door_open` lets the resident in and shuts behind them (and lets them out), `vent_open`
+    // airs it while they're in.
     let (vz, vl) = VENT;
+    let door = new_parts(|| {
+        fbox!(
+            f,
+            "door_glass",
+            DOOR - 0.01,
+            1.86,
+            0.014,
+            (0, 0.06 + 0.93, hz),
+            M.glass
+        );
+    });
+    let door = hinged(join(&door, "door", None), f.at(-DOOR / 2.0, 1.0, hz));
     let vent = new_parts(|| {
         let t = (vl / 2.0) / run; // its middle, from the ridge
         fbox!(
@@ -558,30 +572,9 @@ pub fn glasshouse() -> Vec<Obj> {
             rot = (0, -slope, 0)
         );
     });
-    let hinge = V3::from(f.at(0.0, HR + 0.01, 0));
-    let prop =
-        M4::translation(hinge) * M4::rotation(radians(25.0), Axis::Y) * M4::translation(-hinge);
-    for &o in &vent {
-        let w = o.matrix_world();
-        o.edit(|p| p.mesh.transform(&(prop * w)));
-        o.set_matrix_world(M4::IDENTITY);
-    }
-    join(&[still, vent].concat(), "body", Some(P3::from((0, 0, 0))));
-    // The door: a glass leaf hinged on the left post, swinging out: `door_open` lets the resident in and shuts
-    // behind them (and lets them out).
-    let door = new_parts(|| {
-        fbox!(
-            f,
-            "door_glass",
-            DOOR - 0.01,
-            1.86,
-            0.014,
-            (0, 0.06 + 0.93, hz),
-            M.glass
-        );
-    });
-    let door = hinged(join(&door, "door", None), f.at(-DOOR / 2.0, 1.0, hz));
+    let vent = hinged(join(&vent, "vent", None), f.at(0.0, HR + 0.01, 0));
     let objs = settle!(centre = false);
     swing!(door, "door_open", 70.0, seconds = 0.9, ease = Ease::BackOut);
+    swing!(vent, "vent_open", 25.0, seconds = 0.9, axis = Axis::Y);
     objs
 }

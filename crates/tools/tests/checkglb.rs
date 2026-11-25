@@ -174,7 +174,7 @@ fn a_batch_check_is_judged_by_the_baseline() {
 #[test]
 fn the_sofa_bed_is_measured_held_open_where_furniture_json_has_it() {
     let paths = Paths::repo();
-    let m = measures(&paths, &Default::default()).unwrap();
+    let m = measures(&paths, &Default::default(), &Default::default()).unwrap();
     let sofa = m.objects["sofaBed"].as_ref().unwrap();
     let of = |what: &str| sofa.heights.iter().find(|h| h.what == what).unwrap();
     let (mattress, seat) = (of("mattress"), of("seat"));
@@ -226,7 +226,12 @@ fn the_review_measures_the_pilots_cases() {
     )
     .unwrap();
     let objects = review::objects(std::path::Path::new(&paths.content)).unwrap();
-    let m = measures(&paths, &review::tops(&objects, &reference)).unwrap();
+    let m = measures(
+        &paths,
+        &review::tops(&objects, &reference),
+        &review::model_seats(&objects, &reference),
+    )
+    .unwrap();
     let of = |id: &str| m.objects[id].as_ref().unwrap();
     let crib = of("crib")
         .heights
@@ -255,7 +260,7 @@ fn the_review_measures_the_pilots_cases() {
 
 #[test]
 fn every_object_is_measured() {
-    let m = measures(&Paths::repo(), &Default::default()).unwrap();
+    let m = measures(&Paths::repo(), &Default::default(), &Default::default()).unwrap();
     assert!(m.objects.len() > 500, "{}", m.objects.len());
     let unread: Vec<_> = m
         .objects

@@ -7,7 +7,7 @@ use artkit::json::float_repr as r;
 use artkit::materials::Mat;
 use artkit::math::{Axis, TAU, cos, radians, sin};
 use artkit::motion::{Spin, spin};
-use artkit::parts::{join, new_parts};
+use artkit::parts::{aside, join, new_parts};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, revolve, torus};
 
@@ -340,228 +340,233 @@ pub fn train_table() -> Vec<Obj> {
         segments = 10,
         rings = 6
     );
-    // the ring of wooden track, with two grooves
-    revolve!(
-        "track",
-        &[
-            (RING_R - 0.04, 0.0),
-            (RING_R + 0.04, 0.0),
-            (RING_R + 0.04, 0.012),
-            (RING_R - 0.04, 0.012),
-            (RING_R - 0.04, 0.0)
-        ],
-        at = F.at(RING_X, TABLE_TOP - 0.002, RING_Z),
-        material = M.track,
-        segments = 40,
-        smooth = false
-    );
-    for rr in [RING_R - 0.016, RING_R + 0.016] {
-        torus!(
-            format!("groove{}", r(rr)),
-            rr,
-            0.003,
-            at = F.at(RING_X, TABLE_TOP + 0.0105, RING_Z),
-            material = M.track_groove,
-            major_segments = 40,
-            minor_segments = 4
+    let table = meshes();
+    // the layout on the board (track, tunnel, station, town): drawn, not the table's size
+    let layout = new_parts(|| {
+        // the ring of wooden track, with two grooves
+        revolve!(
+            "track",
+            &[
+                (RING_R - 0.04, 0.0),
+                (RING_R + 0.04, 0.0),
+                (RING_R + 0.04, 0.012),
+                (RING_R - 0.04, 0.012),
+                (RING_R - 0.04, 0.0)
+            ],
+            at = F.at(RING_X, TABLE_TOP - 0.002, RING_Z),
+            material = M.track,
+            segments = 40,
+            smooth = false
         );
-    }
-    // a tunnel the track runs through on the right, grass over its top, a stone portal at each end
-    let (tx, tz) = (RING_X + RING_R, RING_Z);
-    fextrude!(
-        F,
-        "tunnel",
-        &archway(0.072, 0.09, 0.045, 0.075, 8),
-        0.12,
-        (tx, TABLE_TOP, tz),
-        M.grass,
-        bevel = 0.008,
-        bevel_segments = 1
-    );
-    for s in [-1, 1] {
+        for rr in [RING_R - 0.016, RING_R + 0.016] {
+            torus!(
+                format!("groove{}", r(rr)),
+                rr,
+                0.003,
+                at = F.at(RING_X, TABLE_TOP + 0.0105, RING_Z),
+                material = M.track_groove,
+                major_segments = 40,
+                minor_segments = 4
+            );
+        }
+        // a tunnel the track runs through on the right, grass over its top, a stone portal at each end
+        let (tx, tz) = (RING_X + RING_R, RING_Z);
         fextrude!(
             F,
-            format!("portal{s}"),
-            &archway(0.06, 0.08, 0.045, 0.075, 6),
-            0.01,
-            (tx, TABLE_TOP, tz + s as f64 * 0.062),
-            M.spot,
-            bevel = 0.002,
+            "tunnel",
+            &archway(0.072, 0.09, 0.045, 0.075, 8),
+            0.12,
+            (tx, TABLE_TOP, tz),
+            M.grass,
+            bevel = 0.008,
             bevel_segments = 1
         );
-    }
-    // the station on the left of the track: a platform, a building with a pitched roof, a signal
-    fbox!(
-        F,
-        "platform",
-        0.05,
-        0.02,
-        0.26,
-        (-0.09, TABLE_TOP + 0.01, RING_Z),
-        M.spot,
-        bevel = 0.004,
-        bevel_segments = 1
-    );
-    fbox!(
-        F,
-        "station",
-        0.1,
-        0.09,
-        0.2,
-        (-0.16, TABLE_TOP + 0.045, RING_Z),
-        M.toy_yellow,
-        bevel = 0.005,
-        bevel_segments = 1
-    );
-    fextrude!(
-        F,
-        "station_roof",
-        &[(-0.065, 0.0), (0.065, 0.0), (0.0, 0.05)],
-        0.22,
-        (-0.16, TABLE_TOP + 0.09, RING_Z),
-        M.toy_red,
-        bevel = 0.004,
-        bevel_segments = 1
-    );
-    fbox!(
-        F,
-        "station_door",
-        0.004,
-        0.06,
-        0.04,
-        (-0.108, TABLE_TOP + 0.03, RING_Z),
-        M.house_door
-    );
-    for s in [-1, 1] {
+        for s in [-1, 1] {
+            fextrude!(
+                F,
+                format!("portal{s}"),
+                &archway(0.06, 0.08, 0.045, 0.075, 6),
+                0.01,
+                (tx, TABLE_TOP, tz + s as f64 * 0.062),
+                M.spot,
+                bevel = 0.002,
+                bevel_segments = 1
+            );
+        }
+        // the station on the left of the track: a platform, a building with a pitched roof, a signal
         fbox!(
             F,
-            format!("station_window{s}"),
+            "platform",
+            0.05,
+            0.02,
+            0.26,
+            (-0.09, TABLE_TOP + 0.01, RING_Z),
+            M.spot,
+            bevel = 0.004,
+            bevel_segments = 1
+        );
+        fbox!(
+            F,
+            "station",
+            0.1,
+            0.09,
+            0.2,
+            (-0.16, TABLE_TOP + 0.045, RING_Z),
+            M.toy_yellow,
+            bevel = 0.005,
+            bevel_segments = 1
+        );
+        fextrude!(
+            F,
+            "station_roof",
+            &[(-0.065, 0.0), (0.065, 0.0), (0.0, 0.05)],
+            0.22,
+            (-0.16, TABLE_TOP + 0.09, RING_Z),
+            M.toy_red,
+            bevel = 0.004,
+            bevel_segments = 1
+        );
+        fbox!(
+            F,
+            "station_door",
             0.004,
-            0.03,
-            0.035,
-            (-0.108, TABLE_TOP + 0.055, RING_Z + s as f64 * 0.06),
-            M.water
+            0.06,
+            0.04,
+            (-0.108, TABLE_TOP + 0.03, RING_Z),
+            M.house_door
         );
-    }
-    fcyl!(
-        F,
-        "signal_post",
-        0.005,
-        0.14,
-        (-0.09, TABLE_TOP + 0.07, RING_Z + 0.17),
-        M.dark,
-        verts = 6
-    );
-    fbox!(
-        F,
-        "signal",
-        0.016,
-        0.04,
-        0.014,
-        (-0.09, TABLE_TOP + 0.13, RING_Z + 0.17),
-        M.dark,
-        bevel = 0.003,
-        bevel_segments = 1
-    );
-    fsphere!(
-        F,
-        "signal_light",
-        0.006,
-        (-0.09, TABLE_TOP + 0.14, RING_Z + 0.178),
-        M.toy_red,
-        segments = 6,
-        rings = 4
-    );
-    // the town: a road with its line, a house, a pond with stones round it, trees
-    fbox!(
-        F,
-        "road",
-        0.08,
-        0.004,
-        0.8,
-        (-0.3, TABLE_TOP + 0.002, 0),
-        M.track_groove
-    );
-    for k in 0..5 {
+        for s in [-1, 1] {
+            fbox!(
+                F,
+                format!("station_window{s}"),
+                0.004,
+                0.03,
+                0.035,
+                (-0.108, TABLE_TOP + 0.055, RING_Z + s as f64 * 0.06),
+                M.water
+            );
+        }
+        fcyl!(
+            F,
+            "signal_post",
+            0.005,
+            0.14,
+            (-0.09, TABLE_TOP + 0.07, RING_Z + 0.17),
+            M.dark,
+            verts = 6
+        );
         fbox!(
             F,
-            format!("road_line{k}"),
-            0.008,
-            0.002,
-            0.07,
-            (-0.3, TABLE_TOP + 0.005, -0.32 + 0.16 * k as f64),
-            M.paper
+            "signal",
+            0.016,
+            0.04,
+            0.014,
+            (-0.09, TABLE_TOP + 0.13, RING_Z + 0.17),
+            M.dark,
+            bevel = 0.003,
+            bevel_segments = 1
         );
-    }
-    fbox!(
-        F,
-        "house",
-        0.11,
-        0.08,
-        0.1,
-        (-0.5, TABLE_TOP + 0.04, -0.25),
-        M.house,
-        bevel = 0.004,
-        bevel_segments = 1
-    );
-    fextrude!(
-        F,
-        "house_roof",
-        &[(-0.065, 0.0), (0.065, 0.0), (0.0, 0.05)],
-        0.12,
-        (-0.5, TABLE_TOP + 0.08, -0.25),
-        M.roof,
-        bevel = 0.003,
-        bevel_segments = 1
-    );
-    fbox!(
-        F,
-        "house_door",
-        0.03,
-        0.045,
-        0.004,
-        (-0.5, TABLE_TOP + 0.0225, -0.199),
-        M.house_door
-    );
-    fcyl!(
-        F,
-        "pond",
-        0.09,
-        0.006,
-        (-0.49, TABLE_TOP + 0.003, 0.2),
-        M.water,
-        verts = 20
-    );
-    for k in 0..7 {
-        let a = TAU * k as f64 / 7.0;
         fsphere!(
             F,
-            format!("stone{k}"),
-            0.014,
-            (
-                -0.49 + 0.103 * cos(a),
-                TABLE_TOP + 0.004,
-                0.2 + 0.103 * sin(a)
-            ),
-            M.spot,
-            scale = (1.2, 1, 0.6),
+            "signal_light",
+            0.006,
+            (-0.09, TABLE_TOP + 0.14, RING_Z + 0.178),
+            M.toy_red,
             segments = 6,
             rings = 4
         );
-    }
-    for (k, (x, z, h)) in [
-        (-0.55, -0.02, 0.2),
-        (-0.17, -0.3, 0.16),
-        (-0.17, 0.3, 0.18),
-        (0.55, -0.33, 0.16),
-        (0.56, 0.33, 0.14),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        tree(&format!("tree{k}"), x, z, h, TABLE_TOP);
-    }
-    still("body", None);
+        // the town: a road with its line, a house, a pond with stones round it, trees
+        fbox!(
+            F,
+            "road",
+            0.08,
+            0.004,
+            0.8,
+            (-0.3, TABLE_TOP + 0.002, 0),
+            M.track_groove
+        );
+        for k in 0..5 {
+            fbox!(
+                F,
+                format!("road_line{k}"),
+                0.008,
+                0.002,
+                0.07,
+                (-0.3, TABLE_TOP + 0.005, -0.32 + 0.16 * k as f64),
+                M.paper
+            );
+        }
+        fbox!(
+            F,
+            "house",
+            0.11,
+            0.08,
+            0.1,
+            (-0.5, TABLE_TOP + 0.04, -0.25),
+            M.house,
+            bevel = 0.004,
+            bevel_segments = 1
+        );
+        fextrude!(
+            F,
+            "house_roof",
+            &[(-0.065, 0.0), (0.065, 0.0), (0.0, 0.05)],
+            0.12,
+            (-0.5, TABLE_TOP + 0.08, -0.25),
+            M.roof,
+            bevel = 0.003,
+            bevel_segments = 1
+        );
+        fbox!(
+            F,
+            "house_door",
+            0.03,
+            0.045,
+            0.004,
+            (-0.5, TABLE_TOP + 0.0225, -0.199),
+            M.house_door
+        );
+        fcyl!(
+            F,
+            "pond",
+            0.09,
+            0.006,
+            (-0.49, TABLE_TOP + 0.003, 0.2),
+            M.water,
+            verts = 20
+        );
+        for k in 0..7 {
+            let a = TAU * k as f64 / 7.0;
+            fsphere!(
+                F,
+                format!("stone{k}"),
+                0.014,
+                (
+                    -0.49 + 0.103 * cos(a),
+                    TABLE_TOP + 0.004,
+                    0.2 + 0.103 * sin(a)
+                ),
+                M.spot,
+                scale = (1.2, 1, 0.6),
+                segments = 6,
+                rings = 4
+            );
+        }
+        for (k, (x, z, h)) in [
+            (-0.55, -0.02, 0.2),
+            (-0.17, -0.3, 0.16),
+            (-0.17, 0.3, 0.18),
+            (0.55, -0.33, 0.16),
+            (0.56, 0.33, 0.14),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            tree(&format!("tree{k}"), x, z, h, TABLE_TOP);
+        }
+    });
+    aside(&layout, "layout");
+    still("body", Some(&table));
     // the train: an engine and two wagons, turning round the ring's middle
     let parts = new_parts(|| {
         train_piece("engine", 90.0, &engine);

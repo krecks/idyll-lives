@@ -65,7 +65,7 @@ pub fn family() -> Family {
                 .centre(0.0, 0.0)
                 .motions(json!({"uses": {"snack": "fridge_open", "takeout": "fridge_open"}}))
                 .paint(&[("mint", "Body"), ("lid", "Upholstery")]),
-            Model::new("fitnessGame", lounge::fitness_game, (0.865, 1.155, 0.88))
+            Model::new("fitnessGame", lounge::fitness_game, (0.8, 1.155, 0.301))
                 .key("model.couchPotato.fitnessGame")
                 .centre(0.032, 0.01)
                 .motions(json!({"uses": {"workout": "board"}}))
