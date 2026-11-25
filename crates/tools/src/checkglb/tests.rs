@@ -1478,11 +1478,44 @@ fn the_review_measures_the_body_not_what_it_carries() {
     let none = J::Obj(Vec::new());
     let all = Sampler::new(&desk, &none, None).unwrap().unwrap();
     let own = Sampler::own(&desk, &none).unwrap().unwrap();
-    assert!((all.height_by(0.74).unwrap() - 1.2).abs() < 1e-6, "the screen on it");
-    assert!((own.height_by(0.74).unwrap() - 0.74).abs() < 1e-6, "the desk alone");
-    assert_eq!(top_near(&own, [0.72, 0.76], &[]).map(|(_, h)| (h * 100.0).round()), Some(74.0));
+    assert!(
+        (all.height_by(0.74).unwrap() - 1.2).abs() < 1e-6,
+        "the screen on it"
+    );
+    assert!(
+        (own.height_by(0.74).unwrap() - 0.74).abs() < 1e-6,
+        "the desk alone"
+    );
+    assert_eq!(
+        top_near(&own, [0.72, 0.76], &[]).map(|(_, h)| (h * 100.0).round()),
+        Some(74.0)
+    );
     // A bench: its seat 0.45 m up, its back's top rail 0.9 m behind it.
     let bench = quads(&[[0.45, -0.8, 0.8, -0.2, 0.2], [0.9, -0.8, 0.8, -0.25, -0.2]]);
     let s = Sampler::own(&bench, &none).unwrap().unwrap();
-    assert_eq!(seat_near(&s, [0.42, 0.48]).map(|h| (h * 100.0).round()), Some(45.0));
+    assert_eq!(
+        seat_near(&s, [0.42, 0.48]).map(|h| (h * 100.0).round()),
+        Some(45.0)
+    );
+}
+
+/// A crib's changing table: its pad's top is its top, though the pad's underside is level with the top of a rail
+/// in front, which itself stands on the mattress's height: only what stands on nothing found bears things.
+#[test]
+fn a_top_on_a_pad_is_not_taken_for_a_thing_on_a_rail() {
+    // (file x is game -x) the mattress 0.56 m at game x -1 to 0; the changing board 0.78 at 0 to 1, its pad
+    // 0.805 to 0.843 over the middle back; a rail in front 0.80, a bar under it 0.56.
+    let crib = quads(&[
+        [0.56, 0.02, 1.0, -0.5, 0.5],
+        [0.78, -1.0, -0.02, -0.5, 0.5],
+        [0.805, -0.7, -0.3, -0.4, 0.1],
+        [0.843, -0.7, -0.3, -0.4, 0.1],
+        [0.80, -0.6, -0.4, 0.2, 0.3],
+        [0.56, -0.6, -0.4, 0.2, 0.3],
+    ]);
+    let s = Sampler::own(&crib, &J::Obj(Vec::new())).unwrap().unwrap();
+    assert_eq!(
+        top_near(&s, [0.85, 0.95], &[]).map(|(_, h)| (h * 1000.0).round()),
+        Some(843.0)
+    );
 }

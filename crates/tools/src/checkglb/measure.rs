@@ -33,9 +33,10 @@ pub struct Measure {
 /// middle, while a quarter in is still on a table's top, inside its rim or on its board. Lines within
 /// `SEAT_CLEAR` of a seat's hips (`seats`) are left out (a chair's seat or back is no top), unless none of the
 /// others finds a face (a stash box sat on: its top is its seat). Of the faces found, the highest that doesn't
-/// stand on another: one with a face 2 cm or more under it on its line that is what another line found is a
-/// thing on the top (a vase, a tool, a plate: the top goes on under it), while a basin's or a hob's floor is
-/// lower than the worktop round it, which has no top under it. (Where, how high); None: no face looks up there.
+/// stand on another: one with a face 2 cm or more under it on its line that is what another line found, itself
+/// standing on nothing found, is a thing on the top (a vase, a tool, a plate: the top goes on under it), while a
+/// basin's or a hob's floor is lower than the worktop round it, which has no top under it. (Where, how high);
+/// None: no face looks up there.
 pub(super) fn top_near(
     s: &Sampler,
     range: [f64; 2],
@@ -52,14 +53,22 @@ pub(super) fn top_near(
     if found.is_empty() {
         found = on(top_lines(s, &[]));
     }
-    let stands = |(_, h, faces): &([f64; 2], f64, Vec<f64>)| {
+    let stands_on = |(_, h, faces): &([f64; 2], f64, Vec<f64>), under: &[f64]| {
         faces
             .iter()
-            .any(|q| *q <= h - 0.02 && found.iter().any(|(_, other, _)| (other - q).abs() <= 0.01))
+            .any(|q| *q <= h - 0.02 && under.iter().any(|other| (other - q).abs() <= 0.01))
     };
+    // What a thing can stand on is what stands on nothing found: not a rail's top over the mattress, which a
+    // changing pad's underside happens to be level with.
+    let all: Vec<f64> = found.iter().map(|f| f.1).collect();
+    let bases: Vec<f64> = found
+        .iter()
+        .filter(|f| !stands_on(f, &all))
+        .map(|f| f.1)
+        .collect();
     found
         .iter()
-        .filter(|f| !stands(f))
+        .filter(|f| !stands_on(f, &bases))
         .map(|(p, h, _)| (*p, *h))
         .max_by(|a, b| a.1.total_cmp(&b.1))
 }
