@@ -84,7 +84,6 @@ pub(crate) fn stuck_back(w: &World, k: u64) -> bool {
 pub(crate) fn back_off(w: &mut World, c: usize) -> bool {
     let key = car_first(c);
     let others = vehicles(&w.cars, Some(c));
-    let standing: Vec<Driving> = parked(&w.cars).collect();
     let car = &w.cars[c];
     let Some((home, route)) = car.route.as_ref() else {
         return false;
@@ -120,6 +119,7 @@ pub(crate) fn back_off(w: &mut World, c: usize) -> bool {
     // (Back out of the claim of the one it's held up with, too: away from it is out of its way.)
     let partner = car.waits_for;
     let layer = car.layer();
+    let standing: Vec<Driving> = parked(&w.cars).collect();
     if guard(&now, &next, layer, others.iter().chain(&standing)).is_some()
         || w.traffic
             .blocked(key, &now, &next, way, 0.0, false, layer)
