@@ -104,7 +104,6 @@ mod spare_beds;
 mod stable_ids;
 mod storeys;
 mod story_refs;
-mod structure_rect;
 mod structure_sync;
 mod surfaces;
 mod tops_and_conditions;

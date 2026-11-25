@@ -9,7 +9,7 @@ compile_error!(
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use sim_core::save::SAVE_VERSION;
+use sim_core::save::{OLDEST_SAVE_VERSION, SAVE_VERSION};
 use sim_core::{Command, Content, World, mesh, snapshot, view};
 use wasm_bindgen::prelude::*;
 
@@ -38,10 +38,6 @@ fn start() {
         }
     }));
 }
-
-/// Oldest save version the game opens (`sim_core::save::OLDEST_SAVE_VERSION`), as the version read
-/// from the start of a file is.
-const OLDEST_SAVE_VERSION: u64 = sim_core::save::OLDEST_SAVE_VERSION as u64;
 
 /// Why a save can't be opened. The menu keeps one from a newer version, and one this version
 /// failed to load (a later version may open it), and skips them; it removes one that is too old
@@ -82,34 +78,8 @@ impl LoadError {
     }
 }
 
-/// The version a save says it is, read off its start (a save's `version` comes first), so a save
-/// too old to open is known without reading the rest. None: it doesn't start so.
-fn version_of(save_json: &str) -> Option<u64> {
-    let rest = save_json
-        .trim_start()
-        .strip_prefix('{')?
-        .trim_start()
-        .strip_prefix("\"version\"")?
-        .trim_start()
-        .strip_prefix(':')?
-        .trim_start();
-    let digits = rest
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(rest.len());
-    rest[..digits].parse().ok()
-}
-
-/// Loads a save; when that fails, works out whether (and how) the save is to blame. One older
-/// than the game opens (`OLDEST_SAVE_VERSION`) is refused as too old before it is read.
+/// Loads a save; when that fails, works out whether (and how) the save is to blame.
 fn load_save(content_json: &str, save_json: &str) -> Result<World, LoadError> {
-    if let Some(v) = version_of(save_json).filter(|&v| v < OLDEST_SAVE_VERSION) {
-        return Err(LoadError {
-            problem: Some(SaveProblem::TooOld),
-            message: format!(
-                "save version {v} is older than this game opens ({OLDEST_SAVE_VERSION})"
-            ),
-        });
-    }
     World::from_save_json(content_json, save_json).map_err(|e| LoadError {
         problem: save_problem(content_json, save_json, &e.0),
         message: e.0,
@@ -138,7 +108,7 @@ fn save_problem(content_json: &str, save_json: &str, error: &str) -> Option<Save
             .any(|start| error.starts_with(start));
     Some(match version {
         Some(v) if v > u64::from(SAVE_VERSION) => SaveProblem::TooNew,
-        Some(v) if v < OLDEST_SAVE_VERSION => SaveProblem::TooOld,
+        Some(v) if v < u64::from(OLDEST_SAVE_VERSION) => SaveProblem::TooOld,
         _ if damaged => SaveProblem::Corrupt,
         _ => SaveProblem::Failed,
     })
@@ -159,9 +129,6 @@ pub struct Game {
     /// (`set_watch`; else the focus lot's).
     view: Option<[i32; 4]>,
     watch: Option<[i32; 4]>,
-    /// Per storage chunk: its fingerprint and version, as of `chunks_at` (`chunk_versions`).
-    chunks: Vec<(u64, u32)>,
-    chunks_at: Option<u32>,
     /// A fingerprint of the rooms as `rooms_changed` last gave them (None: not yet).
     rooms_sent: Option<u64>,
 }
@@ -330,12 +297,7 @@ impl Game {
     }
 
     /// The room id of every tile, row by row (`width × depth` of the structure; 0 outdoors), as a
-    /// `Uint16Array` (the structure's `rooms`, without the JSON).
-    pub fn rooms(&self) -> Vec<u16> {
-        self.world.lot.rooms_row_major()
-    }
-
-    /// `rooms`, if they changed since this last gave them (or never did): a big world's are
+    /// `Uint16Array`, if they changed since this last gave them (or never did): a big world's are
     /// megabytes, and most edits of the lot (a fence, a floor painted, a door) leave them as they were.
     pub fn rooms_changed(&mut self) -> Option<Vec<u16>> {
         let rooms = self.world.lot.rooms_row_major();
@@ -345,44 +307,6 @@ impl Game {
         }
         self.rooms_sent = Some(print);
         Some(rooms)
-    }
-
-    /// The walls, doors, windows, fences, diagonals, floor coverings and objects inside the tile
-    /// rectangle `[x0, z0, x1, z1)` (stacked rows, as the structure's; JSON, see
-    /// `sim_core::view::structure_rect_json`).
-    pub fn structure_rect(&self, x0: i32, z0: i32, x1: i32, z1: i32) -> String {
-        view::structure_rect_json(&self.world, [x0, z0, x1, z1])
-    }
-
-    /// Versions of the storage chunks (`sim_core::lot::CHUNK` tiles square, stacked rows): the
-    /// chunks across and down, then a version per chunk, row by row (`Uint32Array`). A chunk's
-    /// version changes when something in it does (its walls, floors, objects); fetch it again
-    /// with `structure_rect`.
-    pub fn chunk_versions(&mut self) -> Vec<u32> {
-        let version = self.world.structure_version();
-        let (cols, rows, prints) = if self.chunks_at == Some(version) {
-            let (cols, rows) = self.world.lot.chunk_grid();
-            (cols, rows, Vec::new())
-        } else {
-            view::chunk_fingerprints(&self.world)
-        };
-        if self.chunks_at != Some(version) {
-            if self.chunks.len() != prints.len() {
-                self.chunks = prints.iter().map(|&p| (p, 1)).collect();
-            } else {
-                for (c, &p) in self.chunks.iter_mut().zip(&prints) {
-                    if c.0 != p {
-                        *c = (p, c.1.wrapping_add(1));
-                    }
-                }
-            }
-            self.chunks_at = Some(version);
-        }
-        let mut out = Vec::with_capacity(2 + self.chunks.len());
-        out.push(cols as u32);
-        out.push(rows as u32);
-        out.extend(self.chunks.iter().map(|c| c.1));
-        out
     }
 
     /// Food and dishes on tables, counters and floors (JSON; see `sim_core::view::items_json`).
@@ -476,8 +400,6 @@ impl Game {
             structure: view::StructureSync::default(),
             view: None,
             watch: None,
-            chunks: Vec::new(),
-            chunks_at: None,
             rooms_sent: None,
             hidden: Vec::new(),
         };
@@ -486,7 +408,7 @@ impl Game {
     }
 }
 
-/// Geometry handed to JS once per structure change. Getters copy into typed arrays.
+/// Geometry handed to JS once per structure change. Each `take_*` moves its array out (once).
 #[wasm_bindgen]
 pub struct MeshBuffers {
     positions: Vec<f32>,
@@ -497,24 +419,20 @@ pub struct MeshBuffers {
 
 #[wasm_bindgen]
 impl MeshBuffers {
-    #[wasm_bindgen(getter)]
-    pub fn positions(&self) -> Vec<f32> {
-        self.positions.clone()
+    pub fn take_positions(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.positions)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn normals(&self) -> Vec<f32> {
-        self.normals.clone()
+    pub fn take_normals(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.normals)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn uvs(&self) -> Vec<f32> {
-        self.uvs.clone()
+    pub fn take_uvs(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.uvs)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn indices(&self) -> Vec<u32> {
-        self.indices.clone()
+    pub fn take_indices(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.indices)
     }
 }
 
@@ -640,6 +558,12 @@ mod tests {
             problem(&content, &odd.to_string()),
             Some(SaveProblem::Corrupt)
         );
+        // As do its "saved …" checks.
+        let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
+        odd["lot"]["width"] = serde_json::json!(0);
+        let err = load_save(&content, &odd.to_string()).err().unwrap();
+        assert!(err.message.starts_with("saved "), "{}", err.message);
+        assert_eq!(err.problem, Some(SaveProblem::Corrupt));
         // The game's own data failing isn't the save's fault (it mustn't be removed for that).
         assert_eq!(problem("{", &good), None);
         assert_eq!(problem("{", &with_version("999")), None);
