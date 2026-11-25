@@ -294,3 +294,26 @@ pub fn waste(f: &GameFrame, end_x: f64, rim: f64, floor_y: f64, inner_x: f64, ma
         bevel_segments = 1
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_inside_ring_between_sections_and_on_one() {
+        // the foot, up the outside to the rim's top (the highest), then down the inside
+        let s = [
+            (0.80, 0.38, 0.0, 2.0),
+            (0.86, 0.42, 0.55, 2.0),
+            (0.80, 0.36, 0.50, 3.0),
+            (0.70, 0.30, 0.10, 4.0),
+        ];
+        let near = |a: Section, b: Section| {
+            [(a.0, b.0), (a.1, b.1), (a.2, b.2), (a.3, b.3)]
+                .iter()
+                .all(|(x, y)| (x - y).abs() < 1e-12)
+        };
+        assert!(near(inside_at(&s, 0.30), (0.75, 0.33, 0.30, 3.5)));
+        assert!(near(inside_at(&s, 0.50), s[2]));
+    }
+}

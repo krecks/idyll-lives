@@ -9,6 +9,7 @@ use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
 use artkit::math::{TAU, V3, cos, pow, radians, sin};
 use artkit::place::Facing;
+use artkit::py;
 use artkit::scene::Obj;
 use artkit::{cylinder, fextrude, fsweep, jitter};
 
@@ -273,7 +274,7 @@ pub fn prep_bowl() -> Vec<Obj> {
         ];
         let pts: Vec<(f64, f64, f64)> = p
             .iter()
-            .map(|&(u, w)| (u, heap(u.hypot(w)) + 0.005, w))
+            .map(|&(u, w)| (u, heap(py::hypot(u, w)) + 0.005, w))
             .collect();
         fsweep!(F, format!("bean{i}"), &pts, 0.0045, M.pea, verts = 5);
     }
@@ -284,7 +285,7 @@ pub fn prep_bowl() -> Vec<Obj> {
         ball!(
             format!("pea{i}"),
             0.006,
-            (x, heap(x.hypot(z)) + 0.005, z),
+            (x, heap(py::hypot(x, z)) + 0.005, z),
             M.pea,
             seg = 6,
             rings = 3

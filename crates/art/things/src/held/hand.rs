@@ -9,7 +9,7 @@ use super::dishes::_bag_ring;
 use super::tools::_along;
 use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
-use artkit::math::{PI, TAU, cos, degrees, radians, sin};
+use artkit::math::{PI, TAU, cos, degrees, pow, radians, sin};
 use artkit::place::Facing;
 use artkit::scene::Obj;
 use artkit::{fbox, fextrude, fsphere, fsweep, jitter, sphere};
@@ -1290,7 +1290,7 @@ pub fn steam_iron() -> Vec<Obj> {
     let mut sole: Vec<(f64, f64)> = vec![(-0.055, -0.1), (0.055, -0.1)];
     for k in 0..=10 {
         let a = PI / 2.0 * (1.0 - 2.0 * k as f64 / 10.0);
-        sole.push((0.055 * sin(a), 0.04 + 0.12 * cos(a).powf(1.6)));
+        sole.push((0.055 * sin(a), 0.04 + 0.12 * pow(cos(a), 1.6)));
     }
     fextrude!(
         F,

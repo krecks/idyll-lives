@@ -12,6 +12,7 @@ use artkit::materials::Mat;
 use artkit::math::{PI, TAU, V3, cos, pow, radians, sin};
 use artkit::parts::new_parts;
 use artkit::place::Facing;
+use artkit::py;
 use artkit::scene::Obj;
 use artkit::{cylinder, fextrude, fsweep, jitter, join, sphere};
 
@@ -180,7 +181,7 @@ pub fn pan() -> Vec<Obj> {
     );
     jitter!(heap, 0.003, size = 0.025, seed = 8.5);
     let top = |x: f64, z: f64| {
-        let k = 1.0 - pow(x.hypot(z) / 0.08, 2.0);
+        let k = 1.0 - pow(py::hypot(x, z) / 0.08, 2.0);
         0.012 + 0.04 * (if k > 0.0 { k } else { 0.0 }).sqrt()
     };
     for (i, (x, z, yaw)) in [

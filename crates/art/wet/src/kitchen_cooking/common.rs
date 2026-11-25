@@ -482,3 +482,57 @@ fn cut(mesh: &mut Mesh, mat: Mat, x0: f32, x1: f32, back: f32, z0: f32, z1: f32)
     }
     *mesh = new;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    /// `cut` splices its points in at fixed places and finds the front by exact equality: on a plain box the cavity
+    /// is closed (every edge between two faces) and as large as asked.
+    #[test]
+    fn a_box_hollowed_is_closed_and_its_opening_the_size_asked() {
+        artkit::scene::reset();
+        let f = &GameFrame::new(0.0);
+        let body = fbox!(
+            f,
+            "body",
+            0.5,
+            0.3,
+            0.4,
+            (0.0, 0.5, 0.0),
+            M.dark,
+            bevel = 0.0
+        );
+        // 0.3 wide, 0.2 high, from 2 cm before the front (0.2) back to -0.15: 0.35 deep inside
+        let body = hollow(body, f, "cavity", 0.3, 0.2, 0.37, (0.05, 0.5, 0.035), None);
+        body.read(|o| {
+            let m = &o.mesh;
+            let mut edges: BTreeMap<(u32, u32), usize> = BTreeMap::new();
+            for face in 0..m.faces.len() {
+                let c = m.corners(face);
+                for i in 0..c.len() {
+                    let (a, b) = (c[i], c[(i + 1) % c.len()]);
+                    *edges.entry((a.min(b), a.max(b))).or_default() += 1;
+                }
+            }
+            assert!(edges.values().all(|&n| n == 2), "{edges:?}");
+            assert_eq!(m.verts.len(), 16);
+            let front = m.verts.iter().map(|v| v.y).fold(f32::INFINITY, f32::min);
+            let (opening, back) = (
+                &m.verts[12..],
+                [m.verts[3], m.verts[5], m.verts[9], m.verts[10]],
+            );
+            let span = |vs: &[V3], k: usize| {
+                let it = vs.iter().map(|v| v[k]);
+                it.clone().fold(f32::NEG_INFINITY, f32::max) - it.fold(f32::INFINITY, f32::min)
+            };
+            assert!(opening.iter().all(|v| v.y == front));
+            assert!((span(opening, 0) - 0.3).abs() < 1e-5 && (span(opening, 2) - 0.2).abs() < 1e-5);
+            assert!(
+                back.iter().all(|v| (v.y - front - 0.35).abs() < 1e-5),
+                "{back:?}"
+            );
+        });
+    }
+}

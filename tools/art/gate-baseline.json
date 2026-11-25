@@ -364,6 +364,19 @@
     "model.wineFridge": 5,
     "model.workbench": 14
   },
+  "opened": {
+    "model.couchPotato.recliner": 1,
+    "model.gloomy.recordCabinet": 1,
+    "model.laundryHamper": 1,
+    "model.lazy.napPod": 1,
+    "model.recyclingBins": 3,
+    "model.slob.beanbag": 1,
+    "model.slob.gamingRecliner": 1,
+    "model.telescope": 1,
+    "model.toyBox": 1,
+    "model.toyChest": 1,
+    "model.trashCan": 1
+  },
   "reference": {
     "barStool": 1,
     "bathtubClawfoot": 1,

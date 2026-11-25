@@ -6,6 +6,7 @@ use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit::{Chequer, TaxiWord, chequer, taxi_word};
+use artkit::math::{cos, sin};
 use artkit::parts::{Settle, join_all, settle_all, settle_with};
 use artkit::place::Facing;
 use artkit::rand::Random;
@@ -272,7 +273,7 @@ fn letter_p(segments: usize) -> (Outline, Outline) {
         (0..=segments)
             .map(|k| {
                 let a = -FRAC_PI_2 + PI * k as f64 / segments as f64;
-                (cx + r * a.cos(), cy + r * a.sin())
+                (cx + r * cos(a), cy + r * sin(a))
             })
             .collect()
     };

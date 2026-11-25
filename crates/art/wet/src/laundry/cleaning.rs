@@ -5,7 +5,7 @@
 use super::M;
 use super::common::WALL;
 use artkit::forms::rounded_rect;
-use artkit::math::P3;
+use artkit::math::{P3, cos, pow, sin};
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
@@ -321,11 +321,7 @@ pub fn mop_bucket() -> Vec<Obj> {
         let bail: Vec<(f64, f64, f64)> = (0..=8)
             .map(|k| {
                 let a = std::f64::consts::PI * k as f64 / 8.0;
-                (
-                    bx - 0.16 * a.cos(),
-                    0.27 + 0.02 * a.sin(),
-                    bz - 0.12 * a.sin(),
-                )
+                (bx - 0.16 * cos(a), 0.27 + 0.02 * sin(a), bz - 0.12 * sin(a))
             })
             .collect();
         fsweep!(f, "bucket_bail", &bail, 0.004, M.alu, verts = 6);
@@ -525,7 +521,7 @@ pub fn ironing_board() -> Vec<Obj> {
             let t = k as f64 / 12.0;
             let a = std::f64::consts::FRAC_PI_2 * (1.0 - 2.0 * t);
             // a half ellipse from the right end's corners to the nose
-            outline.push((-0.1 - 0.52 * a.cos().powf(0.8), 0.19 * a.sin()));
+            outline.push((-0.1 - 0.52 * pow(cos(a), 0.8), 0.19 * sin(a)));
         }
         let shift = |p: &(f64, f64)| (p.0, p.1 + BOARD_Z);
         let deck: Vec<(f64, f64)> = outline.iter().map(shift).collect();
@@ -635,7 +631,7 @@ pub fn iron(f: &GameFrame, at: (f64, f64, f64)) {
     for k in 0..=10 {
         let t = k as f64 / 10.0;
         let a = std::f64::consts::FRAC_PI_2 * (1.0 - 2.0 * t);
-        sole.push((-0.04 - 0.12 * a.cos().powf(1.6), 0.055 * a.sin()));
+        sole.push((-0.04 - 0.12 * pow(cos(a), 1.6), 0.055 * sin(a)));
     }
     let at_sole: Vec<(f64, f64)> = sole.iter().map(|p| (x + p.0, z + p.1)).collect();
     fextrude!(
