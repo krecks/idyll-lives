@@ -1,6 +1,7 @@
 //! The home bouldering wall, the interactive spin bike, the rebound trampoline and the streetball hoop.
 
-use super::common::{HOLDS, M, WALL, ease_ends, lofted};
+use super::common::{HOLDS, M, WALL, lofted};
+use crate::ease::ease_ends;
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, cosd, radians, sin, sind};

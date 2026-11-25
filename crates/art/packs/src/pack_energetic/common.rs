@@ -1,6 +1,5 @@
 //! What the energetic pack is built from: its palette and lofted bodies.
 
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::materials::Mat;
 use artkit::math::P3;
 use artkit::place::GameFrame;
@@ -131,10 +130,4 @@ pub fn lofted(
         })
         .collect();
     loft!(name, &sections, material = material)
-}
-
-/// Eases a swept part's flat-capped ends by 4 mm (the rule's pixel at the play camera): only the cap rims turn
-/// 60° or more, so only they are rounded.
-pub fn ease_ends(obj: Obj) -> Obj {
-    bevel_edges(obj, 0.004, 1, 60.0, &EdgeOrder::Corners)
 }
