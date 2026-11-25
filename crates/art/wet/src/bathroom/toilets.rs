@@ -468,7 +468,7 @@ pub fn toilet_compact() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        roll(&f, 0.33, 0.62, WALL, 1);
+        roll(&f, 0.30, 0.62, WALL, 1); // (4.5 cm clear of the cistern)
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let lid = lid(&f, zb, rim + 0.024, r, ratio, M.seat, 0.02, false);

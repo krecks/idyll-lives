@@ -1125,10 +1125,10 @@
       ]
     },
     "wineCooler": {
-      "label": "Under-counter wine cooler under a worktop",
+      "label": "Under-counter wine cooler under a worktop (drawn in its 1 m counter tile with the drawers beside it, to line up in a run)",
       "w": [
         0.3,
-        0.6
+        1
       ],
       "h": [
         0.82,
@@ -1164,10 +1164,10 @@
       ]
     },
     "dishwasher": {
-      "label": "Built-in dishwasher under a worktop (45 or 60 cm)",
+      "label": "Built-in dishwasher under a worktop (45 or 60 cm; drawn in its 1 m counter tile with the cupboard beside it, to line up in a run)",
       "w": [
         0.45,
-        0.6
+        1
       ],
       "h": [
         0.82,
@@ -1219,6 +1219,55 @@
       "d": [
         0.55,
         0.65
+      ],
+      "surface": [
+        0.85,
+        1
+      ],
+      "uses": [
+        "prepare and chop food",
+        "make a sandwich",
+        "store pans and food"
+      ],
+      "minutes": {
+        "sandwich": [
+          3,
+          10
+        ],
+        "prep": [
+          5,
+          20
+        ]
+      },
+      "mechanisms": {
+        "door": [
+          95,
+          110
+        ],
+        "drawerTravel": [
+          0.4,
+          0.55
+        ]
+      },
+      "sources": [
+        "en1116",
+        "dimKitchen",
+        "blum"
+      ]
+    },
+    "cornerBaseCabinet": {
+      "label": "Corner base unit joining two runs of counters into an L (as deep as the run it turns into)",
+      "w": [
+        0.9,
+        1
+      ],
+      "h": [
+        0.85,
+        1
+      ],
+      "d": [
+        0.9,
+        1
       ],
       "surface": [
         0.85,
@@ -1683,10 +1732,10 @@
       ]
     },
     "cooker": {
-      "label": "Freestanding cooker (hob and oven, 50-76 cm)",
+      "label": "Freestanding cooker (hob and oven, 50-76 cm; up to 95 cm drawn to fill its 1 m counter tile, to line up in a run)",
       "w": [
         0.5,
-        0.77
+        0.95
       ],
       "h": [
         0.85,
@@ -15038,12 +15087,12 @@
     "dishwasher": "dishwasher",
     "dishwasherCompact": "dishwasher",
     "counter": "baseCabinet",
-    "counterCorner": "baseCabinet",
+    "counterCorner": "cornerBaseCabinet",
     "counterEnd": "baseCabinet",
     "counterCornerOuter": "baseCabinet",
     "counterDrawers": "baseCabinet",
     "counterOpenShelf": "baseCabinet",
-    "butcherBlock": "baseCabinet",
+    "butcherBlock": "kitchenIsland",
     "counterMarble": "baseCabinet",
     "cooktopCounter": "baseCabinet",
     "microwave": "counterAppliance",

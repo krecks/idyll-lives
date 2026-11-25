@@ -206,12 +206,12 @@ pub fn fridge_mini() -> Vec<Obj> {
             0.89,
             -0.04,
             0.05,
-            0.107,
+            0.07, // a short jar: the fridge's 0.87 with what is on it stays a mini fridge's height
             M.porcelain,
             M.trim,
             12,
         );
-        apple(&fm, "apple_top", 0.12, 0.89, 0.0, 0.042, None);
+        apple(&fm, "apple_top", 0.12, 0.89, 0.0, 0.034, None);
     });
     join(&still, "body", Some((0, 0, 0).into()));
     // the door over the whole front, hinged on its left edge: its seal, a liner and two bins with bottles and a can

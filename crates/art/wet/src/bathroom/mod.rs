@@ -194,10 +194,10 @@ pub fn family() -> Family {
             Model::new(
                 "toiletCompact",
                 toilets::toilet_compact,
-                (0.59, 0.809, 0.631),
+                (0.56, 0.809, 0.631),
             )
             .key("model.toiletCompact")
-            .centre(0.09, -0.1145)
+            .centre(0.075, -0.1145)
             .motions(toilet())
             .paint(&[
                 ("porcelain", "Bowl"),

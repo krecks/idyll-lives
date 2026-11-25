@@ -83,7 +83,7 @@ pub fn family() -> Family {
             // started at the fridge (snapshot.rs: no interaction at a station that isn't the recipe's origin).
             .motions(json!({"uses": {"cook": "burner_on", "stir": "burner_on", "bake": (bake())}}))
             .paint(&[("enamel", "Body"), ("chrome", "Knobs"), ("hob", "Hob")]),
-            Model::new("stoveGas", cookers::stove_gas, (0.92, 1.111, 0.694))
+            Model::new("stoveGas", cookers::stove_gas, (0.92, 1.091, 0.694))
                 .key("model.stoveGas")
                 .centre(0.0, -0.089)
                 // cook and gourmet (and any `stir` step) light the front left burner; bake drops the oven door

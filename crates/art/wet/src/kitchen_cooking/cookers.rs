@@ -188,7 +188,7 @@ pub fn stove_gas() -> Vec<Obj> {
         // a stock pot on the back left pan support; the front left burner is the cook's (the flame lights under their
         // pan) and the two on the right are left free, for what they set down (the frying pan that stood there made
         // three pans of it while they cooked)
-        stock_pot(f, "pot", -0.26, 0.891, -0.30, 0.13, 0.18, M.pot);
+        stock_pot(f, "pot", -0.26, 0.891, -0.30, 0.13, 0.16, M.pot);
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let door = oven_door(f, "oven_door", 0.0, 0.88, 0.42, 0.17, 0.17, 0.50, 0.0345);
