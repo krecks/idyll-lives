@@ -1,10 +1,11 @@
 //! The windowsill herb garden (1x1): a slatted cedar trough on a stand, pots on the shelf below.
 
 use super::common::{_basil, _leaf, _pot, _rosemary, _thyme, M, WALL};
+use crate::ease::{EASE, eased};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3};
-use artkit::parts::{join, new_parts, numbered};
+use artkit::parts::{aside, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsweep, grow, jitter, revolve, settle, torus};
@@ -18,7 +19,7 @@ pub fn herb_garden() -> Vec<Obj> {
                 fsweep!(
                     f,
                     numbered("leg"),
-                    &[(x, 0.0, z), (x, 0.615, z)],
+                    &[(x, 0.0, z), (x, 0.535, z)],
                     0.0,
                     M.cedar_dark,
                     profile = &leg,
@@ -31,7 +32,7 @@ pub fn herb_garden() -> Vec<Obj> {
                 0.04,
                 0.03,
                 0.36,
-                (x, 0.6, -0.23),
+                (x, 0.52, -0.23),
                 M.cedar_dark,
                 bevel = 0.004,
                 bevel_segments = 1
@@ -66,14 +67,15 @@ pub fn herb_garden() -> Vec<Obj> {
                 0.8,
                 0.03,
                 0.05,
-                (0, 0.6, z),
+                (0, 0.52, z),
                 M.cedar_dark,
                 bevel = 0.004,
                 bevel_segments = 1
             );
         }
         // the trough: a dark inside, corner posts, three slats a side with a gap between, a moulded rim; soil, herbs
-        let (y0, w, h, d) = (0.615, 0.84, 0.39, 0.38);
+        // (the trough 8 cm lower than first built: with its herbs it stands 1.21 m, a herb planter's height)
+        let (y0, w, h, d) = (0.535, 0.84, 0.39, 0.38);
         let (z0, z1) = (WALL, WALL + d);
         let zc = (z0 + z1) / 2.0;
         fbox!(
@@ -83,8 +85,7 @@ pub fn herb_garden() -> Vec<Obj> {
             h - 0.06,
             d - 0.05,
             (0, y0 + (h - 0.06) / 2.0, zc),
-            M.cedar_dark,
-            bevel = 0 // (a liner, its edges inside the trough)
+            M.cedar_dark
         );
         for px in [-w / 2.0 + 0.025, w / 2.0 - 0.025] {
             for pz in [z0 + 0.025, z1 - 0.025] {
@@ -97,7 +98,7 @@ pub fn herb_garden() -> Vec<Obj> {
                     (px, y0 + h / 2.0, pz),
                     M.cedar_dark,
                     bevel = 0.006,
-                    bevel_segments = 1
+                    bevel_segments = 2 // (one carried its grain as lines: smeared)
                 );
             }
         }
@@ -145,7 +146,8 @@ pub fn herb_garden() -> Vec<Obj> {
                 (-0.02, 0.0),
                 (-0.02, 0.014),
                 (-0.014, 0.02),
-                (0.03, 0.02)
+                (0.026, 0.02),
+                (0.03, 0.016) // (its inner edge chamfered too)
             ],
             M.cedar_dark,
             at = y0 + h,
@@ -231,18 +233,23 @@ pub fn herb_garden() -> Vec<Obj> {
             verts = 8,
             scale = [0.8, 1.1]
         );
-        // a woven basket of picked herbs on the floor in front, its handle arching over
-        let bz = 0.236;
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // a woven basket of picked herbs on the floor in front, its handle arching over: drawn, not the planter's size
+    let bz = 0.236;
+    let basket = new_parts(|| {
         revolve!(
             "basket",
             &[
-                (0.0, 0.0),
-                (0.09, 0.0),
-                (0.12, 0.09),
-                (0.11, 0.09),
-                (0.08, 0.012),
-                (0.0, 0.012)
-            ],
+                &[(0.0, 0.0)][..],
+                // (its rim rolled over)
+                &eased(
+                    &[(0.09, 0.0), (0.12, 0.09), (0.11, 0.09), (0.08, 0.012)],
+                    EASE
+                ),
+                &[(0.0, 0.012)],
+            ]
+            .concat(),
             at = f.at(-0.2, 0, bz),
             material = M.wicker,
             segments = 16,
@@ -276,7 +283,7 @@ pub fn herb_garden() -> Vec<Obj> {
         );
         _basil(f, -0.2, bz, 0.04, 0.8);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&basket, "basket");
     // The sprig, a stem and leaves in the left pot, built full size and scaled to nothing on the soil: `sprig` grows it
     // while a resident tends the herbs.
     let (sx, sz, sy) = (-0.2, -0.24, 0.205 + 0.14 * 0.9 + 0.006);
