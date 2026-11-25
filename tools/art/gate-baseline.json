@@ -1,32 +1,4 @@
 {
-  "built.farNear": {
-    "buildingFar.church": 2,
-    "buildingFar.farm": 1,
-    "buildingFar.flats": 2,
-    "buildingFar.hall": 1,
-    "buildingFar.restaurant": 2,
-    "buildingFar.school": 1,
-    "buildingFar.shop": 1,
-    "buildingFar.workshop": 1,
-    "far.brick": 1,
-    "far.corner": 1,
-    "far.finishes": 2,
-    "far.ring": 1,
-    "far.wing": 1,
-    "neighbour.corner": 1,
-    "neighbour.finishes": 2,
-    "neighbour.ring": 1,
-    "neighbour.wing": 1,
-    "town.brick": 1,
-    "town.corner": 1,
-    "town.finishes": 2,
-    "town.painted": 1,
-    "town.ring": 1,
-    "town.wing": 1
-  },
-  "built.texels": {
-    "street.block": 1
-  },
   "edges": {
     "model.bookworm.firesideLounge": 29,
     "model.bookworm.libraryWall": 8,

@@ -60,6 +60,29 @@ describe('a house far off', () => {
     expect(Math.max(...slopes.flatMap((t) => t.p.map((p) => p[1])))).toBeCloseTo(top, 6);
   });
 
+  test('stands its storeys as the house does: a storey on part of the one under it a box of its own, the roofs at their own heights', () => {
+    // Two storeys of 12 rows: rooms over 10 × 8 tiles on the ground, 4 × 4 of them upstairs.
+    const [W, SD] = [20, 12];
+    const rooms = new Array<number>(W * SD * 2).fill(0);
+    for (let z = 2; z < 10; z++) for (let x = 2; x < 12; x++) rooms[z * W + x] = 1;
+    for (let z = 4; z < 8; z++) for (let x = 4; x < 8; x++) rooms[(z + SD) * W + x] = 2;
+    const world = { rooms, width: W, depth: SD * 2, storeyDepth: SD, storeys: 2 };
+    const p = planner();
+    const house = [2, 2, 12, 10] as const;
+    const boxes = p.storeyBoxes(world, house, 2);
+    expect(boxes).toEqual([[[2, 2, 12, 10]], [[4, 4, 8, 8]]]);
+    const plot = { x: lotWith((s) => !s.hip), z: 10, house, storeys: 2, boxes };
+    expect(p.farLook(plot).parts.map((q) => [q.from, q.to])).toEqual([
+      [0, WALL_HEIGHT],
+      [WALL_HEIGHT, 2 * WALL_HEIGHT],
+    ]);
+    // (Its top the upper storey's narrower roof's, under the one a box of both storeys had.)
+    expect(p.roofTop(plot)).toBeLessThan(p.roofTop({ ...plot, boxes: undefined }));
+    const far = new Geo();
+    p.farHouse(far, plot);
+    expect(far.idx.length / 3).toBe(28);
+  });
+
   test("its walls and roof are the colours their textures show from far off, not their tints", () => {
     const x = lotWith((s) => s.brick && !s.hip);
     const s = houseScheme(x, 10);

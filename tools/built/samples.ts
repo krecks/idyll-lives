@@ -35,7 +35,7 @@ const { Geo: GeoClass } = await import('../../web/src/render/shared/geometry');
 const { HousePlanner, houseScheme, HOUSE_MATERIALS, WALL_STUB } = await import('../../web/src/render/shared/house');
 const { WALL_HEIGHT } = await import('../../web/src/render/shared/walls');
 const { planStreet, TownStreet, Painter, NO_FOCUS } = await import('../../web/src/render/shared/street');
-const { lotBuilding, lotLookBuilding, unitMeshes } = await import('../../web/src/render/shared/townBuildings');
+const { lotBuilding, lotLookBuilding, towerOf, unitMeshes } = await import('../../web/src/render/shared/townBuildings');
 const { dressBuilding } = await import('../../web/src/render/shared/buildingDress');
 const { writeFences } = await import('../../web/src/render/shared/fences');
 const { CARS, CAR_PAINT, paintCar } = await import('../../web/src/render/shared/cars');
@@ -555,7 +555,18 @@ async function houseSamples(plan: Plan): Promise<Sample[]> {
   const neighbour = seen.silhouettes.parts.map((part) => partMesh(part));
 
   // Far off: the street's far house, and the town view's box (`pc/street.ts`: `farLook` on the lot's pad, here 0).
-  const plot = { x: home.x, z: home.z, house: home.house!, roof: home.roof, storeys: home.storeys, cover: planner.exteriorCover(world, home.house!, home.storeys ?? 1) };
+  // (As the street asks for them, `Street.farPlot`: each storey's boxes, its garage.)
+  const garage = world.garages?.find((g) => g.plot === home.id);
+  const plot = {
+    x: home.x,
+    z: home.z,
+    house: home.house!,
+    roof: home.roof,
+    storeys: home.storeys,
+    cover: planner.exteriorCover(world, home.house!, home.storeys ?? 1),
+    boxes: planner.storeyBoxes(world, home.house!, home.storeys ?? 1),
+    ...(garage ? { garage: { x0: garage.x0, z0: garage.z0, x1: garage.x1, z1: garage.z1 } } : {}),
+  };
   const far = new GeoClass();
   planner.farHouse(far, plot);
   const town = lotBuilding({ id: home.id, chunk: 0, storeys: home.storeys ?? 1, pad: 0, ...planner.farLook(plot) }, () => 0);
@@ -566,7 +577,7 @@ async function houseSamples(plan: Plan): Promise<Sample[]> {
     { key, kind: 'house', about, storeys: count, meshes: near.filter((m) => m.indices.length > 0) },
     { key: `neighbour.${plan.name}`, kind: 'neighbour', of: key, about, storeys: count, meshes: merged(neighbour) },
     { key: `far.${plan.name}`, kind: 'far', of: key, about, storeys: count, meshes: [meshOf('farHouses', BUILT_MATERIALS.plain, far)] },
-    { key: `town.${plan.name}`, kind: 'town', of: key, about, storeys: count, meshes: unitMeshesOf(town) },
+    { key: `town.${plan.name}`, kind: 'town', of: key, about, storeys: count, meshes: merged(town.flatMap(unitMeshesOf)) },
   ];
 }
 
@@ -626,7 +637,7 @@ function buildingSamples([use, w, d, roof, storeys, look]: (typeof BUILDINGS)[nu
   const key = `building.${use}`;
   return [
     { key, kind: 'building', about, storeys, meshes: merged(near) },
-    { key: `buildingFar.${use}`, kind: 'buildingFar', of: key, about, storeys, meshes: unitMeshesOf(t) },
+    { key: `buildingFar.${use}`, kind: 'buildingFar', of: key, about, storeys, meshes: merged((t.church ? [t, towerOf(t)] : [t]).flatMap(unitMeshesOf)) },
   ];
 }
 
