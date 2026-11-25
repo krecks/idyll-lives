@@ -27,6 +27,7 @@ pub mod hardware;
 pub mod joinery;
 mod macros;
 pub mod metalwork;
+mod mug;
 pub mod signs;
 pub mod tableware;
 mod throw;
@@ -38,6 +39,7 @@ pub use figure8::*;
 pub use hardware::*;
 pub use joinery::*;
 pub use metalwork::*;
+pub use mug::*;
 pub use signs::*;
 pub use throw::*;
 pub use turn_round::*;
@@ -47,7 +49,7 @@ pub use turned::*;
 pub use crate::{
     kit_bench_end as bench_end, kit_cabriole as cabriole, kit_chequer as chequer, kit_cut as cut,
     kit_fillet as fillet, kit_knob as knob, kit_lathe as lathe, kit_letters as letters,
-    kit_moulding as moulding, kit_pull as pull, kit_recessed_box as recessed_box,
+    kit_moulding as moulding, kit_mug as mug, kit_pull as pull, kit_recessed_box as recessed_box,
     kit_scroll as scroll, kit_shaker as shaker, kit_songbird as songbird,
     kit_taxi_word as taxi_word, kit_throw as throw, kit_tube as tube, kit_turned as turned,
 };

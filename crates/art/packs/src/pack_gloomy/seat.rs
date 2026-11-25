@@ -2,108 +2,16 @@
 
 use super::common::{M, WALL, WALL2, book, candle, vase};
 use artkit::forms::rounded_rect;
-use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
 use artkit::motion::{Grow, Squash, grow, squash};
 use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{boulder, fbox, fextrude, fsphere, fsweep, jitter, kit, settle, soft, torus};
+use artkit::{boulder, fbox, fextrude, fsphere, fsweep, kit, settle, soft, torus};
 
 // --- the brooding window seat (2x1): a cushioned bench under a rain-streaked window ------------------------
 const FRAME_Z: f64 = WALL + 0.08; // the window wall's front
-
-/// A throw lying on a cushion's top (`top`) from depth z0 to its front edge z1, rolling over it and hanging `hang`
-/// down its front, with a soft wobble.
-#[allow(clippy::too_many_arguments)]
-fn throw(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    w: f64,
-    top: f64,
-    z0: f64,
-    z1: f64,
-    mat: Mat,
-    hang: f64,
-    seed: f64,
-) -> Obj {
-    let t = 0.012;
-    let y = top + t / 2.0;
-    let pts = [
-        (x, y, z0),
-        (x, y + 0.006, (z0 + z1) / 2.0),
-        (x, y + 0.002, z1 - 0.035),
-        (x, y - 0.012, z1 - 0.004),
-        (x, y - 0.04, z1 + t / 2.0 - 0.004),
-        (x, y - hang, z1 + t / 2.0 - 0.006),
-    ];
-    let obj = fsweep!(
-        f,
-        name,
-        &pts,
-        0,
-        mat,
-        profile = rounded_rect(w, t, t / 2.0, 1),
-        up = (1, 0, 0),
-        resolution = 3
-    );
-    jitter!(obj, 0.004, size = 0.12, seed = seed, up = 0.6)
-}
-
-/// A mug standing on `y`: hollow, its handle out at `turn` degrees (0: +x, 90: to the front).
-#[allow(clippy::too_many_arguments)]
-fn mug(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    r: f64,
-    h: f64,
-    material: Mat,
-    turn: f64,
-) {
-    kit::turned!(
-        f,
-        name,
-        x,
-        y,
-        z,
-        &[
-            (0.0, 0.0),
-            (0.88 * r, 0.0),
-            (r, 0.06 * h),
-            (r, h),
-            (0.86 * r, h),
-            (0.86 * r, 0.15 * h),
-            (0.0, 0.15 * h),
-        ],
-        material,
-        segments = 16
-    );
-    let (c, s) = (cosd(turn), sind(turn));
-    let pts: Vec<(f64, f64, f64)> = [
-        (r - 0.003, 0.8),
-        (r + 0.016, 0.82),
-        (r + 0.024, 0.55),
-        (r + 0.015, 0.27),
-        (r - 0.003, 0.25),
-    ]
-    .iter()
-    .map(|&(d, t)| (x + c * d, y + t * h, z + s * d))
-    .collect();
-    fsweep!(
-        f,
-        format!("{name}_handle"),
-        &pts,
-        0.0045,
-        material,
-        verts = 6,
-        resolution = 2
-    );
-}
 
 pub fn window_seat() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
@@ -295,7 +203,7 @@ pub fn window_seat() -> Vec<Obj> {
             2,
             22,
         );
-        mug(
+        kit::mug!(
             f,
             "mug",
             0.7,
@@ -304,7 +212,7 @@ pub fn window_seat() -> Vec<Obj> {
             0.038,
             0.09,
             M.mug,
-            200.0,
+            200.0
         );
         // pillows against the window wall
         soft!(
@@ -357,7 +265,7 @@ pub fn window_seat() -> Vec<Obj> {
             piping = 0.006,
             flat = 3
         );
-        throw(
+        kit::throw!(
             f,
             "throw",
             0.32,
@@ -367,7 +275,7 @@ pub fn window_seat() -> Vec<Obj> {
             zc + 0.282,
             M.throw,
             0.14,
-            2.0,
+            seed = 2.0
         );
         book(
             f,

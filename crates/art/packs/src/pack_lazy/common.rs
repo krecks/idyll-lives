@@ -1,10 +1,10 @@
 //! What the lazy pack is built from: its palette, a mug, a band of a sphere (the pod's hood).
 
 use artkit::materials::Mat;
-use artkit::math::{V3, cos, cosd, radians, sin, sind};
+use artkit::math::{V3, cos, radians, sin};
+use artkit::palette;
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{fsweep, kit, palette};
 
 palette! { M:
     body = ("#E9E4F4", satin),        // the bed's puffy base and cloud headboard; the main part
@@ -59,59 +59,6 @@ palette! { M:
 
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
-
-/// A mug standing on `y`: hollow, its handle out at `turn` degrees (0: +x, 90: to the front).
-#[allow(clippy::too_many_arguments)]
-pub fn _mug(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    r: f64,
-    h: f64,
-    material: Mat,
-    turn: f64,
-) {
-    kit::turned!(
-        f,
-        name,
-        x,
-        y,
-        z,
-        &[
-            (0.0, 0.0),
-            (0.88 * r, 0.0),
-            (r, 0.06 * h),
-            (r, h),
-            (0.86 * r, h),
-            (0.86 * r, 0.15 * h),
-            (0.0, 0.15 * h),
-        ],
-        material,
-        segments = 14
-    );
-    let (c, s) = (cosd(turn), sind(turn));
-    let pts: Vec<(f64, f64, f64)> = [
-        (r - 0.003, 0.8),
-        (r + 0.016, 0.82),
-        (r + 0.024, 0.55),
-        (r + 0.015, 0.27),
-        (r - 0.003, 0.25),
-    ]
-    .iter()
-    .map(|&(d, t)| (x + c * d, y + t * h, z + s * d))
-    .collect();
-    fsweep!(
-        f,
-        format!("{name}_handle"),
-        &pts,
-        0.0045,
-        material,
-        verts = 5,
-        resolution = 2
-    );
-}
 
 /// A closed shell of a sphere about `centre` (game): points at side angle `sides` (from the middle towards ±x) and
 /// pitch `pitch` (from the top, negative towards the back), between radii `r_in` and `r_out`. A pram-hood shape;
