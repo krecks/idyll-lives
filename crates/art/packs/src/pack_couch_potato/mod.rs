@@ -49,9 +49,9 @@ pub fn family() -> Family {
                     ("gamer", "Upholstery"),
                     ("mustard", "Cushion"),
                 ]),
-            Model::new("recliner", lounge::recliner, (0.94, 0.949, 0.76))
+            Model::new("recliner", lounge::recliner, (0.94, 0.948, 0.77))
                 .key("model.couchPotato.recliner")
-                .centre(-0.01, -0.02)
+                .centre(-0.01, -0.015)
                 .motions(
                     json!({"uses": {"recline": "recline", "doze": "recline"}, "ride": "recline"}),
                 )
@@ -74,7 +74,7 @@ pub fn family() -> Family {
                     ("fit_mat", "Mat"),
                     ("board", "Board"),
                 ]),
-            Model::new("lavaLamp", lounge::lava_lamp, (0.896, 1.15, 0.894))
+            Model::new("lavaLamp", lounge::lava_lamp, (0.26, 1.155, 0.26))
                 .key("model.couchPotato.lavaLamp")
                 .centre(0.0019, 0.0232)
                 .motions(json!({"uses": {"zoneOut": "blobs"}, "idle": "drift"}))
