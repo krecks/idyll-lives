@@ -90,7 +90,7 @@ pub fn family() -> Family {
                 Model::new("cypress", cypress::cypress, (1.012, 7.95, 1.025)).key("model.cypress"),
             ),
             tree(
-                Model::new("lemonTree", lemon_tree::lemon_tree, (1.288, 1.994, 1.344))
+                Model::new("lemonTree", lemon_tree::lemon_tree, (1.221, 1.924, 1.272))
                     .key("model.garden.lemonTree")
                     .paint(&[("body", "Pot")])
                     .motions(json!({"growth": "ripen"})),

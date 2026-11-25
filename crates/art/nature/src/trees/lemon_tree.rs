@@ -13,8 +13,9 @@ use artkit::scene::{self, Obj};
 use artkit::shapes::SHARP;
 use artkit::{fruiting, hang, lump, pot, sweep, trunk};
 
-const CENTRE: (f64, f64, f64) = (0.0, 0.0, 1.5);
-const RADII: (f64, f64, f64) = (0.4, 0.4, 0.34);
+// (its top 8 cm lower and 4 cm narrower than it was, its underside where it was: a Meyer lemon in a pot stands 1-1.5 m)
+const CENTRE: (f64, f64, f64) = (0.0, 0.0, 1.46);
+const RADII: (f64, f64, f64) = (0.38, 0.38, 0.3);
 
 pub fn species() -> Species {
     Species {
@@ -30,9 +31,9 @@ pub fn species() -> Species {
             ("fruit", "#F2D23C"),
             ("fruit2", "#F5DC50"),
             ("fruit3", "#E8C42E"),
-            // its slim stem and boughs plain, the bark's tone: with the pot, one draw call (four were three
-            // with the bark's own), and a stem this slim in a pot hardly bends in the wind
-            ("stalk", "#5C4C3E"),
+            // its slim stem and boughs on the plain bark (the birch's, in the bark's tone): with the pot, one draw
+            // call (four were three with the bark's own), and a stem this slim in a pot hardly bends in the wind
+            ("birch_bark", "#5C4C3E"),
         ],
         trunk: Stage::Own(potted),
         crown: Stage::Spec(Crown {
@@ -41,7 +42,7 @@ pub fn species() -> Species {
             tips: 12,
             limbs: 4,
             base_z: (0.95, 1.02),
-            material: Some("stalk"),
+            material: Some("birch_bark"),
             o: Branches {
                 leader_z: Some(1.0),
                 bottom: -0.6,
@@ -152,7 +153,7 @@ fn potted(tree: &mut Tree) {
         14.0,
         verts = 6,
         wobble = 0.0,
-        material = Some(p.get("stalk"))
+        material = Some(p.get("birch_bark"))
     );
 }
 
