@@ -1,5 +1,5 @@
 //! The pronunciation dictionary: Misaki's US English gold and silver dictionaries merged into
-//! `word<TAB>phonemes` lines by `tools/voice/fetch.mjs`.
+//! `word<TAB>phonemes` lines by `cargo fetch-voice`.
 
 use std::collections::HashMap;
 
@@ -17,14 +17,6 @@ impl Lexicon {
             }
         }
         Lexicon { words }
-    }
-
-    pub fn len(&self) -> usize {
-        self.words.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.words.is_empty()
     }
 
     /// Exact entry, or the same word in the other common casing ("hello" / "Hello"), as

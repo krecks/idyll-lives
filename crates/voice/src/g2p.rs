@@ -58,10 +58,6 @@ impl G2p {
         G2p { lexicon }
     }
 
-    pub fn lexicon(&self) -> &Lexicon {
-        &self.lexicon
-    }
-
     /// Phonemes for a line of text, with punctuation and spacing kept.
     pub fn phonemize(&self, text: &str) -> String {
         let tokens = tokenize(text);
@@ -376,12 +372,7 @@ impl G2p {
             let frac: Vec<&str> = frac
                 .bytes()
                 .filter(u8::is_ascii_digit)
-                .map(|d| {
-                    [
-                        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
-                        "nine",
-                    ][(d - b'0') as usize]
-                })
+                .map(|d| numbers::ONES[(d - b'0') as usize])
                 .collect();
             format!("{whole} point {}", frac.join(" "))
         };
@@ -435,13 +426,9 @@ fn is_number(word: &str) -> bool {
         .all(|c| c.is_ascii_digit() || c == b',' || c == b'.')
 }
 
-fn last_char(s: &str) -> Option<char> {
-    s.chars().last()
-}
-
 /// Plural / third person "-s" (https://en.wiktionary.org/wiki/-s).
 fn suffix_s(stem: &str) -> String {
-    match last_char(stem) {
+    match stem.chars().last() {
         Some(c) if "ptkfθ".contains(c) => format!("{stem}s"),
         Some(c) if "szʃʒʧʤ".contains(c) => format!("{stem}ᵻz"),
         _ => format!("{stem}z"),

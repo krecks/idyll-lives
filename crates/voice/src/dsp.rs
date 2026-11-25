@@ -69,7 +69,7 @@ fn biquad(x: &[f64], b: [f64; 3], a: [f64; 2]) -> Vec<f64> {
 /// line don't make it quieter. A clip shorter than a block is one block. Negative infinity for
 /// silence. The same measure as `web/src/audio/loudness.ts`, which the world's sounds are
 /// levelled by.
-pub fn loudness(samples: &[f32]) -> f64 {
+fn loudness(samples: &[f32]) -> f64 {
     let rate = SAMPLE_RATE as f64;
     let x: Vec<f64> = samples.iter().map(|&v| v as f64).collect();
     let shelf = {
@@ -124,7 +124,7 @@ pub fn loudness(samples: &[f32]) -> f64 {
 
 /// The gain that brings a clip to [`LEVEL_LUFS`]: by `LEVEL_MOST_DB` at most either way, and up
 /// only as far as its highest sample stays under `LEVEL_PEAK`. 1 for silence.
-pub fn level_gain(samples: &[f32]) -> f32 {
+fn level_gain(samples: &[f32]) -> f32 {
     let loud = loudness(samples);
     if !loud.is_finite() {
         return 1.0;
@@ -199,7 +199,7 @@ pub fn median_pitch(samples: &[f32]) -> f32 {
 }
 
 /// TD-PSOLA: pitch × `pitch_factor`, length × `time_factor`.
-pub fn psola(x: &[f32], pitch_factor: f64, time_factor: f64) -> Vec<f32> {
+fn psola(x: &[f32], pitch_factor: f64, time_factor: f64) -> Vec<f32> {
     let out_len = (x.len() as f64 * time_factor).round() as usize;
     if x.len() < WINDOW || out_len == 0 {
         return resample(x, (1.0 / time_factor) as f32);

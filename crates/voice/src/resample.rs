@@ -1,7 +1,7 @@
-//! Voice size (depth) by resampling. The model is run at pitch P/α and speed s/α; reading its
-//! output at a step of α then scales every frequency by α (pitch back to P, the formants of the
-//! vocal tract by α) and every duration by 1/α (back to the intended length). α < 1 is a larger
-//! voice (lower formants), α > 1 a smaller one.
+//! Resampling: the model's output brought to 24 kHz, and voice size (depth). Read at a step of
+//! α, a clip has every frequency (pitch and the formants of the vocal tract) scaled by α and
+//! every duration by 1/α; [`crate::dsp::shape`] then puts pitch and length back with PSOLA.
+//! α < 1 is a larger voice (lower formants), α > 1 a smaller one.
 //!
 //! Band-limited interpolation with a Kaiser-windowed sinc (16 zero crossings, β = 8: stop band
 //! about −80 dB). For α > 1 the cut-off moves down to the new Nyquist frequency, so nothing above

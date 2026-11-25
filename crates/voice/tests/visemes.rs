@@ -1,11 +1,13 @@
 //! Mouth shapes (`voice::visemes`): placed over the voiced part of a clip, pauses on its quiet
 //! gaps, and every symbol the phonemizer writes has a viseme.
 
-use std::io::Read;
 use std::path::PathBuf;
 
 use voice::visemes::{self, SIL, VISEMES, VisemeTrack};
-use voice::{G2p, Lexicon, LineInputs, SAMPLE_RATE, VoiceParams};
+use voice::{LineInputs, SAMPLE_RATE, VoiceParams};
+
+mod common;
+use common::g2p;
 
 const RATE: f32 = SAMPLE_RATE as f32;
 
@@ -225,28 +227,6 @@ fn finish_returns_the_clip_and_its_track() {
         at_44k.len(),
         samples.len()
     );
-}
-
-fn g2p() -> Option<G2p> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/public/voice/en-us.lexz");
-    let Ok(file) = std::fs::File::open(&path) else {
-        // CI must test the phonemizer: there a missing dictionary fails instead of skipping.
-        assert!(
-            std::env::var_os("CI").is_none(),
-            "{} missing in CI (run `node tools/voice/fetch.mjs` first)",
-            path.display()
-        );
-        eprintln!(
-            "skipped: {} missing (run `node tools/voice/fetch.mjs`)",
-            path.display()
-        );
-        return None;
-    };
-    let mut tsv = String::new();
-    flate2::read::GzDecoder::new(file)
-        .read_to_string(&mut tsv)
-        .unwrap();
-    Some(G2p::new(Lexicon::parse(&tsv)))
 }
 
 /// Every symbol the phonemizer writes has a viseme (unknown ones would show as E).
