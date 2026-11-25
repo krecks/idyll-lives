@@ -307,7 +307,7 @@ fn saved_while_carrying_it_the_parcel_is_back_at_the_door() {
 }
 
 #[test]
-fn a_setup_whose_sim_isnt_in_town_is_dropped_without_a_refund() {
+fn a_setup_whose_sim_isnt_in_town_is_dropped_and_refunded() {
     let (mut w, content) = garden_home();
     let object = something_new(&w);
     yes(&mut w, 0, object);
@@ -317,13 +317,15 @@ fn a_setup_whose_sim_isnt_in_town_is_dropped_without_a_refund() {
     );
     assert_eq!(w.setups.len(), 1);
     let funds = w.households[0].funds;
-    // A hand-edited save: the setup names a sim who isn't in town. The object is still there, so
-    // nothing was given back for it: refunding it would mint the money.
+    // A damaged save: the setup names a sim who isn't in town. The object was paid for and never
+    // placed (only the parcel is in their hands), so the money comes back.
+    let paid = w.setups[0].paid;
+    assert!(paid > 0);
     let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
     save["setups"][0]["sim"] = json!(99);
     let w = World::from_save_json(&content, &save.to_string()).unwrap();
     assert!(w.setups.is_empty(), "no setup for a sim who isn't there");
-    assert_eq!(w.households[0].funds, funds, "and nothing paid back");
+    assert_eq!(w.households[0].funds, funds + paid, "the money back");
 }
 
 #[test]

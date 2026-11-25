@@ -95,7 +95,7 @@ pub(super) fn at_work(w: &mut World, i: usize) -> bool {
         // Saturating: a content pack's pay can be near `i64::MAX`, and a promotion must not panic.
         let shifts_a_week = next.days.count_ones().max(1) as i64;
         let bonus = next.pay.saturating_mul(shifts_a_week).saturating_add(1) / 2;
-        households[h].funds += bonus;
+        households[h].funds = households[h].funds.saturating_add(bonus);
         job.level += 1;
         job.performance = 0.0;
         sim.planner.recheck = true;

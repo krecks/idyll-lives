@@ -303,14 +303,18 @@ pub(super) fn bad_item_ids_are_refused() {
         .err()
         .map(|e| e.to_string());
     assert_eq!(err.as_deref(), Some("corrupt save: two items share an id"));
-    let json = edited(|s| s["nextItem"] = u32::MAX.into());
-    let err = World::from_save_json(CONTENT, &json)
-        .err()
-        .map(|e| e.to_string());
-    assert_eq!(
-        err.as_deref(),
-        Some("corrupt save: the next item id is out of range")
-    );
+    for next in [crate::setup::PARCEL_IDS, u32::MAX] {
+        let json = edited(|s| s["nextItem"] = next.into());
+        let err = World::from_save_json(CONTENT, &json)
+            .err()
+            .map(|e| e.to_string());
+        assert_eq!(
+            err.as_deref(),
+            Some("corrupt save: the next item id is out of range")
+        );
+    }
+    let json = edited(|s| s["nextItem"] = (crate::setup::PARCEL_IDS - 1).into());
+    assert!(World::from_save_json(CONTENT, &json).is_ok());
 }
 
 /// Numbers out of range in a save (here written as 1e39, which reads as infinity) are brought

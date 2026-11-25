@@ -589,9 +589,10 @@ impl World {
                 .ok_or_else(|| Error::new("corrupt save: an item id is out of range"))?,
             None => 0,
         };
-        // (`Items::add` adds one to this: the top of the range would overflow it.)
+        // (`Items::add` counts up from this, and ids from `PARCEL_IDS` up are the view's parcels:
+        // a real item there would be drawn as one, and the top of the range would overflow.)
         let next_id = save.next_item.max(after_last);
-        if next_id == u32::MAX {
+        if next_id >= crate::setup::PARCEL_IDS {
             return Err(Error::new("corrupt save: the next item id is out of range"));
         }
         world.items.next_id = next_id;
@@ -604,11 +605,9 @@ impl World {
                 Some(object) if (s.sim as usize) < world.sims.len() => world.setups.push(
                     crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
                 ),
-                // (Gone from the content: the money back.)
-                None => h.funds += s.paid,
-                // A setup whose sim isn't in town is a corrupt save: refunding it would mint money
-                // for a household that never paid (the object is still there).
-                Some(_) => {}
+                // (Gone from the content, or a sim the save doesn't have: the money back. It was
+                // paid at the purchase and the object is only placed when the setup is done.)
+                _ => h.funds += s.paid,
             }
         }
         world.make_storeys();
