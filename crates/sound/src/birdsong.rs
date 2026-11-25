@@ -43,7 +43,7 @@ pub struct Species {
     pub song: fn(&mut Rng) -> Vec<Note>,
 }
 
-/// The species (`SPECIES`); a bird of an unknown one sings as the first.
+/// The species (`SPECIES`).
 pub const SPECIES: [Species; 5] = [
     // "Tee-cher tee-cher tee-cher", like a great tit.
     Species {
@@ -223,12 +223,9 @@ pub const VERSIONS: f64 = 3.0;
 
 /// One version of a bird's song at a sample rate (`songSamples`): each note a sine following its pitch curve
 /// with a fast warble and a quiet overtone, faded in and out, then softened and given a faint echo as if from a
-/// garden away. An unknown species sings as the first.
-pub fn song(bird: &Voice, version: u32, rate: f64) -> Vec<f32> {
-    let sp = SPECIES
-        .iter()
-        .find(|s| s.name == bird.species)
-        .unwrap_or(&SPECIES[0]);
+/// garden away. None: no such species.
+pub fn song(bird: &Voice, version: u32, rate: f64) -> Option<Vec<f32>> {
+    let sp = SPECIES.iter().find(|s| s.name == bird.species)?;
     let seed =
         to_i32(bird.seed * VERSIONS + version as f64 + 1.0).wrapping_mul(0x9e37_79b1_u32 as i32);
     let mut r = Rng::new(seed as f64);
@@ -275,7 +272,7 @@ pub fn song(bird: &Voice, version: u32, rate: f64) -> Vec<f32> {
         sp.bright * (0.7 + 0.3 * bird.near),
         1.0 - bird.near,
     );
-    d
+    Some(d)
 }
 
 /// A smooth curve through evenly spaced points, at `x` from 0 to 1.
