@@ -8,6 +8,7 @@ use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::math::{V3, cos, radians, sin};
 use artkit::place::{Facing, GameFrame};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::{fbox, fcyl, fextrude, fsweep, revolve, torus};
 
 /// The hardboard pegboard on the back posts, a shelf along its top, and the tools hung on it: a saw, a square, two
@@ -307,7 +308,7 @@ pub fn tool_board(fr: &GameFrame) {
         up = (1, 0, 0),
         scale = [1.0, 0.85]
     );
-    fsweep!(
+    let head = fsweep!(
         fr,
         "mallet_head",
         &[(0.235, 1.36, z + 0.032), (0.365, 1.36, z + 0.032)],
@@ -315,6 +316,7 @@ pub fn tool_board(fr: &GameFrame) {
         M.plank,
         profile = rounded_rect(0.06, 0.06, 0.012, 2)
     );
+    bevel_edges(head, 0.004, 1, 50.0, &EdgeOrder::Corners); // its faces' edges
     revolve!(
         "tape",
         &[

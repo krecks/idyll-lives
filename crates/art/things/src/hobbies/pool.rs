@@ -15,6 +15,8 @@ use artkit::motion::{Grow, Squash, grow, path, squash};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::shapes::SHARP;
 use artkit::{fbox, fextrude, fsweep, sphere};
 
 const BALL: f64 = 0.0285;
@@ -123,7 +125,7 @@ pub fn pool_table() -> Vec<Obj> {
         }
         // the rails: one moulded frame round the bed, rounded over at the top outside edge
         let rails = [(1.25, 0.7), (-1.25, 0.7), (-1.25, -0.7), (1.25, -0.7)];
-        kit::moulding!(
+        let rails = kit::moulding!(
             f,
             "rails",
             &rails,
@@ -139,14 +141,21 @@ pub fn pool_table() -> Vec<Obj> {
             at = RAIL_TOP - 0.15,
             plane = Facing::Top
         );
+        // its mitred corners' edges eased
+        bevel_edges(rails, 0.004, 1, SHARP, &EdgeOrder::Corners);
         // the cushions: cloth noses along the rails' inside, between the pockets
-        let nose = [
-            (0.0, 0.0),
-            (0.04, 0.0),
-            (0.038, 0.012),
-            (0.026, 0.032),
-            (0.012, 0.03),
-        ];
+        // (its rubber nose rounded)
+        let nose = crate::common::round_at(
+            &[
+                (0.0, 0.0),
+                (0.04, 0.0),
+                (0.038, 0.012),
+                (0.026, 0.032),
+                (0.012, 0.03),
+            ],
+            3,
+            0.006,
+        );
         for s in [-1, 1] {
             let sf = s as f64;
             for (x0, x1) in [(-1.09, -0.07), (0.07, 1.09)] {
@@ -183,17 +192,22 @@ pub fn pool_table() -> Vec<Obj> {
                     x,
                     RAIL_TOP - 0.002,
                     z,
-                    &[
-                        (0.0, 0.0),
-                        (0.046, 0.0),
-                        (0.058, 0.0),
-                        (0.064, 0.003),
-                        (0.06, 0.006),
-                        (0.048, 0.005),
-                        (0.0, 0.003),
-                    ],
+                    // (the leather rolled round its lip)
+                    &crate::common::round_at(
+                        &[
+                            (0.0, 0.0),
+                            (0.046, 0.0),
+                            (0.058, 0.0),
+                            (0.064, 0.003),
+                            (0.06, 0.006),
+                            (0.048, 0.005),
+                            (0.0, 0.003),
+                        ],
+                        3,
+                        0.0015
+                    ),
                     M.pocket,
-                    segments = 14
+                    segments = 12
                 );
             }
             // the sights: mother-of-pearl diamonds on the rails' tops

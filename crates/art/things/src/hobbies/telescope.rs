@@ -247,7 +247,8 @@ pub fn telescope() -> Vec<Obj> {
             (0, TUBE_C.1, TUBE_C.2),
             M.tube,
             rot = tube_rot,
-            verts = 24
+            verts = 24,
+            bevel = 0.003
         );
         let at = |t: f64, off: f64| {
             let p = on_tube(t, off);
@@ -330,7 +331,8 @@ pub fn telescope() -> Vec<Obj> {
             on_tube(-0.445, 0.0),
             M.foot,
             rot = tube_rot,
-            verts = 18
+            verts = 18,
+            bevel = 0.003
         );
         // the focuser: a drawtube with two knobs, the diagonal and the eyepiece
         fcyl!(
@@ -399,7 +401,8 @@ pub fn telescope() -> Vec<Obj> {
             on_tube(0.05, 0.11),
             M.tube,
             rot = tube_rot,
-            verts = 12
+            verts = 12,
+            bevel = 0.002
         );
         fcyl!(
             f,

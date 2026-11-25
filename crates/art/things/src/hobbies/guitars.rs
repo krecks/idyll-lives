@@ -56,6 +56,14 @@ pub fn neck(
             )
         })
         .collect();
+    // the fretboard face's two edges rounded over (closed round the flat for it, then opened again)
+    let mut round = vec![prof[verts]];
+    round.extend(&prof);
+    round = crate::common::round_at(&round, 1, 0.003);
+    round.push(round[1]);
+    let last = round.len() - 2;
+    round = crate::common::round_at(&round, last, 0.003);
+    let prof = round[1..round.len() - 1].to_vec();
     fsweep!(
         fr,
         name,

@@ -4,6 +4,7 @@
 
 use super::M;
 use super::common::{P, ends, flat_quads, stool};
+use crate::common::round_at;
 use artkit::forms::{circle, rounded_rect};
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
@@ -292,13 +293,22 @@ pub fn craft_table() -> Vec<Obj> {
         {
             revolve!(
                 format!("tape{k}"),
-                &[
-                    (0.026, 0.0),
-                    (0.052, 0.0),
-                    (0.052, 0.015),
-                    (0.026, 0.015),
-                    (0.026, 0.0)
-                ],
+                // (the roll's top edges worn round)
+                &round_at(
+                    &round_at(
+                        &[
+                            (0.026, 0.0),
+                            (0.052, 0.0),
+                            (0.052, 0.015),
+                            (0.026, 0.015),
+                            (0.026, 0.0),
+                        ],
+                        3,
+                        0.0015
+                    ),
+                    2,
+                    0.0015
+                ),
                 at = f.at(x, TABLE_TOP, z),
                 material = colour,
                 segments = 16
