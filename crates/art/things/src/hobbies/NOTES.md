@@ -105,25 +105,25 @@ round), since a loop can't wait.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.piano` | 1.54 × 1.48 × 0.83 m | 6,232 | 3 | Body, Trim |
-| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,864 | 3 | Body & neck, Top, Stand |
-| `model.guitarElectric` | 0.46 × 1.00 × 0.58 m | 5,400 | 3 | Guitar, Amp |
-| `model.keyboardDigital` | 1.39 × 1.05 × 0.77 m | 4,646 | 2 | Body, Trim |
-| `model.drumKit` | 1.73 × 1.24 × 1.17 m | 7,990 | 3 | Shells, Hardware |
-| `model.guitarAcoustic` | 0.40 × 1.16 × 0.40 m | 4,320 | 3 | Body, Top, Stand |
+| `model.piano` | 1.54 × 1.48 × 0.83 m | 7,672 | 3 | Body, Trim |
+| `model.ukulele` | 0.35 × 0.84 × 0.26 m | 2,896 | 3 | Body & neck, Top, Stand |
+| `model.guitarElectric` | 0.46 × 1.00 × 0.58 m | 5,432 | 3 | Guitar, Amp |
+| `model.keyboardDigital` | 1.39 × 1.05 × 0.77 m | 5,942 | 2 | Body, Trim |
+| `model.drumKit` | 1.73 × 1.24 × 1.17 m | 7,988 | 3 | Shells, Hardware |
+| `model.guitarAcoustic` | 0.40 × 1.16 × 0.40 m | 4,352 | 3 | Body, Top, Stand |
 | `model.chessTable` | 1.70 × 0.92 × 0.48 m | 4,608 | 3 | Table, Chair |
-| `model.poolTable` | 2.50 × 0.81 × 1.40 m | 7,104 | 4 | Frame, Cloth |
-| `model.foosball` | 1.42 × 0.95 × 0.93 m | 5,892 | 3 | Table, Trim |
-| `model.dartboard` | 0.62 × 0.62 × 0.07 m | 2,228 | 2 | Board, Cabinet |
+| `model.poolTable` | 2.50 × 0.81 × 1.40 m | 7,776 | 4 | Frame, Cloth |
+| `model.foosball` | 1.42 × 0.95 × 0.93 m | 7,780 | 3 | Table, Trim |
+| `model.dartboard` | 0.62 × 0.62 × 0.07 m | 2,236 | 2 | Board, Cabinet |
 | `model.arcadeCabinet` | 0.67 × 1.82 × 0.87 m | 3,756 | 2 | Cabinet, Art |
 | `model.puzzleTable` | 0.87 × 0.79 × 0.89 m | 2,400 | 3 | Table, Stool |
 | `model.easel` | 0.70 × 1.75 × 0.76 m | 3,072 | 3 | Wood, Metal |
-| `model.workbench` | 1.62 × 1.69 × 0.67 m | 6,556 | 3 | Top, Frame, Tool board |
-| `model.telescope` | 0.66 × 1.52 × 0.91 m | 3,640 | 2 | Tube, Tripod |
+| `model.workbench` | 1.62 × 1.69 × 0.67 m | 7,148 | 3 | Top, Frame, Tool board |
+| `model.telescope` | 0.66 × 1.52 × 0.91 m | 4,072 | 2 | Tube, Tripod |
 | `model.sewingTable` | 0.90 × 1.08 × 0.89 m | 5,068 | 3 | Table, Machine |
-| `model.chemistrySet` | 0.92 × 1.40 × 0.50 m | 4,976 | 3 | Bench, Glassware |
-| `model.potteryWheel` | 0.60 × 0.54 × 0.88 m | 3,620 | 3 | Wheel, Stool |
-| `model.craftTable` | 1.70 × 0.90 × 0.89 m | 3,260 | 3 | Wood, Metal |
+| `model.chemistrySet` | 0.92 × 1.40 × 0.50 m | 5,296 | 3 | Bench, Glassware |
+| `model.potteryWheel` | 0.60 × 0.54 × 0.88 m | 3,956 | 3 | Wheel, Stool |
+| `model.craftTable` | 1.70 × 0.90 × 0.89 m | 4,060 | 3 | Wood, Metal |
 
 `check-glb`: 19 models, 0 failed; one warning: the dartboard floats (a wall thing). Khronos validator: 0 errors, 0
 warnings each.
@@ -189,3 +189,5 @@ cargo art hobbies --preview  # previews/hobbies/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 Its soft boxes take the shared form's new shape (the soft form: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `arcadeCabinet`, `chessTable`, `keyboardDigital`, `piano`, `potteryWheel`, `sewingTable`, `workbench`; 34,454 to 34,486 triangles.
+
+- **No hard edges (2026-11-25, gate zero).** The foosball men's faces chamfered (their heads six-sided to stay under 8,000 triangles), the pool table's rails eased, its cushions' noses and pockets' lips rounded (pockets 12 sides), the keyboard's case and rest ledge, the vice, drill and mallet chamfered, the tape rolls', candles', pottery's and flask liquid's edges rounded, the guitar necks' fretboard edges rounded over, the telescope's tubes bevelled; the workbench's chamfered posts take their UVs after the chamfer (`bevel::apply`), so the chamfers aren't smeared. The drum kit back under 8,000 (the kick 24 sides, the ride 26, the crash 20) and the pottery wheel under 4,000 (the pan 28). The craft and jigsaw stools are 2 mm lower (0.478), so they stand under 0.48 m. The pool table keeps four draws (the still part, the rack, the racked balls and the spread balls each play a clip of their own).

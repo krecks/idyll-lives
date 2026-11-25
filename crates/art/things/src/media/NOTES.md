@@ -77,14 +77,14 @@ Rebuilt with the forms and the kit, same sizes, centres, parts, clips, glow, pai
 
 | Model | Size at rest (w × h × d) | Triangles (before → now) | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.tv` | 0.91 × 1.07 × 0.44 m | 2,144 → 3,548 | 3,548 | Body (`tv_cabinet`), Trim (`tv_oak`) |
-| `model.tvWall` | 1.24 × 0.87 × 0.10 m | 492 → 884 | 884 | Body (`wall_frame`), Trim (`wall_bar`) |
-| `model.tvRetro` | 0.89 × 0.79 × 0.43 m | 1,892 → 3,584 | 3,584 | Body (`retro_shell`), Trim (`retro_bezel`) |
+| `model.tv` | 0.91 × 1.07 × 0.44 m | 2,144 → 3,772 | 3,772 | Body (`tv_cabinet`), Trim (`tv_oak`) |
+| `model.tvWall` | 1.24 × 0.87 × 0.10 m | 492 → 948 | 948 | Body (`wall_frame`), Trim (`wall_bar`) |
+| `model.tvRetro` | 0.82 × 0.79 × 0.43 m | 1,892 → 3,584 | 3,584 | Body (`retro_shell`), Trim (`retro_bezel`) |
 | `model.tvStandLow` | 1.82 × 0.80 × 0.46 m | 2,688 → 4,452 | 4,452 | Bench (`bench`), TV (`bench_tv`) |
-| `model.homeCinema` | 1.88 × 1.65 × 0.45 m | 2,408 → 6,248 | 6,248 | Body (`cinema_unit`), Trim (`cinema_oak`) |
-| `model.stereo` | 0.92 × 0.84 × 0.42 m | 3,480 → 3,800 | 3,800 | Body (`stereo_wood`), Trim (`stereo_dark`) |
-| `model.boombox` | 0.60 × 0.95 × 0.44 m | 3,732 → 2,864 | 2,864 | Body (`boombox_body`), Trim (`boombox_trim`) |
-| `model.fireplaceElectric` | 1.76 × 1.32 × 0.92 m | 3,580 → 4,906 | 4,986 | Surround (`surround`), Firebox (`firebox`) |
+| `model.homeCinema` | 1.88 × 1.65 × 0.45 m | 2,408 → 6,632 | 6,632 | Body (`cinema_unit`), Trim (`cinema_oak`) |
+| `model.stereo` | 0.92 × 0.84 × 0.42 m | 3,480 → 4,000 | 4,000 | Body (`stereo_wood`), Trim (`stereo_dark`) |
+| `model.boombox` | 0.60 × 0.76 × 0.44 m | 3,732 → 2,992 | 2,992 | Body (`boombox_body`), Trim (`boombox_trim`) |
+| `model.fireplaceElectric` | 1.76 × 1.32 × 0.92 m | 3,580 → 5,294 | 5,294 | Surround (`surround`), Firebox (`firebox`) |
 
 `check-glb`: 8 models, 0 failed, the warnings above. Khronos validator: 0 errors, 0 warnings each. Checked: the
 gallery next to the old parts; the clips bench (rest, 0.4 s, open) on WebGPU; in play (`bathroom-check`): each bought
@@ -108,3 +108,5 @@ No change to the models' code: their soft boxes take the shared form's new shape
 ## Built in Rust (2026-11-18)
 
 Built in Rust since 2026-11-18 (`cargo art media`), proved against the last Blender build (`ref/blender`). The palette's `crate` is the field `M.crate_`, named `crate` (`named("crate")`): Rust keeps the word.
+
+- **No hard edges (2026-11-25, gate zero).** Every `capsule` (soundbars, bars, the boombox's top) has its ends chamfered; the bowl's and the vase's lips rounded, the picture frame and the firebox's frame chamfered, the logs' ends eased; the bench plant's leaves are shaded round as botany's are (no sharp rim). The crate's chamfered posts take their UVs after the chamfer. The stereo is 4,000 triangles (platter and vinyl 28 sides, cones 18, caps 10) and keeps four draws (wood, the record and the cones). The portable TV is 7 cm narrower (0.79 m case, 0.62 screen: a CRT is at most 0.75 wide), the boombox's aerial is folded down behind the handle (0.765 m on its crate).
