@@ -8,7 +8,8 @@
 
 import { add, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { hangArms, stand, TAU } from './idle';
-import { addV, apply, elbow, euler, footIK, hang, smooth, sub, turned, wrist } from './ik';
+import { addV, apply, elbow, euler, footIK, hang, sub, turned, wrist } from './ik';
+import { smooth } from '../../../../game/noise';
 
 /** Reference walk: 1.1 m/s over a 1.1 s cycle (two steps). */
 const WALK_SPEED = 1.1;

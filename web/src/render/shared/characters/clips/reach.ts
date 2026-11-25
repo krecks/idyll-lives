@@ -14,7 +14,8 @@
 import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { track, tiptoe, type Key } from './games';
 import { bump, hangArms, stand, TAU } from './idle';
-import { armIK, footIK, len, lerpV, pointOn, smooth, sub, wrist, type ArmOptions } from './ik';
+import { armIK, footIK, len, lerpV, pointOn, sub, wrist, type ArmOptions } from './ik';
+import { smooth } from '../../../../game/noise';
 import { SHARES_177, sizes, type Fit, type Size } from './street';
 
 /** The smallest share that reaches a wall cupboard's pulls or the clock's dial (a teen's; a child's doesn't). */

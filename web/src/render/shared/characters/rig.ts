@@ -18,7 +18,7 @@ import type { Placement } from './pose';
 import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
 import type { Stride } from './stride';
-import { clamp, lerp } from '../../../game/noise';
+import { clamp, lerp, smooth } from '../../../game/noise';
 
 /**
  * Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds
@@ -455,9 +455,6 @@ export function gettingIn(rig: SimRig): boolean {
 /** 0 before `from`, easing to 1 over `length` after it. */
 export function ramp(t: number, from: number, length: number): number {
   return smooth(clamp((t - from) / length, 0, 1));
-}
-export function smooth(t: number): number {
-  return t * t * (3 - 2 * t);
 }
 export function wrapAngle(a: number): number {
   a %= Math.PI * 2;

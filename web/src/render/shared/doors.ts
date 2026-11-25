@@ -28,11 +28,6 @@ const DOOR_CLEAR = 1.1;
  * and which resident they are (their row, for `hand`; only walkers are in it).
  */
 export const MOVER = 5;
-/** Smoothstep: eases 0..1 in and out. */
-export function ease(t: number): number {
-  return t * t * (3 - 2 * t);
-}
-
 /**
  * How far ahead of a doorway a leaf starts to swing, for a game running `rate` times as fast: far
  * enough that the swing (`DOOR_SWING` of the sim's real time) finishes as the walker arrives, and

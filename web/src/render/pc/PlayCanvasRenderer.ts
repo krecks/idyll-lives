@@ -89,7 +89,8 @@ import { closedParts, flatLids, inClosed, LID_THICK, viewedFlats, viewedLot, typ
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
 import { cutInView } from '../shared/landVeil';
-import { DOOR_SWING, doorLead, ease, goingThrough, MOVER } from '../shared/doors';
+import { DOOR_SWING, doorLead, goingThrough, MOVER } from '../shared/doors';
+import { smooth } from '../../game/noise';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { playbackRate } from '../shared/gameSpeed';
@@ -2703,7 +2704,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.applyDimming();
     this.gardenPools?.set([]);
     this.lamps.clear();
-    for (const p of this.decor.values()) for (const d of p.draws) d.enabled = false;
     this.lastWorld = this.builtWorld = null;
     this.cameraPlaced = false;
     this.birdsWaited = false;
@@ -2730,6 +2730,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.stairwells = [];
     this.lotRooms = null;
     this.walls = this.wallsLow = null;
+    // Every kept garden draw emptied: the next lot places only the kinds it has (`placeDecor`), and `applyStoreys` shows a draw with copies.
+    for (const p of this.decor.values())
+      for (const d of p.draws) {
+        d.setCount(0);
+        d.update();
+        d.enabled = false;
+      }
   }
 
   private lotMaterial(key: string): pc.StandardMaterial {
@@ -2986,7 +2993,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (open === gate.open) continue;
       this.doorHeard(gate.open, open, gate.leaf.centre, true);
       gate.open = open;
-      swingGate(gate.fences, gate.leaf, ease(open), gate.towards);
+      swingGate(gate.fences, gate.leaf, smooth(open), gate.towards);
       swung = true;
       if (casts(gate.leaf.centre)) moved = urgent = true;
     }
@@ -3002,7 +3009,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       door.open = open;
       // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides stays
       // turned shut and slides into the wall (from where it was built).
-      const k = ease(open);
+      const k = smooth(open);
       const { slide, base } = leaf;
       if (slide) leaf.pivot.setLocalPosition(base.x + slide[0] * k, base.y, base.z + slide[1] * k);
       leaf.pivot.setLocalEulerAngles(0, ((slide ? leaf.close : leaf.close * (1 - leaf.opens * k)) * 180) / Math.PI, 0);

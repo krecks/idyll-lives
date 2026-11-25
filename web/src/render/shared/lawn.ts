@@ -23,7 +23,7 @@
 
 import { groundDepth, type WorldStructure } from '../../core/protocol';
 import { fillPoly } from '../../game/footprints';
-import { hash, valueNoise } from '../../game/noise';
+import { hash, smooth, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
 
 /**
@@ -105,8 +105,8 @@ function baseMap(world: WorldStructure, tw: number, td: number, was?: { rects: S
   // began them on a ruled line.)
   const inFromEdge = (x: number, z: number, k: number): number => {
     const p = world.plots[k - 1];
-    const t = Math.min(1, (Math.min(x - p.x, p.x + p.w - 1 - x, z - p.z, p.z + p.d - 1 - z) + 0.5) / Math.max(0.5, M.stripeEdge));
-    return t * t * (3 - 2 * t);
+    // (Never below 0: the tile is on the plot.)
+    return smooth((Math.min(x - p.x, p.x + p.w - 1 - x, z - p.z, p.z + p.d - 1 - z) + 0.5) / Math.max(0.5, M.stripeEdge));
   };
   world.plots.forEach((p, k) => {
     const h = hash(p.x, p.z, seed + 411);
