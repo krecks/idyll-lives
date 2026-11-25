@@ -99,8 +99,8 @@ pub fn beanbag() -> Vec<Obj> {
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
     // The bag: one lofted body, squat and round, rising into a back behind a soft seat (top 0.45), its vinyl
-    // wrinkled, a piped seam round its foot and a carry loop: one part with its origin on the floor: `squash`
-    // settles it under its sitter.
+    // wrinkled, a piped seam round its foot and a carry loop: one part with its origin on the floor at its back:
+    // `squash` settles it under its sitter, spreading forward and to the sides, not into the wall.
     let bag = new_parts(|| {
         let n = 28;
         let b = f.at(0, 0, 0);
@@ -178,7 +178,7 @@ pub fn beanbag() -> Vec<Obj> {
             resolution = 2
         );
     });
-    let bag = join(&bag, "bag", Some(P3::from((0, 0, 0))));
+    let bag = join(&bag, "bag", Some(P3::from((0, 0.432, 0))));
     let objs = settle!(centre = false);
     squash!(bag, "squash", (1.04, 1.04, 0.86), seconds = 0.5);
     objs
@@ -440,6 +440,7 @@ pub fn snack_nightstand() -> Vec<Obj> {
 
 // --- the command-couch gaming recliner (2x1): one seat in the middle, a mini-fridge table and a console dock ----
 const HINGE: (f64, f64) = (0.42, -0.3); // the back's hinge (height, depth)
+const RIDE: f64 = 0.14; // how far the seat and back ride forward as it reclines
 const CUP: (f64, f64, f64) = (0.37, 0.6, 0.12); // the cup holder's pivot (x, height, depth), at the armrest's front
 
 pub fn gaming_recliner() -> Vec<Obj> {
@@ -455,43 +456,6 @@ pub fn gaming_recliner() -> Vec<Obj> {
             M.seat,
             round = 0.05,
             piping = 0.006
-        );
-        soft!(
-            f,
-            "seat",
-            0.6,
-            0.12,
-            0.58,
-            (0, 0.38, -0.02),
-            M.stripe,
-            round = 0.045,
-            puff = 0.012,
-            flat = 2
-        );
-        for k in [-0.1, 0.1] {
-            // the seat's stitched channels
-            fbox!(
-                f,
-                format!("seat_channel{k}"),
-                0.008,
-                0.004,
-                0.5,
-                (k, 0.452, -0.02),
-                M.seat
-            );
-        }
-        soft!(
-            f,
-            "footrest",
-            0.5,
-            0.1,
-            0.24,
-            (0, 0.34, 0.32),
-            M.seat,
-            rot = (10, 0, 0),
-            round = 0.04,
-            puff = 0.01,
-            flat = 2
         );
         for s in [-1, 1] {
             let sf = s as f64;
@@ -693,7 +657,7 @@ pub fn gaming_recliner() -> Vec<Obj> {
         _can(f, "can", -0.3, 0.38, 0.0, M.pop_blue, true, 15.0);
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
-    // The tall back with its stripe and headrest pillow, hinged at the seat's back: `recline` lays it back 20°.
+    // The tall back with its stripe and headrest pillow, hinged at the seat's back: `recline` lays it back.
     let (hy, hz) = HINGE;
     let back = new_parts(|| {
         soft!(
@@ -737,6 +701,47 @@ pub fn gaming_recliner() -> Vec<Obj> {
         );
     });
     let back = hinged(join(&back, "back", None), f.at(0, hy, hz));
+    // The seat and footrest, which ride forward on the base as the back reclines (a wall-hugger's track).
+    let seat = new_parts(|| {
+        soft!(
+            f,
+            "seat",
+            0.6,
+            0.12,
+            0.58,
+            (0, 0.38, -0.02),
+            M.stripe,
+            round = 0.045,
+            puff = 0.012,
+            flat = 2
+        );
+        for k in [-0.1, 0.1] {
+            // the seat's stitched channels
+            fbox!(
+                f,
+                format!("seat_channel{k}"),
+                0.008,
+                0.004,
+                0.5,
+                (k, 0.452, -0.02),
+                M.seat
+            );
+        }
+        soft!(
+            f,
+            "footrest",
+            0.5,
+            0.1,
+            0.24,
+            (0, 0.34, 0.32),
+            M.seat,
+            rot = (10, 0, 0),
+            round = 0.04,
+            puff = 0.01,
+            flat = 2
+        );
+    });
+    let seat = join(&seat, "seat", Some(P3::ZERO));
     // The cup holder with a soda in it, tucked under the right armrest's front: `cup_out` swings it out.
     let (cx, cy, cz) = CUP;
     let cup = new_parts(|| {
@@ -771,7 +776,10 @@ pub fn gaming_recliner() -> Vec<Obj> {
     });
     let cup = hinged(join(&cup, "cup_holder", None), f.at(cx, cy, cz));
     let objs = settle!(centre = false);
-    swing!(back, "recline", -20.0, seconds = 1.0, axis = Axis::X);
+    // A wall-hugger: the back lies back 12° as it and the seat ride 14 cm forward, its top kept off the wall.
+    swing!(back, "recline", -12.0, seconds = 1.0, axis = Axis::X);
+    slide!(back, "recline", (0, -RIDE, 0), seconds = 1.0);
+    slide!(seat, "recline", (0, -RIDE, 0), seconds = 1.0);
     swing!(cup, "cup_out", 110.0, seconds = 0.6);
     objs
 }

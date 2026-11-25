@@ -236,6 +236,7 @@ pub fn recliner() -> Vec<Obj> {
     let foot = hinged(join(&foot, "footrest", None), f.at(0, fy, fz));
     let objs = settle!(centre = false);
     swing!(back, "recline", -11.0, seconds = 1.2, axis = Axis::X);
+    slide!(back, "recline", (0, -0.03, 0), seconds = 1.2); // as a wall-hugger: forward as it tips, its top off the wall
     swing!(foot, "recline", -80.0, seconds = 1.2, axis = Axis::X);
     objs
 }
