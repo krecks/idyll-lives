@@ -15,8 +15,6 @@
 //! budget of a thing under 35 cm), 2,000 for the few 35-40 cm across (the pot, the pan, the boards, trays and
 //! platters). Turned things are `lathe`s (fluted, lobed or bent where the thing is); crusts, rims, handles,
 //! straws and piped icing are sweeps; boards, leaves, cutlery and smears are outlines extruded.
-//!
-//! `HELD_MEASURE=1 cargo art held --preview` prints where each is built and its size, to copy into its `i(...)` line.
 
 use artkit::family::{Build, Family, Model};
 
@@ -42,11 +40,6 @@ fn i(
     code: bool,
     tolerance: f64,
 ) -> Model {
-    let tolerance = if std::env::var_os("HELD_MEASURE").is_some() {
-        3.0
-    } else {
-        tolerance
-    };
     let model = Model::new(id, build, size)
         .key(key)
         .centre(centre.0, centre.1)

@@ -7,7 +7,7 @@ use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, asin, atan2, cos, degrees, pow, radians, sin};
 use artkit::mesh::{Mesh, edge};
 use artkit::palette;
-use artkit::parts::{Settle, join_all, measure, settle_with};
+use artkit::parts::{Settle, join_all, settle_with};
 use artkit::place::{Coord, Facing, GameFrame, Spot};
 use artkit::scene::{self, Obj};
 use artkit::{boulder, cube, cylinder, fextrude, fsweep, jitter, sphere};
@@ -1204,19 +1204,6 @@ pub fn loft(
 /// A still model: everything joined into one node and stood on the floor, where it was built.
 pub fn done(name: &str) -> Vec<Obj> {
     let obj = join_all(name);
-    if std::env::var_os("HELD_MEASURE").is_some() {
-        let (lo, hi) = measure(&[obj]);
-        println!(
-            "[art] {name} built centred on game ({:.4}, {:.4}), size {:.3} x {:.3} x {:.3}, bottom {:.4}",
-            -(lo[0] + hi[0]) / 2.0,
-            -(lo[1] + hi[1]) / 2.0,
-            hi[0] - lo[0],
-            hi[2] - lo[2],
-            hi[1] - lo[1],
-            lo[2]
-        );
-        return settle_with(&[obj], Settle::default());
-    }
     settle_with(
         &[obj],
         Settle {
