@@ -160,8 +160,10 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
   return out;
 }
 
-/** The welcome signs' lettering, per app and town name (drawn once). */
-const lettering = new WeakMap<pc.AppBase, Map<string, pc.StandardMaterial>>();
+/** The welcome signs' lettering, per app and town name (drawn once), the latest asked for last, and how many signs show it. */
+const lettering = new WeakMap<pc.AppBase, Map<string, { mat: pc.StandardMaterial; signs: number }>>();
+/** Town names whose lettering is kept once no sign shows it: the menus' town and the game's, and a few more. */
+const KEEP_LETTERING = 4;
 
 /** A "Welcome to …" sign on the right of the road into town, a little way out, facing arrivals. */
 function welcomeSign(app: pc.AppBase, name: string, road: Point[], parent: pc.Entity): pc.Entity | null {
@@ -198,16 +200,25 @@ function welcomeSign(app: pc.AppBase, name: string, road: Point[], parent: pc.En
   const [w, ht, y0, zf] = [1.45, 0.52, 1.55, 0.03];
   text.poly([[w, y0 - ht, zf], [-w, y0 - ht, zf], [-w, y0 + ht, zf], [w, y0 + ht, zf]], [0, 0, 1], [[0, 1], [1, 1], [1, 0], [0, 0]]);
   const textMesh = meshFrom(device, text.meshData());
-  if (textMesh) drawMesh(frame, 'welcomeSignText', textMesh, letteringOf(app, name));
+  if (textMesh) drawMesh(frame, 'welcomeSignText', textMesh, letteringOf(app, name, frame));
   return frame;
 }
 
-/** The material of a sign's lettering for town `name`: the board's green, a cream border and the words, faintly lit from within. */
-function letteringOf(app: pc.AppBase, name: string): pc.StandardMaterial {
+/**
+ * The material of a sign's lettering for town `name`: the board's green, a cream border and the words, faintly lit
+ * from within. `sign` shows it until it is destroyed.
+ */
+function letteringOf(app: pc.AppBase, name: string, sign: pc.Entity): pc.StandardMaterial {
   let byName = lettering.get(app);
   if (!byName) lettering.set(app, (byName = new Map()));
   const had = byName.get(name);
-  if (had) return had;
+  if (had) {
+    byName.delete(name);
+    byName.set(name, had);
+    had.signs++;
+    sign.once('destroy', () => had.signs--);
+    return had.mat;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 192;
@@ -239,7 +250,19 @@ function letteringOf(app: pc.AppBase, name: string): pc.StandardMaterial {
   // (0.25 in linear light.)
   const e = Math.pow(0.25, 1 / 2.2);
   mat.emissive.set(e, e, e);
-  MaterialLibrary.for(app).adopt(mat);
-  byName.set(name, mat);
+  const lib = MaterialLibrary.for(app);
+  lib.adopt(mat);
+  const made = { mat, signs: 1 };
+  sign.once('destroy', () => made.signs--);
+  byName.set(name, made);
+  // A town made after another (each name a texture of its own): the oldest let go of, but none a sign still shows.
+  for (const [old, l] of byName) {
+    if (byName.size <= KEEP_LETTERING) break;
+    if (l.signs > 0) continue;
+    byName.delete(old);
+    lib.release(l.mat);
+    l.mat.diffuseMap?.destroy();
+    l.mat.destroy();
+  }
   return mat;
 }
