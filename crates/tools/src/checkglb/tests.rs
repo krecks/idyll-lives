@@ -1110,3 +1110,11 @@ fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn an_argument_it_does_not_know_is_a_usage_error() {
+    for args in [["--valdate"], ["chair"]] {
+        let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+        assert_eq!(main(&args), 2, "{args:?}");
+    }
+}

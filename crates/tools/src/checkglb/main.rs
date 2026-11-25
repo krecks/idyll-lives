@@ -2,14 +2,31 @@
 
 use super::*;
 
+pub const USAGE: &str = "usage: cargo check-glb [keys… (model., item., tool.)] [--keys] [--preview [--sheet]] [--validate] [--update-baseline] | --against <rev|dir> | --built <dir>";
+
 /// `cargo check-glb [keys…] [--keys] [--preview [--sheet]] [--validate] [--update-baseline]`, or
-/// `--against` (`against::main`), or `--built` (`built::main`): the exit code.
+/// `--against` (`against::main`), or `--built` (`built::main`): the exit code (2 on an argument it doesn't know).
 pub fn main(args: &[String]) -> i32 {
     if args.iter().any(|a| a == "--against") {
         return against::main(args);
     }
     if args.iter().any(|a| a == "--built") {
         return built::main(args);
+    }
+    let flag = |a: &str| {
+        [
+            "--keys",
+            "--preview",
+            "--sheet",
+            "--validate",
+            "--update-baseline",
+        ]
+        .contains(&a)
+    };
+    let key = |a: &str| a.starts_with("model.") || a.starts_with("item.") || a.starts_with("tool.");
+    if let Some(a) = args.iter().find(|a| !flag(a) && !key(a)) {
+        eprintln!("check-glb: {a}: no such flag or key\n{USAGE}");
+        return 2;
     }
     let paths = Paths::repo();
     if args.iter().any(|a| a == "--keys") {
@@ -29,11 +46,7 @@ pub fn main(args: &[String]) -> i32 {
             }
         };
     }
-    let keys: Vec<String> = args
-        .iter()
-        .filter(|a| a.starts_with("model.") || a.starts_with("item.") || a.starts_with("tool."))
-        .cloned()
-        .collect();
+    let keys: Vec<String> = args.iter().filter(|a| key(a)).cloned().collect();
     // The counted checks run over every file at once (`BatchCheck`), by name.
     let mut batch: Vec<(&'static str, BatchCheck)> = Vec::new();
     if args.iter().any(|a| a == "--validate") {
