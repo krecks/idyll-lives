@@ -15604,6 +15604,51 @@
         "rhsSyng"
       ],
       "reason": "the plant as sold and kept on a sill or a shelf: half a metre tall and wider than tall; the mature climber's range is the label's"
+    },
+    "toiletBoxed": {
+      "label": "WC on its boxed-in cistern (a wall-hung pan or a smart toilet on a pre-wall frame, the boxing a shelf behind it)",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.9,
+        1.25
+      ],
+      "d": [
+        0.5,
+        0.75
+      ],
+      "seat": [
+        0.4,
+        0.485
+      ],
+      "uses": [
+        "use the toilet",
+        "flush",
+        "wash hands after"
+      ],
+      "minutes": {
+        "use": [
+          2,
+          10
+        ]
+      },
+      "mechanisms": {
+        "lid": [
+          95,
+          110
+        ],
+        "seatRing": [
+          95,
+          110
+        ]
+      },
+      "sources": [
+        "ada604",
+        "dimToilets"
+      ],
+      "reason": "the pan hangs off a frame boxed in to 0.9-1.25 m and as wide as the boxing (0.5-1.2 m); the pan alone floats, so the piece is pan and boxing together"
     }
   },
   "groups": {
@@ -16262,7 +16307,9 @@
     "lawnMower": "lawnMower",
     "meditationCushion": "floorCushion",
     "massageTable": "massageTable",
-    "sauna": "saunaCabin"
+    "sauna": "saunaCabin",
+    "toiletSmart": "toiletBoxed",
+    "toiletWallHung": "toiletBoxed"
   },
   "decor": [
     "wallArt",
