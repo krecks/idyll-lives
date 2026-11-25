@@ -119,7 +119,7 @@ mod tests {
     /// only if their boxes' middles did: a far version leaving out an outermost part (the silo's hopper) is off.
     #[test]
     fn far_versions_stand_where_the_models_do() {
-        for model in super::family().expect("farm").models {
+        for model in super::family().models {
             let Some(far @ Far::Own(_)) = model.far else {
                 continue;
             };

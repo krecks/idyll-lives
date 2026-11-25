@@ -12,7 +12,7 @@ The screens the residents watch (the cinema's, the console's) stand on the wall 
 seats in front of them, the sitters facing the object's back (content `"seat": {"height": 0.45, "forward": 0.05,
 "facing": "back"}` for the cinema, `"forward": 0.12` for the console, as the piano and the writer's bureau). Each is
 built as the old part first stood (the seats at the back, the screen at the front edge facing them, its oak back to
-the room) and turned round (`turn_round`), so its oak back is on the wall and the console's tray slides out the other
+the room) and turned round (`kit::turn_round`), so its oak back is on the wall and the console's tray slides out the other
 way (+Z game, towards the players); the old parts were turned the same way. The cinema's hips stay where they were on its seats (0.05 is the old 0 turned round);
 the console's sit 8 cm further back than before, against the loveseat's back, so the knees stay under the shelf.
 

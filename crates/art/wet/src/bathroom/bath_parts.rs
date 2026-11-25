@@ -8,8 +8,8 @@ use artkit::materials::Mat;
 use artkit::math::{Axis, PI, cos, pow, sin, v3};
 use artkit::mesh::Mesh;
 use artkit::motion::{Ease, Grow, Path, grow, keys};
-use artkit::parts::{join, new_parts, set_origin};
-use artkit::place::{Coord, GameFrame};
+use artkit::parts::set_origin;
+use artkit::place::GameFrame;
 use artkit::py;
 use artkit::scene::{self, Obj};
 use artkit::shapes::shade;
@@ -77,25 +77,6 @@ pub fn loft(name: &str, sections: &[Section], material: Mat, segments: usize, sh
     let obj = scene::add(name, mesh);
     shade(obj, true, sharp);
     obj.set_location((0, 0, 0))
-}
-
-/// A tap's stream from its spout `tip` down to the tub's floor, hidden at rest (the sinks' `water`).
-pub fn stream<X: Coord>(f: &GameFrame, tip: (f64, f64, X), floor_y: f64, name: &str) -> Obj {
-    let (x, y, z) = tip;
-    let parts = new_parts(|| {
-        fcyl!(
-            f,
-            name,
-            0.011,
-            y - floor_y,
-            (x, (y + floor_y) / 2.0, z),
-            M.water,
-            verts = 10
-        );
-    });
-    let obj = join(&parts, name, Some(f.at(x, y, z)));
-    obj.edit(|o| o.scale.z = 0.001);
-    obj
 }
 
 /// The bath water: the tub's inside from just under its floor ring `floor` (a, b, y, n) up to `top`, a little in

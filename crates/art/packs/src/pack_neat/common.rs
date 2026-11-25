@@ -2,8 +2,7 @@
 
 use artkit::materials::Mat;
 use artkit::math::P3;
-use artkit::place::{Coord, GameFrame};
-use artkit::scene::Obj;
+use artkit::place::GameFrame;
 use artkit::{fcyl, loft, palette, ring, soft};
 
 palette! { M:
@@ -69,7 +68,7 @@ pub const PASTELS: [Mat; 6] = [
     M.pastel_a, M.pastel_b, M.pastel_c, M.pastel_d, M.pastel_e, M.pastel_f,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// `n` folded towels stacked on `y`, each plump with its fold rounded; returns the stack's top.
 #[allow(clippy::too_many_arguments)]
@@ -100,39 +99,6 @@ pub fn _towels(
         );
     }
     y + n as f64 * 0.046
-}
-
-/// A rounded-cornered box lofted upright (an appliance's cabinet, a dock): `r`-ish corners in plan (`sq`), its top
-/// and bottom edges eased.
-#[allow(clippy::too_many_arguments)]
-pub fn _box<X: Coord, Z: Coord>(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    d: f64,
-    at: (X, f64, Z),
-    material: Mat,
-    sq: f64,
-    verts: usize,
-) -> Obj {
-    let (x, y, z) = at;
-    let b = f.at(x, y - h / 2.0, z);
-    let rings = [(0.0, -0.006), (0.006, 0.0), (h - 0.006, 0.0), (h, -0.006)];
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(hh, e)| {
-            ring!(
-                w / 2.0 + e,
-                d / 2.0 + e,
-                z = b.z + hh,
-                verts = verts,
-                square = sq,
-                at = (b.x, b.y)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
 }
 
 /// A bottle: a rounded-square body, its shoulder, a neck and a cap.

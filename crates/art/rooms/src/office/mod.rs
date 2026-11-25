@@ -104,7 +104,7 @@ palette! { M:
 }
 
 const F: GameFrame = GameFrame::new(0.0);
-const WALL: f64 = -0.43; // the wall's face, game depth (one tile deep)
+use artkit::kit::WALL;
 const DT: f64 = 0.74; // the second catalogue's desk top
 const FT: f64 = 0.7525; // the plain desks' top (content surface 0.75)
 const CHAIR_Z: f64 = -0.17; // where a desk's own chair stands (furniture.json `seats` fwd)

@@ -1,9 +1,7 @@
 //! OU1's seats: the park bench, the folding bistro set, the picnic table, the garden and Adirondack chairs and
 //! the three-seat garden bench.
 
-use super::common::{
-    Bar, F, M, bar, board, bolts, cup, end_round, finish, jug, plank, rod, side_slab, v,
-};
+use super::common::{Bar, F, M, bar, bolts, cup, end_round, finish, jug, plank, rod, side_slab, v};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
@@ -582,7 +580,8 @@ pub fn picnic_table() -> Vec<Obj> {
                 );
             }
         }
-        board(
+        kit::board(
+            &F,
             &format!("brace{s}"),
             (sf * 0.92, seat - 0.07, 0),
             (sf * 0.04, top - 0.07, 0),
@@ -824,7 +823,8 @@ fn slatted_chair(prefix: &str, material: Mat, fan: f64) {
             bevel_segments = 2
         );
     }
-    board(
+    kit::board(
+        &F,
         &format!("{prefix}back_rail"),
         (-0.3, 0.56, -0.25),
         (0.3, 0.56, -0.25),

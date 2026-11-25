@@ -613,7 +613,16 @@ pub fn ironing_board() -> Vec<Obj> {
         );
     });
     join(&board, "body", Some(P3::from((0, 0, 0))));
-    let iron = new_parts(|| iron(f, (0.69, BOARD_Y - 0.012, BOARD_Z)));
+    let iron = new_parts(|| {
+        artkit::kit::steam_iron(
+            f,
+            (0.69, BOARD_Y - 0.012, BOARD_Z),
+            (-1.0, 0.0),
+            M.iron_plate,
+            M.iron_body,
+            M.iron_accent,
+        )
+    });
     let iron = hinged(
         join(&iron, "iron", None),
         f.at(0.69, BOARD_Y - 0.012, BOARD_Z),
@@ -621,80 +630,4 @@ pub fn ironing_board() -> Vec<Obj> {
     let objs = settle!(centre = false);
     squash!(iron, "iron_off", 0.001, seconds = OFF);
     objs
-}
-
-/// A steam iron standing on its soleplate at `at` (x, height, depth), pointing to the left (-x): the soleplate, the
-/// shell over it and its handle, the water window and the dial.
-pub fn iron(f: &GameFrame, at: (f64, f64, f64)) {
-    let (x, y, z) = at;
-    let mut sole: Vec<(f64, f64)> = vec![(0.1, -0.055), (0.1, 0.055)];
-    for k in 0..=10 {
-        let t = k as f64 / 10.0;
-        let a = std::f64::consts::FRAC_PI_2 * (1.0 - 2.0 * t);
-        sole.push((-0.04 - 0.12 * pow(cos(a), 1.6), 0.055 * sin(a)));
-    }
-    let at_sole: Vec<(f64, f64)> = sole.iter().map(|p| (x + p.0, z + p.1)).collect();
-    fextrude!(
-        f,
-        "iron_sole",
-        &at_sole,
-        0.012,
-        (0, y, 0),
-        M.iron_plate,
-        plane = Facing::Top,
-        bevel = 0.003,
-        bevel_segments = 1
-    );
-    let shell: Vec<(f64, f64)> = sole
-        .iter()
-        .map(|p| (x + p.0 * 0.92 + 0.004, z + p.1 * 0.9))
-        .collect();
-    fextrude!(
-        f,
-        "iron_shell",
-        &shell,
-        0.05,
-        (0, y + 0.012, 0),
-        M.iron_body,
-        plane = Facing::Top,
-        bevel = 0.016,
-        bevel_segments = 2
-    );
-    fsweep!(
-        f,
-        "iron_handle",
-        &artkit::kit::fillet!(
-            &[
-                (x + 0.085, y + 0.06, z),
-                (x + 0.07, y + 0.125, z),
-                (x - 0.08, y + 0.125, z),
-                (x - 0.1, y + 0.06, z)
-            ],
-            0.03
-        ),
-        0.0,
-        M.iron_body,
-        profile = rounded_rect(0.03, 0.022, 0.009, 2),
-        up = (0, 0, 1)
-    );
-    fbox!(
-        f,
-        "iron_window",
-        0.07,
-        0.03,
-        0.004,
-        (x - 0.04, y + 0.045, z + 0.047),
-        M.iron_accent,
-        bevel = 0.002,
-        bevel_segments = 1
-    );
-    fcyl!(
-        f,
-        "iron_dial",
-        0.016,
-        0.012,
-        (x + 0.035, y + 0.066, z),
-        M.iron_accent,
-        verts = 12
-    );
 }

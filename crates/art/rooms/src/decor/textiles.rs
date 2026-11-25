@@ -25,10 +25,6 @@ fn pleats(
     waves: usize,
 ) -> Obj {
     let (amp, t) = (0.018, 0.008);
-    let n = waves * 8;
-    let xs: Vec<f64> = (0..=n)
-        .map(|k| x_out + (x_in - x_out) * k as f64 / n as f64)
-        .collect();
     let h = y1 - y0;
     let rows = [
         (y0, 1.0, 1.4, 0.0),
@@ -40,51 +36,15 @@ fn pleats(
         (y1 - 0.065, 0.42, 1.3, 0.45),
         (y1, 0.38, 1.3, 0.45),
     ];
-    let mut verts: Vec<V3> = Vec::new();
-    let mut m = 0;
-    for &(y, af, tf, phase) in &rows {
-        let front: Vec<(f64, f64)> = xs
-            .iter()
-            .enumerate()
-            .map(|(k, &x)| {
-                (
-                    x,
-                    z + t * tf / 2.0
-                        + amp * af * sin(2.0 * PI * waves as f64 * k as f64 / n as f64 + phase),
-                )
-            })
-            .collect();
-        let back: Vec<(f64, f64)> = front.iter().map(|&(x, d)| (x, d - t * tf)).collect();
-        let mut ring = front.clone();
-        ring.extend(back.iter().rev());
-        m = ring.len();
-        verts.extend(ring.iter().map(|&(x, d)| V3::from(F.at(x, y, d))));
-    }
-    let mut faces: Vec<Vec<u32>> = Vec::new();
-    for r in 0..rows.len() - 1 {
-        let (a, b) = (r * m, (r + 1) * m);
-        for i in 0..m {
-            faces.push(vec![
-                (a + i) as u32,
-                (a + (i + 1) % m) as u32,
-                (b + (i + 1) % m) as u32,
-                (b + i) as u32,
-            ]);
-        }
-    }
-    let smooth = faces.len();
-    for base in [0, (rows.len() - 1) * m] {
-        // the bottom and top edges: a strip of quads across the cloth's thickness
-        for k in 0..n {
-            faces.push(vec![
-                (base + k) as u32,
-                (base + k + 1) as u32,
-                (base + m - 2 - k) as u32,
-                (base + m - 1 - k) as u32,
-            ]);
-        }
-    }
-    mesh(name, verts, &faces, material, smooth) // the cloth smooth, its hems flat
+    let (verts, faces) = kit::pleats!(F, &rows, x_out, x_in, z, waves, amp, t, per_fold = 8);
+    let smooth = faces.len() - 2 * waves * 8; // the cloth smooth, its hems flat
+    mesh(
+        name,
+        verts.into_iter().map(V3::from).collect(),
+        &faces,
+        material,
+        smooth,
+    )
 }
 
 /// Two pleated panels on a rail, gathered open at the sides (rest). At night `close` draws them across: each widens

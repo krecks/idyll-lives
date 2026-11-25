@@ -1,7 +1,8 @@
 //! The fold-down wall bed and the sofa bed.
 
-use super::common::{Cushion, book, cushion, fillet, leg, panel, pillow, plain};
+use super::common::{Cushion, book, cushion, leg, panel, pillow, plain};
 use super::{F, M};
+use artkit::kit::fillet;
 use artkit::math::{Axis, P3, PI, cos, sin};
 use artkit::motion::{Grow, grow};
 use artkit::parts::{hinged, join, new_parts, turn};

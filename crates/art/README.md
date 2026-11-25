@@ -188,8 +188,11 @@ rewrites the models, the pack and centres.json in the tree.
    - `soft_box!` (`soft!`): cushions, pillows, mattresses, duvets (below, "Soft things");
    - `forms::mirrored`, `forms::bisect` (a cut along a plane), `jitter!` (a hand-made wobble);
    - `artkit::kit`: whole parts more than one family uses (`kit::tube!`, `fillet!`, `pull!`, `knob!`, `shaker!`,
-     `moulding!`, `cabriole!`, `scroll!`, `bench_end!`, `songbird!`, `letters!`, `cut!`, `recessed_box!`:
-     [kit/mod.rs](../artkit/src/kit/mod.rs) has an example of each); `artkit::botany` for plants and trees.
+     `moulding!`, `cabriole!`, `scroll!`, `bench_end!`, `songbird!`, `letters!`, `cut!`, `recessed_box!`, `mug!`,
+     `throw!`, `board`, `tiled_walls!`, `steam_iron`, `duvet!` with `duvet_flap!` and `turn_down!`, `pleats!`,
+     `figure8`, `turn_round`, and `kit::WALL`, the wall's face in a one-deep footprint:
+     [kit/mod.rs](../artkit/src/kit/mod.rs) has an example of each); `artkit::botany` for plants and trees; a
+     family's helper's options are written with `artkit::options!`, as the kit's are.
 
    The options are each builder's struct (`shapes::Cube`, `Round`; `forms::Sweep`, `Loft`, `Extrude`;
    `soft::SoftBox`), set by name in the macro: `fbox!(F, "top", 1.2, 0.03, 0.8, (0, 0.735, 0), M.oak, bevel =

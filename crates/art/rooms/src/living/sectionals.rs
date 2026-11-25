@@ -1,10 +1,11 @@
 //! L1 continued: the designer sofa, the three-seater, the sectional's modules and its chaise.
 
-use super::common::{Cushion, cushion, panel, plain, seat, settled, taper_leg, throw};
+use super::common::{Cushion, cushion, panel, plain, seat, settled, taper_leg};
 use super::sofas::run;
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::P3;
 use artkit::parts::{join, new_parts};
@@ -296,7 +297,8 @@ pub fn chaise() -> Vec<Obj> {
                 ..Cushion::default()
             },
         );
-        throw(
+        kit::throw!(
+            F,
             "throw",
             -0.06,
             0.52,
@@ -305,8 +307,8 @@ pub fn chaise() -> Vec<Obj> {
             0.935,
             M.throw_oat,
             0.1,
-            -3.0,
-            5.0,
+            turn = -3.0,
+            seed = 5.0
         );
         0.45
     };

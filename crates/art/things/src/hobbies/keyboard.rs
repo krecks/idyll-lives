@@ -5,9 +5,10 @@
 //! a three-octave keyboard on an X-stand). Still.
 
 use super::M;
-use super::common::{P, flat_quads, sheet_music, turn_round};
+use super::common::{P, flat_quads, sheet_music};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
+use artkit::kit::turn_round;
 use artkit::kit::{self, fillet};
 use artkit::math::{PI, cos, sin};
 use artkit::parts::{Settle, join_all, settle_with};

@@ -53,10 +53,11 @@ pub fn _lump(obj: Obj, amount: f64, scale: f64, seed: f64) {
     });
 }
 
-/// A boulder `top` high (Blender z), roughened (`grain`: and pitted finer still, metres), with `fractures`
-/// (direction, depth: how far in from its outside, metres) cut flat across it, then cut off under the ground.
+/// A boulder `top` high (Blender z), roughened (`rough`: its noise and how lumpy it is; `grain`: and pitted finer
+/// still, metres), with `fractures` (direction, depth: how far in from its outside, metres) cut flat across it, then
+/// cut off flat at `ground` (Blender z), where it goes into the ground (the garden decor's stones too).
 #[allow(clippy::too_many_arguments)]
-fn _stone(
+pub fn _stone(
     name: &str,
     radius: f64,
     at: (f64, f64, f64),
@@ -67,6 +68,8 @@ fn _stone(
     subdivisions: usize,
     fractures: &[((f64, f64, f64), f64)],
     grain: f64,
+    rough: (f64, f64),
+    ground: f64,
 ) -> Obj {
     let o = boulder!(
         name,
@@ -75,10 +78,10 @@ fn _stone(
         material = material,
         scale = (1, 1, 1),
         seed = seed,
-        noise = 0.26,
+        noise = rough.0,
         subdivisions = subdivisions
     );
-    _lump(o, 0.08, 4.0, seed);
+    _lump(o, rough.1, 4.0, seed);
     if grain != 0.0 {
         _lump(o, grain, 14.0, seed + 5.1);
     }
@@ -103,7 +106,7 @@ fn _stone(
             .fold(f32::NEG_INFINITY, f32::max);
         p.loc.z = (top - highest as f64) as f32;
     });
-    _cut(o, (0, 0, GROUND), (0, 0, -1))
+    _cut(o, (0, 0, ground), (0, 0, -1))
 }
 
 /// Colours a stone's weathered faces (its rounded ones, not the fresh flat breaks): lichen in patches on what
@@ -159,6 +162,8 @@ pub fn rock() -> Vec<Obj> {
         low(4, 1),
         low(&fractures[..], &[][..]),
         low(0.025, 0.0),
+        (0.26, 0.08),
+        GROUND,
     );
     let side = _stone(
         "rock_side",
@@ -174,6 +179,8 @@ pub fn rock() -> Vec<Obj> {
             &[][..],
         ),
         low(0.03, 0.0),
+        (0.26, 0.08),
+        GROUND,
     );
     if low(true, false) {
         _weather(main, 1.3, M.lichen, M.soil, 0.25);
@@ -197,6 +204,8 @@ pub fn rock() -> Vec<Obj> {
                 2,
                 &[],
                 0.0,
+                (0.26, 0.08),
+                GROUND,
             );
             _weather(peb, sd, M.lichen, M.soil, 0.6);
         }

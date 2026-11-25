@@ -12,7 +12,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
 
 - **Piano**: an upright with its back on the wall's face and its bench in front; the pianist faces the case
   (content `"seat": {"height": 0.47, "forward": 0.227, "facing": "back"}`). It is built as the old part
-  stood (keys to the back) and turned round (`turn_round`), so its clips open the other way; the old part
+  stood (keys to the back) and turned round (`kit::turn_round`), so its clips open the other way; the old part
   was turned the same. Two
   parts share one clip, `fallboard`, played by `play` until the use ends: the fallboard lifts 90° off the keys
   to stand against the case, and the music desk, hinged at its top, swings its foot out 18° so the sheet leans
@@ -30,7 +30,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
   so both are held as guitars.
 - **Digital piano** (2 × 1): still. A console of 88 full-size keys (52 white at 2.35 cm, A0 at the player's left, game -x as built),
   their tops at 0.745 m as the upright's, on two side panels with a pedal board, a control strip and a music rest, an
-  X-legged bench at 0.48 m; built facing the front and turned round (`turn_round`) to stand with its back on the
+  X-legged bench at 0.48 m; built facing the front and turned round (`kit::turn_round`) to stand with its back on the
   wall like the upright, the player facing it (content `seat` 0.48 m, `forward` 0.18, `facing: back`). 2026-10-21,
   review M-hobbies-04: a three-octave keyboard on an X-stand on one tile, the keys at 0.845 m.
 - **Drum kit** (2 × 2): a real five-piece spread out (2026-10-21, review M-hobbies-05: packed onto one tile): a 22"
@@ -139,7 +139,7 @@ axes. What each now has:
   legs. The fallboard has a lip, a nameplate and hinges; the music desk an arched top pierced with fretwork.
 - **Guitar stands** (`guitar_stand`): a tube post with a height collar, legs bent back in one piece, a cradle bent in
   one piece with rubber sleeves, a rubber-lined yoke.
-- **Ukulele, guitars**: bodies are extruded outlines (`figure8` bouts; the electric's double cutaway) with rounded
+- **Ukulele, guitars**: bodies are extruded outlines (`kit::figure8` bouts; the electric's double cutaway) with rounded
   edges and inset tops, D-section swept necks, shaped heads, fret dots; the electric's saddles, tremolo arm, turned
   knobs, switch and jack; the acoustic's binding, rosette rings, pickguard and pinned bridge. The amp's grille is
   piped, its handle a strap.

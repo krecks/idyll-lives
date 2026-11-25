@@ -1,8 +1,9 @@
 //! The garden letterbox on its post, the hose reel cart and the push lawnmower: the yard's chores.
 
-use super::common::{F, M, bent, board, rod};
+use super::common::{F, M, bent, rod};
 use artkit::far::{is_low, low};
 use artkit::forms::{Plane, rounded_rect, smooth_outline};
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, V3};
 use artkit::motion::{Swing, path, swing};
@@ -343,6 +344,7 @@ pub fn hose_reel() -> Vec<Obj> {
         0.06,
         tv,
         low(4, 2),
+        1.0,
     );
     for sx in [-1.0, 1.0] {
         rod(
@@ -451,7 +453,8 @@ pub fn hose_reel() -> Vec<Obj> {
         angle = 80.0
     );
     // the crank on the right: an arm off the hub, a knob to turn it by
-    board(
+    kit::board(
+        &F,
         "crank",
         (0.244, hy, hz),
         (0.244, hy - 0.095, hz + 0.045),
@@ -686,6 +689,7 @@ pub fn lawn_mower() -> Vec<Obj> {
         0.07,
         low(10, 6),
         low(4, 2),
+        1.0,
     );
     for sx in [-1.0, 1.0] {
         fbox!(
@@ -743,6 +747,7 @@ pub fn lawn_mower() -> Vec<Obj> {
             0.03,
             6,
             3,
+            1.0,
         );
     }
     // the grass box between the handle's tubes: a bag deepest at the chute, tapering to its back, under a hard
@@ -789,6 +794,7 @@ pub fn lawn_mower() -> Vec<Obj> {
         0.025,
         low(8, 5),
         low(3, 1),
+        1.0,
     );
     // forward in its footprint, so the grip ends a few cm in from the front edge, where the pusher's hands are
     let mower = join_all("lawnMower");

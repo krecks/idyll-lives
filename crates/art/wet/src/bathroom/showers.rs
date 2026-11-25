@@ -8,8 +8,7 @@
 use super::M;
 use super::common::{bends, bottle, wall_rose};
 use super::shower_parts::{
-    bar_mixer, caddy, curtain, curtain_rings, frame, grate, hand_shower, head, rain, tiled_walls,
-    tray,
+    bar_mixer, caddy, curtain, curtain_rings, frame, grate, hand_shower, head, rain, tray,
 };
 use artkit::forms::rounded_rect;
 use artkit::kit;
@@ -32,7 +31,17 @@ pub fn shower() -> Vec<Obj> {
         grate(
             &f, "drain", 0.1, 0.047, 0.1, 0.09, 0.09, M.fittings, 5, true,
         );
-        tiled_walls(&f, -0.45, 0.45, -0.45, 0.45, 0.058, top, 0.03, 0.3, 0.005);
+        kit::tiled_walls!(
+            &f,
+            (-0.45, 0.45),
+            (-0.45, 0.45),
+            (0.058, top),
+            0.03,
+            0.3,
+            0.005,
+            M.grout,
+            M.tile
+        );
         // a glass side, and a fixed panel in front (the sliding door, inside it, is its own part)
         fbox!(
             f,
@@ -213,7 +222,17 @@ pub fn shower_stall() -> Vec<Obj> {
         grate(
             &f, "drain", 0.05, 0.069, 0.05, 0.09, 0.09, M.fittings, 5, true,
         );
-        tiled_walls(&f, -0.45, 0.45, -0.45, 0.45, 0.08, 2.08, 0.04, 0.25, 0.005);
+        kit::tiled_walls!(
+            &f,
+            (-0.45, 0.45),
+            (-0.45, 0.45),
+            (0.08, 2.08),
+            0.04,
+            0.25,
+            0.005,
+            M.grout,
+            M.tile
+        );
         // an L-shaped rail at the open sides, bent round the corner; the curtain hangs along the whole side, and its
         // front is its own part
         kit::tube!(

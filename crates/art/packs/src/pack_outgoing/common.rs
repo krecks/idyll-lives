@@ -76,7 +76,7 @@ pub const PHOTOS: [Mat; 8] = [
     M.coral, M.turq, M.sunny, M.magenta, M.photo_b, M.photo_a, M.photo_c, M.beer,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A spirit bottle standing on `y`: a body (round, or square as a whisky's), its label, a shoulder, neck and cap.
 #[allow(clippy::too_many_arguments)]

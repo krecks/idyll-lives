@@ -55,7 +55,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A candlestick standing on `y`, its candle a little melted at the top; returns the wick's top (x, height, z).
 #[allow(clippy::too_many_arguments)]

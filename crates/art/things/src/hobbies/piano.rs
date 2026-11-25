@@ -4,9 +4,10 @@
 //! sheet music leans back for reading.
 
 use super::M;
-use super::common::{flat_quads, sheet_music, turn_round};
+use super::common::{flat_quads, sheet_music};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
+use artkit::kit::turn_round;
 use artkit::kit::{self};
 use artkit::math::{Axis, P3, PI, TAU, cos, sin};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};

@@ -11,7 +11,7 @@ use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, loft};
 
 /// The wall's face, game depth: the toilets' cisterns and the storage stand on it.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A closed loop of Blender points round game (cx, cz) at height `y`: `rx` across, `rz` to the front (`back`
 /// behind, if given), squarer towards a rounded rectangle as `square` grows, narrower to the front by `egg`.

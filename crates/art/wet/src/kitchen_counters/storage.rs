@@ -14,7 +14,7 @@ use artkit::py;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, loft, ring, sweep, swing};
 
-pub const WALL: f64 = -0.43; // the back face of a wall thing, in game depth (docs/design/objects.md)
+pub use artkit::kit::WALL;
 
 /// An open case: a back at depth `zback`, two sides, a top and a bottom, open at the front.
 #[allow(clippy::too_many_arguments)] // (as the script called it)

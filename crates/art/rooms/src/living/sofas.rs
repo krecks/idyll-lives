@@ -2,7 +2,7 @@
 //! in place. Two nodes: the sofa (upholstery, frame, back cushions, pillows, legs) and its seat cushions (`seat`,
 //! origin on their underside), which `sink_in` squashes 2 cm while it's sat or dozed on.
 
-use super::common::{Cushion, cushion, leg, panel, pillow, plain, seat, settled, taper_leg, throw};
+use super::common::{Cushion, cushion, leg, panel, pillow, plain, seat, settled, taper_leg};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -635,7 +635,8 @@ pub fn sofa_three() -> Vec<Obj> {
                 },
             );
         }
-        throw(
+        kit::throw!(
+            F,
             "throw",
             0.86,
             0.6,
@@ -644,8 +645,8 @@ pub fn sofa_three() -> Vec<Obj> {
             0.375,
             M.throw_sage,
             0.1,
-            4.0,
-            3.0,
+            turn = 4.0,
+            seed = 3.0
         );
         0.44
     };

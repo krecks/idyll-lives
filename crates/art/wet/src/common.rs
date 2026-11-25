@@ -139,20 +139,37 @@ pub fn shaker<X: Coord, Y: Coord>(
 /// and scaled to nothing along its length, so it is hidden until `grow` runs the clip. `material` is the calling
 /// family's own water.
 pub fn water<X: Coord>(f: &GameFrame, spout: (X, f64, f64), floor_y: f64, material: Mat) -> Obj {
-    let (x, top_y, z) = spout;
-    let length = py::max(0.06, top_y - floor_y);
+    stream(f, "water", spout, floor_y, material, 0.012, 10, 0.06)
+}
+
+/// A stream `r` thick (`verts` round) from a spout's `tip` down to `floor_y` (at least `least` long), joined with
+/// its origin at the tip and scaled to nothing along its length, so it is hidden until `grow` runs it out: a tap's,
+/// a bath filler's, a coffee machine's.
+#[allow(clippy::too_many_arguments)]
+pub fn stream<X: Coord, Z: Coord>(
+    f: &GameFrame,
+    name: &str,
+    tip: (X, f64, Z),
+    floor_y: f64,
+    material: Mat,
+    r: f64,
+    verts: usize,
+    least: f64,
+) -> Obj {
+    let (x, top_y, z) = tip;
+    let length = py::max(least, top_y - floor_y);
     let parts = new_parts(|| {
         fcyl!(
             f,
-            "water",
-            0.012,
+            name,
+            r,
             length,
             (x, (top_y + floor_y) / 2.0, z),
             material,
-            verts = 10
+            verts = verts
         );
     });
-    let obj = join(&parts, "water", Some(f.at(x, top_y, z)));
+    let obj = join(&parts, name, Some(f.at(x, top_y, z)));
     obj.edit(|o| o.scale.z = 0.001);
     obj
 }

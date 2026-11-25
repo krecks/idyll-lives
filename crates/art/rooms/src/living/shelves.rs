@@ -18,7 +18,7 @@ use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsphere, fsweep, jitter, settle, swing};
 
-pub(super) const WALL: f64 = -0.43;
+pub(super) use artkit::kit::WALL;
 pub(super) const BOOK_TIP: f64 = 25.0;
 
 /// The covers the books are drawn from, by chance.

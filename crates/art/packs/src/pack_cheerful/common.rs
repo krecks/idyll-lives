@@ -103,7 +103,7 @@ pub const STRIPES: [Mat; 6] = [
     M.stripe_violet,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
 /// The mocktail cart's top shelf's top.
@@ -216,7 +216,6 @@ pub fn pleats(
     t: f64,
     along_x: bool,
 ) -> Obj {
-    let n = folds * 4;
     let h = y1 - y0;
     let rows = [
         (y0, 1.0, 1.5, 0.0),
@@ -227,41 +226,7 @@ pub fn pleats(
         (y1 - 0.06, 0.4, 1.3, 0.42),
         (y1, 0.36, 1.3, 0.42),
     ];
-    let (mut verts, mut m) = (Vec::new(), 0);
-    for &(y, af, tf, phase) in &rows {
-        let front: Vec<(f64, f64)> = (0..=n)
-            .map(|k| {
-                (
-                    z0 + (z1 - z0) * k as f64 / n as f64,
-                    amp * af * sin(2.0 * PI * folds as f64 * k as f64 / n as f64 + phase)
-                        + t * tf / 2.0,
-                )
-            })
-            .collect();
-        let mut ring = front.clone();
-        ring.extend(front.iter().rev().map(|&(u, o)| (u, o - t * tf)));
-        m = ring.len();
-        verts.extend(ring.iter().map(|&(u, o)| {
-            if along_x {
-                f.at(u, y, x + o)
-            } else {
-                f.at(x + o, y, u)
-            }
-        }));
-    }
-    let m = m as u32;
-    let mut faces: Vec<Vec<u32>> = Vec::new();
-    for r in 0..rows.len() as u32 - 1 {
-        let (a, b) = (r * m, (r + 1) * m);
-        faces.extend((0..m).map(|i| vec![a + i, a + (i + 1) % m, b + (i + 1) % m, b + i]));
-    }
-    let n = n as u32;
-    for base in [0, (rows.len() as u32 - 1) * m] {
-        // the top and bottom edges across the cloth's thickness
-        faces.extend(
-            (0..n).map(|k| vec![base + k, base + k + 1, base + m - 2 - k, base + m - 1 - k]),
-        );
-    }
+    let (verts, faces) = kit::pleats!(f, &rows, z0, z1, x, folds, amp, t, along_x = along_x);
     object_of!(name, &verts, &faces, &[mat], sharp = 70)
 }
 

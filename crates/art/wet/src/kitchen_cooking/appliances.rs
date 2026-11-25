@@ -1,11 +1,12 @@
 //! The microwave counter and the small appliances: the coffee machine, the breakfast counter and two dishwashers,
 //! each on a base unit under a worktop.
 
-use super::common::{fillet, hollow, knob};
+use super::common::{hollow, knob};
 use super::{M, SECONDS};
-use crate::common::shaker;
+use crate::common::{shaker, stream};
 use artkit::forms::rounded_rect;
 use artkit::kit;
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::Axis;
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
@@ -338,36 +339,6 @@ fn counter(f: &GameFrame, w: f64, body: Option<Mat>, top: Option<Mat>) {
     }
 }
 
-/// A thin stream from (x, top_y, z) down to bottom_y, joined with its origin at the top and scaled
-/// to nothing along its length, so it is hidden until `grow` runs the clip (the `water_on` way).
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-fn stream(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    top_y: f64,
-    z: f64,
-    bottom_y: f64,
-    material: Mat,
-    r: f64,
-) -> Obj {
-    let length = artkit::py::max(0.05, top_y - bottom_y);
-    let parts = new_parts(|| {
-        fcyl!(
-            f,
-            name,
-            r,
-            length,
-            (x, (top_y + bottom_y) / 2.0, z),
-            material,
-            verts = 8
-        );
-    });
-    let obj = join(&parts, name, Some(f.at(x, top_y, z)));
-    obj.edit(|o| o.scale.z = 0.001); // hidden at rest; `grow` runs it out along its length
-    obj
-}
-
 // --- coffee machine: 1x1, a counter with an espresso machine on the worktop ----------------------------
 
 /// A counter with an espresso machine on it: a rounded body with a steel cup-warmer and its rail on top, a group
@@ -601,7 +572,16 @@ pub fn coffee_machine() -> Vec<Obj> {
     // the cup, on the drip tray's front edge, sliding back under the spout for `brew`
     let parts = new_parts(|| cup(f, "cup", -0.14, 0.965, 0.0));
     let cup = join(&parts, "cup", Some(f.at(-0.14, 0.965, 0.0)));
-    let stream = stream(f, "stream", -0.14, 1.122, -0.11, 0.99, M.coffee, 0.008);
+    let stream = stream(
+        f,
+        "stream",
+        (-0.14, 1.122, -0.11),
+        0.99,
+        M.coffee,
+        0.008,
+        8,
+        0.05,
+    );
     settle_all();
     slide!(cup, "brew", (0, 0.11, 0), seconds = 0.6);
     grow(

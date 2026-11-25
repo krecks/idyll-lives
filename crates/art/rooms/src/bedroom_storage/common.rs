@@ -59,7 +59,7 @@ palette! { M:
 
 /// Game numbers as they are: the models stand where the game places them.
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, the back of anything against it
+pub use artkit::kit::WALL;
 
 pub const DRAWER_SECONDS: f64 = 0.9; // a drawer slides out 30 cm in this long
 // seconds the nightstand's drawer stays out (the dressers' and wardrobes' stay open while the resident changes,

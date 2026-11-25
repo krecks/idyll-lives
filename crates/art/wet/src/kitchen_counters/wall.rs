@@ -3,7 +3,7 @@
 
 use super::M;
 use super::storage::{WALL, jar, lathe_at};
-use super::turned::{canister, lathe, mug, plates};
+use super::turned::{canister, lathe, plates};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
@@ -580,7 +580,7 @@ pub fn kitchen_shelf_wall() -> Vec<Obj> {
             M.spoon,
             14,
         );
-        mug(
+        kit::mug!(
             f,
             "pot1",
             -0.12,
@@ -590,7 +590,7 @@ pub fn kitchen_shelf_wall() -> Vec<Obj> {
             0.09,
             M.cream,
             -30.0,
-            12,
+            segments = 12
         );
         // a trailing plant in a pot: a crown of leaves, two vines trailing over the shelf's front
         lathe(

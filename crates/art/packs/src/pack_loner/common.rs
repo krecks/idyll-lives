@@ -64,7 +64,7 @@ pub const BANDS: [(Mat, Mat); 4] = [
     (M.field_a, M.field_b),
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
 

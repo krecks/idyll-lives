@@ -7,7 +7,6 @@ use artkit::math::{P3, PI, cosd, sin, sind};
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
 use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
-use artkit::py::round;
 use artkit::scene::Obj;
 use artkit::{
     fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, revolve, ring, settle, slide,
@@ -502,76 +501,6 @@ pub fn power_blender() -> Vec<Obj> {
 
 // --- the contrast rain shower (1x1): a cabin of its own tile, a square rain head, hot and cold dials -----------------
 
-/// The back wall (game x0..x1 at the back z0) and the left wall (at x0, z0..z1): grout backing, square tiles with
-/// softened edges.
-#[allow(clippy::too_many_arguments)]
-fn tiled_walls(
-    f: &GameFrame,
-    x0: f64,
-    x1: f64,
-    z0: f64,
-    z1: f64,
-    y0: f64,
-    y1: f64,
-    t: f64,
-    size: f64,
-    gap: f64,
-) {
-    fbox!(
-        f,
-        "grout_back",
-        x1 - x0,
-        y1 - y0,
-        t,
-        ((x0 + x1) / 2.0, (y0 + y1) / 2.0, z0 + t / 2.0),
-        M.grout
-    );
-    fbox!(
-        f,
-        "grout_left",
-        t,
-        y1 - y0,
-        z1 - z0 - t,
-        (x0 + t / 2.0, (y0 + y1) / 2.0, (z0 + t + z1) / 2.0),
-        M.grout
-    );
-    let rows = 1.max(round((y1 - y0) / size));
-    let th = (y1 - y0) / rows as f64;
-    let cols = 1.max(round((x1 - x0 - t) / size));
-    let tw = (x1 - x0 - t) / cols as f64;
-    let deep = 1.max(round((z1 - z0 - t) / size));
-    let td = (z1 - z0 - t) / deep as f64;
-    for j in 0..rows {
-        let y = y0 + th * (j as f64 + 0.5);
-        for i in 0..cols {
-            fbox!(
-                f,
-                numbered("tile"),
-                tw - gap,
-                th - gap,
-                0.008,
-                (x0 + t + tw * (i as f64 + 0.5), y, z0 + t + 0.004),
-                M.tile,
-                bevel = 0.002,
-                bevel_segments = 1
-            );
-        }
-        for i in 0..deep {
-            fbox!(
-                f,
-                numbered("tile"),
-                0.008,
-                th - gap,
-                td - gap,
-                (x0 + t + 0.004, y, z0 + t + td * (i as f64 + 0.5)),
-                M.tile,
-                bevel = 0.002,
-                bevel_segments = 1
-            );
-        }
-    }
-}
-
 const HEAD: (f64, f64, f64) = (0.0, 2.0, -0.02); // the rain head's underside
 const DOOR_HALF: f64 = 0.28; // half the glass door's width, across the middle of the front
 
@@ -637,7 +566,19 @@ pub fn contrast_shower() -> Vec<Obj> {
                 M.tray
             );
         }
-        tiled_walls(f, -s, s, -s, s, 0.058, top, 0.03, 0.3, 0.005);
+        kit::tiled_walls!(
+            f,
+            (-s, s),
+            (-s, s),
+            (0.058, top),
+            0.03,
+            0.3,
+            0.005,
+            M.grout,
+            M.tile,
+            thick = 0.008,
+            bevel = 0.002
+        );
         fbox!(
             f,
             "glass_side",

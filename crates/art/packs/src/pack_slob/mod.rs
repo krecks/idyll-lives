@@ -17,7 +17,7 @@ use artkit::family::{Family, Model};
 use artkit::json;
 
 mod cart;
-mod common;
+pub(crate) mod common;
 mod lounge;
 mod play;
 

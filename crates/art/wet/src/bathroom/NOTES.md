@@ -134,7 +134,7 @@ Validate › Showers until checked in play.
   gathered into that corner at rest
   (scaled to 0.32 along the rail about its origin there); `curtain_draw` grows it across in 0.9 s, 1 s into the
   use, held till the use ends (A-bathroom-02). The water comes on at 1.8 s.
-- **Tiles** (`tiled_walls`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
+- **Tiles** (`kit::tiled_walls!`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
   the stall 25 cm. The walk-in shower's stone wall has grooved joints; the rain shower's walls are plain stone.
   The rain shower's front glass covers only the left half: the right half is the way in.
 - **Details (2026-10-22).** Trays are one loft with a raised lip round a floor falling to the drain (`_tray`), the

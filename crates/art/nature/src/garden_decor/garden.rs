@@ -1,7 +1,8 @@
 //! The gnome, the wheelbarrow planter and the boulders.
 
 use super::M;
-use super::common::{_on_top, _stone};
+use super::common::_on_top;
+use crate::ground::rock::_stone;
 use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
 use artkit::math::{P3, TAU, cos, degrees, sin};
@@ -578,11 +579,12 @@ pub fn boulder() -> Vec<Obj> {
     _stone(
         "boulder_main",
         0.34,
-        (-0.06, 0.02),
+        (-0.06, 0.02, 0.0),
         M.rock,
         (1.12, 0.94, 0.86),
         0.4,
         0.43,
+        3,
         &[
             ((0.1, -0.05, 1.0), 0.07),
             ((0.35, -0.2, 1.0), 0.05),
@@ -591,29 +593,37 @@ pub fn boulder() -> Vec<Obj> {
             ((0.6, -0.8, 0.25), 0.05),
             ((-0.5, -0.9, 0.1), 0.04),
         ],
-        3,
+        0.0,
+        (0.3, 0.1),
+        0.0,
     );
     _stone(
         "boulder_side",
         0.21,
-        (0.3, 0.17),
+        (0.3, 0.17, 0.0),
         M.rock_dark,
         (1.0, 0.92, 0.8),
         2.1,
         0.24,
-        &[((0.5, -0.6, 1.0), 0.03), ((1.0, 0.2, 0.3), 0.04)],
         3,
+        &[((0.5, -0.6, 1.0), 0.03), ((1.0, 0.2, 0.3), 0.04)],
+        0.0,
+        (0.3, 0.1),
+        0.0,
     );
     _stone(
         "boulder_small",
         0.13,
-        (0.26, -0.27),
+        (0.26, -0.27, 0.0),
         M.rock_warm,
         (1.05, 0.85, 0.75),
         4.2,
         0.12,
-        &[((0.3, -0.4, 1.0), 0.02)],
         2,
+        &[((0.3, -0.4, 1.0), 0.02)],
+        0.0,
+        (0.3, 0.1),
+        0.0,
     );
     let moss = _on_top(&[(-0.14, 0.12), (0.02, 0.18), (0.32, 0.24)], 0.03);
     let lichen = _on_top(&[(0.08, -0.08), (-0.28, -0.1), (0.26, -0.27)], 0.012);

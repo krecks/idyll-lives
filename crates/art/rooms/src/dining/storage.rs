@@ -14,7 +14,7 @@ use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, revolve, swing};
 
-pub(super) const WALL: f64 = -0.43; // where the storage is built from (game depth); `settle()` then moves it to the old part's centre
+pub(super) use artkit::kit::WALL;
 pub(super) const LEG_H: f64 = 0.16; // a sideboard's legs
 pub const DOOR_SECONDS: f64 = 0.9; // a storage door swings open in this long, while clean things are put away (a `cupboard`)
 

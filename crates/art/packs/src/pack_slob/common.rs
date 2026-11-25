@@ -64,9 +64,10 @@ pub const POP: [Mat; 6] = [
     M.pop_yellow,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
-/// A rounded-cornered box lofted upright (a case, a cabinet), its top and bottom edges eased by `ease`.
+/// A rounded-cornered box lofted upright (a case, a cabinet, the neat pack's appliances and dock), its top and
+/// bottom edges eased by `ease`.
 #[allow(clippy::too_many_arguments)]
 pub fn _box<X: Coord, Z: Coord>(
     f: &GameFrame,

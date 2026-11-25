@@ -4,14 +4,12 @@
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, PI, cos, radians, sin, sqrt};
-use artkit::parts::{hinged, join, measure, new_parts};
+use artkit::math::{P3, PI, cos, radians, sin, sqrt};
+use artkit::parts::{join, measure};
 use artkit::place::{Coord, GameFrame};
 use artkit::scene::{self, Obj, meshes};
-use artkit::{
-    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, ring, soft, squash, swing,
-};
-use artkit::{palette, settle};
+use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, ring, soft};
+use artkit::{kit, palette, settle};
 
 palette! { M:
     // shared
@@ -54,12 +52,10 @@ palette! { M:
 pub const F: GameFrame = GameFrame::new(0.0);
 
 pub const DUVET: f64 = 0.05; // the duvet's top above the mattress top
-pub const FLAP: f64 = 0.045; // the flap's thickness at rest
 // The game's quilt over a sleeper lies 10 cm above the mattress off the body, times the sleeper's size (8.5 cm
 // for the smallest), and rounds down to 6 cm over its outer 8 cm. Folded, the flap must stay under it, so the
-// clip also flattens it to this much of its thickness (its top, the sheet's, 7.5 cm above the mattress) and,
-// where the quilt's edge would cross it, narrows it to 8 cm inside that edge (`turn_down`).
-pub const FOLDED: f64 = 0.4;
+// clip also flattens it to 0.4 of its thickness (its top, the sheet's, 7.5 cm above the mattress) and, where the
+// quilt's edge would cross it, narrows it to 8 cm inside that edge (`kit::turn_down`).
 /// The quilt's edge from the bed's middle: a one-tile bed's, a two-tile bed's outer one.
 fn quilt_edge(tiles: usize) -> f64 {
     match tiles {
@@ -178,78 +174,18 @@ pub fn mattress(name: &str, w: f64, h: f64, d: f64, top: f64, z: impl Coord, o: 
 pub const RUMPLE: f64 = 0.03; // how deep the duvet's folds are
 pub const FOLDS: f64 = 0.26; // and how far apart
 
-/// The duvet's lower two thirds: from the fold to the foot, draped down the sides and the foot end, puffed on top
-/// (its middle at `DUVET`) and rumpled, as a duvet shaken out lies: soft folds across it, its sides hanging
-/// unevenly, its corners drawn in. The folds only go down and in, so it stays under the game's quilt and inside its
-/// box. `runner` (from, to, in game depth): where a runner lies across it and it is smooth.
-#[allow(clippy::too_many_arguments)]
-fn duvet(
-    top: f64,
-    half: f64,
-    z_fold: f64,
-    z_foot: f64,
-    drape: f64,
-    material: Mat,
-    seed: f64,
-    flat: Option<usize>,
-    runner: Option<(f64, f64)>,
-) -> Obj {
-    let (over, puff) = (0.028, 0.012);
-    let (y0, y1) = (top - drape, top + DUVET);
-    let mid = (z_fold + z_foot + over) / 2.0;
-    // (the soft box's own y runs to the back: a game depth z is its y = mid - z)
-    let calm = runner.map(|r| (mid - r.1, mid - r.0));
-    soft!(
-        F,
-        "duvet",
-        2.0 * (half + over),
-        y1 - y0 - 2.0 * puff,
-        z_foot + over - z_fold,
-        (0, (y0 + y1) / 2.0, mid),
-        material,
-        round = 0.06,
-        puff = puff,
-        flat = flat,
-        pinch = 0.0,
-        rumple = RUMPLE,
-        rumple_size = FOLDS,
-        seed = seed + half,
-        calm = calm,
-        resting = true
-    )
-}
-
-/// The duvet's top third, flat on the mattress with the sheet turned down over its head edge; one part hinged
-/// across its fold on the duvet's top, so turning it 180 degrees lays it over the rest.
+/// The duvet's top third, flat on the mattress with the sheet turned down over its head edge, hinged across its
+/// fold (`kit::duvet_flap`).
 pub fn flap(top: f64, half: f64, z_top: f64, z_fold: f64, material: Mat) -> Obj {
-    let parts = new_parts(|| {
-        let y = top + DUVET - FLAP / 2.0;
-        soft!(
-            F,
-            "flap",
-            2.0 * (half + 0.012),
-            FLAP - 0.01,
-            z_fold - z_top,
-            (0, y, (z_top + z_fold) / 2.0),
-            material,
-            round = 0.018,
-            puff = 0.005
-        );
-        soft!(
-            F,
-            "flap_sheet",
-            2.0 * (half + 0.016),
-            FLAP + 0.008,
-            0.13,
-            (0, y, z_top + 0.055),
-            M.sheet,
-            round = 0.022
-        );
-    });
-    // A hair above the duvet's top, so the flap folded over doesn't lie in its plane.
-    hinged(
-        join(&parts, "duvet_flap", None),
-        F.at(0, top + DUVET + 0.003, z_fold),
+    kit::duvet_flap!(
+        F,
+        top,
+        half,
+        z_top,
+        z_fold,
+        material,
+        M.sheet,
+        height = DUVET
     )
 }
 
@@ -274,8 +210,20 @@ pub fn bedding(
     o: Bedding,
 ) -> f64 {
     let z_fold = o.fold.unwrap_or(z_top + (z_foot - z_top) / 3.0);
-    duvet(
-        top, half, z_fold, z_foot, drape, material, o.seed, o.flat, o.runner,
+    kit::duvet!(
+        F,
+        top,
+        half,
+        z_fold,
+        z_foot,
+        drape,
+        material,
+        height = DUVET,
+        rumple = RUMPLE,
+        folds = FOLDS,
+        seed = o.seed,
+        flat = o.flat,
+        runner = o.runner
     );
     z_fold
 }
@@ -351,20 +299,11 @@ pub fn channel(
     loft!(name, &secs, material = material)
 }
 
-/// Keys `clip`: the flap turns 180 degrees over the rest of the duvet and, as it goes, flattens to `FOLDED` of its
-/// thickness (about its hinge, so it stays on the duvet) and narrows to keep 8 cm inside the edge of the game's
-/// quilt (`quilt_edge`), so the quilt over a sleeper hides it. `half`: the bedding's half width.
+/// Keys `clip` (`kit::turn_down`): the flap turns over the rest of the duvet, flattened and narrowed to stay inside
+/// the edge of the game's quilt over a `tiles` wide bed. `half`: the bedding's half width.
 pub fn turn_down(flap: Obj, clip: &str, half: f64, tiles: usize) {
-    let narrow = 1.0_f64.min((quilt_edge(tiles) - 0.08) / (half + 0.016));
-    swing!(flap, clip, 180.0, seconds = SECONDS, axis = Axis::X);
-    squash!(flap, clip, (narrow, 1, FOLDED), seconds = SECONDS);
-    squash!(flap, clip, (1, ROLL, 1), seconds = SECONDS, back = true);
+    kit::turn_down!(flap, clip, half, quilt_edge(tiles), seconds = SECONDS);
 }
-
-// Half way over, the flap is gathered to this much of its length along the bed (it springs out again as it lies
-// down), so a duvet turned back rolls over its fold as cloth does, a low bulge, never a board standing up.
-const ROLL: f64 = 0.2;
-
 /// Joins what's in the scene as the still bed, builds the flap, settles, and keys `turn_down`.
 pub fn finish(name: &str, flap_args: (f64, f64, f64, f64, Mat), tiles: usize) -> Vec<Obj> {
     let still = meshes();

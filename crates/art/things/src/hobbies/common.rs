@@ -5,10 +5,9 @@ pub use crate::common::P;
 use artkit::forms::rounded_rect;
 use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
-use artkit::math::{Axis, M4, V3, cos, cosd, degrees, pow, radians, sin, sind};
+use artkit::math::{M4, V3, cos, cosd, degrees, pow, radians, sin, sind};
 use artkit::mesh::{Mesh, normal_newell};
 use artkit::motion::{Squash, squash};
-use artkit::parts::turn;
 use artkit::place::GameFrame;
 use artkit::scene::{self, Obj};
 use artkit::{fbox, fcyl, fsweep, rod, soft, torus};
@@ -281,17 +280,6 @@ pub fn stool(fr: &GameFrame, z: f64, top: f64, r: f64, legs: Mat, seat: Mat, x: 
         major_segments = 20,
         minor_segments = 4
     );
-}
-
-/// Turns a model built in place half a turn about the footprint's middle (each part about its own origin, which
-/// moves round with it), then moves it `forward` m to the front. A part's clips then open the other way.
-pub fn turn_round(objs: &[Obj], forward: f64) {
-    for &o in objs {
-        turn(o, 180.0, Axis::Z);
-        o.edit(|p| {
-            p.loc = V3::new(-p.loc.x, (-(p.loc.y as f64) - forward) as f32, p.loc.z);
-        });
-    }
 }
 
 /// Leans an upright instrument back by `degrees` and stands its foot at game `foot`. The lean is the node's turn,

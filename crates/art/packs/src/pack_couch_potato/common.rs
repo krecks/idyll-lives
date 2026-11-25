@@ -1,15 +1,14 @@
 //! What the couch potato pack is built from: its palette, pleated curtains, speaker drivers, screens and snacks.
 
 use artkit::materials::Mat;
-use artkit::math::{PI, V3, atan2, cosd, sind};
-use artkit::parts::{numbered, turn};
+use artkit::math::{PI, atan2, cosd, sind};
+use artkit::parts::numbered;
 use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
 use artkit::scene::Obj;
 use artkit::{fbox, fextrude, fsphere, kit, object_of, palette, revolve};
 
 use artkit::forms::rounded_rect;
-use artkit::math::Axis;
 
 palette! { M:
     // the cinema wall
@@ -98,7 +97,6 @@ pub fn pleats(
     mat: Mat,
     t: f64,
 ) -> Obj {
-    let n = folds * 4;
     let h = y1 - y0;
     let rows = [
         (y0, 1.0, 1.5, 0.0),
@@ -109,51 +107,8 @@ pub fn pleats(
         (y1 - 0.05, 0.4, 1.3, 0.42),
         (y1, 0.36, 1.3, 0.42),
     ];
-    let (mut verts, mut m) = (Vec::new(), 0);
-    for &(y, af, tf, phase) in &rows {
-        let front: Vec<(f64, f64)> = (0..=n)
-            .map(|k| {
-                (
-                    x0 + (x1 - x0) * k as f64 / n as f64,
-                    amp * af
-                        * artkit::math::sin(2.0 * PI * folds as f64 * k as f64 / n as f64 + phase)
-                        + t * tf / 2.0,
-                )
-            })
-            .collect();
-        let mut ring = front.clone();
-        ring.extend(front.iter().rev().map(|&(u, o)| (u, o - t * tf)));
-        m = ring.len();
-        verts.extend(ring.iter().map(|&(u, o)| f.at(u, y, z + o)));
-    }
-    let m = m as u32;
-    let mut faces: Vec<Vec<u32>> = Vec::new();
-    for r in 0..rows.len() as u32 - 1 {
-        let (a, b) = (r * m, (r + 1) * m);
-        faces.extend((0..m).map(|i| vec![a + i, a + (i + 1) % m, b + (i + 1) % m, b + i]));
-    }
-    let n = n as u32;
-    for base in [0, (rows.len() as u32 - 1) * m] {
-        faces.extend(
-            (0..n).map(|k| vec![base + k, base + k + 1, base + m - 2 - k, base + m - 1 - k]),
-        );
-    }
+    let (verts, faces) = kit::pleats!(f, &rows, x0, x1, z, folds, amp, t);
     object_of!(name, &verts, &faces, &[mat], sharp = 70)
-}
-
-/// Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
-/// which moves round with it), as pack_bookworm turned the writer's bureau. A part's slides then go the other way.
-pub fn turn_round(objs: &[Obj]) {
-    for &o in objs {
-        turn(o, 180.0, Axis::Z);
-        o.edit(|p| {
-            p.loc = V3 {
-                x: -p.loc.x,
-                y: -p.loc.y,
-                z: p.loc.z,
-            }
-        });
-    }
 }
 
 /// A speaker driver at (x, y) on a face at depth `z`, facing +z (`facing` 1) or -z: its flange, a rolled

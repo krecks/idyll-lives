@@ -2,8 +2,9 @@
 
 use super::M;
 use super::common::{frets, guitar_stand, lean, off_stand, strings};
-use super::guitars::{dots, figure8, inset, neck};
+use super::guitars::{dots, inset, neck};
 use artkit::forms::smooth_outline;
+use artkit::kit::figure8;
 use artkit::math::P3;
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::GameFrame;
