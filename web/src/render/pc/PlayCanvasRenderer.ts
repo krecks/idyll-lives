@@ -2712,6 +2712,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.darkRooms.clear();
     this.awakeRooms.clear();
     this.occupiedRooms.clear();
+    // The ended game's callbacks: kept, its frame would go on running and its session stay alive behind the menus.
+    this.onFrame = this.onView = null;
+    this.flatsOpen = null;
   }
 
   /** Takes down the lot layer (it's built again for the next lot). */
