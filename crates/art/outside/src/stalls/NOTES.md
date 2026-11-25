@@ -30,8 +30,8 @@ floor).
   sign on its front (a bun, a sausage with rounded ends and a mustard zigzag), squeeze bottles, a napkin box with a
   napkin pulled up, a stack of paper trays, four posts on feet and a striped awning (six slats, red and white, a
   scalloped valance) leaning down to the front. The hot plate (a steel tray, a ribbed dark plate, five bowed sausages
-  and two split buns) has a hinged, rounded steel lid (`lid`) with a bar handle on its back edge:
-  `lid_open` lifts it 75° in 0.9 s a second into the sale, for 1.4 s, as the vendor behind it takes a sausage.
+  and two split buns) has a rounded steel lid (`lid`) hinged on its front edge, with a bar handle on its back edge:
+  `lid_open` lifts it 75° away from the vendor in 0.9 s a second into the sale, for 1.4 s, as they take a sausage.
 
 ## The machines
 

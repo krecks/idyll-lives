@@ -124,7 +124,7 @@ pub fn wheel(f: &GameFrame, name: &str, x: f64, z: f64, r: f64, spokes: usize) {
             0.01,
             (x + r * 0.46 * sin(a), r + r * 0.46 * cos(a), z),
             M.steel,
-            rot = (0.0, 0.0, degrees(a))
+            rot = (0.0, -degrees(a), 0.0)
         );
     }
 }
