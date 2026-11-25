@@ -64,6 +64,9 @@ pub struct Travel {
     /// it faces and whether it's a bay off the road (`cars::park_spot`), worked out once: the
     /// spots and the roads stay as the town file has them. Not saved.
     pub(crate) parked: Vec<Option<([f32; 2], f32, bool)>>,
+    /// The trails' indices into `graph.roads`, ascending: `outings::trail_step` projects only
+    /// onto these, not onto every road in town. Not saved: the graph is the town file's.
+    pub(crate) trails: Vec<u32>,
 }
 
 /// A plot's door (its bits) and where it gets on the roads on foot and by car
@@ -88,7 +91,16 @@ impl Travel {
             zebras: Default::default(),
             doors: Vec::new(),
             parked: Vec::new(),
+            trails: Vec::new(),
         };
+        travel.trails = travel
+            .graph
+            .roads
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.kind == RoadKind::Trail)
+            .map(|(i, _)| i as u32)
+            .collect();
         travel.parked = (0..travel.file.parking.len())
             .map(|k| crate::cars::park_spot(&travel, k))
             .collect();
