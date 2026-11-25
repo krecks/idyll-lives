@@ -1,5 +1,5 @@
 /**
- * Picking (`pick`, `pickPlane`, `pickVertical`, `pickOnWall`, `objectBox`): analytic, on the CPU,
+ * Picking (`pick`, `pickPlane`, `pickOnWall`, `objectBox`): analytic, on the CPU,
  * no GPU picking. A ray from the game camera through the pointer (`GameCamera.ray`, in game space
  * through `space.ts`) meets the floor of the storey in view, the placed objects' boxes
  * (`LotContents.placed`, the ones prepared with the world: what's drawn of each, never past its
@@ -37,7 +37,6 @@ export class Picker {
   /** The last pick's ray (game space, render rows; `dir` of unit length). */
   private readonly origin = { x: 0, y: 0, z: 0 };
   private readonly dir = { x: 0, y: -1, z: 0 };
-  private readonly forward = { x: 0, y: 0, z: 0 };
 
   constructor(
     private readonly camera: GameCamera,
@@ -90,24 +89,6 @@ export class Picker {
     if (d.y > -1e-6 || o.y <= y) return null;
     const t = (y - o.y) / d.y;
     return { x: o.x + d.x * t, z: o.z + d.z * t + this.view.rowOf(storey) };
-  }
-
-  /** The last ray's height over lot point (`x`, `z`) above its storey's floor, on the upright plane through it square to the view. */
-  pickVertical(x: number, z: number): number | null {
-    const o = this.origin;
-    const d = this.dir;
-    const k = this.view.storeyOf(z);
-    const pz = z - this.view.rowOf(k);
-    // The upright plane through the point, square to the camera's view across the floor.
-    const f = this.camera.forwardInGame(this.forward);
-    const len = Math.hypot(f.x, f.z);
-    if (len < 1e-6) return null;
-    const nx = f.x / len;
-    const nz = f.z / len;
-    const along = d.x * nx + d.z * nz;
-    if (Math.abs(along) < 1e-6) return null;
-    const t = ((x - o.x) * nx + (pz - o.z) * nz) / along;
-    return o.y + d.y * t - k * WALL_HEIGHT;
   }
 
   /** Where the last ray meets wall line `line` (`h`: lot z, `v`: x; in `storeyRow`'s storey's rows): along it and above that storey's floor. */

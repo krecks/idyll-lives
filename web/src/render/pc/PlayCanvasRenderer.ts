@@ -4021,10 +4021,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.picker.pickPlane(height);
   }
 
-  pickVertical(x: number, z: number): number | null {
-    return this.picker.pickVertical(x, z);
-  }
-
   pickOnWall(axis: 'h' | 'v', line: number, storeyRow: number): { along: number; y: number } | null {
     return this.picker.pickOnWall(axis, line, storeyRow);
   }
