@@ -16,7 +16,7 @@ fn arch_hole(cx: f64, w: f64, y0: f64, y1: f64) -> Vec<(f64, f64)> {
     let r = w * 0.8; // each side's arc, centred across the opening
     let spring = y1 - sqrt(r * r - pow(r - w / 2.0, 2.0));
     let mut pts = vec![(cx - w / 2.0, y0), (cx + w / 2.0, y0)];
-    let a0 = libm::acos((r - w / 2.0) / r); // where each arc meets the middle
+    let a0 = artkit::math::acos((r - w / 2.0) / r); // where each arc meets the middle
     for k in 0..5 {
         // up the right side from the spring to the apex
         let a = a0 * k as f64 / 5.0;
