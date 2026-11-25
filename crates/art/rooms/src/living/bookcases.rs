@@ -685,7 +685,7 @@ pub fn display_cabinet() -> Vec<Obj> {
     swing!(
         door,
         "door_open",
-        -100.0,
+        100.0,
         seconds = 1.0,
         ease = Ease::BackOut
     );

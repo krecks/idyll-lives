@@ -128,8 +128,8 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
   (it has no back).
 - **Display cabinet**: walnut, solid sides, a pale back, glass-look shelves (plain `gloss`, so the door is its only
   glass), ornaments; a brass-framed glass door with a brass knob, a node of its own (`door`, its origin on the hinge
-  at its left, `DOOR_HINGE`) with no clip yet: the (+use) swing needs only `swing!(door, "door_open", ..)` and a use.
-  Still, it counts 3 draws; with a clip the door's brass and glass draw on their own (4).
+  at its left, `DOOR_HINGE`), swinging +100° to the front (`door_open`); with the clip the door's brass and glass
+  draw on their own (4 draws).
 - Plants on the shelves are plain satin spheres, not `foliage`, so they cost no draw; the cube shelf's bins are
   `fabric` (its second draw), the ladder shelf's basket too.
 
