@@ -23,8 +23,9 @@ Every model has a `<id>.far.glb` for the town overview (the menus' town, the new
     grille, vents or levers (1,556). Decimated, it lost its lowest lug vertices and floated 1.7 cm;
   - the round bale: a coarser roll, one dark ring on each end, flat twine bands (396). Decimated, the twine
     turned to shards;
-  - the hay stack: three plain bales and their twine (108);
-  - the trough: plain sides and rim, no corrugations, the feed pipe and tap (288). Decimated, the corrugations made spikes;
+  - the hay stack: three plain bales and their twine (396);
+  - the trough: plain sides and rim, no corrugations, the feed pipe and tap (288). Decimated, the corrugations made
+    spikes;
   - the coop: house, roof, legs, one-piece ramp, trims, the hatch up over the dark pop hole, the windows as dark
     panels in frames, the nest box (264). Decimated, its legs and ramp went to spikes.
   Each reaches as far as its model, so `settle` stands it where the model stands (the hopper, the weights, the
@@ -60,8 +61,11 @@ draws as they were.
   (`hay_dark`), three bands of twine with two tied ends hanging, wisps of straw on its top and ends. 1.2 m across and
   1.2 m long, up to an adult's chest, on 2 × 2 tiles (2026-10-21; it was 0.99 m on one, waist-high); `town.ts`
   `farmstead` places it on the fallow field by its footprint.
-- **Hay stack**: three square bales, two side by side and one on top turned 3°, each pressed in nine uneven flakes, a
-  little proud of each other, tied twice with round twine, the cut ends darker, straw on top.
+- **Hay stack**: three square bales, two side by side and one half as deep on top across the back, turned 3°, each
+  pressed in nine uneven flakes, a little proud of each other, tied twice with round twine, the cut ends darker, straw
+  on top. The content's two slots sit on the bottom bales' tops (0.45 m, `STACK_SEAT`) at x = ±0.5, 0.25 m forward,
+  in front of the top bale, their backs to it (2026-11-25; the top bale covered the whole depth, and sitters sank
+  15–18 cm into it).
 - **Scarecrow**: a rough, slightly crooked post and a cross-bar in a plaid shirt (a body rounded in section, sleeves
   bagging round the bar, the check lines following its front, buttons, a pocket, a collar and cuffs) and patched,
   hemmed trousers. A rope belt knotted in front with its ends hanging. Straw pokes out at the hands, ankles, waist
@@ -108,7 +112,7 @@ The table says Paint, Roof. The barn, silo and coop take those with their real m
 | `model.farm.silo` | 2.80 × 6.90 × 2.72 m | 9,396 | 632 | 1 |
 | `model.farm.tractor` | 1.62 × 2.51 × 3.30 m | 9,688 | 1,556 | 1 |
 | `model.farm.hayBale` | 1.23 × 1.23 × 1.23 m | 3,168 | 396 | 2 (hay fabric + plain) |
-| `model.farm.hayStack` | 1.91 × 0.93 × 0.90 m | 3,588 | 108 | 2 |
+| `model.farm.hayStack` | 1.91 × 0.93 × 0.88 m | 3,588 | 396 | 2 |
 | `model.farm.scarecrow` | 1.00 × 2.12 × 0.55 m | 4,034 | 999 | 3 (post wood, clothes fabric, plain) |
 | `model.farm.trough` | 1.88 × 0.66 × 0.75 m | 2,700 | 288 | 1 |
 | `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 2,624 | 264 | 3 (walls wood + plain, the hatch) |

@@ -575,8 +575,9 @@ fn a_frame(prefix: &str, beam_y: f64, material: Mat, round_legs: bool, spread: f
     }
 }
 
-// The seat hung 5 cm lower than it was: the cushion's top at 0.515 m (content `seat` 0.50, sunk in it).
+// The seat hung 5 cm lower than it was; the cushion's top is the content's `seat` height.
 const PORCH_DROP: f64 = 0.05;
+pub(super) const PORCH_SEAT: f64 = 0.52;
 
 pub fn porch_swing() -> Vec<Obj> {
     let frame = new_parts(|| a_frame("", 2.0, M.porch_frame, false, 0.42));
@@ -735,9 +736,9 @@ pub fn porch_swing() -> Vec<Obj> {
             F,
             "cushion",
             1.28,
-            0.065,
+            0.08,
             0.42,
-            (0, 0.5225 - d, 0.05),
+            (0, PORCH_SEAT - 0.04, 0.05),
             M.porch_cushion,
             round = 0.03,
             puff = 0.01,

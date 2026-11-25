@@ -84,6 +84,35 @@ pub fn family() -> Option<Family> {
 #[cfg(test)]
 mod tests {
     use artkit::family::{Far, make, make_far};
+    use artkit::json::Json;
+
+    /// The hay stack's seat is the one the content names: its two slots spread across the width (x = ±0.5), in
+    /// front of the top bale.
+    #[test]
+    fn content_facts() {
+        let o = crate::content_object("community.json", "farm.hayStack");
+        let seat = o.get("seat").expect("a seat");
+        let (height, forward) = super::hay::STACK_SEAT;
+        assert_eq!(
+            seat.get("height").and_then(Json::num),
+            Some(height),
+            "hayStack: seat moved"
+        );
+        assert_eq!(
+            seat.get("forward").and_then(Json::num),
+            Some(forward),
+            "hayStack: seat moved"
+        );
+        assert_eq!(
+            o.get("slots").and_then(Json::num),
+            Some(2.0),
+            "hayStack: slots moved"
+        );
+        assert!(
+            o.get("places").is_none(),
+            "hayStack: places now name the seats"
+        );
+    }
 
     /// A far version built by hand stands where its model stands. Each is settled (centred on its own box) as
     /// one part whose origin is its build's first part's, the same in both, so their places after settle agree

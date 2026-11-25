@@ -116,3 +116,23 @@ pub fn family() -> Option<Family> {
          sway with whoever is on them, and the hot tub's cover folds back for a soak.",
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use artkit::json::Json;
+
+    /// The porch swing's cushion top is the content's seat height.
+    #[test]
+    fn content_facts() {
+        let o = crate::content_object("catalog2/outdoor.json", "porchSwing");
+        let height = o
+            .get("seat")
+            .and_then(|s| s.get("height"))
+            .and_then(Json::num);
+        assert_eq!(
+            height,
+            Some(super::leisure::PORCH_SEAT),
+            "porchSwing: seat moved"
+        );
+    }
+}

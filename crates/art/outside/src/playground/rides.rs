@@ -12,10 +12,11 @@ use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, rod, settle, soft, torus};
 
-// A 3 m plank on an A-frame stand. The content's two slots sit at x = ±0.75 m (3 m wide, 2 slots), at the
-// seat height 0.56 m: the seats are there, level at rest. The plank, its seats and handles are one part
+// A 3 m plank on an A-frame stand. The content's two places are at x = ±0.78 m (`SEAT_X`), at the seat height
+// 0.56 m: the seats are there, level at rest, the handles 0.28 m in from them. The plank, its seats and handles are one part
 // turning about the axle (0.46 m up), so the riders go up and down with it.
 const AXLE: f64 = 0.46;
+pub(super) const SEAT_X: f64 = 0.78;
 
 pub fn seesaw() -> Vec<Obj> {
     let still = new_parts(|| {
@@ -168,7 +169,7 @@ pub fn seesaw() -> Vec<Obj> {
                 0.34,
                 0.04,
                 0.28,
-                (sf * 0.75, 0.532, 0),
+                (sf * SEAT_X, 0.532, 0),
                 M.seat,
                 round = 0.018,
                 puff = 0.008,
@@ -178,10 +179,10 @@ pub fn seesaw() -> Vec<Obj> {
                 F,
                 format!("seat_lip{s}"),
                 &[
-                    (sf * 0.92, 0.535, -0.12),
-                    (sf * 0.94, 0.6, -0.1),
-                    (sf * 0.94, 0.6, 0.1),
-                    (sf * 0.92, 0.535, 0.12)
+                    (sf * (SEAT_X + 0.17), 0.535, -0.12),
+                    (sf * (SEAT_X + 0.19), 0.6, -0.1),
+                    (sf * (SEAT_X + 0.19), 0.6, 0.1),
+                    (sf * (SEAT_X + 0.17), 0.535, 0.12)
                 ],
                 0.02,
                 M.seat,
@@ -204,10 +205,10 @@ pub fn seesaw() -> Vec<Obj> {
                 format!("handle{s}"),
                 &kit::fillet!(
                     &[
-                        (sf * 0.47, 0.49, -0.135),
-                        (sf * 0.47, 0.82, -0.135),
-                        (sf * 0.47, 0.82, 0.135),
-                        (sf * 0.47, 0.49, 0.135)
+                        (sf * (SEAT_X - 0.28), 0.49, -0.135),
+                        (sf * (SEAT_X - 0.28), 0.82, -0.135),
+                        (sf * (SEAT_X - 0.28), 0.82, 0.135),
+                        (sf * (SEAT_X - 0.28), 0.49, 0.135)
                     ],
                     0.035
                 ),
@@ -223,7 +224,7 @@ pub fn seesaw() -> Vec<Obj> {
                     0.08,
                     0.06,
                     0.008,
-                    (sf * 0.47, 0.49, zf * 0.128),
+                    (sf * (SEAT_X - 0.28), 0.49, zf * 0.128),
                     M.steel,
                     bevel = 0.002,
                     bevel_segments = 1
@@ -231,7 +232,10 @@ pub fn seesaw() -> Vec<Obj> {
                 fsweep!(
                     F,
                     format!("grip{s}{z}"),
-                    &[(sf * 0.47, 0.82, zf * 0.035), (sf * 0.47, 0.82, zf * 0.1)],
+                    &[
+                        (sf * (SEAT_X - 0.28), 0.82, zf * 0.035),
+                        (sf * (SEAT_X - 0.28), 0.82, zf * 0.1)
+                    ],
                     0.026,
                     M.rubber,
                     verts = 10

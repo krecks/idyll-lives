@@ -31,3 +31,23 @@ pub fn families() -> Vec<(&'static str, Option<Family>)> {
         ("water_edge", water_edge::family()),
     ]
 }
+
+/// A content object by its id, from `file` under web/public/content: for the families' content-facts tests.
+#[cfg(test)]
+fn content_object(file: &str, id: &str) -> artkit::json::Json {
+    use artkit::json::{Json, loads};
+    let path = format!(
+        "{}/../../../web/public/content/{file}",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let content = loads(&text).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let Some(Json::Arr(objects)) = content.get("objects") else {
+        panic!("{file}: no objects")
+    };
+    objects
+        .iter()
+        .find(|o| o.get("id").and_then(Json::str) == Some(id))
+        .unwrap_or_else(|| panic!("{id} in {file}"))
+        .clone()
+}
