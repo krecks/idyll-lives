@@ -122,8 +122,9 @@ const FILES: [(&str, &str); 13] = [
 ];
 
 /// Files earlier versions wrote that are no longer used (they would be copied into the build).
-const OBSOLETE: [&str; 14] = [
+const OBSOLETE: [&str; 15] = [
     "misaki-LICENSE",
+    "en-us.lex.stamp",
     "pocket-en-2026-04",
     "presets-2.pcm",
     "presets-2.json",
@@ -145,6 +146,10 @@ const LEXICON_LICENSE: (&str, &str, &str) = (
     "misaki-LICENSE.txt",
     "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
 );
+
+/// The dictionary's SHA-256, unpacked (gzip's bytes may differ from build to build, the text doesn't).
+/// The browser checks its size (`web/src/voice/tts.worker.ts`): change it there too.
+const LEXICON_SHA256: &str = "7d33f53aed4e1d6946ab726cda27cef897bbeb17911cbf70e01b63d5b581206b";
 
 const LEXICON: [(&str, &str); 2] = [
     (
@@ -265,13 +270,8 @@ fn run() -> Result<(), String> {
 /// short and the engine has no tagger). Named `.lexz`, not `.gz`: servers send `.gz` files with
 /// `Content-Encoding: gzip`, and the browser would unpack them on its own.
 fn lexicon(agent: &ureq::Agent, out: &Path) -> Result<(), String> {
-    let stamp: Vec<String> = LEXICON
-        .iter()
-        .map(|(_, sha)| sha[..12].to_string())
-        .collect();
-    let stamp = stamp.join(" ");
-    let stamp_path = out.join("en-us.lex.stamp");
-    if std::fs::read_to_string(&stamp_path).is_ok_and(|s| s == stamp) {
+    let path = out.join("en-us.lexz");
+    if download::file_sha256(&path, true).as_deref() == Some(LEXICON_SHA256) {
         return Ok(());
     }
     println!("voice: building en-us.lexz");
@@ -297,8 +297,13 @@ fn lexicon(agent: &ureq::Agent, out: &Path) -> Result<(), String> {
     }
     let lines: Vec<String> = words.iter().map(|(w, p)| format!("{w}\t{p}")).collect();
     let text = format!("{}\n", lines.join("\n"));
-    download::write(&out.join("en-us.lexz"), &gzip9(text.as_bytes())?)?;
-    download::write(&stamp_path, stamp.as_bytes())?;
+    let actual = sha256_hex(text.as_bytes());
+    if actual != LEXICON_SHA256 {
+        return Err(format!(
+            "en-us.lexz: SHA-256 {actual}, expected {LEXICON_SHA256}"
+        ));
+    }
+    download::write(&path, &gzip9(text.as_bytes())?)?;
     println!("voice: {} words", lines.len());
     Ok(())
 }
