@@ -1,7 +1,7 @@
 //! Numbers to English words (what Misaki gets from `num2words`), for the cases game lines use:
 //! cardinals, ordinals, years and simple decimals.
 
-const ONES: [&str; 20] = [
+pub const ONES: [&str; 20] = [
     "zero",
     "one",
     "two",

@@ -4,7 +4,7 @@
 //! the clip's voiced span, and pauses (commas, sentence ends) are moved onto the quiet gaps the
 //! model actually left. A 100 Hz loudness envelope goes along, for how wide the mouth opens.
 //!
-//! All of it runs on the final samples (trimmed and resampled, see [`crate::ModelInputs::finish`]),
+//! All of it runs on the final samples (trimmed and resampled, see [`crate::LineInputs::finish`]),
 //! so the times are the clip's own.
 
 /// The visemes in index order (Oculus/Meta's set).
