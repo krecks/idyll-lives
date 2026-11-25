@@ -85,11 +85,13 @@ pub(crate) fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
             }
             2 => {
                 let len = varint(buf, &mut at)? as usize;
-                if at + len > buf.len() {
-                    return Err("protobuf: truncated bytes field".into());
-                }
-                let p = &buf[at..at + len];
-                at += len;
+                // `at + len` overflows for a length near `u64::MAX`: checked, it is a short buffer.
+                let end = at
+                    .checked_add(len)
+                    .filter(|&end| end <= buf.len())
+                    .ok_or("protobuf: truncated bytes field")?;
+                let p = &buf[at..end];
+                at = end;
                 (0, p)
             }
             other => return Err(format!("protobuf: wire type {other} not supported")),
@@ -365,6 +367,14 @@ mod tests {
         let bytes = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f];
         let mut at = 0;
         assert!(varint(&bytes, &mut at).is_err(), "an error, not a panic");
+    }
+
+    #[test]
+    fn a_length_past_the_buffer_is_refused() {
+        // Field 2, wire type 2, then a length of `u64::MAX`: `at + len` would wrap.
+        let mut bytes = vec![0x12];
+        bytes.extend_from_slice(&encode_varint(u64::MAX));
+        assert!(fields(&bytes).is_err(), "an error, not a panic");
     }
 
     /// A graph with one initializer of `n` float32 values called `w`, and one node.
