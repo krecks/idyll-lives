@@ -3354,11 +3354,11 @@
         "dressed": true,
         "size": [
           1.54,
-          0.42
+          0.5
         ],
         "at": [
           0,
-          0.24
+          0.2
         ]
       },
       "interactions": [
