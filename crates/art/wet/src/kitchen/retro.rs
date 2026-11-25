@@ -54,6 +54,18 @@ pub fn fridge_retro() -> Vec<Obj> {
         cut_shell(shell, cavity);
         soft(shell);
         cavity.remove();
+        // a breaker strip lining the opening's mouth: the cut's rim, where the shell's front rounds back, is eased
+        fextrude!(
+            fr,
+            "breaker",
+            &rounded_rect(0.62, 1.42, 0.003, 1),
+            0.04,
+            (0, 0.85, 0.259),
+            M.liner,
+            holes = [rounded_rect(0.586, 1.386, 0.003, 1)],
+            bevel = 0.003,
+            bevel_segments = 1
+        );
         // chrome hinges on the door's hinge side
         for y in [0.2, 1.47] {
             fcyl!(

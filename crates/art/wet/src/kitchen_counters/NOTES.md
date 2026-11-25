@@ -217,3 +217,13 @@ cargo art kitchen_counters --preview  # previews/kitchen_counters/<id>.png, <id>
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `recyclingBins`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+No hard edge shows unbevelled any more (50 → 0). The worktop's ends and back top edge are eased 1.5 mm (a run's tops
+still meet in a hairline, no groove), the bar's top and foot rail ends the same, the bar end's waterfall bevelled, the
+cooker hood's canopy drops 4 mm at 45° to the wall and its rim is eased onto the slope, the recycling bins' rims are
+eased and the cans' lids too. The glazed and the corner wall cabinets' pulls stand 2.3 cm off the doors (0.40 m deep, a
+wall cabinet's). The corner counter is a corner unit in docs/review/reference.json (as deep as the run it turns into),
+the butcher block an island (it stands on legs, free); the corner counter's crock of utensils stands to 1.26 m, over a
+base unit's height (reported).

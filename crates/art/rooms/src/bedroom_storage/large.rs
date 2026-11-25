@@ -819,33 +819,44 @@ pub fn wardrobe_single() -> Vec<Obj> {
 
 // --- the armoire: mahogany, a cornice, raised-panel doors with brass knobs, on bun feet -------------------
 /// A crown moulding round the front and sides at height `y` (its bottom), its path `x` either side and at game depth
-/// `front`: a cove rising and swelling out `out` to a flat top. Its back edge reaches only 1 cm in from the path,
-/// inside the path's 1.2 cm corners: reaching farther, it folded back on itself round each front corner (faces
-/// turned inside out).
+/// `front`: a cove rising and swelling out `out` to a flat top, its top's corners eased and its ends (on the wall's
+/// face) chamfered. Its back edge reaches only 1 cm in from the path, inside the path's 1.2 cm corners: reaching
+/// farther, it folded back on itself round each front corner (faces turned inside out).
 #[allow(clippy::too_many_arguments)]
 fn crown(name: &str, x: f64, front_z: f64, back: f64, y: f64, material: Mat, h: f64, out: f64) {
-    let prof = [
+    // the cove as drawn for the 6.9 cm crown that reaches 5 cm, scaled to this one
+    let (ku, kv) = (h / 0.069, out / 0.05);
+    let mut prof: Vec<(f64, f64)> = [
         (0.0, 0.0),
         (0.0, -0.006),
         (0.012, -0.012),
         (0.024, -0.02),
         (0.036, -0.032),
         (0.046, -0.044),
-        (0.054, -out),
-        (h, -out),
-        (h, 0.01),
-        (0.0, 0.01),
-    ];
-    let path = kit::fillet(
-        &[
-            (-x, y, back),
-            (-x, y, front_z),
-            (x, y, front_z),
-            (x, y, back),
-        ],
-        0.012,
+        (0.054, -0.05),
+    ]
+    .iter()
+    .map(|&(u, v)| (u * ku, v * kv))
+    .collect();
+    prof.extend([(h, -out), (h, 0.01), (0.0, 0.01)]);
+    // swept about its middle (`c`), so the rings at its ends can shrink into it: a chamfer
+    let c = (h / 2.0, (0.01 - out) / 2.0);
+    let centred: Vec<(f64, f64)> = prof.iter().map(|&(u, v)| (v - c.1, u - c.0)).collect();
+    // (eased with height as its v: what it leaves sharp is its bottom, on the cornice)
+    let prof: Vec<(f64, f64)> = crate::common::eased(&centred, 0.004)
+        .iter()
+        .map(|&(v, u)| (u, v))
+        .collect();
+    let (x, front_z, y) = (x - c.1, front_z - c.1, y + c.0); // the path through its middle, out by -c.1
+    let (z0, z1) = (back, back + 0.004);
+    let mut path = vec![(-x, y, z0)];
+    path.extend(kit::fillet(
+        &[(-x, y, z1), (-x, y, front_z), (x, y, front_z), (x, y, z1)],
+        0.012 - c.1,
         2,
-    );
+    ));
+    path.push((x, y, z0));
+    let end = 1.0 - 0.004 / (h / 2.0).min((0.01 + out) / 2.0); // each end's ring 4 mm in all round
     fsweep!(
         F,
         name,
@@ -854,7 +865,8 @@ fn crown(name: &str, x: f64, front_z: f64, back: f64, y: f64, material: Mat, h: 
         material,
         profile = prof,
         up = (0, 0, 1),
-        angle = 30
+        angle = 30,
+        scale = artkit::forms::by(move |w| if w <= 0.0 || w >= 1.0 { end } else { 1.0 })
     );
 }
 

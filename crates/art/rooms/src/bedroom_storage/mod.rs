@@ -49,10 +49,10 @@ pub fn family() -> Family {
             Model::new(
                 "nightstandRound",
                 small::nightstand_round,
-                (0.54, 0.57, 0.56),
+                (0.54, 0.57, 0.549),
             )
             .key("model.nightstandRound")
-            .centre(0.0, -0.0498)
+            .centre(0.0, -0.0555)
             .paint(&[("clay", "Body"), ("brass", "Handles")]),
             Model::new(
                 "nightstandDrawers",

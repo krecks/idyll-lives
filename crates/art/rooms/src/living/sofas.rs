@@ -2,13 +2,16 @@
 //! in place. Two nodes: the sofa (upholstery, frame, back cushions, pillows, legs) and its seat cushions (`seat`,
 //! origin on their underside), which `sink_in` squashes 2 cm while it's sat or dozed on.
 
-use super::common::{Cushion, cushion, leg, panel, pillow, plain, seat, settled, taper_leg};
+use super::common::{
+    Cushion, cabriole, cushion, leg, listed, panel, pillow, plain, seat, settled, swept, taper_leg,
+};
 use super::{F, M};
-use artkit::forms::rounded_rect;
+use crate::common::eased_prism;
+use artkit::forms::{catmull, rounded_rect};
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, TAU, cos, exp, pow, radians, sin};
+use artkit::math::{P3, PI, TAU, V3, cos, exp, pow, radians, sin};
 use artkit::parts::{join, new_parts};
 use artkit::py;
 use artkit::scene::Obj;
@@ -252,21 +255,17 @@ pub fn sofa_classic() -> Vec<Obj> {
         for i in 0..7 {
             let u = (f64::from(i) + 0.5) / 7.0;
             let (x, t) = (-0.84 + 1.68 * u, hump(u));
-            fsweep!(
-                F,
-                format!("channel{i}"),
-                &[
+            channel(
+                &format!("channel{i}"),
+                [
                     (x, 0.33, -0.27),
                     (x, (0.33 + t) / 2.0, -0.3),
-                    (x, t - 0.07, -0.325),
-                    (x, t - 0.04, -0.36)
+                    (x, t - 0.09, -0.32),
+                    (x, t - 0.035, -0.37),
                 ],
-                0.0,
+                (0.236, 0.15, 0.065, 2),
+                &[1.0, 1.03, 1.0, 0.85],
                 M.linen,
-                profile = rounded_rect(0.236, 0.15, 0.065, 2),
-                up = (1, 0, 0),
-                resolution = 2,
-                scale = [1.0, 1.03, 1.0, 0.85]
             );
         }
         // the show-wood rail along the hump: one moulded piece
@@ -297,14 +296,15 @@ pub fn sofa_classic() -> Vec<Obj> {
                 (0.6 + 0.1 * sin(a), sf * (0.1 * cos(a)))
             }));
             section.push((0.5, sf * -0.085)); // (height, x out)
-            fsweep!(
-                F,
-                format!("arm{s}"),
-                &[(ax, 0, -0.39), (ax, 0, 0.32)],
-                0.0,
+            eased_prism(
+                &F,
+                &format!("arm{s}"),
+                &section,
+                ax,
+                -0.39,
+                0.32,
+                0.004,
                 M.linen,
-                profile = section,
-                angle = 50
             );
             fcyl!(
                 F,
@@ -374,15 +374,15 @@ pub fn sofa_classic() -> Vec<Obj> {
         for x in [-0.82, 0.82] {
             for (z, dz) in [(0.33, 1.0), (-0.38, -1.0)] {
                 let sx = if x > 0.0 { 1.0 } else { -1.0 };
-                kit::cabriole!(
-                    F,
-                    format!("leg{}{}", float_repr(x), float_repr(z)),
+                cabriole(
+                    &format!("leg{}{}", float_repr(x), float_repr(z)),
                     x,
                     z,
                     0.18,
                     M.walnut_legs,
                     0.025 * sx,
-                    0.02 * dz
+                    0.02 * dz,
+                    0.024,
                 );
             }
         }
@@ -406,6 +406,36 @@ pub fn sofa_classic() -> Vec<Obj> {
         0.44
     };
     settled(seat(cushions, 0.34, 0.033))
+}
+
+/// A stuffed channel of a back: a rounded rectangle (w across, d thick, corners r in `segs` steps) swept up from the deck through
+/// `given` (game) and rolled back (no tighter than its thickness: inside, it would fold), thickening by `list`
+/// along it, its end chamfered 4 mm.
+pub(super) fn channel(
+    name: &str,
+    given: [(f64, f64, f64); 4],
+    (w, d, r, segs): (f64, f64, f64, usize),
+    list: &[f64],
+    mat: Mat,
+) -> Obj {
+    let (mut pts, wher) = catmull(&given.map(|(x, y, z)| V3::from(F.at(x, y, z))), 2, false);
+    let mut scales: Vec<f64> = wher.iter().map(|&w| listed(list, w)).collect();
+    // the last ring 4 mm on, shrunk 4 mm on its thinner side
+    let (end, k) = (pts[pts.len() - 1], scales[scales.len() - 1]);
+    pts.push(end + (end - pts[pts.len() - 2]).normalized() * 0.004);
+    scales.push(k * (1.0 - 0.004 / (d / 2.0 * k)));
+    let profile = rounded_rect(w, d, r, segs);
+    // stuffed, it shades round over its corners' steps
+    swept(
+        name,
+        &pts,
+        &profile,
+        &scales,
+        V3::from((1, 0, 0)),
+        60.0,
+        0.0,
+        mat,
+    )
 }
 
 /// The camel back's top at `u` across (0 to 1).
@@ -483,6 +513,7 @@ pub fn box_sofa(
                 Cushion {
                     rot: P3::from((-9, 0, 0)),
                     puff: 0.03,
+                    flat: Some(3), // its crown within 3 mm (a pixel at the play camera)
                     ..Cushion::default()
                 },
             );
@@ -676,15 +707,7 @@ pub fn rolled_arm(
         (cy + r * sin(a), s * (lean + r * cos(a)))
     }));
     section.push((cy - r * 1.4, s * inner)); // (height, x out)
-    fsweep!(
-        F,
-        name,
-        &[(ax, 0, z0), (ax, 0, z1)],
-        0.0,
-        mat,
-        profile = &section,
-        angle = 50
-    );
+    eased_prism(&F, name, &section, ax, z0, z1, 0.004, mat);
     // a welt round the scroll of its front face, a little in from its edge, running down its outer side
     let mut pts = vec![(ax + s * (lean + r * 0.92) * 0.97, y0 + 0.03, z1 - 0.002)];
     pts.extend(

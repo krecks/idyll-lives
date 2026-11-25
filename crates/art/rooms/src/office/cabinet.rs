@@ -101,8 +101,9 @@ pub(super) fn leaves(
             material,
             profile = [(0.0, -0.016), (0.003, 0.0), (0.0, 0.016), (-0.0015, 0.0)],
             up = (0, 0, 1),
+            angle = 180.0, // a leaf: thin, its margins shade round
             resolution = 2,
-            scale = [0.4, 1.0, 0.8, 0.15]
+            scale = [0.5, 1.0, 0.75, 0.3]
         );
     }
 }

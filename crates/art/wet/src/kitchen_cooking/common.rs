@@ -140,7 +140,7 @@ pub fn burner(f: &GameFrame, name: &str, x: f64, z: f64, y: f64, r: f64) {
         &ring,
         0.005,
         M.grate,
-        verts = 4,
+        verts = 6,
         closed = true
     );
     for i in 0..4 {
@@ -156,7 +156,7 @@ pub fn burner(f: &GameFrame, name: &str, x: f64, z: f64, y: f64, r: f64) {
             ],
             0.005,
             M.grate,
-            verts = 4
+            verts = 6
         );
     }
 }

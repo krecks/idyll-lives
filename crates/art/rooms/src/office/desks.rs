@@ -20,7 +20,7 @@ use artkit::{
 // --- the desks with their own chair: a top at the front of the tile, a frame, the chair behind -----------------
 pub fn computer_desk() -> Vec<Obj> {
     let still = new_parts(|| {
-        top(1.54, 0.38, 0.26, M.oak, FT);
+        top(1.54, 0.5, 0.2, M.oak, FT); // 0.5 deep: over the knees of the resident sitting at it
         // the sides: a sled frame each, bent from one square tube round its foot, legs and top rail
         let sq = rounded_rect(0.04, 0.04, 0.007, 1);
         for s in [-1, 1] {
@@ -133,7 +133,7 @@ pub fn computer_desk() -> Vec<Obj> {
     });
     join!(&still, "computerDesk", origin = (0, 0, 0));
     // the monitor on it, facing the resident, the mug, lamp, cactus, notebook and pen, and the chair drawn at
-    // it: not part of the desk's size (the monitor stands 1.21 m up, the desk's own top 0.75)
+    // it: not part of the desk's size (the monitor stands 1.2 m up, the desk's own top 0.75)
     let carried = new_parts(|| {
         monitor(
             "monitor",
@@ -141,7 +141,7 @@ pub fn computer_desk() -> Vec<Obj> {
             0.4,
             0.62,
             0.37,
-            1.03,
+            1.02,
             M.monitor,
             M.screen,
             Some(M.wallpaper),
@@ -229,13 +229,13 @@ pub fn computer_desk() -> Vec<Obj> {
     });
     let tray = join(&parts, "tray", None);
     settle!(centre = false);
-    slide!(tray, "tray_out", (0, 0.15, 0), seconds = 0.6);
+    slide!(tray, "tray_out", (0, 0.2, 0), seconds = 0.6);
     meshes()
 }
 
 pub fn desk_writing() -> Vec<Obj> {
     let still = new_parts(|| {
-        top(1.54, 0.42, 0.24, M.oak, FT);
+        top(1.54, 0.5, 0.2, M.oak, FT); // 0.5 deep: over the knees of the resident sitting at it
         desk_frame(1.54, None, Some((-0.1, 0.4)), None);
         fbox!(
             F,

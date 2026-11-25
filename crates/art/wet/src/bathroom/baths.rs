@@ -26,12 +26,14 @@ use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, py, soft};
 pub fn bathtub() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let (rim, floor_y) = (0.58, 0.15);
-    let sections: [Section; 8] = [
+    let sections: [Section; 10] = [
         (0.70, 0.24, 0.12, 3.0),
         (0.79, 0.33, 0.48, 4.0), // the tub's outside, behind the panels
         (0.91, 0.43, 0.50, 10.0),
-        (0.91, 0.43, rim, 10.0), // the deck's edge
-        (0.77, 0.29, rim, 4.0),
+        (0.91, 0.43, rim - 0.004, 10.0), // the deck's edge, eased
+        (0.906, 0.426, rim, 10.0),
+        (0.774, 0.294, rim, 4.0),
+        (0.769, 0.289, rim - 0.003, 4.0),
         (0.765, 0.285, rim - 0.012, 4.0), // the deck, and the inside's lip
         (0.71, 0.25, 0.25, 3.5),
         (0.66, 0.2, floor_y, 3.0), // down the inside to the floor
@@ -89,6 +91,7 @@ pub fn bathtub() -> Vec<Obj> {
                 (rim + 0.08, 0.022, 0.022),
                 (rim + 0.095, 0.026, 0.026),
                 (rim + 0.11, 0.02, 0.02),
+                (rim + 0.113, 0.016, 0.016), // its top eased
             ],
             M.chrome,
             Lathe { verts: 14, ..LATHE },
@@ -406,7 +409,7 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
                 (rim - 0.24, -0.424),
             ],
             M.towel,
-            0.012,
+            0.009, // a terry towel's one layer: its cut end too thin to show an edge
         );
     });
     let (floor_ring, top) = rings.unwrap();
@@ -430,12 +433,13 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
 pub fn bathtub_freestanding() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let (rim, floor_y) = (0.58, 0.15);
-    let sections: [Section; 10] = [
+    let sections: [Section; 11] = [
         (0.66, 0.27, 0.0, 2.2),
         (0.7, 0.3, 0.03, 2.2),
         (0.86, 0.395, 0.45, 2.3), // the outside
         (0.895, 0.41, 0.56, 2.3),
-        (0.885, 0.405, rim, 2.3), // the rim
+        (0.889, 0.4075, rim - 0.006, 2.3), // the rim, rolled
+        (0.882, 0.4035, rim, 2.3),
         (0.85, 0.372, rim, 2.3),
         (0.832, 0.356, rim - 0.025, 2.3),
         (0.77, 0.315, 0.35, 2.25),
@@ -548,7 +552,7 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
                 (rim - 0.22, -0.41),
             ],
             M.towel,
-            0.012,
+            0.009, // a terry towel's one layer: its cut end too thin to show an edge
         );
     });
     let (floor_ring, top) = rings.unwrap();

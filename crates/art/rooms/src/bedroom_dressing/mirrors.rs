@@ -417,7 +417,7 @@ pub fn dressing_table() -> Vec<Obj> {
         // the oval mirror on a brass stand at the far edge, facing the seat
         frame_loop(
             "ring",
-            &ellipse(0.29, 0.35, 48),
+            &ellipse(0.29, 0.35, 36),
             &moulding(0.035, 0.03),
             (0, OVAL_Y, OVAL_Z),
             M.table_frame,
@@ -712,28 +712,37 @@ pub fn mirror_wall() -> Vec<Obj> {
     );
     // the ledge under it: a tray with a rolled lip, on two bent brackets; a cup, a toothbrush and the toothpaste
     let shelf_y = 0.972;
-    let tray = [
-        (0.0, -0.0425),
-        (0.0, 0.045),
-        (0.006, 0.0472),
-        (0.022, 0.0468),
-        (0.026, 0.0428),
-        (0.024, 0.0388),
-        (0.012, 0.0398),
-        (0.012, -0.0425),
-    ];
-    let profile: Vec<(f64, f64)> = tray.iter().map(|&(u, v)| (u, -v)).collect();
-    fsweep!(
-        F,
+    // its section (depth out from the wall's face less 4.25 cm, height): from the floor's front, round the lip,
+    // along the tray's top to the back; its corners eased (with height as eased's v: the underside's stay sharp)
+    let tray: Vec<(f64, f64)> = crate::common::eased(
+        &[
+            (0.045, 0.0),
+            (0.0472, 0.006),
+            (0.0468, 0.022),
+            (0.0428, 0.026),
+            (0.0388, 0.024),
+            (0.0398, 0.012),
+            (-0.0425, 0.012),
+            (-0.0425, 0.0),
+        ],
+        0.003,
+    );
+    // lofted along x, its ends chamfered 2 mm (its lip is too thin for more)
+    let ring = |o: &[(f64, f64)], x: f64| -> Vec<P3> {
+        o.iter()
+            .map(|&(v, u)| F.at(x, shelf_y - 0.006 + u, WALL + 0.0425 + v))
+            .collect()
+    };
+    let end = crate::common::inset(&tray, 0.002);
+    loft!(
         "shelf",
         &[
-            (-0.26, shelf_y - 0.006, WALL + 0.0425),
-            (0.26, shelf_y - 0.006, WALL + 0.0425)
+            ring(&end, -0.26),
+            ring(&tray, -0.258),
+            ring(&tray, 0.258),
+            ring(&end, 0.26)
         ],
-        0,
-        M.wall_frame,
-        profile = profile,
-        up = (0, 0, 1),
+        material = M.wall_frame,
         angle = 35
     );
     for s in [-1, 1] {

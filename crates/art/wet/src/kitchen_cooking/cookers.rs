@@ -188,7 +188,7 @@ pub fn stove_gas() -> Vec<Obj> {
         // a stock pot on the back left pan support; the front left burner is the cook's (the flame lights under their
         // pan) and the two on the right are left free, for what they set down (the frying pan that stood there made
         // three pans of it while they cooked)
-        stock_pot(f, "pot", -0.26, 0.891, -0.30, 0.13, 0.18, M.pot);
+        stock_pot(f, "pot", -0.26, 0.891, -0.30, 0.13, 0.16, M.pot);
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let door = oven_door(f, "oven_door", 0.0, 0.88, 0.42, 0.17, 0.17, 0.50, 0.0345);
@@ -240,7 +240,8 @@ pub fn wall_oven() -> Vec<Obj> {
                 0.004 + 0.016 * (1.0 - cos(radians(a))),
             ));
         }
-        cove.extend([(0.07, 0.02), (0.07, -0.01)]);
+        // its top's edges eased, the front's and the one inside, over the cornice
+        cove.extend([(0.066, 0.02), (0.07, 0.016), (0.07, -0.006), (0.066, -0.01)]);
         fsweep!(
             f,
             "cornice_moulding",
@@ -452,9 +453,9 @@ pub fn range_cooker() -> Vec<Obj> {
             ],
             0.0,
             M.towel,
-            profile = rounded_rect(0.17, 0.006, 0.003, 1),
+            profile = rounded_rect(0.17, 0.006, 0.003, 2), // its edges round
             up = (1, 0, 0),
-            resolution = 2,
+            resolution = 4,
             angle = 70.0
         );
         for (k, y) in [0.76, 0.79].into_iter().enumerate() {

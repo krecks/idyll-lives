@@ -5,6 +5,7 @@ use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, cos, radians, sin, sqrt};
+use artkit::mesh::UvWay;
 use artkit::parts::{join, measure};
 use artkit::place::{Coord, GameFrame};
 use artkit::scene::{self, Obj, meshes};
@@ -234,12 +235,12 @@ pub fn runner(name: &str, x: f64, y_top: f64, z: f64, depth: f64, hang: f64, mat
     let (t, rr) = (0.012, 0.035);
     let yc = y_top - t / 2.0;
     let mut pts = vec![(-x, yc - hang, z)];
-    pts.extend((0..91).step_by(15).map(|a| {
+    pts.extend((0..91).step_by(30).map(|a| {
         let a = radians(a as f64);
         (-x + rr - rr * cos(a), yc - rr + rr * sin(a), z)
     }));
     pts.extend([0.5, 0.0, -0.5].map(|k| (-x * k, yc, z)));
-    pts.extend((0..91).step_by(15).map(|a| {
+    pts.extend((0..91).step_by(30).map(|a| {
         let a = radians(a as f64);
         (x - rr + rr * sin(a), yc - rr + rr * cos(a), z)
     }));
@@ -271,21 +272,19 @@ pub fn channel(
     material: Mat,
     dome: bool,
 ) -> Obj {
-    let (verts, rows) = (16, 4);
+    let verts = 16;
     let (bx, by) = (-x, -(z + t / 2.0));
     let hw = w / 2.0;
     let r = if dome { hw } else { 0.06_f64.min(hw * 0.5) };
     let ring = |rx: f64, ry: f64, at_z: f64| {
         ring!(rx, ry, z = at_z, verts = verts, square = 3.0, at = (bx, by))
     };
-    let mut secs: Vec<Vec<P3>> = vec![ring(hw * 0.92, t / 2.0 * 0.5, y0)];
-    for k in 0..=rows {
-        secs.push(ring(
-            hw,
-            t / 2.0,
-            y0 + 0.015 + (y1 - r - y0 - 0.015) * k as f64 / rows as f64,
-        ));
-    }
+    // (its straight run is one span: rings between would be the same ring)
+    let mut secs: Vec<Vec<P3>> = vec![
+        ring(hw * 0.92, t / 2.0 * 0.5, y0),
+        ring(hw, t / 2.0, y0 + 0.015),
+        ring(hw, t / 2.0, y1 - r),
+    ];
     for a in [25.0, 50.0, 70.0, 84.0] {
         let (c, s) = (cos(radians(a)), sin(radians(a)));
         let rx = if dome { hw * c } else { hw - r + r * c };
@@ -296,7 +295,10 @@ pub fn channel(
         ));
     }
     secs.push(ring(if dome { 0.004 } else { hw - r }, t / 2.0 * 0.4, y1));
-    loft!(name, &secs, material = material)
+    let c = loft!(name, &secs, material = material);
+    // laid flat on its face, not round its middle (a flat column's sides would stretch the cloth)
+    c.edit(|p| p.uv = UvWay::Box);
+    c
 }
 
 /// Keys `clip` (`kit::turn_down`): the flap turns over the rest of the duvet, flattened and narrowed to stay inside
@@ -348,7 +350,9 @@ pub fn legs_square(xs: &[f64], zs: &[f64], h: f64, material: Mat, w: f64) {
                 material,
                 verts = 4,
                 rot = (0, 0, 45),
-                smooth = false
+                smooth = false,
+                bevel = 0.004,
+                bevel_segments = 1
             );
         }
     }
@@ -381,7 +385,7 @@ pub fn post(name: &str, x: f64, z: f64, h: f64, w: f64, material: Mat, cap: Cap,
         (x, (y0 + shaft) / 2.0, z),
         material,
         bevel = 0.006,
-        bevel_segments = 1
+        bevel_segments = 2
     );
     fbox!(
         F,

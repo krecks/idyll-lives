@@ -496,7 +496,8 @@ pub fn canopy(name: &str, r: f64, h: f64, material: Mat, segments: usize, y: f64
             (r * 0.82, h * 0.5),
             (r * 0.97, h * 0.72),
             (r, h * 0.85),
-            (r, h),
+            (r, h - 0.003),
+            (r - 0.003, h), // its rim against the ceiling eased
             (0.0, h),
         ],
         material,

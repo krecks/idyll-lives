@@ -446,7 +446,7 @@ pub fn nightstand_round() -> Vec<Obj> {
                 rot = (0, 0, -a)
             );
         }
-        kit::knob!(F, "knob", 0, 0.42, z + 0.255, 0.0185, M.brass);
+        kit::knob!(F, "knob", 0, 0.42, z + 0.255, 0.0125, M.brass); // (2.5 cm: the drum stays a nightstand's depth)
         revolve!(
             "top",
             &[
@@ -920,7 +920,8 @@ fn braid(
         material,
         verts = 4,
         closed = true,
-        scale = scale
+        scale = scale,
+        angle = 100 // a cord is round: its four sides shade so
     );
 }
 

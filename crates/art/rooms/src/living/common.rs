@@ -11,7 +11,7 @@ use artkit::parts::{join, new_parts, settle};
 use artkit::place::{Coord, Facing};
 use artkit::scene::{self, Obj, meshes};
 use artkit::soft::{Puff, Sag, SoftBox};
-use artkit::{fbox, fextrude, fsweep, loft, ring, soft};
+use artkit::{fbox, fextrude, loft, ring, soft};
 
 pub const SINK: f64 = 0.02;
 const SEAT_SAG: f64 = 0.014; // how far a seat cushion's top sinks towards its front edge, where legs go over it
@@ -129,21 +129,126 @@ pub fn leg(
     verts: usize,
 ) -> Obj {
     let (sx, sz) = splay;
-    fsweep!(
-        F,
+    let pts = [
+        (x, h, z),
+        (x, h - 0.003, z), // its top eased
+        (x, h - 0.012, z),
+        (x + sx * 0.12, h - 0.02, z + sz * 0.12),
+        (x + sx, 0.006, z + sz),
+        (x + sx, 0.0, z + sz),
+    ]
+    .map(|(x, y, z)| V3::from(F.at(x, y, z)));
+    tube(
         name,
-        &[
-            (x, h, z),
-            (x, h - 0.012, z),
-            (x + sx * 0.12, h - 0.02, z + sz * 0.12),
-            (x + sx, 0.006, z + sz),
-            (x + sx, 0.0, z + sz)
-        ],
+        &pts,
         r,
+        &[0.86, 1.0, 1.0, 0.86, 0.66, 0.6],
+        verts,
         mat,
-        verts = verts,
-        scale = [1.0, 1.0, 0.86, 0.66, 0.6]
     )
+}
+
+/// `kit::cabriole`'s leg (out by (sx, sz) at the knee, slim at the ankle, flaring into a pad foot) from the frame
+/// at height `h` to the floor, its top eased, as a `tube`: the kit's sweep shears its wood where the ankle flares.
+#[allow(clippy::too_many_arguments)]
+pub fn cabriole(name: &str, x: f64, z: f64, h: f64, mat: Mat, sx: f64, sz: f64, r: f64) -> Obj {
+    let given = [
+        (x, h, z),
+        (x + sx, h * 0.62, z + sz),
+        (x + sx * 0.4, 0.06, z + sz * 0.4),
+        (x + sx * 0.55, 0.02, z + sz * 0.55),
+        (x + sx * 0.55, 0.0, z + sz * 0.55),
+    ]
+    .map(|(x, y, z)| V3::from(F.at(x, y, z)));
+    let (curve, wher) = artkit::forms::catmull(&given, 2, false);
+    // its top eased, as `leg`'s
+    let mut pts = vec![curve[0], V3::from(F.at(x, h - 0.003, z))];
+    pts.extend(&curve[1..]);
+    let mut scales = vec![0.86, 1.0];
+    scales.extend(
+        wher[1..]
+            .iter()
+            .map(|&w| listed(&[1.0, 1.05, 0.7, 1.1, 1.15], w)),
+    );
+    tube(name, &pts, r, &scales, 10, mat)
+}
+
+/// `list`'s value `w` of the way along it (0 to 1), linear between its entries: a sweep's `Scale::List`.
+pub fn listed(list: &[f64], w: f64) -> f64 {
+    let f = w * (list.len() - 1) as f64;
+    let i = (f as usize).min(list.len() - 2);
+    list[i] + (list[i + 1] - list[i]) * (f - i as f64)
+}
+
+/// A round tube `verts` round through `pts` (Blender), `r` times each point's scale: `swept`.
+pub fn tube(name: &str, pts: &[V3], r: f64, scales: &[f64], verts: usize, mat: Mat) -> Obj {
+    let angle = artkit::shapes::round_angle(verts);
+    swept(
+        name,
+        pts,
+        &artkit::forms::circle(r, verts),
+        scales,
+        V3::Z,
+        angle,
+        0.0,
+        mat,
+    )
+}
+
+/// `profile` ((u, v) about the path, u towards `up`) swept through `pts` (Blender), times each point's scale, its
+/// ends capped flat and, `ends` over 0, chamfered that much (its outline set in at each end, the full one `ends`
+/// along), smooth but for edges turning over `angle`; laid with a sweep's UVs as if it kept one scale. A sweep's
+/// UVs grow round it with its scale, so they shear where it thickens fast (an eased top, an ankle flaring into a
+/// foot, a chamfered end).
+#[allow(clippy::too_many_arguments)]
+pub fn swept(
+    name: &str,
+    pts: &[V3],
+    profile: &[(f64, f64)],
+    scales: &[f64],
+    up: V3,
+    angle: f64,
+    ends: f64,
+    mat: Mat,
+) -> Obj {
+    let (mut pts, mut scales) = (pts.to_vec(), scales.to_vec());
+    let mut outlines = vec![profile.to_vec(); pts.len()];
+    if ends > 0.0 {
+        let (n, small) = (pts.len(), crate::common::inset(profile, ends));
+        let first = pts[0] + (pts[1] - pts[0]).normalized() * ends;
+        let last = pts[n - 1] + (pts[n - 2] - pts[n - 1]).normalized() * ends;
+        pts.insert(1, first);
+        pts.insert(n, last);
+        scales.insert(1, scales[0]);
+        scales.insert(n, scales[n]);
+        outlines = vec![profile.to_vec(); n + 2];
+        outlines[0] = small.clone();
+        outlines[n + 1] = small;
+    }
+    let n = pts.len();
+    let tangent = |i: usize| (pts[(i + 1).min(n - 1)] - pts[i.saturating_sub(1)]).normalized();
+    let t0 = tangent(0);
+    let mut normal = up - t0 * up.dot(t0);
+    if normal.length() < 1e-6 {
+        normal = t0.orthogonal();
+    }
+    let (mut along, mut normal) = (t0, normal.normalized());
+    let rings: Vec<Vec<P3>> = (0..n)
+        .map(|i| {
+            // carried along as the sweep's frames are, so it doesn't twist
+            let t = tangent(i);
+            normal = along.rotation_difference(t) * normal;
+            normal = (normal - t * normal.dot(t)).normalized();
+            along = t;
+            let bi = t.cross(normal);
+            outlines[i]
+                .iter()
+                .map(|&(u, v)| (pts[i] + (normal * u + bi * v) * scales[i]).into())
+                .collect()
+        })
+        .collect();
+    let body = loft!(name, &rings, material = mat, angle = angle);
+    artkit::uv::along(body, n, profile, &vec![1.0; n], &pts, false)
 }
 
 /// The seat cushions `cushions()` makes (returning their top), joined into the part `seat`, with the clip that
@@ -186,7 +291,7 @@ pub fn taper_leg(
         mat,
         r,
         splay.unwrap_or((0.008_f64.copysign(x), 0.008_f64.copysign(z))),
-        10,
+        8, // 4 cm across: within 1.5 mm of round
     )
 }
 
@@ -324,19 +429,6 @@ pub fn mesh(name: &str, verts: &[(f64, f64, f64)], faces: &[Vec<u32>], material:
     scene::add(name, m)
 }
 
-/// The faces of a prism of two loops of `k` points: the first loop's, the second's (reversed), the sides.
-pub fn prism_faces(k: usize) -> Vec<Vec<u32>> {
-    let k32 = k as u32;
-    let mut faces = vec![
-        (0..k32).collect::<Vec<u32>>(),
-        (k32..2 * k32).rev().collect(),
-    ];
-    for i in 0..k32 {
-        faces.push(vec![i, (i + 1) % k32, k32 + (i + 1) % k32, k32 + i]);
-    }
-    faces
-}
-
 /// A hardback seen end on, as an outline (across, out) about the crown of its spine (0, 0), counter-clockwise: two
 /// boards `b` thick running `depth` back from the crown, and the spine between them, rounded `bulge` proud of where
 /// the boards' edges end and `sp` thick (the page block stands behind it), in `n` steps round.
@@ -406,7 +498,8 @@ pub fn hardback(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, 
         h - 2.0 * PAGES_IN,
         pd,
         (x, y + h / 2.0, front - bu - SPINE - pd / 2.0),
-        M.pages
+        M.pages,
+        bevel = 0.0 // set in between the boards: no edge of it stands free
     );
     if band {
         fextrude!(
@@ -422,19 +515,28 @@ pub fn hardback(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, 
     }
 }
 
-/// One book standing on `y`, `t` thick, its spine at `front`: the cover, the page block just showing on top, and
+/// One book standing on `y`, `t` thick, its spine at `front`: the cover, the page block showing on top, and
 /// a gilt band across some spines.
 #[allow(clippy::too_many_arguments)]
 pub fn book(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, band: bool) {
     fbox!(F, "book", t, h, d, (x, y + h / 2.0, front - d / 2.0), cover);
-    fbox!(
-        F,
+    // the page block's top just over the cover's (its sides, a millimetre high, nobody sees)
+    let (u, z0, z1, top) = (
+        (t - 0.006) / 2.0,
+        front - d + 0.002,
+        front - 0.01,
+        y + h + 0.001,
+    );
+    mesh(
         "pages",
-        t - 0.006,
-        0.004,
-        d - 0.012,
-        (x, y + h, front - d / 2.0 - 0.004),
-        M.pages
+        &[
+            (x - u, top, z0),
+            (x + u, top, z0),
+            (x + u, top, z1),
+            (x - u, top, z1),
+        ],
+        &[vec![0, 1, 2, 3]],
+        M.pages,
     );
     if band {
         fbox!(

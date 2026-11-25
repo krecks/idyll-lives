@@ -159,7 +159,9 @@ pub fn fridge_built_in() -> Vec<Obj> {
                 0.012,
                 (sf * 0.185, 0.94, 0.146),
                 M.carton,
-                holes = [grip]
+                holes = [grip],
+                bevel = 0.003,
+                bevel_segments = 1
             );
         }
         for (i, y) in [0.16, 0.48].into_iter().enumerate() {
@@ -183,7 +185,9 @@ pub fn fridge_built_in() -> Vec<Obj> {
                 0.014,
                 (0, y + 0.09, 0.152),
                 M.shelf,
-                holes = [grip]
+                holes = [grip],
+                bevel = 0.003,
+                bevel_segments = 1
             );
             for s in [-1, 1] {
                 fbox!(

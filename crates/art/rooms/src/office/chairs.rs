@@ -3,7 +3,7 @@
 
 use super::common::turned;
 use super::{F, M};
-use artkit::forms::rounded_rect;
+use artkit::forms::{Scale, rounded_rect};
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, degrees, exp, pow, radians, sin};
 use artkit::parts::{hinged, join, new_parts};
@@ -297,6 +297,12 @@ fn loop_arm(name: &str, s: i32, z: f64, seat_y: f64, frame: Mat, pad: Mat, _lite
     );
 }
 
+/// Lays `part`'s UVs a box per face (a back is a flat slab, not a round thing: round about its height they stretch
+/// across its sides).
+fn box_uv(part: Obj) {
+    part.edit(|p| p.uv = artkit::mesh::UvWay::Box);
+}
+
 /// `chair_seat`'s options: the back's material (the seat's by default), the frame's (black steel) and the arms'
 /// (the frame's); a `head`rest; `channels` stitched across (or stripes up a racing back); a mesh back in a frame
 /// of `mesh_frame`; how far behind the seat the back stands, how far it leans (degrees), the arms ('t' or
@@ -428,23 +434,29 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
     let plate_y = yb - back_h / 2.0 + 0.08;
     let plate_z = rear - 0.01 + (back_h / 2.0 - 0.08) * sin(radians(lean));
     let sz = plate_z - 0.022;
+    // its top end chamfered: the last 4 mm narrowing 4 mm across its width
+    let mut spine: Vec<(f64, f64, f64)> = kit::fillet!(
+        &[
+            (0.0, seat_y - 0.115, z - 0.06),
+            (0.0, seat_y - 0.115, sz),
+            (0.0, plate_y, sz)
+        ],
+        0.06,
+        3
+    );
+    spine.insert(spine.len() - 1, (0.0, plate_y - 0.004, sz));
+    let mut taper = vec![1.0; spine.len()];
+    taper[spine.len() - 1] = 1.0 - 0.004 / 0.035;
     fsweep!(
         F,
         "spine",
-        &kit::fillet!(
-            &[
-                (0.0, seat_y - 0.115, z - 0.06),
-                (0.0, seat_y - 0.115, sz),
-                (0.0, plate_y, sz)
-            ],
-            0.06,
-            3
-        ),
+        &spine,
         0.0,
         frame,
         profile = rounded_rect(0.024, 0.07, 0.01, 1),
         up = (0, 1, 0),
-        angle = 50
+        angle = 50,
+        scale = Scale::List(taper)
     );
     let parts = new_parts(|| {
         fbox!(
@@ -460,7 +472,7 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
         );
         if let Some(mf) = mesh_frame {
             // a moulded frame round a taut mesh, the mesh bowed to the back
-            loft!(
+            box_uv(loft!(
                 "back",
                 &contour_rings(
                     bw - 0.03,
@@ -474,8 +486,9 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
                     4.0,
                     0.0
                 ),
-                material = back
-            );
+                material = back,
+                angle = 80 // a padded back is round all over
+            ));
             fsweep!(
                 F,
                 "back_frame",
@@ -500,7 +513,7 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
             );
         } else if channels.is_some() && !head {
             // a leather shell, padded in front with four stitched pillows, each as wide as the back where it is
-            loft!(
+            box_uv(loft!(
                 "back",
                 &contour_rings(
                     bw,
@@ -514,8 +527,9 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
                     4.0,
                     0.08
                 ),
-                material = back
-            );
+                material = back,
+                angle = 80 // a padded back is round all over
+            ));
             let n = 4;
             let span = back_h * 0.86;
             for k in 0..n {
@@ -538,7 +552,7 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
                 );
             }
         } else {
-            loft!(
+            box_uv(loft!(
                 "back",
                 &contour_rings(
                     bw,
@@ -552,8 +566,9 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
                     4.0,
                     0.08
                 ),
-                material = back
-            );
+                material = back,
+                angle = 80 // a padded back is round all over
+            ));
             loft!(
                 "back_shell",
                 &contour_rings(

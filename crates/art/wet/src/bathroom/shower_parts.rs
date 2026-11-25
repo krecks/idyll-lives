@@ -254,6 +254,7 @@ pub fn head(
             (y + 0.001, r * 0.94, r * 0.94),
             (y + t * 0.2, r, r),
             (y + t * 0.75, r, r),
+            (y + t * 0.9, r * 0.97, r * 0.97), // its top's edge eased
             (y + t, r * 0.82, r * 0.82),
             (y + t * 1.25, r * 0.25, r * 0.25),
         ],
@@ -459,7 +460,7 @@ pub fn caddy(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64, 
 }
 
 /// A curtain hanging in `waves` soft folds from game point `a` (x, z) to `b`, from `y0` up to `y1`: one wavy sheet,
-/// thick `t`.
+/// thick `t`, its hems square to it as it stands gathered to `gather` of its length along game x (1: as built).
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn curtain(
     f: &GameFrame,
@@ -472,6 +473,7 @@ pub fn curtain(
     depth: f64,
     t: f64,
     steps: usize,
+    gather: f64,
 ) -> Obj {
     let (ax, az) = a;
     let (bx, bz) = b;
@@ -489,13 +491,28 @@ pub fn curtain(
         })
         .collect();
     let (cx, cz) = ((ax + bx) / 2.0, (az + bz) / 2.0);
+    // the cloth's two faces t apart square to the wave, its hems square to it as it stands gathered (so a hem is t
+    // wide, too thin to show an edge)
+    let across: Vec<(f64, f64)> = (0..=n)
+        .map(|k| {
+            let w =
+                depth / 2.0 * cos(TAU * waves as f64 * k as f64 / n as f64) * TAU * waves as f64
+                    / l;
+            let g = if k == 0 || k == n { gather } else { 1.0 };
+            let (dx, dz) = ((ux + nx * w) * g, uz + nz * w);
+            let m = py::hypot(dx, dz);
+            (-dz / m / g, dx / m)
+        })
+        .collect();
     let front = mid
         .iter()
-        .map(|&(x, z)| (x + nx * t / 2.0 - cx, z + nz * t / 2.0 - cz));
+        .zip(&across)
+        .map(|(&(x, z), &(px, pz))| (x + px * t / 2.0 - cx, z + pz * t / 2.0 - cz));
     let back = mid
         .iter()
+        .zip(&across)
         .rev()
-        .map(|&(x, z)| (x - nx * t / 2.0 - cx, z - nz * t / 2.0 - cz));
+        .map(|(&(x, z), &(px, pz))| (x - px * t / 2.0 - cx, z - pz * t / 2.0 - cz));
     let outline: Vec<(f64, f64)> = front.chain(back).collect();
     fextrude!(
         f,
@@ -506,7 +523,7 @@ pub fn curtain(
         M.curtain,
         plane = Facing::Top,
         smooth = true,
-        angle = 60
+        angle = 45 // the folds smooth, the hems' corners sharp (as built and gathered)
     )
 }
 

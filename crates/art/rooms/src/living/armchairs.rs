@@ -1,14 +1,13 @@
 //! L2, the armchairs: built as the sofas are, their seats sinking in (`sink_in`), but for the designer chair
 //! (still).
 
-use super::common::{Cushion, cushion, panel, plain, round_rings, seat, settled};
-use super::sofas::{box_sofa, rolled_arm};
+use super::common::{Cushion, cabriole, cushion, panel, plain, round_rings, seat, settled, swept};
+use super::sofas::{box_sofa, channel, rolled_arm};
 use super::{F, M};
-use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::forms::{catmull, rounded_rect, smooth_outline};
 use artkit::json::float_repr;
-use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, TAU, cos, exp, pow, radians, sin, sqrt};
+use artkit::math::{P3, PI, TAU, V3, cos, exp, pow, radians, sin, sqrt};
 use artkit::parts::{join, join_all, new_parts, settle};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -34,7 +33,7 @@ pub fn armchair_bergere() -> Vec<Obj> {
             (0, 0.26, -0.058),
             M.linen,
             bevel = 0.05,
-            bevel_segments = 3
+            bevel_segments = 2
         );
         // the apron: a serpentine lower edge dropping to a carved lobe in the middle
         let mut outline = vec![(0.34, 0.195), (-0.34, 0.195)];
@@ -59,21 +58,17 @@ pub fn armchair_bergere() -> Vec<Obj> {
         for i in 0..6 {
             let u = (f64::from(i) + 0.5) / 6.0;
             let (x, t) = (-0.3 + 0.6 * u, top(u));
-            fsweep!(
-                F,
-                format!("channel{i}"),
-                &[
+            channel(
+                &format!("channel{i}"),
+                [
                     (x, 0.31, -0.29),
                     (x, (0.31 + t) / 2.0, -0.32),
-                    (x, t - 0.05, -0.345),
-                    (x, t - 0.022, -0.385)
+                    (x, t - 0.07, -0.34),
+                    (x, t - 0.02, -0.385),
                 ],
-                0.0,
+                (0.112, 0.11, 0.05, 1),
+                &[1.0, 1.04, 1.0, 0.9],
                 M.linen,
-                profile = rounded_rect(0.112, 0.11, 0.05, 2),
-                up = (1, 0, 0),
-                resolution = 2,
-                scale = [1.0, 1.04, 1.0, 0.9]
             );
         }
         // the show-wood frame round the back: one moulded rail along the arch
@@ -171,15 +166,15 @@ pub fn armchair_bergere() -> Vec<Obj> {
         for x in [-0.31, 0.31] {
             for (z, dz) in [(0.3, 1.0), (-0.385, -1.0)] {
                 let sx = if x > 0.0 { 1.0 } else { -1.0 };
-                kit::cabriole!(
-                    F,
-                    format!("leg{}{}", float_repr(x), float_repr(z)),
+                cabriole(
+                    &format!("leg{}{}", float_repr(x), float_repr(z)),
                     x,
                     z,
                     0.18,
                     M.walnut_legs,
                     0.02 * sx,
-                    0.02 * dz
+                    0.02 * dz,
+                    0.024,
                 );
             }
         }
@@ -196,7 +191,8 @@ pub fn armchair_bergere() -> Vec<Obj> {
             M.linen_cushion,
             round = 0.035,
             puff = 0.016,
-            piping = 0.006
+            piping = 0.006,
+            resting = true
         );
         0.42
     };
@@ -368,29 +364,41 @@ pub fn armchair_leather() -> Vec<Obj> {
 /// A moulded plywood shell: a section `w` across whose sides curl up `dish` towards the sitter, `t` thick, swept
 /// along a game path (the seat front to back, a back bottom to top).
 fn shell(name: &str, path: &[(i32, f64, f64)], w: f64, dish: f64, t: f64, mat: Mat) -> Obj {
-    let n = 8;
-    let face: Vec<(f64, f64)> = (0..=n)
-        .map(|i| {
-            let i = f64::from(i);
-            (
-                -w / 2.0 + w * i / f64::from(n),
-                -dish * pow(2.0 * i / f64::from(n) - 1.0, 2.0),
-            )
-        })
+    let (n, c) = (8, 0.004);
+    let face = |u: f64| -dish * pow(2.0 * u / w, 2.0);
+    // its moulded edges eased: each corner of the section cut c back, and its ends chamfered c
+    let mut low = vec![
+        (-w / 2.0, face(-w / 2.0) + c),
+        (c - w / 2.0, face(c - w / 2.0)),
+    ];
+    low.extend((1..n).map(|i| {
+        let u = -w / 2.0 + w * f64::from(i) / f64::from(n);
+        (u, face(u))
+    }));
+    low.extend([
+        (w / 2.0 - c, face(w / 2.0 - c)),
+        (w / 2.0, face(w / 2.0) + c),
+    ]);
+    let mut profile = low.clone();
+    profile.extend(low.iter().rev().map(|&(u, v)| {
+        let edge = (u.abs() - w / 2.0).abs() < 1e-9;
+        (u, v + t - if edge { 2.0 * c } else { 0.0 })
+    }));
+    let given: Vec<V3> = path
+        .iter()
+        .map(|&(x, y, z)| V3::from(F.at(x, y, z)))
         .collect();
-    let mut profile = face.clone();
-    profile.extend(face.iter().rev().map(|&(u, v)| (u, v + t)));
-    fsweep!(
-        F,
+    let (pts, _) = catmull(&given, 2, false);
+    let scales = vec![1.0; pts.len()];
+    swept(
         name,
-        path,
-        0.0,
+        &pts,
+        &profile,
+        &scales,
+        V3::from((1, 0, 0)),
+        60.0,
+        c,
         mat,
-        profile = profile,
-        up = (1, 0, 0),
-        resolution = 2,
-        scale = 1.0,
-        angle = 60
     )
 }
 
@@ -652,16 +660,15 @@ pub fn armchair_wingback() -> Vec<Obj> {
         for x in [-0.36, 0.36] {
             let xs = float_repr(x);
             // cabrioles in front, plain swept legs raked back behind
-            kit::cabriole!(
-                F,
-                format!("leg_front{xs}"),
+            cabriole(
+                &format!("leg_front{xs}"),
                 x,
                 z1 - 0.06,
                 0.17,
                 M.walnut_warm,
                 0.015_f64.copysign(x),
                 0.02,
-                r = 0.02
+                0.02,
             );
             fsweep!(
                 F,

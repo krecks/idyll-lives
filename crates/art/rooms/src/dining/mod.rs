@@ -171,7 +171,7 @@ pub fn family() -> Family {
                 .key("model.tableBarHigh")
                 .paint(&[("top_black", "Top"), ("legs_black", "Legs")]),
             // K8: chairs and stools
-            Model::new("barStool", chairs::bar_stool, (0.39, 0.742, 0.39))
+            Model::new("barStool", chairs::bar_stool, (0.39, 0.717, 0.39))
                 .key("model.barStool")
                 .motions(stool.clone())
                 .paint(&SEAT),
@@ -201,11 +201,11 @@ pub fn family() -> Family {
             .centre(0.0, 0.032)
             .key("model.chairUpholstered")
             .paint(&[("legs_walnut", "Frame"), ("upholstery", "Upholstery")]),
-            Model::new("chairModern", shells::chair_modern, (0.44, 0.789, 0.496))
+            Model::new("chairModern", shells::chair_modern, (0.448, 0.793, 0.499))
                 .centre(0.0, 0.032)
                 .key("model.chairModern")
                 .paint(&[("legs_black", "Frame"), ("shell", "Seat")]),
-            Model::new("chairWindsor", shells::chair_windsor, (0.475, 0.975, 0.474))
+            Model::new("chairWindsor", shells::chair_windsor, (0.47, 0.968, 0.47))
                 .centre(0.0, 0.041)
                 .key("model.chairWindsor")
                 .paint(&[("frame_windsor", "Frame"), ("seat_windsor", "Seat")]),
@@ -234,7 +234,7 @@ pub fn family() -> Family {
                 .key("model.benchDining")
                 .paint(&[("legs_oakd", "Frame"), ("seat_oak", "Seat")]),
             // K9: dining storage
-            Model::new("sideboard", storage::sideboard, (1.82, 1.1, 0.668))
+            Model::new("sideboard", storage::sideboard, (1.82, 1.04, 0.668))
                 .centre(0.0, -0.096)
                 .key("model.sideboard")
                 .motions(put_away.clone())

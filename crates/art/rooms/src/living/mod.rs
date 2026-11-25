@@ -139,8 +139,9 @@ palette! { M:
     bin_sage = ("#9DAF8C", fabric), // the cube shelf's fabric bins
     bin_clay = ("#C98F6B", fabric),
     bin_hole = ("#3A3530", matte),
-    vitrine = ("#7A5234", wood), // the display cabinet
-    vitrine_back = ("#E8E2D6", wood),
+    // the display cabinet, in a plain finish (as its ornaments): its door's brass and glass draw on their own
+    vitrine = ("#7A5234", satin),
+    vitrine_back = ("#E8E2D6", satin),
     shelf_glass = ("#CFDCDF", gloss), // its shelves: plain, so its door is the only glass
     book_e = ("#2B2B2E", satin),
     book_f = ("#D8D2C4", satin),
@@ -252,7 +253,7 @@ pub fn family() -> Family {
                 .centre(0.0, -0.02)
                 .motions(sofa_uses())
                 .paint(&[("teal", "Upholstery"), ("teal_cushion", "Cushions"), ("brass", "Frame"), ("brass_legs", "Legs")]),
-            Model::new("sofaThreeSeat", sectionals::sofa_three_seat, (2.86, 0.823, 0.88))
+            Model::new("sofaThreeSeat", sectionals::sofa_three_seat, (2.82, 0.823, 0.88))
                 .key("model.sofaThreeSeat")
                 .centre(0.0, 0.01)
                 .motions(sofa_uses())
@@ -283,9 +284,9 @@ pub fn family() -> Family {
                 .centre(0.0, 0.015)
                 .motions(sofa_uses())
                 .paint(&[SECTIONAL[0], SECTIONAL[1], SECTIONAL[2], ("pillow_mustard", "Pillow")]),
-            Model::new("chaise", sectionals::chaise, (0.96, 0.823, 1.9))
+            Model::new("chaise", sectionals::chaise, (0.96, 0.823, 1.84))
                 .key("model.chaise")
-                .centre(0.0, 0.02)
+                .centre(0.0, -0.01)
                 .motions(sofa_uses())
                 .paint(&[SECTIONAL[0], SECTIONAL[1], SECTIONAL[2], ("throw_oat", "Throw")]),
             // L2: the armchairs and small seats
@@ -351,10 +352,10 @@ pub fn family() -> Family {
                 .key("model.coffeeTable")
                 .motions(json!({"uses": {"magazine": "drawer_open"}, "hold": 2.5}))
                 .paint(&[("oak", "Wood"), ("brass", "Knob")]),
-            Model::new("coffeeTableGlass", tables::coffee_table_glass, (1.3, 0.6, 0.74))
+            Model::new("coffeeTableGlass", tables::coffee_table_glass, (1.3, 0.525, 0.74))
                 .key("model.coffeeTableGlass")
                 .paint(&[("chrome", "Frame"), ("glass", "Glass")]),
-            Model::new("coffeeTableMarble", tables::coffee_table_marble, (0.88, 0.58, 0.88))
+            Model::new("coffeeTableMarble", tables::coffee_table_marble, (0.88, 0.535, 0.88))
                 .key("model.coffeeTableMarble")
                 .paint(&[("marble", "Top"), ("brass", "Base")]),
             Model::new("sideTable", tables::side_table, (0.55, 0.55, 0.45))
