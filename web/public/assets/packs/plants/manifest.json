@@ -486,10 +486,10 @@
           "finish": "material.finish.matte"
         },
         "bloom": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "bloom2": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "centre_dark": {
           "finish": "material.finish.matte"

@@ -8,7 +8,9 @@ use artkit::botany::species::{Aims, Crown, Hearts, Perches, Seeds, Species, Stag
 use artkit::far::low;
 use artkit::math::{TAU, cos, sin};
 use artkit::perch::Find;
-use artkit::scene::Obj;
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::scene::{self, Obj};
+use artkit::shapes::SHARP;
 use artkit::{fruiting, hang, lump, pot, sweep, trunk};
 
 const CENTRE: (f64, f64, f64) = (0.0, 0.0, 1.5);
@@ -99,6 +101,14 @@ pub fn lemon_tree() -> Vec<Obj> {
 fn potted(tree: &mut Tree) {
     let p = &tree.palette;
     let top = pot!(p, 0.3, 0.5, r_bottom = 0.22, rim = 0.016);
+    // its square-cut rim eased, as a thrown pot's is (KIT: botany's `pot` cuts it square)
+    bevel_edges(
+        scene::obj("pot"),
+        low(0.004, 0.0),
+        1,
+        SHARP,
+        &EdgeOrder::Corners,
+    );
     // a raised band round the pot under its rim
     let (zb, rb) = (
         0.36,

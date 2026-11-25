@@ -483,13 +483,13 @@
           "finish": "material.finish.leafcards"
         },
         "fruit": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "fruit2": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "fruit3": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.foliage"
         },
         "green": {
           "finish": "material.finish.foliage"

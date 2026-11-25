@@ -41,6 +41,19 @@ pub fn plain_leaves(p: artkit::materials::Palette) -> artkit::materials::Palette
     p.with(&changed)
 }
 
+/// `p` with the petals `names` on `foliage`: a petal is a leaf's thin sheet (the gate doesn't judge its rims as
+/// edges), and sways with the plant.
+pub fn leafy_petals(p: artkit::materials::Palette, names: &[&str]) -> artkit::materials::Palette {
+    let changed: Vec<artkit::materials::Mat> = names
+        .iter()
+        .map(|&name| artkit::materials::Mat {
+            finish: "foliage",
+            ..p.get(name)
+        })
+        .collect();
+    p.with(&changed)
+}
+
 /// The family.
 pub fn family() -> Family {
     let pot = |model: Model| model.tolerance(TOLERANCE).paint(&[("body", "Pot")]);
@@ -129,7 +142,8 @@ pub fn family() -> Family {
             ),
             bed(
                 Model::new("sunflowers", flowers::sunflowers, (0.84, 2.108, 0.907))
-                    .key("model.garden.sunflowers"),
+                    .key("model.garden.sunflowers")
+                    .palette(leafy_petals(BASE.palette(), &["bloom", "bloom2"])),
                 &[("bloom", "Petals")],
             ),
             bed(

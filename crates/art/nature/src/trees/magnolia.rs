@@ -10,6 +10,7 @@ use artkit::bvh::Rays;
 use artkit::far::{is_low, low};
 use artkit::math::{atan2, cos, degrees, sin, v3};
 use artkit::perch::Find;
+use artkit::materials::{Mat, Palette};
 use artkit::scene::Obj;
 use artkit::{cupped, leaves};
 
@@ -131,13 +132,26 @@ pub fn species() -> Species {
     }
 }
 
+/// The blooms' colours (`fruit`, `fruit2`, `fruit3`) on `foliage`: a goblet is a cup of petals, thin as a leaf (the
+/// gate doesn't judge its lip as an edge), and sways with the crown.
+pub fn petals(p: &Palette) -> Palette {
+    let leafy: Vec<Mat> = ["fruit", "fruit2", "fruit3"]
+        .iter()
+        .map(|&name| Mat {
+            finish: "foliage",
+            ..p.get(name)
+        })
+        .collect();
+    p.with(&leafy)
+}
+
 pub fn magnolia() -> Vec<Obj> {
     grow(&species())
 }
 
 /// Two green clumps among the blossom, and the blooms.
 fn blooms(tree: &mut Tree) {
-    let p = &tree.palette;
+    let p = &petals(&tree.palette);
     leaves!(
         "leaves",
         0.3,
@@ -200,4 +214,6 @@ fn blooms(tree: &mut Tree) {
             segments = low(6, 4)
         );
     }
+    // (turned, then tilted: round their own axis no longer)
+    crate::box_uvs(&["bloom"]);
 }

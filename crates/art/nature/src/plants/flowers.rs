@@ -223,12 +223,15 @@ pub fn daisies() -> Vec<Obj> {
 /// Sunflowers: four tall, hairy stalks with big, drooping heart-shaped leaves, their heavy heads turned to the
 /// front: two rows of golden petals round a domed brown disc of seeds, green behind.
 pub fn sunflowers() -> Vec<Obj> {
-    let p = palette(&[
-        ("bloom", "#F5C518"),
-        ("bloom2", "#E8A812"),
-        ("centre_dark", "#5A3A1E"),
-        ("stem", "#5E8C3A"),
-    ]);
+    let p = super::leafy_petals(
+        palette(&[
+            ("bloom", "#F5C518"),
+            ("bloom2", "#E8A812"),
+            ("centre_dark", "#5A3A1E"),
+            ("stem", "#5E8C3A"),
+        ]),
+        &["bloom", "bloom2"],
+    );
     let m = |name: &str| p.get(name);
     let mut rng = Random::new(54);
     let top = mound!(&p);
@@ -337,6 +340,7 @@ pub fn sunflowers() -> Vec<Obj> {
             segments = low(10, 5)
         );
     }
+    crate::box_uvs(&["stalk", "petiole", "back"]);
     fit_to(&meshes(), 0.84, 2.108, 0.907);
     settle(&[join_all("sunflowers")])
 }

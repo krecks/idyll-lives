@@ -53,6 +53,27 @@ pub fn _hex(r: f64, z: f64, n: usize, flat: Option<f64>, lift: f64, phase: f64) 
     out
 }
 
+/// `ring` with every `every`th point from the first (its corners) cut in two, `cut` along each side from it: a
+/// cut stone's corner eased, its turn split in two (a hexagon's 60° into two of 30°: no hard edge).
+pub fn _eased(ring: &[P3], every: usize, cut: f64) -> Vec<P3> {
+    let n = ring.len();
+    let mut out = Vec::with_capacity(n + n / every);
+    for (j, &p) in ring.iter().enumerate() {
+        if j % every != 0 {
+            out.push(p);
+            continue;
+        }
+        let towards = |q: P3| {
+            let (dx, dy, dz) = (q.x - p.x, q.y - p.y, q.z - p.z);
+            let k = cut / (dx * dx + dy * dy + dz * dz).sqrt();
+            p3(p.x + dx * k, p.y + dy * k, p.z + dz * k)
+        };
+        out.push(towards(ring[(j + n - 1) % n]));
+        out.push(towards(ring[(j + 1) % n]));
+    }
+    out
+}
+
 /// A ring of carved lotus petals from radius r0 at z0 to r1 at z1: rings of `n` x 3 points, each petal's middle
 /// proud by `depth` (a fraction), its edges a little in.
 pub fn _petals(r0: f64, r1: f64, z0: f64, z1: f64, n: usize, depth: f64) -> Vec<Vec<P3>> {
@@ -96,5 +117,17 @@ mod tests {
         assert!((ring[0].x - 0.2).abs() < 1e-12 && (ring[0].z - 1.03).abs() < 1e-12);
         assert!(((ring[1].x * ring[1].x + ring[1].y * ring[1].y).sqrt() - 0.15).abs() < 1e-12);
         assert!((ring[1].z - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn an_eased_hexagon_cuts_each_corner_in_two() {
+        let ring = _eased(&_hex(0.2, 0.0, 6, None, 0.0, 0.0), 1, 0.005);
+        assert_eq!(ring.len(), 12);
+        // the corner at (0.2, 0) becomes two points 5 mm from it, along its two sides
+        for p in &ring[..2] {
+            let d = ((p.x - 0.2).powi(2) + p.y.powi(2)).sqrt();
+            assert!((d - 0.005).abs() < 1e-12);
+        }
+        assert_eq!(_eased(&_hex(0.2, 0.0, 12, Some(0.17), 0.0, 0.0), 2, 0.005).len(), 18);
     }
 }

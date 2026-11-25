@@ -1,13 +1,13 @@
 //! The cast and carved stone: the bird bath, the fountain and the lantern.
 
-use super::common::{_hex, _petals, _scalloped};
+use super::common::{_eased, _hex, _petals, _scalloped};
 use super::{F, M};
 use artkit::kit;
 use artkit::math::{PI, TAU, cos, cosd, p3, radians, sin, sind};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{join, join_all, new_parts, settle};
 use artkit::scene::{Obj, meshes};
-use artkit::{cone, cylinder, extrude, loft, revolve, ring, sphere, sweep, torus};
+use artkit::{cube, cylinder, extrude, loft, revolve, ring, sphere, sweep, torus};
 
 /// A cast-stone bird bath: a moulded round plinth, a fluted column under a turned capital, a shallow bowl whose
 /// rim waves in twelve scallops, water in it, a robin dipping its beak at the rim.
@@ -358,8 +358,15 @@ pub fn fountain() -> Vec<Obj> {
 /// A Japanese stone lantern (tōrō): a hexagonal footing under a ring of lotus petals, a round post with a band, a
 /// platform on petals, the fire box between six posts (a moon window in four sides, open to the front and back,
 /// the warm light inside), a roof with upturned corners curling up, and the jewel on a lotus cup.
+/// How far in from each corner the lantern's cut stone is eased.
+const EASE: f64 = 0.005;
+
 pub fn lantern() -> Vec<Obj> {
-    let hex = |r: f64, z: f64| _hex(r, z, 6, None, 0.0, 0.0);
+    // (each corner of the cut stone eased: `_eased`)
+    let hex = |r: f64, z: f64| _eased(&_hex(r, z, 6, None, 0.0, 0.0), 1, EASE);
+    let roof = |r: f64, z: f64, flat: f64, lift: f64| {
+        _eased(&_hex(r, z, 12, Some(flat), lift, 0.0), 2, EASE)
+    };
     loft!(
         "base",
         &[
@@ -394,9 +401,15 @@ pub fn lantern() -> Vec<Obj> {
         material = M.stone,
         segments = 16
     );
+    // the petals' rim rolled over into their top (out and up, then in), no turn of 60° in it: carved stone
+    let mut petals = _petals(0.09, 0.17, 0.48, 0.535, 12, 0.12);
+    for (k, dz) in [(1.0041, 0.004), (0.9906, 0.0073)] {
+        let rim: Vec<_> = petals[1].iter().map(|p| p3(p.x * k, p.y * k, p.z + dz)).collect();
+        petals.push(rim);
+    }
     loft!(
         "platform_petals",
-        &_petals(0.09, 0.17, 0.48, 0.535, 12, 0.12),
+        &petals,
         material = M.stone,
         angle = 60
     );
@@ -404,8 +417,10 @@ pub fn lantern() -> Vec<Obj> {
         "platform",
         &[
             hex(0.16, 0.53),
-            hex(0.2, 0.545),
+            hex(0.196, 0.5435),
+            hex(0.2, 0.548),
             hex(0.2, 0.57),
+            hex(0.196, 0.5737),
             hex(0.15, 0.575)
         ],
         material = M.stone,
@@ -421,15 +436,13 @@ pub fn lantern() -> Vec<Obj> {
     for i in 0..6 {
         let a = (60 * i) as f64;
         let r = 0.135;
-        cone!(
+        cube!(
             format!("post{i}"),
-            0.026,
-            0.024,
-            0.2,
+            (0.035, 0.035, 0.2),
             at = (r * cosd(a), r * sind(a), 0.67),
             material = M.stone,
-            verts = 4,
-            smooth = false
+            rot = (0, 0, 45),
+            bevel = 0.004
         );
     }
     for i in 0..6 {
@@ -456,7 +469,8 @@ pub fn lantern() -> Vec<Obj> {
             ],
             0.018,
             material = M.stone,
-            holes = [hole]
+            holes = [hole],
+            bevel = 0.004
         );
         panel.set_rotation((0, 0, mid - 90 + 180));
         let mid = mid as f64;
@@ -472,12 +486,14 @@ pub fn lantern() -> Vec<Obj> {
     loft!(
         "roof",
         &[
-            _hex(0.15, 0.78, 12, Some(0.13), 0.0, 0.0),
-            _hex(0.258, 0.81, 12, Some(0.224), 0.022, 0.0),
-            _hex(0.27, 0.835, 12, Some(0.234), 0.03, 0.0),
-            _hex(0.2, 0.872, 12, Some(0.18), 0.012, 0.0),
-            _hex(0.12, 0.915, 12, Some(0.105), 0.0, 0.0),
-            _hex(0.06, 0.945, 12, Some(0.052), 0.0, 0.0)
+            roof(0.15, 0.78, 0.13, 0.0),
+            roof(0.258, 0.81, 0.224, 0.022),
+            roof(0.27, 0.835, 0.234, 0.03),
+            // (the eave's top rounded over into the roof: no turn of 60° in it)
+            roof(0.265, 0.845, 0.229, 0.027),
+            roof(0.2, 0.872, 0.18, 0.012),
+            roof(0.12, 0.915, 0.105, 0.0),
+            roof(0.06, 0.945, 0.052, 0.0)
         ],
         material = M.stone,
         angle = 55
