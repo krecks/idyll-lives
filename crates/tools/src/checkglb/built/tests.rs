@@ -789,6 +789,17 @@ fn the_gate_judges_a_dump_by_the_baseline() {
         (low.get(EDGES, "house.box"), low.get("edges", "model.x")),
         (1, 1)
     );
+    // A sample that can't be read fails, but its counts are not stale: lowering keeps them.
+    std::fs::write(join(&dump, "car.chest.glb"), b"no model").unwrap();
+    let r = run();
+    assert!(
+        r.text.starts_with("FAIL car.chest\n       error: "),
+        "{}",
+        r.text
+    );
+    assert!(!r.text.contains("car.chest is no sample"), "{}", r.text);
+    let (low, _) = Baseline::read(&paths.baseline).unwrap().lowered(&r.counts);
+    assert_eq!(low.get(EDGES, "car.chest"), 9);
     // A dump that isn't there.
     assert!(
         gate(&paths, &at("none"), &[])
