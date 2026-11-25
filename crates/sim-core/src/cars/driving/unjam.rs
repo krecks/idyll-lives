@@ -59,20 +59,22 @@ pub(crate) fn unjam(w: &mut World) {
         false
     };
     for (c, car) in w.cars.iter().enumerate() {
-        let by = crate::traffic::waits_on_at(w, car_first(c), &asks);
         let waiting = matches!(car.state, CarState::Leaving | CarState::Arriving)
             && car.sight == Sight::Seen
             && !car.standing
             && tick >= car.stall.1 + PASS_WAIT
             && car.shown.is_some_and(|s| s.2)
-            && match car.pass_by {
-                Some(p) => {
-                    car.progress <= p.from
-                        && by
-                            .iter()
-                            .all(|&k| k >= 1 << 63 && still(k) && !on_foot_ahead(k))
+            && {
+                let by = crate::traffic::waits_on_at(w, car_first(c), &asks);
+                match car.pass_by {
+                    Some(p) => {
+                        car.progress <= p.from
+                            && by
+                                .iter()
+                                .all(|&k| k >= 1 << 63 && still(k) && !on_foot_ahead(k))
+                    }
+                    None => by.iter().any(|&k| standing(k)),
                 }
-                None => by.iter().any(|&k| standing(k)),
             };
         let key = car_first(c);
         if waiting
