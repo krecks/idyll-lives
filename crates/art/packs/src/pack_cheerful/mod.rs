@@ -23,9 +23,9 @@ pub fn family() -> Family {
         "pack_cheerful",
         M.palette(),
         vec![
-            Model::new("jukebox", music::jukebox, (0.75, 1.43, 0.495))
+            Model::new("jukebox", music::jukebox, (0.75, 1.43, 0.555))
                 .key("model.cheerful.jukebox")
-                .centre(0.0, -0.183)
+                .centre(0.0, -0.1526)
                 .motions(json!({"uses": {"dance": "record"}, "loops": {"dance": "spin"}}))
                 .paint(&[("cherry", "Body"), ("amber", "Trim")]),
             Model::new(

@@ -110,3 +110,8 @@ parts, clips and draws as before.
   sweep's frame doesn't twist); the curtains' folds take more points (6 a fold on the fixed one: no crest turns
   60°), their hem and heading 11.5 mm thick, and a corded side hem down each end; to stay under the 8,000 aim the
   cushions are `resting`, the bulbs and popcorn 6 × 3, the table 24 sides, its stem 16 (7,764 to 7,970 triangles).
+- `jukebox` (1 edge to 0, 4 draws to 3): the record window's back panel is bevelled 4 mm; the cabinet 6 cm deeper
+  (0.495 to 0.555 m, its front forward; a jukebox is 0.6 to 0.75 m deep); the speaker cloth plain `matte`, not
+  `fabric`, so the spinning label is the third draw (5,792 to 6,056 triangles).
+- `karaokeMachine` (1 to 0): the spotlight's front lip chamfered (4,688 to 4,720).
+- `mocktailCart` (28 to 0): the canopy's stripes and scalloped valance 1 cm thick (were 12 mm, a hard edge's width).

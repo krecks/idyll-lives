@@ -15,7 +15,7 @@ palette! { M:
     amber = ("#F6A609", gloss, glow("#FFB733")), // the arch band and the bubble tubes: lit at night
     sunny = ("#FFE29A", gloss, glow("#FFE7A8")), // the inner arch band, lit
     window = ("#5B3A8C", gloss), // the record window's back
-    grille = ("#E9D8B0", fabric), // the speaker cloth
+    grille = ("#E9D8B0", matte), // the speaker cloth (plain: the spinning label is the fourth draw it would cost)
     cards = ("#FFF2C8", gloss), // the song cards
     vinyl = ("#2B2433", gloss),
     label = ("#F6C744", gloss),
