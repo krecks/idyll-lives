@@ -3,10 +3,10 @@
 //! tiers over head height (from 2.1 m), so residents walk past and work at it from the next tile; a few stray sprigs
 //! on top, which shaping takes off.
 
+use artkit::botany::_with_part;
 use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Buttress, ClumpAims, Stem};
 use artkit::botany::species::{Aims, Perches, Roots, Seeds, Species, Stage, Tree, Trunk, grow};
-use artkit::botany::{_with_part, WithPart};
 use artkit::far::is_low;
 use artkit::math::{PI, TAU, V3, cos, sin, v3};
 use artkit::perch::Find;
@@ -185,6 +185,5 @@ fn trimmed(tree: &mut Tree, still: Obj) -> Vec<Obj> {
         || sprigs!("sprig", p, at, 0.35, n = 6, length = 0.22),
         at,
         "trim",
-        WithPart::default(),
     )
 }

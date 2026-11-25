@@ -259,11 +259,6 @@ pub fn sprigs(name: &str, p: &Palette, centre: impl Into<V3>, spread: f64, o: Sp
     }
 }
 
-options! {
-    /// `_with_part`'s options.
-    WithPart { kind: &'static str = "squash" }
-}
-
 /// Joins what `build` makes into a moving part `name` (origin at `origin`), settles, and shrinks it away
 /// (clip `clip`): the still part and the moving one.
 pub fn _with_part(
@@ -272,9 +267,7 @@ pub fn _with_part(
     build: impl FnOnce(),
     origin: impl Into<P3>,
     clip: &str,
-    o: WithPart,
 ) -> Vec<Obj> {
-    let _ = o.kind;
     if is_low() {
         // a far version: all one still part
         build();

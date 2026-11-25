@@ -115,7 +115,6 @@ impl Default for LeafyShrub<'_> {
 /// and perches. A far version: the stems unforked and three-sided, the clumps coarser (and a little bigger, for the
 /// leaves' reach), no single leaves (their random numbers still drawn).
 pub fn leafy_shrub(
-    p: &Palette,
     seed: i128,
     w: f64,
     h: f64,
@@ -123,7 +122,6 @@ pub fn leafy_shrub(
     wood: Mat,
     o: LeafyShrub,
 ) -> Vec<(V3, f64)> {
-    let _ = p;
     let (name, band, skirt) = (o.name, o.band, o.skirt);
     let d = match o.depth {
         Some(depth) if depth != 0.0 => depth,

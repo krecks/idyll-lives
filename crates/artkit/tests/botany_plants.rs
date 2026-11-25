@@ -5,8 +5,8 @@
 mod common;
 
 use artkit::botany::{
-    self, _fit_with_part, _flower, MEADOW_FLOWERS, SHRUB, ShrubMass, fiddle, fit_to, hedge_top,
-    raised_bed, sword,
+    self, _fit_with_part, _flower, _with_part, MEADOW_FLOWERS, SHRUB, ShrubMass, fiddle, fit_to,
+    hedge_top, lupin_spike, raised_bed, sword,
 };
 use artkit::far::{far_of, is_low, low};
 use artkit::materials::{Finish, Finishes, Palette};
@@ -15,10 +15,10 @@ use artkit::parts::{join_all, new_parts, settle};
 use artkit::rand::Random;
 use artkit::scene::{self, Obj};
 use artkit::{
-    _crop, _put, _with_part, arc, blade, cone, cube, cut_leaf, dome, dots, florets, hedge_block,
-    leaf, leafy_shrub, lobed, lump, lupin_spike, mound, normals, on_masses, outline, perch,
-    perches, pinnate, rays, ribbed, rose_head, rose_leaf, rosettes, slits, soil_top, sphere,
-    spiral, stalk, star, stem, tulip_head, twig, vessel,
+    _crop, _put, arc, blade, cone, cube, cut_leaf, dome, dots, florets, hedge_block, leaf,
+    leafy_shrub, lobed, lump, mound, normals, on_masses, outline, perch, perches, pinnate, rays,
+    ribbed, rose_head, rose_leaf, rosettes, slits, soil_top, sphere, spiral, stalk, star, stem,
+    tulip_head, twig, vessel,
 };
 use common::*;
 use std::cell::RefCell;
@@ -1063,17 +1063,16 @@ fn flowers(name: &str, p: &Palette) -> Option<Ret> {
             stalk!("stem", v3(0.3, 0.1, 0.02), (0.25, 0.14, 0.5), m("stem"));
         }
         "lupin_spike" => {
-            lupin_spike!(
+            lupin_spike(
                 "spike",
                 (0.21, -0.13, 0.9 - 0.36),
                 0.36,
                 0.045,
                 m("blossom4"),
-                seed = 3
             );
         }
         "lupin_spike_plain" => {
-            lupin_spike!("spike", v3(0.0, 0.1, 0.2), 0.25, 0.03, m("blossom"));
+            lupin_spike("spike", v3(0.0, 0.1, 0.2), 0.25, 0.03, m("blossom"));
         }
         "_flower" => _flower("flower2", v3(0.03, -0.1, 0.9), 180.0 + 12.0, 0.05, p),
         "_flower_small" => _flower("flower6", (0.05, -0.12, 1.1), 180.0 - 12.0, 0.04, p),
@@ -2225,7 +2224,6 @@ fn bush_flowering() {
     };
     let leafy = greens(&p, ["leaf_dark", "leaf_dark", "leaf", "stem", "leaf_light"]);
     leafy_shrub!(
-        &p,
         33,
         1.208,
         1.016,
@@ -2343,19 +2341,21 @@ fn rosebush() {
     perches!(5, 140, &[(0.0, 0.0, 0.3)], per = 8, bare = bare);
     keep_found();
     let (_, _, tip, a, tilt) = canes[front];
-    _with_part!(
+    _with_part(
         "rose",
         join_all("rosebush"),
-        || rose_head!(
-            "cut_rose",
-            tip,
-            0.05,
-            p.get("bloom"),
-            yaw = degrees(a),
-            tilt = tilt
-        ),
+        || {
+            rose_head!(
+                "cut_rose",
+                tip,
+                0.05,
+                p.get("bloom"),
+                yaw = degrees(a),
+                tilt = tilt
+            )
+        },
         tip,
-        "cut"
+        "cut",
     );
 }
 
@@ -2507,7 +2507,6 @@ fn shrubs(name: &str, p: &Palette) -> Option<Ret> {
         "leafy_shrub_plain" => {
             let mut seen = Vec::new();
             let out = leafy_shrub!(
-                p,
                 7,
                 0.9,
                 0.8,
@@ -2914,7 +2913,6 @@ fn beds(name: &str, p: &Palette) -> Option<Ret> {
         "mound_small" => return Some(vec![mound!(p, r = 0.4)]),
         "mound_low" => return Some(vec![mound!(p, r = 0.3, h = 0.05)]),
         "clumps" => botany::clumps(
-            p,
             &mut Random::new(9),
             7,
             0.33,
@@ -2924,7 +2922,6 @@ fn beds(name: &str, p: &Palette) -> Option<Ret> {
             &greens,
         ),
         "rosettes" => rosettes!(
-            p,
             &mut Random::new(11),
             3,
             0.3,
@@ -2936,7 +2933,6 @@ fn beds(name: &str, p: &Palette) -> Option<Ret> {
             tilt = (15.0, 35.0)
         ),
         "rosettes_pinnae" => rosettes!(
-            p,
             &mut Random::new(12),
             3,
             0.3,
@@ -2949,7 +2945,6 @@ fn beds(name: &str, p: &Palette) -> Option<Ret> {
             pinnae = 3
         ),
         "rosettes_oval" => rosettes!(
-            p,
             &mut Random::new(13),
             3,
             0.34,
@@ -2962,7 +2957,6 @@ fn beds(name: &str, p: &Palette) -> Option<Ret> {
             tilt = (10.0, 30.0)
         ),
         "rosettes_plain" => rosettes!(
-            p,
             &mut Random::new(14),
             3,
             0.2,
@@ -3192,7 +3186,6 @@ fn a_macro_works_out_what_was_given_by_place_before_what_was_given_by_name() {
     );
     took("perches");
     leafy_shrub!(
-        &p,
         1,
         at("place", 0.5),
         0.4,
