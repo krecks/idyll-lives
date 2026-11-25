@@ -390,6 +390,9 @@ describe('residents', async () => {
         }
       }
       expect(record).toMatchSnapshot();
+      // Quit: no part left drawn, the shadow-only copies with the rest.
+      characters.clear();
+      expect(parts.filter((p) => p.enabled).map((p) => p.name)).toEqual([]);
     } finally {
       performance.now = realNow;
       globalThis.fetch = realFetch;
