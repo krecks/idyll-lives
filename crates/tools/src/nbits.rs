@@ -16,9 +16,10 @@
 //! `cargo fetch-voice`.
 
 use crate::fp16::{
-    FLOAT, bytes_field, fields, read_tensor, round_to_half, string_field, varint_field,
+    FLOAT, MIN_VALUES, bytes_field, fields, read_tensor, round_to_half, string_field, varint,
+    varint_field,
 };
-use crate::int8::{Int8, weights_to_int8};
+use crate::int8::{Int8, tensor, weights_to_int8};
 use std::collections::HashMap;
 
 /// Values per block, each with its own scale.
@@ -29,8 +30,6 @@ const UINT8: u64 = 2;
 /// `AttributeProto.type`.
 const ATTR_INT: u64 = 2;
 const ATTR_INTS: u64 = 7;
-/// Weights smaller than this stay as `int8.rs` has them.
-const MIN_VALUES: usize = 1024;
 
 /// What converting a model did.
 pub struct Nbits {
@@ -91,17 +90,7 @@ fn ints(attribute: &[u8]) -> Result<Vec<i64>, String> {
             (8, 2) => {
                 let mut at = 0;
                 while at < f.payload.len() {
-                    let (mut v, mut shift) = (0u64, 0);
-                    loop {
-                        let b = *f.payload.get(at).ok_or("protobuf: truncated ints")?;
-                        at += 1;
-                        v |= u64::from(b & 0x7f) << shift;
-                        if b < 0x80 {
-                            break;
-                        }
-                        shift += 7;
-                    }
-                    out.push(v as i64);
+                    out.push(varint(f.payload, &mut at)? as i64);
                 }
             }
             _ => {}
@@ -160,17 +149,6 @@ fn quantize(n: usize, k: usize, w: impl Fn(usize, usize) -> f32) -> (Vec<u8>, Ve
         }
     }
     (bytes, scales)
-}
-
-fn tensor(name: &str, ty: u64, dims: &[u64], raw: &[u8]) -> Vec<u8> {
-    let mut out = Vec::new();
-    for &d in dims {
-        out.extend_from_slice(&varint_field(1, d));
-    }
-    out.extend_from_slice(&varint_field(2, ty));
-    out.extend_from_slice(&string_field(8, name));
-    out.extend_from_slice(&bytes_field(9, raw));
-    out
 }
 
 fn int_attribute(name: &str, value: i64) -> Vec<u8> {
