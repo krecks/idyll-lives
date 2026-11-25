@@ -7,7 +7,7 @@ use std::time::Instant;
 use sim_core::World;
 
 const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../web/public/content/");
-const LOT: &str = include_str!("../../../web/public/content/lots/starter.json");
+const LOT: &str = include_str!("../tests/starter_lot.json");
 
 /// base.json plus every file in its `"include"` list, merged the way the game loads them.
 fn content() -> String {
