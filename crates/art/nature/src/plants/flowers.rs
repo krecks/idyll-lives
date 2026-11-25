@@ -177,12 +177,14 @@ pub fn daisies() -> Vec<Obj> {
         top - 0.01,
         &[m("leaf"), m("leaf_dark"), m("leaf_light")],
         leaves = 4,
-        length = 0.17,
-        width = 0.065,
+        // (a lawn daisy's spoon-shaped leaves, under its flowers)
+        length = 0.12,
+        width = 0.05,
         tilt = (15.0, 35.0)
     );
     for (i, (x, y, _)) in spiral!(15, 0.38, &mut rng).into_iter().enumerate() {
-        let h = rng.uniform(0.25, 0.36);
+        // (lawn daisies, Bellis perennis: a carpet flowering 8-15 cm up, a large-flowered kind's heads)
+        let h = rng.uniform(0.25, 0.36) * 0.4;
         let (yaw, tilt) = (rng.uniform(0.0, 360.0), rng.uniform(0.0, 30.0));
         stalk!(
             format!("stem{i}"),
@@ -194,7 +196,7 @@ pub fn daisies() -> Vec<Obj> {
         rays!(
             format!("daisy{i}"),
             (x, y, h),
-            0.045,
+            0.03,
             10,
             m("bloom"),
             yaw = yaw,
@@ -211,12 +213,14 @@ pub fn daisies() -> Vec<Obj> {
                 material = m("centre"),
                 segments = 5,
                 rings = 3,
-                scale = (0.015, 0.015, 0.009)
+                scale = (0.01, 0.01, 0.006)
             );
             _put!(eye, (x, y, h), yaw = yaw, tilt = tilt, lift = 0.004);
         }
     }
-    fit_to(&meshes(), 0.84, 0.376, 0.84);
+    // (short stems: along their path, their ends stretched the texture over 2x)
+    crate::box_uvs(&["stem"]);
+    fit_to(&meshes(), 0.84, 0.15, 0.84);
     settle(&[join_all("daisies")])
 }
 

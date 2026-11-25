@@ -137,7 +137,7 @@ pub fn family() -> Family {
                 &[("bloom", "Petals")],
             ),
             bed(
-                Model::new("daisies", flowers::daisies, (0.84, 0.376, 0.84))
+                Model::new("daisies", flowers::daisies, (0.84, 0.15, 0.84))
                     .key("model.garden.daisies"),
                 &[("bloom", "Petals")],
             ),
