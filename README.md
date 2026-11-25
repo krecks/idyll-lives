@@ -78,7 +78,7 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run test:sound` | Run the sound crate's tests (each sound made and held to what it should be) |
 | `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
 | `bun run check:voice` | Check the voices in Bun against golden hashes (`tools/voice/check.mjs`) |
-| `bun run check:llm` | Check the language model's prompts, cleaning and golden lines in Bun (`tools/llm/check.mjs`; several minutes). Run it by hand when a prompt, a cleaning rule or the model changes, not on every release |
+| `bun run check:llm` | Check the language model's prompts and golden lines in Bun (`tools/llm/check.mjs`; several minutes). Run it by hand when a prompt or the model changes, not on every release (the cleaning rules' cases are in `web/tests/talkClean.test.ts`) |
 | `bun run devices:llm` | Run the voices and language model's device test in Chromium (`tools/llm/devices.mjs`) |
 | `bun ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; `--cpu` on the processor; writes `bench-results/llm-*/` |
 | `bun run assets` | Build or update the compressed asset copies (the build does this too) |

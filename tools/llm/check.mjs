@@ -3,10 +3,8 @@
  * Checks the language model that writes residents' lines as the browser's worker runs it
  * (`engine.mjs`: its 4-bit build, the worker's own `generate.ts`; on the CPU here, four threads),
  * with the game's own prompts (`web/src/talk/prompt.ts`, `content/talk/en.json`) and cleaning
- * (`clean.ts`):
+ * (`clean.ts`; its own cases are in `web/tests/talkClean.test.ts`):
  *
- * - `cleanLine` keeps what's said and drops labels, quotes, narration, stage directions and
- *   blocked words;
  * - prompts stay within their token budget, in three parts: rules and worked examples the same
  *   for everyone, the persona the same from line to line, then the moment; replies reuse the
  *   model's state after the parts they share (a new resident's first line only reads their
@@ -32,41 +30,7 @@ const fail = (message) => {
   process.exit(1);
 };
 
-// ---- cleaning -----------------------------------------------------------------------------------
-
 const clean = (raw, names = ['Tom']) => cleanLine(raw, { me: 'Mia', names, blocklist: text.blocklist });
-const CLEAN = [
-  ['Time to cook something nice.', 'Time to cook something nice.'],
-  ['Mia says: "How was your day, Tom?"', 'How was your day, Tom?'],
-  ["Mia's line: \"Pasta, fresh pasta!\"", 'Pasta, fresh pasta!'],
-  ['"Hey Tom!" Mia waves.', 'Hey Tom!'],
-  ['Mia smiles as she drifts off to sleep.', null],
-  ['Tom laughs and says "good one"', null],
-  ['*stretches* Time for bed', 'Time for bed.'],
-  ['Mia, stop it!', 'Stop it!'],
-  ['I love this 😀 so much!!', 'I love this so much!!'],
-  ['What the hell is this crap?', null],
-  ['Mia', null],
-  ['One. Two. Three. Four.', 'One. Two. Three. Four.'],
-  ['One. Two. Three. Four. Five. Six.', 'One. Two. Three. Four. Five.'],
-  ['Look at [read](/ɹˈɛd/) this', 'Look at this.'],
-  ['<|im_end|>', null],
-  ['Sure, as an AI I can help.', null],
-];
-for (const [raw, want] of CLEAN) {
-  const got = clean(raw);
-  if (got !== want) fail(`cleanLine(${JSON.stringify(raw)}) = ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
-}
-// Cut short (out of tokens or time): the unfinished sentence goes (with nothing finished, the line).
-const CUT = [
-  ['What a day. I think I will', 'What a day.'],
-  ['What a day. I think I will!', 'What a day. I think I will!'],
-  ['What a day and', null],
-];
-for (const [raw, want] of CUT) {
-  const got = cleanLine(raw, { me: 'Mia', names: ['Tom'], blocklist: text.blocklist, cut: true });
-  if (got !== want) fail(`cleanLine(${JSON.stringify(raw)}, cut) = ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
-}
 
 // ---- prompts ------------------------------------------------------------------------------------
 
