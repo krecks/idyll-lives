@@ -59,7 +59,7 @@ pub fn press_cylinder(
 ) -> Obj {
     let l = 2.0 * PP_FRAME - 0.02;
     let parts = new_parts(|| {
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             name,
             r,
@@ -69,7 +69,7 @@ pub fn press_cylinder(
             rot = (0, 90, 0),
             verts = sides(r, 16, 32)
         ));
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             format!("{name}_axle"),
             0.035,
@@ -81,7 +81,7 @@ pub fn press_cylinder(
         ));
         for s in [-1, 1] {
             // its bearers: steel rings at its ends
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("{name}_bearer{s}"),
                 r + 0.004,
@@ -177,7 +177,7 @@ pub fn printing_press() -> Vec<Obj> {
                     m.dark
                 );
             }
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("panel_lock{k}"),
                 0.012,
@@ -231,7 +231,7 @@ pub fn printing_press() -> Vec<Obj> {
                 .into_iter()
                 .enumerate()
             {
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("boss{s}{k}"),
                     0.06,
@@ -246,7 +246,7 @@ pub fn printing_press() -> Vec<Obj> {
         // the impression cylinder (steel, smooth: it shows no turning), the ink rollers in a pyramid under a hood,
         // the ink fountain at the back
         let (y, z, r) = PP_IMPRESSION;
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "impression",
             r,
@@ -266,7 +266,7 @@ pub fn printing_press() -> Vec<Obj> {
         .into_iter()
         .enumerate()
         {
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("ink_roller{k}"),
                 rr,
@@ -277,7 +277,7 @@ pub fn printing_press() -> Vec<Obj> {
                 verts = 14
             ));
         }
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "fountain",
             &[
@@ -318,7 +318,7 @@ pub fn printing_press() -> Vec<Obj> {
                 1.3 + 0.198 * sin(radians(a as f64)),
             )
         }));
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "hood",
             &hood,
@@ -357,7 +357,7 @@ pub fn printing_press() -> Vec<Obj> {
                 m.iron
             );
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "reel",
             rr,
@@ -367,7 +367,7 @@ pub fn printing_press() -> Vec<Obj> {
             rot = (0, 90, 0),
             verts = sides(rr, 24, 40)
         ));
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "reel_core",
             0.05,
@@ -377,7 +377,7 @@ pub fn printing_press() -> Vec<Obj> {
             rot = (0, 90, 0),
             verts = 12
         ));
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "reel_shaft",
             0.025,
@@ -387,7 +387,7 @@ pub fn printing_press() -> Vec<Obj> {
             rot = (0, 90, 0),
             verts = 10
         ));
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "brake",
             0.11,
@@ -399,7 +399,7 @@ pub fn printing_press() -> Vec<Obj> {
         ));
         // the web: up from the reel over the guide roller at the back of the frames, and out of the cylinders'
         // nip to the cutter at the front
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "guide",
             0.04,
@@ -555,7 +555,7 @@ pub fn printing_press() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("button{k}"),
                 0.016,
@@ -566,7 +566,7 @@ pub fn printing_press() -> Vec<Obj> {
                 verts = 10
             ));
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "stop",
             0.028,

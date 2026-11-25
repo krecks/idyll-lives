@@ -1,7 +1,7 @@
 //! The doorstep delivery locker and the effortless vibration plate.
 
 use super::common::{M, WALL};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
@@ -465,21 +465,25 @@ pub fn vibe_plate() -> Vec<Obj> {
         // the column at the plate's far end, which the stander faces (they step on from the tile in front and face
         // in), curving up to the console; the handlebar bent from one tube, its arms reaching back to either side of
         // them at waist height, the grips by their hands (2026-10-21: a short bar at the hip, 30 cm ahead: I-packs-04)
-        ease_ends(fsweep!(
-            f,
-            "column",
-            &[
-                (0.0, 0.09, -0.235),
-                (0.0, 0.5, -0.27),
-                (0.0, BAR_Y - 0.02, -0.32)
-            ],
-            0.0,
-            M.plate,
-            profile = rounded_rect(0.07, 0.09, 0.03, 3),
-            up = (0, 1, 0),
-            resolution = 2,
-            scale = [1.15, 1.0, 0.9]
-        ));
+        ease(
+            fsweep!(
+                f,
+                "column",
+                &[
+                    (0.0, 0.09, -0.235),
+                    (0.0, 0.5, -0.27),
+                    (0.0, BAR_Y - 0.02, -0.32)
+                ],
+                0.0,
+                M.plate,
+                profile = rounded_rect(0.07, 0.09, 0.03, 3),
+                up = (0, 1, 0),
+                resolution = 2,
+                scale = [1.15, 1.0, 0.9]
+            ),
+            60.0,
+            1,
+        );
         fcyl!(
             f,
             "column_collar",

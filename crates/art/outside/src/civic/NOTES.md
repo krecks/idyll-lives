@@ -112,14 +112,14 @@ Built in Rust since 2026-11-18, proved against the last Blender build (`cargo ch
 
 The gate's `edges` found 75 (lectern 14, plant table 10, hotel reception 10, bar counter 8, duty desk 6, altar 6,
 vault door 4, mannequin 4, teller counter 2, exam couch 2, three desks 1); none now, none accepted. The family's
-revolves, lofts, sweeps and extrusions that named no bevel take the crate's `eased` (a 4 mm chamfer on turns over 50°,
+revolves, lofts, sweeps and extrusions that named no bevel take `artkit::bevel::eased` (a 4 mm chamfer on turns over 50°,
 none on a part under 12 mm one way or 10 cm every way): the open books' page blocks, the pots, the brass, the
 candles, the vault's rims. Not the bar's tumblers, the pen pot or the hotel lamp's shade: thin-walled, their chamfer
 made edges of its own. The plant table's pots have their rim's top edge cut across in the profile instead, ten
 round (a chamfer all round took it past 8,000 triangles), its legs a one-step chamfer; the teller's speaking
 grille's back rim is cut across the same way; a book's boards take a 2 mm chamfer (3 mm met in a 6 mm board's
-middle, a ridge). The teacher's globe's turned base lays box UVs on its chamfered mesh (`boxed`): round about its
-axis, the walnut's grain stretched over its slopes.
+middle, a ridge). The teacher's globe's turned base lays box UVs (`UvWay::Box`, on its chamfered mesh): round about
+its axis, the walnut's grain stretched over its slopes.
 
 ## Audit (2026-11-25)
 

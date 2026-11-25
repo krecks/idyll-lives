@@ -181,7 +181,7 @@ pub fn basketball_hoop() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        crate::eased(kit::moulding!(
+        artkit::bevel::eased(kit::moulding!(
             F,
             "board_frame",
             &[

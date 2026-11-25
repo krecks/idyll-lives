@@ -12,7 +12,7 @@ use crate::noise::noise_at;
 use crate::parts::{join, join_all, measure, new_parts, settle};
 use crate::rand::Random;
 use crate::scene::{Obj, meshes};
-use crate::shapes::{Cube, Revolve, cube, options, revolve};
+use crate::shapes::{AUTO_BEVEL, Cube, Revolve, cube, options, revolve};
 
 options! {
     /// `spiral`'s options.
@@ -261,8 +261,8 @@ pub fn _crop(
     vec![still, plants, fruit]
 }
 
-/// A raised bed of boards (the palette `p`'s `body`, the part the player colours), two to a side, with corner
-/// posts, full of soil mounded into rows: returns the soil's height.
+/// A raised bed of boards (the palette `p`'s `body`, the part the player colours), two to a side, their arrises
+/// chamfered (`AUTO_BEVEL`), with corner posts, full of soil mounded into rows: returns the soil's height.
 pub fn raised_bed(p: &Palette, w: f64, d: f64, h: f64) -> f64 {
     let body = p.get("body");
     for s in [-1, 1] {
@@ -277,6 +277,7 @@ pub fn raised_bed(p: &Palette, w: f64, d: f64, h: f64) -> f64 {
                         z: h / 4.0 + k as f64 * h / 2.0,
                     },
                     material: Some(body),
+                    bevel: AUTO_BEVEL,
                     ..Cube::default()
                 },
             );
@@ -290,6 +291,7 @@ pub fn raised_bed(p: &Palette, w: f64, d: f64, h: f64) -> f64 {
                         z: h / 4.0 + k as f64 * h / 2.0,
                     },
                     material: Some(body),
+                    bevel: AUTO_BEVEL,
                     ..Cube::default()
                 },
             );

@@ -39,7 +39,7 @@ pub fn shop_counter() -> Vec<Obj> {
             bevel = 0.008
         );
         // the worktop: walnut with a rounded nose along its front, a cove moulding under it
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "worktop",
             &[
@@ -301,7 +301,7 @@ pub fn shop_counter() -> Vec<Obj> {
             rot = (-15, 0, 0)
         );
         for s in [-1, 1] {
-            crate::eased(fextrude!(
+            artkit::bevel::eased(fextrude!(
                 f,
                 format!("rack_end{s}"),
                 &[

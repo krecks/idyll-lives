@@ -2,7 +2,6 @@
 
 use super::WALL;
 use super::common::{M, chain};
-use crate::ease::{EASE, ease_ends, eased};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, radians, sin, sind};
@@ -11,6 +10,7 @@ use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{
     boulder, fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, settle, soft, swing, torus,
 };
@@ -48,7 +48,7 @@ pub fn heavy_bag() -> Vec<Obj> {
             profile = rounded_rect(0.06, 0.08, 0.012, 2),
             up = (0, 0, 1)
         );
-        ease_ends(foot);
+        ease(foot, 60.0, 1);
         let foot = fsweep!(
             f,
             "foot_cross",
@@ -58,7 +58,7 @@ pub fn heavy_bag() -> Vec<Obj> {
             profile = rounded_rect(0.06, 0.08, 0.012, 2),
             up = (0, 0, 1)
         );
-        ease_ends(foot);
+        ease(foot, 60.0, 1);
         for (x, z) in [(0.0, 0.34), (-0.355, -0.37), (0.355, -0.37)] {
             fbox!(
                 f,
@@ -182,7 +182,7 @@ pub fn heavy_bag() -> Vec<Obj> {
                 s as f64 * 0.177 + (s > 0) as i32 as f64 * 0.045,
                 0.17,
                 -0.29,
-                &eased(&prof, EASE),
+                &eased(&prof, AUTO_WIDTH),
                 m,
                 segments = 22,
                 rot = (0.0, 90.0, 0.0)
@@ -470,7 +470,7 @@ pub fn smash_bin() -> Vec<Obj> {
                     (px, h / 2.0, pz),
                     M.crate_dark,
                     bevel = 0.004,
-                    bevel_segments = 2
+                    bevel_segments = 1
                 );
             }
         }

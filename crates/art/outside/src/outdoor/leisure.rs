@@ -774,7 +774,7 @@ pub fn swing_set() -> Vec<Obj> {
                 .iter()
                 .map(|&u| (x + u, 0.48 + 0.035 * pow(u / 0.2, 2.0), 0))
                 .collect();
-            crate::eased(fsweep!(
+            artkit::bevel::eased(fsweep!(
                 F,
                 format!("seat{}", float_repr(x)),
                 &belt,

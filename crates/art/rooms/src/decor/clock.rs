@@ -249,7 +249,7 @@ pub fn grandfather_clock() -> Vec<Obj> {
             // turned brass columns either side of the hood door
             turned_g(
                 &format!("column{s}"),
-                &crate::common::eased(
+                &artkit::forms::eased(
                     &[
                         (0.0, 0.0),
                         (0.02, 0.0),
@@ -276,7 +276,7 @@ pub fn grandfather_clock() -> Vec<Obj> {
             F,
             "cornice",
             &box_outline(0.6, 0.4, GF_Z),
-            &crate::common::eased_loop(
+            &artkit::forms::eased_loop(
                 &[
                     (0.07, 0.0),
                     (0.03, 0.0),
@@ -518,7 +518,7 @@ pub fn grandfather_clock() -> Vec<Obj> {
         );
         revolve!(
             "pendulum_bob",
-            &crate::common::eased(
+            &artkit::forms::eased(
                 &[
                     (0.0, -0.008),
                     (0.035, -0.006),

@@ -216,7 +216,7 @@ fn frame() {
     );
     for z in [-hz + 0.01, hz - 0.01] {
         // a finial at each end of the ridge
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             numbered("finial"),
             &[
                 (0.0, 0.0),

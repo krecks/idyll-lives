@@ -459,7 +459,7 @@ pub fn boombox() -> Vec<Obj> {
                 );
             }
             for zz in [-0.205, 0.205] {
-                let post = rbox!(
+                rbox!(
                     format!("crate_post{s}{}", float_repr(zz)),
                     0.03,
                     0.42,
@@ -468,8 +468,6 @@ pub fn boombox() -> Vec<Obj> {
                     M.crate_dark,
                     r = 0.003
                 );
-                // (chamfered before its UVs are made, so the chamfers get their own)
-                artkit::bevel::apply(post);
             }
         }
         for x in [-0.15, 0.15] {

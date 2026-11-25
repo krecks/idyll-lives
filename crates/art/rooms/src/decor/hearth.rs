@@ -144,7 +144,7 @@ pub fn fireplace() -> Vec<Obj> {
                 (0.8, WALL + 0.28),
                 (-0.8, WALL + 0.28)
             ],
-            &crate::common::eased_loop(
+            &artkit::forms::eased_loop(
                 &[
                     (0.03, 0.0),
                     (0.0, 0.0),
@@ -430,7 +430,7 @@ pub fn fireplace() -> Vec<Obj> {
         let top = 1.32;
         revolve!(
             "vase",
-            &crate::common::eased(
+            &artkit::forms::eased(
                 &[
                     (0.0, 0.0),
                     (0.036, 0.0),
@@ -500,7 +500,7 @@ pub fn fireplace() -> Vec<Obj> {
                 F,
                 "picture_frame",
                 &rect(0.3, 0.38, top + 0.19, 0.55),
-                &crate::common::eased_loop(
+                &artkit::forms::eased_loop(
                     &[
                         (0.0, 0.0),
                         (0.0, 0.02),

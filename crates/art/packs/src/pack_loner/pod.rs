@@ -1,7 +1,7 @@
 //! The hush-shell reading pod and the shortwave radio desk.
 
 use super::common::{_book, _chair, _desk, _mug, M, WALL};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, PI, cos, cosd, pow, sin, sind};
@@ -104,7 +104,7 @@ pub fn quiet_pod() -> Vec<Obj> {
                 verts = 14,
                 resolution = 2
             );
-            ease_ends(edge);
+            ease(edge, 60.0, 1);
             fsweep!(
                 f,
                 numbered("wing_piping"),

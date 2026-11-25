@@ -376,7 +376,7 @@ pub(super) fn eased_bar(
     material: Mat,
     along_x: bool,
 ) -> Obj {
-    let small = crate::common::inset(outline, c);
+    let small = artkit::forms::inset(outline, c);
     let k = outline.len() as u32;
     let mut verts: Vec<(f64, f64, f64)> = Vec::new();
     for (a, o) in [

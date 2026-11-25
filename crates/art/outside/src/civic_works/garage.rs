@@ -132,7 +132,7 @@ pub fn tyre_rack() -> Vec<Obj> {
                 let x = -0.79 + t as f64 * (1.58 / (n - 1) as f64);
                 let ty = y + 0.05 - (r - sqrt(r * r - pow(TR_D / 2.0 - 0.085, 2.0))) + r; // down between the beams
                 // its open bead eased, sixteen round (eased, twenty went past the triangles' aim)
-                crate::eased(tyre(
+                artkit::bevel::eased(tyre(
                     &format!("tyre{lv}{t}"),
                     x,
                     ty,

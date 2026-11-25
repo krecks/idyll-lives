@@ -343,8 +343,6 @@ pub fn snake_plant() -> Vec<Obj> {
             );
         }
     }
-    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
-    crate::chamfer(&["pot", "saucer"]);
     settle(&[join_all("snakePlant")])
 }
 
@@ -519,8 +517,6 @@ pub fn cacti() -> Vec<Obj> {
             rot = (0, r, 0)
         );
     }
-    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
-    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.568, 0.521, 0.465);
     settle(&[join_all("cacti")])
 }
@@ -727,8 +723,6 @@ pub fn boston_fern() -> Vec<Obj> {
             ribs = 3
         );
     }
-    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
-    crate::chamfer(&["pot", "saucer"]);
     settle(&[join_all("bostonFern")])
 }
 
@@ -793,8 +787,6 @@ pub fn palm() -> Vec<Obj> {
             ribs = 5
         );
     }
-    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
-    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.770, 0.905, 0.693);
     settle(&[join_all("palm")])
 }
@@ -937,8 +929,6 @@ pub fn orchid() -> Vec<Obj> {
             );
         }
     }
-    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
-    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.431, 1.228, 0.381);
     settle(&[join_all("orchid")])
 }

@@ -1,7 +1,7 @@
 //! What the farm is built from: the palette, the frame, and the slabs, shells and bars the buildings are made of,
 //! each drawn as an outline on a plane and thickened across it.
 
-pub use crate::eased;
+pub use artkit::bevel::eased;
 use artkit::forms;
 use artkit::materials::Mat;
 use artkit::math::{V3, cosd, sind};

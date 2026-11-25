@@ -3,7 +3,8 @@
 
 use super::common::{hollow, knob};
 use super::{M, SECONDS};
-use crate::common::{eased, shaker, stream};
+use crate::common::{shaker, stream};
+use artkit::forms::eased;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::kit::fillet;

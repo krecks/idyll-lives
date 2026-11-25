@@ -1,7 +1,6 @@
 //! The espresso bar and the cookbook lectern.
 
 use super::common::{_lofted, M, WALL};
-use crate::ease::{EASE, ease_ends, eased};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -10,6 +9,7 @@ use artkit::motion::{Path, keys};
 use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, RotationMode};
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{
     fbox, fcone, fcyl, fextrude, fsphere, fsweep, grow, jitter, revolve, settle, soft, swing,
 };
@@ -27,7 +27,7 @@ fn _cup(f: &GameFrame, x: f64, y: f64, z: f64, m: Option<Mat>) {
             // (its rim rolled over)
             &eased(
                 &[(0.026, 0.0), (0.042, 0.007), (0.04, 0.009), (0.0, 0.004)],
-                EASE
+                AUTO_WIDTH
             ),
         ]
         .concat(),
@@ -777,8 +777,10 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             ];
             let pts = [_on_desk(0.0, 0.032, -0.155), _on_desk(0.0, 0.032, 0.155)];
             // (the block's fore-edge rounded, its ends eased)
-            let swapped: Vec<(f64, f64)> =
-                eased(&prof, EASE).iter().map(|&(u, v)| (v, u)).collect();
+            let swapped: Vec<(f64, f64)> = eased(&prof, AUTO_WIDTH)
+                .iter()
+                .map(|&(u, v)| (v, u))
+                .collect();
             let pages = fsweep!(
                 f,
                 numbered("pages"),
@@ -788,7 +790,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
                 profile = swapped,
                 up = (0, 0, 1)
             );
-            ease_ends(pages);
+            ease(pages, 60.0, 1);
         }
         fbox!(
             f,

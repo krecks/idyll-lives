@@ -136,7 +136,7 @@ pub fn car(m: &LIFT) {
         );
         for s in [-1, 1] {
             let x = s as f64 * 0.805;
-            crate::eased(fsweep!(
+            artkit::bevel::eased(fsweep!(
                 F,
                 format!("a_pillar{s}"),
                 &[(x, y + 0.92, 0.97), (x, y + 1.43, 0.3)],
@@ -154,7 +154,7 @@ pub fn car(m: &LIFT) {
                 (x, y + 1.17, -0.18),
                 paint
             );
-            crate::eased(fextrude!(
+            artkit::bevel::eased(fextrude!(
                 F,
                 format!("c_pillar{s}"),
                 &[
@@ -240,7 +240,7 @@ pub fn car(m: &LIFT) {
                 ],
                 up = (0, 0, 1)
             );
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("disc{s}{zcs}"),
                 0.14,
@@ -250,7 +250,7 @@ pub fn car(m: &LIFT) {
                 rot = (0, 90, 0),
                 verts = low(20, 8)
             ));
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("hub{s}{zcs}"),
                 0.065,
@@ -294,7 +294,7 @@ pub fn car(m: &LIFT) {
                     m.iron,
                     verts = 8
                 );
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("spring{s}{zcs}"),
                     0.055,
@@ -318,7 +318,7 @@ pub fn car(m: &LIFT) {
     // its front and back: lamps, grille, plates (white at the front, yellow at the back), bumpers' lower lips
     for s in [-1, 1] {
         let sf = s as f64;
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             format!("headlamp{s}"),
             &[(-0.2, -0.03), (0.15, -0.05), (0.2, 0.04), (-0.18, 0.05)],
@@ -391,7 +391,7 @@ pub fn car(m: &LIFT) {
         m.dark
     );
     // the exhaust under it, out at the back on the left
-    crate::eased(kit_tube!(
+    artkit::bevel::eased(kit_tube!(
         F,
         "exhaust",
         &[
@@ -405,7 +405,7 @@ pub fn car(m: &LIFT) {
         m.steel,
         round = low(2, 1)
     ));
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "silencer",
         0.1,
@@ -444,7 +444,7 @@ pub fn alloy(name: &str, m: &LIFT) -> Obj {
             Some(low(24, 12)),
             Axis::Z,
         );
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             format!("{name}_rim"),
             &[
                 (0.0, 0.06),
@@ -565,7 +565,7 @@ pub fn lift_post(s: i32, m: &LIFT) {
         bevel = low(0.01, 0.0),
         bevel_segments = 1
     );
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         format!("ram{s}"),
         0.04,
@@ -647,7 +647,7 @@ pub fn lift_arm(s: i32, t: i32, m: &LIFT) {
         material = m.steel,
         rot = (0, 0, yaw)
     );
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         format!("pivot{s}{t}"),
         0.05,
@@ -665,7 +665,7 @@ pub fn lift_arm(s: i32, t: i32, m: &LIFT) {
         m.chrome,
         verts = low(8, 6)
     );
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         format!("pad{s}{t}"),
         0.07,
@@ -685,7 +685,7 @@ pub fn car_lift() -> Vec<Obj> {
         }
     }
     // the floor plate between the posts over the hoses and cables: a low ramp of chequer plate
-    crate::eased(fextrude!(
+    artkit::bevel::eased(fextrude!(
         F,
         "floor_plate",
         &[(-0.17, 0.0), (0.17, 0.0), (0.12, 0.03), (-0.12, 0.03)],

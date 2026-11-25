@@ -1,7 +1,7 @@
 //! The chef's island (2x1): a marble-topped island, a hob on it, drawers on the cook's side, two stools.
 
 use super::common::M;
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, cosd, sind};
@@ -80,20 +80,24 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
             round = 1
         );
     }
-    ease_ends(fsweep!(
-        f,
-        numbered("stool_back"),
-        &[
-            (x - 0.16, STOOL + 0.21, z - 0.15),
-            (x, STOOL + 0.21, z - 0.183),
-            (x + 0.16, STOOL + 0.21, z - 0.15)
-        ],
-        0.0,
-        M.oak,
-        profile = rounded_rect(0.1, 0.022, 0.008, 1),
-        up = (0, 0, 1),
-        resolution = 3
-    ));
+    ease(
+        fsweep!(
+            f,
+            numbered("stool_back"),
+            &[
+                (x - 0.16, STOOL + 0.21, z - 0.15),
+                (x, STOOL + 0.21, z - 0.183),
+                (x + 0.16, STOOL + 0.21, z - 0.15)
+            ],
+            0.0,
+            M.oak,
+            profile = rounded_rect(0.1, 0.022, 0.008, 1),
+            up = (0, 0, 1),
+            resolution = 3
+        ),
+        60.0,
+        1,
+    );
 }
 
 pub fn chefs_island() -> Vec<Obj> {

@@ -65,7 +65,7 @@ pub fn prism(name: &str, profile: &[(f64, f64)], a0: f64, a1: f64, material: Mat
         faces.push(vec![i, j, n + j, n + i]);
     }
     let verts = a.into_iter().chain(b).collect();
-    crate::eased(forms::object(
+    artkit::bevel::eased(forms::object(
         name,
         verts,
         &faces,

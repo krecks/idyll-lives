@@ -214,6 +214,4 @@ fn blooms(tree: &mut Tree) {
             segments = low(6, 4)
         );
     }
-    // (turned, then tilted: round their own axis no longer)
-    crate::box_uvs(&["bloom"]);
 }

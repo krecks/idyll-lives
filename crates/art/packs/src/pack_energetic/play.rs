@@ -1,7 +1,7 @@
 //! The home bouldering wall, the interactive spin bike, the rebound trampoline and the streetball hoop.
 
 use super::common::{HOLDS, M, WALL, lofted};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, cosd, radians, sin, sind};
@@ -386,7 +386,7 @@ pub fn spin_bike() -> Vec<Obj> {
             profile = rounded_rect(0.1, 0.12, 0.035, 2),
             up = (1, 0, 0)
         );
-        ease_ends(swept);
+        ease(swept, 60.0, 1);
         fextrude!(
             f,
             "back_shell",
@@ -426,7 +426,7 @@ pub fn spin_bike() -> Vec<Obj> {
             up = (1, 0, 0),
             resolution = 2
         );
-        ease_ends(swept);
+        ease(swept, 60.0, 1);
         for (z, w) in [(-0.66, 0.6), (0.86, 0.56)] {
             fsweep!(
                 f,
@@ -460,7 +460,7 @@ pub fn spin_bike() -> Vec<Obj> {
             up = (1, 0, 0),
             resolution = 2
         );
-        ease_ends(swept);
+        ease(swept, 60.0, 1);
         // the flywheel's rounded housing, the orange wheel showing in each side with its spokes
         revolve!(
             "housing",
@@ -513,7 +513,7 @@ pub fn spin_bike() -> Vec<Obj> {
             profile = rounded_rect(0.2, 0.22, 0.05, 2),
             up = (1, 0, 0)
         );
-        ease_ends(swept);
+        ease(swept, 60.0, 1);
         for s in [-1.0, 1.0] {
             // the side grips by the seat: bent tube, foam grips
             kit::tube!(
@@ -677,7 +677,7 @@ pub fn spin_bike() -> Vec<Obj> {
                 up = (1, 0, 0),
                 scale = [1.0, 0.75]
             );
-            ease_ends(crank);
+            ease(crank, 60.0, 1);
             fcyl!(
                 f,
                 numbered("spindle"),
@@ -995,7 +995,7 @@ pub fn streetball_hoop() -> Vec<Obj> {
             verts = 12,
             round = 1
         );
-        ease_ends(upper);
+        ease(upper, 60.0, 1);
         revolve!(
             "collar",
             &[

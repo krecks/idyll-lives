@@ -101,7 +101,7 @@ Every hard edge the gate found (47) is gone, and the photo wall's legs no longer
   cushions unpiped (their cords cost 320 triangles past the aim) and the hidden base, chaise base and back panels
   rounded in one step; the lamp, pot, tray, cups and console legs a few sides fewer, the plant's leaves 2 rows
   (7,996 triangles, was 9,200).
-- **Karaoke stage and dance floor:** the speakers' cones and the moving-head spots eased (`crate::ease::eased`);
+- **Karaoke stage and dance floor:** the speakers' cones and the moving-head spots eased (`artkit::forms::eased`);
   the dance floor's steel edge mitred across its corners.
 - **Video-call corner:** the chair shell's rim chamfered, the plant pot's rim cut, the chair back 1 cm forward (0.77 m
   deep, a small desk's 0.70 + 10 %).

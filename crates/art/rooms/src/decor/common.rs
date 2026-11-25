@@ -276,7 +276,7 @@ pub fn frame(
         (border, depth - 0.007),
         (border, 0.0),
     ];
-    let profile = crate::common::eased_loop(profile.unwrap_or(&default), 0.003);
+    let profile = artkit::forms::eased_loop(profile.unwrap_or(&default), 0.003);
     kit::moulding!(
         F,
         "frame",
@@ -689,7 +689,7 @@ pub fn pedestal(h: f64, w: f64, material: Mat) {
         F,
         "plinth_cap",
         &box_outline(2.0 * m, 2.0 * m, 0.0),
-        &crate::common::eased_loop(
+        &artkit::forms::eased_loop(
             &[
                 (0.04, 0.0),
                 (0.02, 0.0),

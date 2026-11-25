@@ -117,7 +117,7 @@ Every hard edge the gate found (42) is gone:
 - **Espresso bar:** the saucers' rims rolled over, the drip tray eased, the towel's fold over its rail rolls round.
 - **Herb garden:** the trough's rim chamfered inside too, its liner eased, the basket's rim rolled over; the trough
   8 cm lower (on 0.54 m legs), so with its herbs it stands 1.21 m; the basket set aside; the trough's posts bevelled
-  in two segments (one smeared their grain).
+  in one segment (their UVs laid on the bevel).
 - **Pizza oven:** the sauce bowl's rim chamfered; the prep counter beside it set aside (as a desk's chair): it
   measures 1.57 m wide with the peel on the counter. It keeps 4 draw calls: the door, the peel and the flames move on
   their own.

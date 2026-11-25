@@ -74,7 +74,7 @@ pub fn fire_pole() -> Vec<Obj> {
         m.body,
         verts = sides(r, 16, 64)
     );
-    crate::eased(revolve!(
+    artkit::bevel::eased(revolve!(
         "collar",
         &[
             (0.0, CEILING - 0.12),
@@ -242,7 +242,7 @@ pub fn hose_rack() -> Vec<Obj> {
             );
             let (bx, by, bz) = drop[drop.len() - 1];
             if k == 0 {
-                crate::eased(revolve!(
+                artkit::bevel::eased(revolve!(
                     format!("branch{k}"),
                     &[
                         (0.0, 0.0),

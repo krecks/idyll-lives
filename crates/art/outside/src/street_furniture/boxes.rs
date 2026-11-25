@@ -134,7 +134,7 @@ pub fn litter_bin() -> Vec<Obj> {
             resolution = 2
         );
         // the label on its front: a white plate with a bin sign and two lines on it
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "label",
             &rounded_rect(0.16, 0.08, 0.01, 2),
@@ -338,7 +338,7 @@ pub fn post_box() -> Vec<Obj> {
             m.dark
         );
         // the collection times: a framed white plate with its lines
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "times_frame",
             &rounded_rect(0.16, 0.13, 0.012, 2),

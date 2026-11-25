@@ -108,7 +108,7 @@ The Workbench previews draw glass opaque and metal dark: the server rack's serve
 
 The gate's `edges` found 137 (car lift 47, tyre rack 30, printing press 25, fire engine 12, flag pole 7, server
 rack 6, cement mixer 4, the timber stack, hose rack and fire pole 1); none now, none accepted. The press's, yard's
-and the station's revolves, sweeps, lofts and extrusions that named no bevel take the crate's `eased` (a 4 mm chamfer
+and the station's revolves, sweeps, lofts and extrusions that named no bevel take `artkit::bevel::eased` (a 4 mm chamfer
 on turns over 50°; not the mixer's tow handle), as do the lift's brakes, springs, pads, pillars, lamps, floor plate,
 exhaust and the wheel's rim, the engine's arches, beacons, wheel caps and head-lamp bezels, the tyre rack's and the
 timber stack's tyres (their open beads); a blank server panel takes the 2 mm chamfer the others have.

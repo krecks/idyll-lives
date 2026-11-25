@@ -1,13 +1,13 @@
 //! The heated quilt table and the smart-home command hub.
 
 use super::common::{M, WALL};
-use crate::ease::{EASE, ease_ends, eased};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, sind};
 use artkit::parts::{aside, hinged, join, new_parts, numbered, turn};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{fbox, fcyl, fsphere, fsweep, kit, settle, soft, swing, torus};
 
 // --- the heated quilt table (2x1): a kotatsu in front, two poufs (tops 0.45) at x = ±0.5 behind it ---------
@@ -52,15 +52,11 @@ fn _drape(
         ));
     }
     let prof = rounded_rect(y1 - y0, t, t * 0.45, 1);
-    ease_ends(fsweep!(
-        f,
-        name,
-        &pts,
-        0.0,
-        material,
-        profile = prof,
-        up = (0, 0, 1)
-    ))
+    ease(
+        fsweep!(f, name, &pts, 0.0, material, profile = prof, up = (0, 0, 1)),
+        60.0,
+        1,
+    )
 }
 
 pub fn quilt_table() -> Vec<Obj> {
@@ -196,7 +192,7 @@ pub fn quilt_table() -> Vec<Obj> {
                     (0.055, 0.016),
                     (0.0, 0.016),
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             M.porcelain,
             segments = 22
@@ -301,7 +297,7 @@ pub fn quilt_table() -> Vec<Obj> {
                     (0.06, 0.006),
                     (0.0, 0.006),
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             M.porcelain,
             segments = 18

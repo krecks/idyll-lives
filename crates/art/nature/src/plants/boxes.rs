@@ -226,8 +226,6 @@ pub fn geraniums() -> Vec<Obj> {
             seed = i as f64 * 0.6
         );
     }
-    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
-    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.424, 0.65, 0.468);
     settle(&[join_all("geraniums")])
 }

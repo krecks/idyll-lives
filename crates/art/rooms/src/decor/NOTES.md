@@ -146,11 +146,11 @@ still names this file by its old name (decor.md).
 
 ## Hard edges eased (2026-11-25)
 
-The gate's `edges` and `texels` find none left. Every moulding's profile is eased all round (`crate::common::eased_loop`,
+The gate's `edges` and `texels` find none left. Every moulding's profile is eased all round (`artkit::forms::eased_loop`,
 3 mm: the frames, their backs on the wall too, the painting's bead, the canvas's float frame, the pedestals' caps,
 the clock's cornice, the pictures on the shelf and the mantel); the shelf boards and the mantel have their backs on
 the wall eased and their ends chamfered; the surround's jambs and lintel are eased where they meet the breast; the
-vases' lips, the clock's hood columns and its bob's knife edge are rolled (`crate::common::eased`); the bust's neck
+vases' lips, the clock's hood columns and its bob's knife edge are rolled (`artkit::forms::eased`); the bust's neck
 ends inside the head. The coat on the stand is lofted through flat oval rings, where it was a lathe squashed after
 its UVs were laid (its cloth stretched 2.2× at the hem and shoulders).
 

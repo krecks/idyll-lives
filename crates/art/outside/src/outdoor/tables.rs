@@ -98,7 +98,7 @@ pub fn patio_table_round() -> Vec<Obj> {
         M.mosaic
     };
     // the top: a slab under the mosaic, the tiles, an iron band round its edge
-    crate::eased(revolve!(
+    artkit::bevel::eased(revolve!(
         "top",
         &[
             (0.0, 0.676),

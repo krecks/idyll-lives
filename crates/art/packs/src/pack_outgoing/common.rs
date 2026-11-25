@@ -1,11 +1,11 @@
 //! What the outgoing pack is built from: its palette, the bottles, glasses, stools and speakers more than one of its
 //! models stands about.
 
-use crate::ease::{EASE, eased};
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
 use artkit::place::GameFrame;
 use artkit::{fcone, fcyl, fsweep, loft, palette, revolve, ring, soft, torus};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 palette! { M:
     body = ("#E8735A", satin),       // coral: the bar's counter, the desk frame, the stage, the floor's frame
@@ -304,7 +304,7 @@ pub fn _speaker(
                     (r * 0.2, 0.0),
                     (0.0, 0.004)
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             at = f.at(x, cy, zf),
             material = if k != 0 { M.dark } else { M.coral },

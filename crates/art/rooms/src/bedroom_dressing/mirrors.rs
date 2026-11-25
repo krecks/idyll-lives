@@ -714,7 +714,7 @@ pub fn mirror_wall() -> Vec<Obj> {
     let shelf_y = 0.972;
     // its section (depth out from the wall's face less 4.25 cm, height): from the floor's front, round the lip,
     // along the tray's top to the back; its corners eased (with height as eased's v: the underside's stay sharp)
-    let tray: Vec<(f64, f64)> = crate::common::eased(
+    let tray: Vec<(f64, f64)> = artkit::forms::eased(
         &[
             (0.045, 0.0),
             (0.0472, 0.006),
@@ -733,7 +733,7 @@ pub fn mirror_wall() -> Vec<Obj> {
             .map(|&(v, u)| F.at(x, shelf_y - 0.006 + u, WALL + 0.0425 + v))
             .collect()
     };
-    let end = crate::common::inset(&tray, 0.002);
+    let end = artkit::forms::inset(&tray, 0.002);
     loft!(
         "shelf",
         &[

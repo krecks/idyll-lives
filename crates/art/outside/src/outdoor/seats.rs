@@ -252,7 +252,7 @@ fn bistro_chair(c: f64, facing: i32) {
             .map(|&x| at(x, y, lz - 0.015 * (1.0 - artkit::math::pow(x / 0.205, 2.0))))
             .collect();
         let up = v(lean);
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             format!("chair{}_back{k}", float_repr(c)),
             &bow,
@@ -426,7 +426,7 @@ fn basket(x: f64, y: f64, z: f64, w: f64, h: f64, d: f64) {
             )
         })
         .collect();
-    crate::eased(loft!("basket", &sections, material = M.wicker));
+    artkit::bevel::eased(loft!("basket", &sections, material = M.wicker));
     let rim: Vec<(f64, f64, f64)> = rounded_rect(w + 0.012, d + 0.012, 0.03, 2)
         .iter()
         .map(|&(u, v)| (x + u, y + h * 0.78, z + v))

@@ -88,7 +88,7 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
             verts = 6
         );
     }
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         format!("{name}_cap"),
         0.055,
@@ -353,7 +353,7 @@ pub fn fire_engine() -> Vec<Obj> {
                 .into_iter()
                 .map(|(z, y)| (sf * (if zc > 0.0 { hx } else { FE_HALF }), y, z))
                 .collect();
-            crate::eased(fsweep!(
+            artkit::bevel::eased(fsweep!(
                 F,
                 format!("arch{s}{}", float_repr(zc)),
                 &pts,
@@ -514,7 +514,7 @@ pub fn fire_engine() -> Vec<Obj> {
     }
     for s in [-1, 1] {
         let sf = s as f64;
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             format!("head_bezel{s}"),
             &rounded_rect(0.36, 0.2, 0.04, low(3, 1)),
@@ -699,7 +699,7 @@ pub fn fire_engine() -> Vec<Obj> {
         }
     }
     for s in [-1, 1] {
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             format!("beacon{s}"),
             0.07,

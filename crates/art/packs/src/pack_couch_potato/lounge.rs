@@ -1,13 +1,13 @@
 //! The Cloud Nine power recliner, the sofa-side snack fridge, the living-room workout game and the lava glow lamp.
 
 use super::common::M;
-use crate::ease::{EASE, ease_ends, eased};
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, PI, cos, cosd, radians, sin, sind};
 use artkit::motion::{Ease, Spin, spin};
 use artkit::parts::{ASIDE, aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{
     fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, revolve, ring, settle, slide, soft,
     swing,
@@ -84,7 +84,7 @@ pub fn recliner() -> Vec<Obj> {
                 profile = profile,
                 angle = 55
             );
-            ease_ends(arm);
+            ease(arm, 60.0, 1);
             fcyl!(
                 f,
                 numbered("roll_end"),
@@ -126,7 +126,7 @@ pub fn recliner() -> Vec<Obj> {
                     (0.03, 0.11),
                     (0.0, 0.11)
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             at = f.at(0.37, 0.64, 0.12),
             material = M.teal,
@@ -505,7 +505,7 @@ pub fn snack_fridge() -> Vec<Obj> {
                 // (its rim rolled over)
                 &eased(
                     &[(0.06, 0.0), (0.11, 0.06), (0.105, 0.062), (0.055, 0.008)],
-                    EASE
+                    AUTO_WIDTH
                 ),
                 &[(0.0, 0.008)],
             ]

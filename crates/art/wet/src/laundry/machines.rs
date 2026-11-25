@@ -3,7 +3,7 @@
 
 use super::M;
 use super::common::{DOOR_R, DOOR_Y, DOOR_Z, folded, front_disc, lump, rbox};
-use crate::common::eased;
+use artkit::forms::eased;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit::fillet;
 use artkit::materials::Mat;

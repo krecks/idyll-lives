@@ -1,8 +1,8 @@
 //! The gift-knitting rocker, the welcome tea table and the hearthside quilted settee.
 
 use super::common::{M, cup, teapot};
-use crate::ease::ease_ends;
 use crate::pack_hot_headed::common::fluted;
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, radians, sin, sind};
@@ -302,15 +302,19 @@ pub fn knitting_rocker() -> Vec<Obj> {
                 )
             })
             .collect();
-        ease_ends(fsweep!(
-            f,
-            "crest",
-            &crest,
-            0,
-            M.rocker,
-            profile = rounded_rect(0.08, 0.035, 0.014, 2),
-            up = (0, 0, 1)
-        ));
+        ease(
+            fsweep!(
+                f,
+                "crest",
+                &crest,
+                0,
+                M.rocker,
+                profile = rounded_rect(0.08, 0.035, 0.014, 2),
+                up = (0, 0, 1)
+            ),
+            60.0,
+            1,
+        );
         kit::tube!(
             f,
             "stretcher",
@@ -754,15 +758,19 @@ fn rolled_arm(
         vec![(cy - r * 1.4, s * inner)],
     ]
     .concat(); // (height, x out)
-    ease_ends(fsweep!(
-        f,
-        name,
-        &[(ax, 0, z0), (ax, 0, z1)],
-        0,
-        mat,
-        profile = &section,
-        angle = 50
-    ));
+    ease(
+        fsweep!(
+            f,
+            name,
+            &[(ax, 0, z0), (ax, 0, z1)],
+            0,
+            mat,
+            profile = &section,
+            angle = 50
+        ),
+        60.0,
+        1,
+    );
     let mut pts = vec![(ax + s * (lean + r * 0.92) * 0.97, y0 + 0.03, z1 - 0.002)];
     pts.extend(
         section[2..section.len() - 1]

@@ -1,7 +1,6 @@
 //! The potting bench (2x1): a sage bench against the wall, pots and seedlings, tools on the back board.
 
 use super::common::{_flower, _pot, _rosette, M, WALL};
-use crate::ease::{EASE, eased};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::kit;
@@ -12,6 +11,7 @@ use artkit::scene::Obj;
 use artkit::{
     fbox, fcyl, fextrude, fsweep, grow, jitter, leaf, loft, revolve, ring, settle, soft, torus,
 };
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 const TOP: f64 = 0.88;
 const SEEDLING: (f64, f64) = (-0.62, -0.02); // the pot the seedling comes up in (x, depth)
@@ -110,7 +110,7 @@ fn _bench_frame(f: &GameFrame) {
         (0, TOP + 0.43, 0),
         M.sage,
         plane = Facing::Top,
-        bevel = EASE,
+        bevel = AUTO_WIDTH,
         bevel_segments = 1
     );
     fbox!(
@@ -252,7 +252,7 @@ fn _hand_tools(f: &GameFrame) {
                 (0.03, 0.05),
                 (0.012, 0.05)
             ],
-            EASE
+            AUTO_WIDTH
         ),
         at = f.at(0.72, TOP + 0.36, WALL + 0.11),
         material = M.cedar_dark,
@@ -269,7 +269,7 @@ fn _hand_tools(f: &GameFrame) {
                 (0.046, 0.03),
                 (0.024, 0.034)
             ],
-            EASE
+            AUTO_WIDTH
         ),
         at = f.at(0.72, TOP + 0.36, WALL + 0.11),
         material = M.green_dark,

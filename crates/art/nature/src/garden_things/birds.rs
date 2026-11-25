@@ -259,8 +259,6 @@ pub fn planterBox() -> Vec<Obj> {
             );
         }
     }
-    // (the trim's chamfers laid with their own grain)
-    crate::bevel_first(&["leg", "batten"]);
     let planter = join_all("planterBox");
     // centred on PLANTER_C deep, the far version too (its leaves are coarser)
     let (lo, hi) = measure(&[planter]);
@@ -501,9 +499,8 @@ pub fn birdhouse() -> Vec<Obj> {
             bevel_segments = 1
         );
     }
-    // the gabled box's arrises eased under the roof's overhang; the post's chamfer laid with its own grain
-    crate::chamfer(&["house"]);
-    crate::bevel_first(&["post"]);
+    // the gabled box's arrises eased under the roof's overhang
+    artkit::bevel::ease(artkit::scene::obj("house"), artkit::shapes::SHARP, 1);
     join_all("birdhouse");
     settle_all();
     meshes()

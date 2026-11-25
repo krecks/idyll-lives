@@ -128,7 +128,7 @@ No change to the build: its soft boxes take the shared form's new shape (the kit
 ## Gate to zero (2026-11-25)
 
 No hard edge shows unbevelled any more (6 → 0): the porthole ring's back edge is eased and the dryer's basket rim
-rounded (`crate::common::eased`). The washer's and the dryer's fourth draw call is their glass door and drum, each a
+rounded (`artkit::forms::eased`). The washer's and the dryer's fourth draw call is their glass door and drum, each a
 moving part: left as it is.
 
 ## Audit (2026-11-25)

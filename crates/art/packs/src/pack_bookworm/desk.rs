@@ -1,7 +1,7 @@
 //! The writer's bureau and the book-club tea trolley.
 
 use super::common::{M, books, knob, lamp, mug, pile};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, cosd, pow, sin, sind};
@@ -122,7 +122,7 @@ fn bureau_chair(f: &GameFrame, z: f64) {
         up = (0, 0, 1),
         resolution = 2
     );
-    ease_ends(crest);
+    ease(crest, 60.0, 1);
     fbox!(
         f,
         "chair_rail",

@@ -2,7 +2,6 @@
 
 use super::common::{_pot, _rosette, M};
 use super::ferns::{_fern, _orchid, _palm};
-use crate::ease::{EASE, ease_ends};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, atan2, cosd, degrees, sind};
@@ -11,6 +10,7 @@ use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::{hypot, int};
 use artkit::scene::Obj;
+use artkit::{bevel::ease, shapes::AUTO_WIDTH};
 use artkit::{boulder, fbox, fextrude, fsweep, settle, soft, swing};
 
 // width, depth, wall height, ridge height
@@ -353,15 +353,19 @@ pub fn glasshouse() -> Vec<Obj> {
                 bevel = 0.006,
                 bevel_segments = 1
             );
-            ease_ends(fsweep!(
-                f,
-                format!("bench_back_post{}", float_repr(x)),
-                &[(x, 0.39, -0.21), (x, 0.82, -0.29)],
-                0.0,
-                M.cedar_dark,
-                profile = rounded_rect(0.04, 0.04, EASE, 1),
-                up = (0, 1, 0)
-            ));
+            ease(
+                fsweep!(
+                    f,
+                    format!("bench_back_post{}", float_repr(x)),
+                    &[(x, 0.39, -0.21), (x, 0.82, -0.29)],
+                    0.0,
+                    M.cedar_dark,
+                    profile = rounded_rect(0.04, 0.04, AUTO_WIDTH, 1),
+                    up = (0, 1, 0)
+                ),
+                60.0,
+                1,
+            );
         }
         for x in [-0.36, 0.36] {
             soft!(

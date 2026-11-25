@@ -134,7 +134,7 @@ The gate's `edges` and `texels` find none left in the office:
 - **Chairs:** the backs shade round (a padded back is round all over) and take UVs a box a face, where round about
   their height stretched the cloth across their sides (the task chair's mesh 54 %, the office chair's 19 %, the
   executive's leather 15 %); the spine's top end is chamfered.
-- **Boards:** the whiteboard's and the corkboard's frames are eased all round (`crate::common::eased_loop`, their
+- **Boards:** the whiteboard's and the corkboard's frames are eased all round (`artkit::forms::eased_loop`, their
   backs on the wall too). The architect's lamp's shade rim is rolled.
 - **Filing cabinet:** the plant's leaves taper less sharply at the base and the tip (0.5 to 1 to 0.3, was 0.4 to 1 to
   0.15): a sweep's UVs shear where its width changes fast, and they stretched 10 % of the leaves.
