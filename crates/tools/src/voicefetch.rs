@@ -172,11 +172,6 @@ float32 when the model loads, and the files are gzipped (.onnxz). Nothing was re
 voice styles (F1-F5, M1-M5) are unchanged.
 ";
 
-/// The model's folder (`web/public/voice/supertonic-3/`).
-pub fn model_dir() -> PathBuf {
-    out().join(MODEL_DIR)
-}
-
 fn out() -> PathBuf {
     crate::characters::repo_root()
         .join("web")

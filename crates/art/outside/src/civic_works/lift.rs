@@ -29,8 +29,6 @@ pub const CAR_FA: f64 = 1.27; // its front axle's depth
 pub const CAR_RA: f64 = -1.25; // its rear axle's depth
 pub const CAR_WR: f64 = 0.31; // its wheels' radius
 pub const CAR_BELT: f64 = 0.94; // its waist line, over its own ground
-#[allow(dead_code)] // (the script's own: nothing reads it)
-pub const CAR_ROOF: f64 = 1.47; // its roof, over its own ground
 
 /// Draws `objs` in towards the middle the higher they are, from none at game height y0 to `k` of their x at y1:
 /// a car's glasshouse leaning in to its roof (tumblehome).
