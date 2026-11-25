@@ -545,6 +545,8 @@ pub struct World {
     pub(crate) object_plot: Vec<Option<u32>>,
     /// Objects by plot, for decisions (see `index.rs`); kept up to date by `refresh_index`.
     pub(crate) object_index: ObjectIndex,
+    /// The objects' centres, kept beside `object_index` so a refresh doesn't allocate them again.
+    pub(crate) object_centres: Vec<[f32; 2]>,
     pub sims: Vec<Sim>,
     pub households: Vec<Household>,
     pub plots: Vec<Plot>,

@@ -208,6 +208,7 @@ impl World {
             setups: Vec::new(),
             object_plot: Vec::new(),
             object_index: ObjectIndex::default(),
+            object_centres: Vec::new(),
             sims: Vec::new(),
             households: Vec::new(),
             plots: Vec::new(),

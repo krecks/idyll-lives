@@ -6,11 +6,10 @@ impl World {
     /// Rebuilds the objects-by-plot index if objects were added, removed or changed since.
     pub(crate) fn refresh_index(&mut self) {
         if self.object_index.version != self.objects_version {
-            let centres: Vec<[f32; 2]> = self
-                .objects
-                .iter()
-                .map(|o| o.centre(&self.content))
-                .collect();
+            // (The scratch taken out and put back: a town that changes all day allocates once.)
+            let mut centres = std::mem::take(&mut self.object_centres);
+            centres.clear();
+            centres.extend(self.objects.iter().map(|o| o.centre(&self.content)));
             let ground = if self.stairs.depth > 0 {
                 self.stairs.depth as usize
             } else {
@@ -33,6 +32,7 @@ impl World {
             };
             self.object_index.links =
                 crate::surface::Links::new(&self.content, &self.objects, &nav);
+            self.object_centres = centres;
         }
     }
 
