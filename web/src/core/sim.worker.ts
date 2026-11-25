@@ -461,30 +461,22 @@ function postWorld(): void {
 
 /**
  * What the camera streams in (`watched`; until the renderer says: the viewed lot) is simulated in
- * full detail, lots nobody watches in less (`sim_core::lod`). A sim with `set_watch` (open-world
- * sim-grid) keeps the view (the focus lot's structure) and the watch apart; an older one has only
- * `set_view`, which is its full-detail area.
+ * full detail, lots nobody watches in less (`sim_core::lod`). The view (the focus lot's structure)
+ * and the watch are kept apart.
  */
 function watch(g: Game): void {
-  const split = g as Game & { set_watch?(x0: number, z0: number, x1: number, z1: number): void; clear_watch?(): void };
-  if (typeof split.set_watch === 'function') {
-    if (region) g.set_view(region[0], region[1], region[2], region[3]);
-    else g.clear_view();
-    // (Only the camera's: it's also what's drawn, and cars out of it drive through each other. Till
-    // then the viewed lot is the full-detail area, `set_view`, and every car is in sight.)
-    if (watched) split.set_watch(watched[0], watched[1], watched[2], watched[3]);
-    else split.clear_watch?.();
-    return;
-  }
-  const area = watched ?? region;
-  if (area) g.set_view(area[0], area[1], area[2], area[3]);
+  if (region) g.set_view(region[0], region[1], region[2], region[3]);
   else g.clear_view();
+  // (Only the camera's: it's also what's drawn, and cars out of it drive through each other. Till
+  // then the viewed lot is the full-detail area, `set_view`, and every car is in sight.)
+  if (watched) g.set_watch(watched[0], watched[1], watched[2], watched[3]);
+  else g.clear_watch();
 }
 
 function mesh(g: Game, kind: number): MeshArrays {
   const [x0, z0, x1, z1] = region ?? [0, 0, 1 << 16, 1 << 16];
   const m = g.build_mesh(kind, x0, z0, x1, z1);
-  const out = { positions: m.positions, normals: m.normals, uvs: m.uvs, indices: m.indices };
+  const out = { positions: m.take_positions(), normals: m.take_normals(), uvs: m.take_uvs(), indices: m.take_indices() };
   m.free();
   return out;
 }
