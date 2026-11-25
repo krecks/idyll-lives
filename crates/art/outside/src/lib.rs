@@ -60,6 +60,14 @@ pub fn ease(obj: Obj, angle: f64, segments: usize) -> Obj {
     if is_low() || sides.iter().any(|&s| s < 0.0119) || sides.iter().all(|&s| s < 0.099) {
         return obj;
     }
+    bevelled(obj, angle, segments)
+}
+
+/// `ease` whatever the part's size: a thin disc whose rim the gate finds all the same.
+pub fn bevelled(obj: Obj, angle: f64, segments: usize) -> Obj {
+    if is_low() {
+        return obj;
+    }
     // (the gate's `edges` finds turns of 60° or more: a rounded corner's 45° steps are left as they are)
     // (a profile closed on its first point, a revolve's, leaves a seam the bevel can't cross: welded first)
     obj.edit(|o| o.mesh.remove_doubles(1e-6));

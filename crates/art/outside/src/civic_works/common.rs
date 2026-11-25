@@ -4,12 +4,13 @@
 
 use artkit::far::{is_low, low};
 use artkit::materials::Mat;
-use artkit::math::{Axis, PI, asin, cos, sin};
-use artkit::place::{Coord, Facing, GameFrame};
+use artkit::math::{Axis, PI, V3, asin, cos, sin};
+use artkit::mesh::Mesh;
+use artkit::place::{Coord, GameFrame};
 use artkit::py;
 use artkit::scene::Obj;
-use artkit::shapes::sides;
-use artkit::{fbox, fextrude, revolve};
+use artkit::shapes::{SHARP, shade, sides};
+use artkit::{fbox, revolve};
 
 /// A model's palette: the colours every model may use, then its own (the script's `_palette(**own)`), so a build
 /// reads `M.rubber` and `M.body` alike. `own_palette! { S: }` is the shared colours alone.
@@ -91,15 +92,8 @@ pub fn slats(
         out.extend([(x + s * t * 0.4, ya), (x + s * t, ya + p * 0.12)]);
     }
     out.extend([(x + s * t * 0.4, y1), (x, y1)]);
-    fextrude!(
-        F,
-        name,
-        &out,
-        (z1 - z0).abs(),
-        (0, 0, (z0 + z1) / 2.0),
-        material,
-        plane = Facing::Front
-    )
+    let pts: Vec<(f64, f64, f64)> = out.iter().map(|&(u, v)| (u, v, z0)).collect();
+    ribbon(name, &pts, (0.0, 0.0, z1 - z0), (s, 0.0, 0.0), material)
 }
 
 /// A roller shutter on a face looking to the back at game depth `z`, from x0 to x1 and height y0 to y1.
@@ -134,15 +128,49 @@ pub fn slats_back(
         out.extend([(z - t * 0.4, ya), (z - t, ya + p * 0.12)]);
     }
     out.extend([(z - t * 0.4, y1), (z, y1)]);
-    fextrude!(
-        F,
-        name,
-        &out,
-        (x1 - x0).abs(),
-        ((x0 + x1) / 2.0, 0, 0),
-        material,
-        plane = Facing::Side
-    )
+    let pts: Vec<(f64, f64, f64)> = out.iter().map(|&(u, v)| (x0, v, u)).collect();
+    ribbon(name, &pts, (x1 - x0, 0.0, 0.0), (0.0, 0.0, -1.0), material)
+}
+
+/// A shutter's slats: the game points `line` (its profile on the body, from its foot to its head) drawn out along
+/// `run`, a quad a step, facing `out`; open at its ends and its back, which lie in the body's guides and on its face
+/// (an extrusion's end caps and back cost as many triangles again, none seen).
+fn ribbon(
+    name: &str,
+    line: &[(f64, f64, f64)],
+    run: (f64, f64, f64),
+    out: (f64, f64, f64),
+    material: Mat,
+) -> Obj {
+    let mut vs: Vec<V3> = line
+        .iter()
+        .map(|&(x, y, z)| V3::from(F.at(x, y, z)))
+        .collect();
+    vs.extend(
+        line.iter()
+            .map(|&(x, y, z)| V3::from(F.at(x + run.0, y + run.1, z + run.2))),
+    );
+    let n = line.len() as u32;
+    // each step's quad, the closing one (the back on the body) left out, all wound one way
+    let mut faces: Vec<Vec<u32>> = (0..n - 1)
+        .map(|i| vec![i, i + 1, n + i + 1, n + i])
+        .collect();
+    let out = V3::from(F.at(out.0, out.1, out.2)) - V3::from(F.at(0, 0, 0));
+    let facing: f64 = faces
+        .iter()
+        .map(|f| {
+            let [a, b, c] = [0, 1, 2].map(|k| vs[f[k] as usize]);
+            (b - a).cross(c - a).dot(out)
+        })
+        .sum();
+    if facing < 0.0 {
+        for f in &mut faces {
+            f.reverse();
+        }
+    }
+    let mut mesh = Mesh::from_pydata(std::mem::take(&mut vs), &faces);
+    mesh.set_material(Some(material));
+    shade(artkit::scene::add(name, mesh), false, SHARP)
 }
 
 /// A tyre round an axle along game x (or `Axis::Z`; or `Axis::Y`, lying flat) through (x, y, z): rounded
@@ -220,4 +248,21 @@ pub fn tyre(
         rot = rot,
         segments = segments.unwrap_or_else(|| low(sides(r, 24, 44), 16))
     )
+}
+
+/// A flat mark on a face, its four game `corners` going round it: one quad, facing `out` (a game direction), where a
+/// box takes 12 triangles (a slot punched in an upright).
+pub fn mark(name: &str, corners: [(f64, f64, f64); 4], out: (f64, f64, f64), material: Mat) -> Obj {
+    let mut vs: Vec<V3> = corners
+        .iter()
+        .map(|&(x, y, z)| V3::from(F.at(x, y, z)))
+        .collect();
+    let n = (vs[1] - vs[0]).cross(vs[2] - vs[0]);
+    let out = V3::from(F.at(out.0, out.1, out.2));
+    if n.dot(out) < 0.0 {
+        vs.reverse();
+    }
+    let mut mesh = Mesh::from_pydata(vs, &[vec![0, 1, 2, 3]]);
+    mesh.set_material(Some(material));
+    shade(artkit::scene::add(name, mesh), false, SHARP)
 }

@@ -129,7 +129,7 @@ pub fn timber_stack() -> Vec<Obj> {
                 (x - 0.02, top - drape + 0.02, -0.458),
                 (x, 0.06, -0.44),
             ];
-            kit_tube!(
+            crate::eased(kit_tube!(
                 F,
                 format!("rope{k}"),
                 &kit_fillet!(&pts, 0.03, steps = low(2, 1)),
@@ -137,10 +137,10 @@ pub fn timber_stack() -> Vec<Obj> {
                 m.rope,
                 verts = low(6, 4),
                 round = 1
-            );
+            ));
         }
         // an old tyre on top, keeping the tarp down
-        tyre(
+        crate::eased(tyre(
             "old_tyre",
             0.32,
             top + 0.045 + 0.08,
@@ -151,7 +151,7 @@ pub fn timber_stack() -> Vec<Obj> {
             None,
             Some(low(24, 10)),
             Axis::Y,
-        );
+        ));
     });
     join_all(if is_low() {
         "timberStack_far"
@@ -171,7 +171,7 @@ pub fn cement_mixer() -> Vec<Obj> {
     let drum = new_parts(|| {
         // the drum: a cone up from its gear end to the belly, a shoulder in to the mouth, the inside dark and crusted
         let n = low(32, 12);
-        revolve!(
+        crate::eased(revolve!(
             "drum",
             &[
                 (0.0, -0.32),
@@ -191,9 +191,9 @@ pub fn cement_mixer() -> Vec<Obj> {
             at = (0, 0, 0),
             material = m.body,
             segments = n
-        );
+        ));
         // the cement dried on its inside: a thin shell just within it
-        revolve!(
+        crate::eased(revolve!(
             "drum_crust",
             &[
                 (0.0, 0.064),
@@ -208,7 +208,7 @@ pub fn cement_mixer() -> Vec<Obj> {
             at = (0, 0, 0),
             material = m.crust,
             segments = n
-        );
+        ));
         torus!(
             "lip_crust",
             0.142,
@@ -279,7 +279,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 bevel = low(0.006, 0.0),
                 bevel_segments = 1
             );
-            fcyl!(
+            crate::eased(fcyl!(
                 F,
                 format!("pivot{s}"),
                 0.035,
@@ -288,7 +288,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 m.steel,
                 rot = (0, 90, 0),
                 verts = low(12, 6)
-            );
+            ));
         }
         fbox!(
             F,
@@ -301,7 +301,7 @@ pub fn cement_mixer() -> Vec<Obj> {
             bevel = low(0.006, 0.0),
             bevel_segments = 1
         );
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "post",
             0.04,
@@ -309,7 +309,7 @@ pub fn cement_mixer() -> Vec<Obj> {
             (0, 0.38, -0.1),
             m.frame,
             verts = low(12, 6)
-        );
+        ));
         torus!(
             "handwheel",
             0.12,
@@ -333,7 +333,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 rot = (degrees(a), 0, 0)
             );
         }
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "wheel_knob",
             0.016,
@@ -342,7 +342,7 @@ pub fn cement_mixer() -> Vec<Obj> {
             m.plastic,
             rot = (0, 90, 0),
             verts = 6
-        );
+        ));
         // the motor under its cover, behind the post, its vents
         fbox!(
             F,
@@ -385,7 +385,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 (0.12, 0.49, -0.135),
                 m.red_lens
             );
-            kit_tube!(
+            crate::eased(kit_tube!(
                 F,
                 "lead",
                 &[
@@ -398,12 +398,12 @@ pub fn cement_mixer() -> Vec<Obj> {
                 m.plastic,
                 verts = 4,
                 round = 2
-            );
+            ));
         }
         // the stand: a tube frame, two wheels at the back, two legs at the front, a handle to wheel it by
         for s in [-1, 1] {
             let sf = s as f64;
-            kit_tube!(
+            crate::eased(kit_tube!(
                 F,
                 format!("frame{s}"),
                 &[
@@ -414,7 +414,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 0.018,
                 m.frame,
                 round = low(2, 1)
-            );
+            ));
             fbox!(
                 F,
                 format!("foot{s}"),
@@ -445,7 +445,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 Some(low(20, 10)),
                 Axis::X,
             );
-            fcyl!(
+            crate::eased(fcyl!(
                 F,
                 format!("hub{s}"),
                 0.095,
@@ -454,9 +454,9 @@ pub fn cement_mixer() -> Vec<Obj> {
                 m.yellow,
                 rot = (0, 90, 0),
                 verts = low(14, 6)
-            );
+            ));
         }
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "axle",
             0.016,
@@ -465,7 +465,7 @@ pub fn cement_mixer() -> Vec<Obj> {
             m.steel,
             rot = (0, 90, 0),
             verts = 6
-        );
+        ));
         fbox!(F, "cross", 0.44, 0.04, 0.04, (0, 0.25, -0.1), m.frame);
         kit_tube!(
             F,
@@ -524,7 +524,7 @@ pub fn flag_pole() -> Vec<Obj> {
             bevel = low(0.01, 0.0),
             bevel_segments = 1
         );
-        revolve!(
+        crate::eased(revolve!(
             "flange",
             &[
                 (0.0, 0.06),
@@ -537,11 +537,11 @@ pub fn flag_pole() -> Vec<Obj> {
             at = F.at(0, 0, 0),
             material = m.body,
             segments = low(24, 8)
-        );
+        ));
         if !is_low() {
             for k in 0..4 {
                 let a = TAU * (k as f64 + 0.5) / 4.0;
-                fcyl!(
+                crate::eased(fcyl!(
                     F,
                     format!("bolt{k}"),
                     0.012,
@@ -549,10 +549,10 @@ pub fn flag_pole() -> Vec<Obj> {
                     (0.095 * cos(a), 0.08, 0.095 * sin(a)),
                     m.steel,
                     verts = 6
-                );
+                ));
             }
         }
-        fcone!(
+        crate::eased(fcone!(
             F,
             "pole",
             0.055,
@@ -561,8 +561,8 @@ pub fn flag_pole() -> Vec<Obj> {
             (0, 0.2 + (FP_H - 0.2) / 2.0, 0),
             m.body,
             verts = low(16, 8)
-        );
-        fcyl!(
+        ));
+        crate::eased(fcyl!(
             F,
             "truck",
             0.045,
@@ -570,7 +570,7 @@ pub fn flag_pole() -> Vec<Obj> {
             (0, FP_H + 0.03, 0),
             m.body,
             verts = low(16, 8)
-        );
+        ));
         fsphere!(
             F,
             "ball",
@@ -593,7 +593,7 @@ pub fn flag_pole() -> Vec<Obj> {
             bevel_segments = 1
         );
         for (k, x) in [-0.012, 0.012].into_iter().enumerate() {
-            fcyl!(
+            crate::eased(fcyl!(
                 F,
                 format!("halyard{k}"),
                 0.0035,
@@ -601,7 +601,7 @@ pub fn flag_pole() -> Vec<Obj> {
                 (x, 1.3 + (FP_H - 1.3) / 2.0, -0.06),
                 m.rope,
                 verts = 4
-            );
+            ));
         }
         for (j, y) in [FP_H - 0.12, FP_H - 0.12 - FP_FLAG.1]
             .into_iter()
@@ -628,7 +628,7 @@ pub fn flag_pole() -> Vec<Obj> {
         let n = low(24, 8);
         let path = flag_path(n);
         let (hh, t) = (FP_FLAG.1 / 2.0, 0.006);
-        fsweep!(
+        crate::eased(fsweep!(
             F,
             "flag",
             &path,
@@ -641,8 +641,8 @@ pub fn flag_pole() -> Vec<Obj> {
                 (-hh, t / 2.0)
             ],
             up = (0, 0, 1)
-        );
-        fsweep!(
+        ));
+        crate::eased(fsweep!(
             F,
             "flag_band",
             &path,
@@ -655,9 +655,9 @@ pub fn flag_pole() -> Vec<Obj> {
                 (-0.09, t / 2.0 + 0.002)
             ],
             up = (0, 0, 1)
-        );
+        ));
         let k = n * 4 / 10;
-        fsweep!(
+        crate::eased(fsweep!(
             F,
             "flag_canton",
             &path[..k + 1],
@@ -670,7 +670,7 @@ pub fn flag_pole() -> Vec<Obj> {
                 (0.13, t / 2.0 + 0.003)
             ],
             up = (0, 0, 1)
-        );
+        ));
     });
     let on_its_pad = Settle {
         centre: false,
