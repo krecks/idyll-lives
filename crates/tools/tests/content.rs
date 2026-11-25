@@ -145,3 +145,56 @@ fn first_group_into_an_empty_validate() {
         "{text}"
     );
 }
+
+/// An included file that defines an id again overrides base.json: the last file wins and the id is listed once.
+#[test]
+fn an_include_overrides_base() {
+    let fx = fixtures();
+    let dir = std::env::temp_dir().join(format!("ll-content-test-{}-override", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    copy_dir(&fx.join("content"), &dir.join("content"));
+    let one = dir.join("content/catalog/one.json");
+    let text = std::fs::read_to_string(&one).unwrap().replacen(
+        "\"objects\": [",
+        "\"objects\": [\n    {\"id\": \"rug\", \"category\": \"validate\", \"group\": \"late\"},\n    {\"id\": \"vase\", \"category\": \"living\", \"group\": \"tables\"},",
+        1,
+    );
+    std::fs::write(&one, text).unwrap();
+    let base = std::fs::read_to_string(dir.join("content/base.json")).unwrap();
+    let run = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_content"))
+            .args(args)
+            .args(["--content", "content", "--plan", "nowhere"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let list = run(&["list"]);
+    assert_eq!(list.matches("  rug  ->").count(), 1, "{list}");
+    assert!(
+        list.contains("seed (1)") && list.contains("late (2)"),
+        "{list}"
+    );
+    let moved = run(&["in", "vase", "--group", "late"]);
+    let one_after = std::fs::read_to_string(&one).unwrap();
+    let base_after = std::fs::read_to_string(dir.join("content/base.json")).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        moved.contains("vase: living / tables -> validate / late"),
+        "{moved}"
+    );
+    assert_eq!(
+        base_after, base,
+        "base.json's vase was edited, not the override"
+    );
+    assert!(
+        one_after.contains("{\"id\": \"vase\", \"category\": \"validate\", \"group\": \"late\"}"),
+        "{one_after}"
+    );
+}

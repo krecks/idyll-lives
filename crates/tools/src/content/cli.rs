@@ -88,6 +88,14 @@ fn find<'a, V>(v: &'a [(String, V)], k: &str) -> Option<&'a V> {
     v.iter().find(|e| e.0 == k).map(|e| &e.1)
 }
 
+/// Sets key `k` to `x`: a key seen before keeps its place and takes the new value (the last file wins).
+fn put<V>(v: &mut Vec<(String, V)>, k: String, x: V) {
+    match v.iter_mut().find(|e| e.0 == k) {
+        Some(e) => e.1 = x,
+        None => v.push((k, x)),
+    }
+}
+
 fn opt(s: &Option<String>) -> String {
     s.clone().unwrap_or_else(|| "None".into())
 }
@@ -113,14 +121,22 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
     for (fi, f) in files.iter().enumerate() {
         for o in f.array("objects") {
             if let Some(id) = o.get("id") {
-                by_id.push((id.value.py().unwrap_or_else(|| "None".into()), (fi, o)));
+                put(
+                    &mut by_id,
+                    id.value.py().unwrap_or_else(|| "None".into()),
+                    (fi, o),
+                );
             }
         }
     }
     let mut cats: Vec<(String, (usize, &Node))> = Vec::new();
     for (fi, f) in files.iter().enumerate() {
         for c in f.array("buyCategories") {
-            cats.push((c.val("id").unwrap_or_else(|| "None".into()), (fi, c)));
+            put(
+                &mut cats,
+                c.val("id").unwrap_or_else(|| "None".into()),
+                (fi, c),
+            );
         }
     }
     let Some(&(vfile, vcat)) = find(&cats, "validate") else {
