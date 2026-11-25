@@ -173,9 +173,11 @@
       }
     }
   }
+  // (Let go too: the job's `finally` would attach the disposed editor again.)
   $effect(() => () => {
     clearTimeout(settling);
     job?.abort();
+    job = null;
   });
 
   /** What proposing again asks about (`whatGoes`): the layout's edits, the built town's tweaks. */
@@ -332,6 +334,8 @@
     } finally {
       leaving = false;
     }
+    // (Another one asked for meanwhile: not on with the one being replaced.)
+    if (making) return;
     const l = app.layout;
     if (!l || editor.issues.blocking.length || fewHomes || app.screen !== 'streets') return;
     const w = app.world;

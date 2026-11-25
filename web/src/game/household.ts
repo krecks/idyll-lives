@@ -593,6 +593,12 @@ export function householdProblems(content: Content, h: HouseholdDraft): string[]
     if (!m.name.trim()) problems.push('Every member needs a name');
     for (const p of content.validateCharacter(m.traits, m.perks)) problems.push(`${who}: ${p}`);
   }
+  // (A member made younger keeps their bonds: partners only between grown-ups, as `residentsOf` pairs them.)
+  for (const b of h.bonds) {
+    if (b.preset !== 'partners') continue;
+    const both = [b.a, b.b].map((u) => h.members.find((m) => m.uid === u));
+    if (both.every((m) => m) && !both.every((m) => content.isAdult(m!.age))) problems.push(`${both.map((m) => m!.name.trim() || 'Unnamed').join(' and ')}: only grown-ups can be partners`);
+  }
   return problems;
 }
 

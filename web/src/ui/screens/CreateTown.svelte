@@ -186,7 +186,11 @@
       }
     }
   }
-  $effect(() => () => job?.abort());
+  // (Let go too: the job's `finally` would attach the disposed editor again.)
+  $effect(() => () => {
+    job?.abort();
+    job = null;
+  });
 
   let confirming = $state<{ text: string; yes: string; go: () => void } | null>(null);
   function answer(yes: boolean) {
@@ -224,6 +228,8 @@
     } finally {
       leaving = false;
     }
+    // (Another one asked for meanwhile: not on with the one being replaced.)
+    if (making) return;
     const w = app.world;
     if (!w || editor.issues.blocking.length || app.screen !== 'town') return;
     const named = name.trim();

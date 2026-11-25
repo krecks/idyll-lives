@@ -20,7 +20,8 @@
   const residents = $derived(
     game.sims.filter((s) => game.households[s.household]?.player && !services.content.lifeStages.find((st) => st.id === s.stage)?.baby),
   );
-  const who = $derived(game.plannerFor);
+  // (Opened on a baby, or on someone gone: the household's plan, shown and edited as such.)
+  const who = $derived(residents.some((r) => r.id === game.plannerFor) ? game.plannerFor : 'household');
   const sim = $derived(who === 'household' ? null : (residents.find((s) => s.id === who) ?? null));
   const info = (id: number) => game.roster.find((r) => r.id === id);
 
@@ -91,8 +92,11 @@
   function edit(patch: Partial<RoutineIn>) {
     if (selected === null || !block) return;
     const next = { ...block, ...patch };
-    if (!content.activity(next.activity)?.skill) delete next.skill;
+    const a = content.activity(next.activity);
+    if (!a?.skill) delete next.skill;
     else next.skill ??= trainSkill;
+    // (An 8 h sleep made another activity is cut to that one's longest, as the grid's drag is: else the sim refuses the list.)
+    next.minutes = Math.min(next.minutes, a?.sleep ? content.planner.maxSleepMinutes : content.planner.maxMinutes);
     change(routines.map((r, i) => (i === selected ? next : r)));
   }
   function remove() {

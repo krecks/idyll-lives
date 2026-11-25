@@ -475,7 +475,13 @@
                   aria-label="Age in years"
                   min={content.lifeStages[0].from}
                   max={content.stageAges(content.lifeStages[content.lifeStages.length - 1].id)[1]}
-                  bind:value={sim.age}
+                  value={sim.age}
+                  onchange={(e) => {
+                    // (Taken when typed, not each key: 45 to 52 passes through 5, which would drop a job.)
+                    const n = e.currentTarget.valueAsNumber;
+                    if (Number.isFinite(n)) sim.age = n;
+                    else e.currentTarget.value = String(sim.age);
+                  }}
                 />
                 <span class="hint">years old</span>
               </label>

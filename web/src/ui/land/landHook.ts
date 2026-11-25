@@ -23,6 +23,7 @@ import { heightAt, LAND_CELL, wetAt, type LandPatch } from '../../game/land';
 import type { LandTool } from '../../game/landBrush';
 import type { LandEditor } from '../../game/landEdit';
 import type { LandSurface } from './landStroke';
+import { DEBUG_HOOKS } from '../../debug/hooks';
 
 export interface LandHookHost {
   editor(): LandEditor | null;
@@ -47,7 +48,7 @@ declare global {
   }
 }
 
-const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+const DEBUG = DEBUG_HOOKS && typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
 
 const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
 

@@ -121,7 +121,7 @@
     const bench = BENCH ? await import('./debug/bench') : null;
     bench?.prepareBench();
     // (`hud=0` on any debug page: the world without the interface, for checks' pictures.)
-    if (!BENCH && new URLSearchParams(location.search).get('hud') === '0') (await import('./debug/bench')).hideHud();
+    if (!BENCH && DEBUG_HOOKS && new URLSearchParams(location.search).get('hud') === '0') (await import('./debug/bench')).hideHud();
     // (`__bench` on `?debug` pages from the main menu on, with the bench's hooks: a game state swapped in and played in fixed
     // steps, `debug/benchTime.ts`. A benchmark's page puts its own up once it has warmed up.)
     if (!BENCH && DEBUG_HOOKS && new URLSearchParams(location.search).has('debug')) void import('./debug/bench').then((m) => m.installDebugBench());

@@ -312,8 +312,8 @@ export function nearestFew(tags: readonly { key: string; far: number }[], most: 
   return new Set(order.slice(0, Math.max(0, most)).map((t) => t.key));
 }
 
-/** The homes for sale: their price and size (a flat's over its own rectangle, `lots` the town's lots and flats). */
-export function saleTags(homes: readonly HomeForSale[], lots: Lots, money: (n: number) => string): TownTag[] {
+/** The homes for sale: their price (none for `money` null: a Creative game) and size (a flat's over its own rectangle, `lots` the town's lots and flats). */
+export function saleTags(homes: readonly HomeForSale[], lots: Lots, money: ((n: number) => string) | null): TownTag[] {
   return homes.flatMap((h) => {
     const p = plotInfo(lots, h.plot);
     if (!p) return [];
@@ -322,7 +322,7 @@ export function saleTags(homes: readonly HomeForSale[], lots: Lots, money: (n: n
       {
         key: `s:${h.plot}`,
         kind: 'sale' as const,
-        title: h.price ? `${money(h.price)}+` : 'For sale',
+        title: h.price && money ? `${money(h.price)}+` : 'For sale',
         detail: size,
         anchor: { x: p.x + p.w / 2, z: p.z + p.d / 2 },
         lift: 6,
