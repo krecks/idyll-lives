@@ -253,7 +253,7 @@ pub fn family() -> Family {
                 .centre(0.0, -0.02)
                 .motions(sofa_uses())
                 .paint(&[("teal", "Upholstery"), ("teal_cushion", "Cushions"), ("brass", "Frame"), ("brass_legs", "Legs")]),
-            Model::new("sofaThreeSeat", sectionals::sofa_three_seat, (2.86, 0.823, 0.88))
+            Model::new("sofaThreeSeat", sectionals::sofa_three_seat, (2.82, 0.823, 0.88))
                 .key("model.sofaThreeSeat")
                 .centre(0.0, 0.01)
                 .motions(sofa_uses())

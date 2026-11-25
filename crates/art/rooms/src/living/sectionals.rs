@@ -163,7 +163,7 @@ pub fn sofa_three_seat() -> Vec<Obj> {
         M.moss,
         M.moss_cushion,
         M.oak_legs,
-        2.86,
+        2.82,
         &[-1, 1],
         &["back"],
         0.88,
