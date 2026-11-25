@@ -1,13 +1,13 @@
 //! L2, the armchairs: built as the sofas are, their seats sinking in (`sink_in`), but for the designer chair
 //! (still).
 
-use super::common::{Cushion, cabriole, cushion, panel, plain, round_rings, seat, settled};
+use super::common::{Cushion, cabriole, cushion, panel, plain, round_rings, seat, settled, swept};
 use super::sofas::{box_sofa, channel, rolled_arm};
 use super::{F, M};
-use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::forms::{catmull, rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, TAU, cos, exp, pow, radians, sin, sqrt};
+use artkit::math::{P3, PI, TAU, V3, cos, exp, pow, radians, sin, sqrt};
 use artkit::parts::{join, join_all, new_parts, settle};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -364,29 +364,41 @@ pub fn armchair_leather() -> Vec<Obj> {
 /// A moulded plywood shell: a section `w` across whose sides curl up `dish` towards the sitter, `t` thick, swept
 /// along a game path (the seat front to back, a back bottom to top).
 fn shell(name: &str, path: &[(i32, f64, f64)], w: f64, dish: f64, t: f64, mat: Mat) -> Obj {
-    let n = 8;
-    let face: Vec<(f64, f64)> = (0..=n)
-        .map(|i| {
-            let i = f64::from(i);
-            (
-                -w / 2.0 + w * i / f64::from(n),
-                -dish * pow(2.0 * i / f64::from(n) - 1.0, 2.0),
-            )
-        })
+    let (n, c) = (8, 0.004);
+    let face = |u: f64| -dish * pow(2.0 * u / w, 2.0);
+    // its moulded edges eased: each corner of the section cut c back, and its ends chamfered c
+    let mut low = vec![
+        (-w / 2.0, face(-w / 2.0) + c),
+        (c - w / 2.0, face(c - w / 2.0)),
+    ];
+    low.extend((1..n).map(|i| {
+        let u = -w / 2.0 + w * f64::from(i) / f64::from(n);
+        (u, face(u))
+    }));
+    low.extend([
+        (w / 2.0 - c, face(w / 2.0 - c)),
+        (w / 2.0, face(w / 2.0) + c),
+    ]);
+    let mut profile = low.clone();
+    profile.extend(low.iter().rev().map(|&(u, v)| {
+        let edge = (u.abs() - w / 2.0).abs() < 1e-9;
+        (u, v + t - if edge { 2.0 * c } else { 0.0 })
+    }));
+    let given: Vec<V3> = path
+        .iter()
+        .map(|&(x, y, z)| V3::from(F.at(x, y, z)))
         .collect();
-    let mut profile = face.clone();
-    profile.extend(face.iter().rev().map(|&(u, v)| (u, v + t)));
-    fsweep!(
-        F,
+    let (pts, _) = catmull(&given, 2, false);
+    let scales = vec![1.0; pts.len()];
+    swept(
         name,
-        path,
-        0.0,
+        &pts,
+        &profile,
+        &scales,
+        V3::from((1, 0, 0)),
+        60.0,
+        c,
         mat,
-        profile = profile,
-        up = (1, 0, 0),
-        resolution = 2,
-        scale = 1.0,
-        angle = 60
     )
 }
 

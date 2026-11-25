@@ -190,14 +190,17 @@ pub fn tube(name: &str, pts: &[V3], r: f64, scales: &[f64], verts: usize, mat: M
         scales,
         V3::Z,
         angle,
+        0.0,
         mat,
     )
 }
 
 /// `profile` ((u, v) about the path, u towards `up`) swept through `pts` (Blender), times each point's scale, its
-/// ends capped flat, smooth but for edges turning over `angle`; laid with a sweep's UVs as if it kept one scale. A
-/// sweep's UVs grow round it with its scale, so they shear where it thickens fast (an eased top, an ankle flaring
-/// into a foot, a chamfered end).
+/// ends capped flat and, `ends` over 0, chamfered that much (its outline set in at each end, the full one `ends`
+/// along), smooth but for edges turning over `angle`; laid with a sweep's UVs as if it kept one scale. A sweep's
+/// UVs grow round it with its scale, so they shear where it thickens fast (an eased top, an ankle flaring into a
+/// foot, a chamfered end).
+#[allow(clippy::too_many_arguments)]
 pub fn swept(
     name: &str,
     pts: &[V3],
@@ -205,8 +208,23 @@ pub fn swept(
     scales: &[f64],
     up: V3,
     angle: f64,
+    ends: f64,
     mat: Mat,
 ) -> Obj {
+    let (mut pts, mut scales) = (pts.to_vec(), scales.to_vec());
+    let mut outlines = vec![profile.to_vec(); pts.len()];
+    if ends > 0.0 {
+        let (n, small) = (pts.len(), crate::common::inset(profile, ends));
+        let first = pts[0] + (pts[1] - pts[0]).normalized() * ends;
+        let last = pts[n - 1] + (pts[n - 2] - pts[n - 1]).normalized() * ends;
+        pts.insert(1, first);
+        pts.insert(n, last);
+        scales.insert(1, scales[0]);
+        scales.insert(n, scales[n]);
+        outlines = vec![profile.to_vec(); n + 2];
+        outlines[0] = small.clone();
+        outlines[n + 1] = small;
+    }
     let n = pts.len();
     let tangent = |i: usize| (pts[(i + 1).min(n - 1)] - pts[i.saturating_sub(1)]).normalized();
     let t0 = tangent(0);
@@ -223,14 +241,14 @@ pub fn swept(
             normal = (normal - t * normal.dot(t)).normalized();
             along = t;
             let bi = t.cross(normal);
-            profile
+            outlines[i]
                 .iter()
                 .map(|&(u, v)| (pts[i] + (normal * u + bi * v) * scales[i]).into())
                 .collect()
         })
         .collect();
     let body = loft!(name, &rings, material = mat, angle = angle);
-    artkit::uv::along(body, n, profile, &vec![1.0; n], pts, false)
+    artkit::uv::along(body, n, profile, &vec![1.0; n], &pts, false)
 }
 
 /// The seat cushions `cushions()` makes (returning their top), joined into the part `seat`, with the clip that

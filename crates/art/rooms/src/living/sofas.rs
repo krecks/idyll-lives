@@ -433,6 +433,7 @@ pub(super) fn channel(
         &scales,
         V3::from((1, 0, 0)),
         60.0,
+        0.0,
         mat,
     )
 }
