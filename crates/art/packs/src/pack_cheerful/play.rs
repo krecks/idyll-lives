@@ -1,6 +1,7 @@
 //! The rainbow hammock, the sunrise stretch lamp and the confetti party booth.
 
-use super::common::{M, STRIPES, WALL2, bulb, ease_ends, pleats, slab, tumbler};
+use super::common::{M, STRIPES, WALL2, bulb, pleats, slab, tumbler};
+use crate::ease::ease_ends;
 use super::music::tilt;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;

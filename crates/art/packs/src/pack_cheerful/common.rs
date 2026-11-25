@@ -1,7 +1,6 @@
 //! What the cheerful pack is built from: its palette, flat shapes from outlines, arch outlines, bands, bulbs,
 //! pleated curtains and tumblers.
 
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, V3, cos, sin};
@@ -109,12 +108,6 @@ pub use artkit::kit::WALL;
 pub const WALL2: f64 = -0.93;
 /// The mocktail cart's top shelf's top.
 pub const TOP: f64 = 0.815;
-
-/// Eases a swept part's flat-capped ends by 4 mm (the rule's pixel at the play camera): only the cap rims turn
-/// 60° or more, so only they are rounded.
-pub fn ease_ends(obj: Obj) -> Obj {
-    bevel_edges(obj, 0.004, 1, 60.0, &EdgeOrder::Corners)
-}
 
 // --- meshes from points ------------------------------------------------------------------------------------------
 
