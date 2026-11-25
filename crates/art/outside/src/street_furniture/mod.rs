@@ -109,8 +109,6 @@ pub fn family() -> Option<Family> {
              night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for \
              `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water \
              runs near the camera (`water_run`, ambient).",
-        )
-        .pack("street_furniture")
-        ,
+        ),
     )
 }

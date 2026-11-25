@@ -64,7 +64,6 @@ palette! { M:
     mozzarella = ("#F3E3B0", satin),
     pepperoni = ("#9C3024", satin),
     bun = ("#D69A55", satin),
-    bun_dark = ("#B5743A", satin),
     bun_base = ("#E8C48A", matte),
     pastry = ("#D8A257", matte),
     pastry_baked = ("#C08040", matte),

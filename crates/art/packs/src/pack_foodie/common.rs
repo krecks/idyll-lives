@@ -88,7 +88,6 @@ palette! { M:
     hob = ("#22262B", gloss),
     ring = ("#7E848B", gloss),       // the hob's printed rings, grey (red, the cook's ring at rest looked lit)
     heat = ("#D2402A", gloss),       // the hob's ring glowing hot under the pan while it cooks
-    carrot = ("#E2832E", satin),
     plate = ("#F6F3EA", gloss),
     // added with the detail pass
     crust = ("#D9A35A", matte),      // bread crusts, the pizza's rim

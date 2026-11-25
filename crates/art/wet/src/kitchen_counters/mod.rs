@@ -69,7 +69,6 @@ palette! { M:
     bin3 = ("#E3B23C", satin),
     lid = ("#2F3236", satin),               // a bin's lid
     walnut = ("#7A5234", satin),            // a bar's body and slats
-    island = ("#9DAF8C", satin),            // the kitchen island's sage stool seats
     towel = ("#B4483C", satin),             // a red tea towel
 }
 

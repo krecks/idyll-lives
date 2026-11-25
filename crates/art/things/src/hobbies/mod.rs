@@ -111,7 +111,6 @@ palette! { M:
     pearl = ("#EDE6D6", gloss), // the rail sights
     rack = ("#A8754A", gloss), // the triangle
     cue = ("#D9B98A", satin),
-    cue_butt = ("#3B2A20", satin),
     ball_yellow = ("#F2C14E", gloss),
     ball_blue = ("#3E8EDE", gloss),
     ball_red = ("#D9483B", gloss),

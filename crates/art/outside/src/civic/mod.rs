@@ -116,14 +116,6 @@ mod tests {
     use super::common::SEAT;
     use artkit::json::{Json, loads};
 
-    fn num(j: Option<&Json>) -> Option<f64> {
-        match j {
-            Some(Json::Num(x)) => Some(*x),
-            Some(Json::Int(i)) => Some(*i as f64),
-            _ => None,
-        }
-    }
-
     /// The seats the content names are the ones the pew and the waiting bench are built to.
     #[test]
     fn content_facts() {
@@ -142,13 +134,25 @@ mod tests {
                 .find(|o| o.get("id").and_then(Json::str) == Some(id))
                 .unwrap_or_else(|| panic!("{id} in civic.json"));
             let seat = o.get("seat").expect("a seat");
-            assert_eq!(num(seat.get("height")), Some(SEAT), "{id}: seat moved");
-            assert_eq!(num(seat.get("forward")), Some(0.0), "{id}: seat moved");
+            assert_eq!(
+                seat.get("height").and_then(Json::num),
+                Some(SEAT),
+                "{id}: seat moved"
+            );
+            assert_eq!(
+                seat.get("forward").and_then(Json::num),
+                Some(0.0),
+                "{id}: seat moved"
+            );
             let Json::Obj(fields) = seat else {
                 panic!("{id}: seat")
             };
             assert_eq!(fields.len(), 2, "{id}: seat moved");
-            assert_eq!(num(o.get("slots")), Some(3.0), "{id}: slots moved");
+            assert_eq!(
+                o.get("slots").and_then(Json::num),
+                Some(3.0),
+                "{id}: slots moved"
+            );
         }
     }
 }

@@ -88,7 +88,6 @@ palette! { M:
     patch_d = ("#A8BFA0", fabric),
     pillow_a = ("#E3A0A0", fabric),
     pillow_b = ("#F1E6C8", fabric),
-    soil = ("#5C4433", matte), // the potted plants' soil
 }
 
 /// The wall's face in a 1-deep footprint, game depth.

@@ -19,7 +19,6 @@ mod stonework;
 palette! { M:
     stone = ("#B9B2A6", matte),
     stone_dark = ("#8F887C", matte),
-    stone_warm = ("#C6BCA9", matte),
     water = ("#6FA8C0", gloss), // opaque, like the old parts' water
     moss = ("#5E8A3C", foliage),
     leaf = ("#4E7A34", foliage),
