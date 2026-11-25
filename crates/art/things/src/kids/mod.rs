@@ -9,7 +9,7 @@
 //!
 //! Each is built where the game places it (`F`, game axes: x, height, depth; front +depth), then stood on the floor
 //! (`common::place`, `centre` on its `Model`), so seats, mattresses and wall backs stay where the game puts
-//! residents. Seat and mattress heights are the renderer's (characters.ts `SEATS`, `BEDS`; the content's `surface`
+//! residents. Seat and mattress heights are the renderer's (furniture.json `seats`, `beds`; the content's `surface`
 //! and `seat`).
 //!
 //! Built with the forms: mattresses, pillows, duvets and cushions are soft boxes, frames and rails one swept piece,

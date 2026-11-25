@@ -7,7 +7,7 @@ The module builds the nine beds of BR1 into `web/public/assets/models/bedroom/` 
 ## Shared
 
 - **Mattresses centred, at the renderer's mattress heights.** The game lays sleepers centred on the footprint (head about
-  0.84 m behind the middle, feet 0.86 m in front) at characters.ts `BEDS` (`BUNKS` for the bunk's two). Each
+  0.84 m behind the middle, feet 0.86 m in front) at furniture.json `beds` (`bunks` for the bunk's two). Each
   mattress top is that height: `bed` 0.58, `bedSingle` 0.5, `bedBunk` 0.44 and 1.38, `bedFuton` 0.4, `bedKing`
   0.59. The oak double, the queen and the four-poster are 0.52 and the daybed 0.51, as the old parts were: they
   got `BEDS` entries with those tops. Headboard faces stay behind depth -0.87, so heads don't go into them.

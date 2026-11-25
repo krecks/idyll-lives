@@ -13,7 +13,7 @@
 //! The sofa bed is a boxy two-seater against the wall (the old part's size), whose mattress, folded away inside
 //! the base under the seat at rest, pulls out forward over the seat and onto the floor in front (`bed_out`), held
 //! out while the object is open (dozing on it, "Pull out the bed"; "Fold the bed away"). Sleepers lie with their
-//! heads on the seat and the rest on the mattress (characters.ts BEDS['sofaBed']: its top and how far forward).
+//! heads on the seat and the rest on the mattress (furniture.json beds.sofaBed: its top and how far forward).
 //!
 //! The sofas and sectionals copy the old primitive parts, where they stand. Their seat cushions are a part of
 //! their own that sinks 2 cm while sat or dozed on (`sink_in`). The armchairs too, but for the recliner (it

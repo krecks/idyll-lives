@@ -96,7 +96,7 @@ palette! { M:
     flame = ("#FF9A3C", gloss, glow("#FFB25C")),
     flame_core = ("#FFD27A", gloss, glow("#FFE0A0")),
     candle = ("#EFE5D3", gloss),
-    hearth_cushion = ("#B5653F", matte), // the floor cushion residents warm up on (characters.ts SEATS)
+    hearth_cushion = ("#B5653F", matte), // the floor cushion residents warm up on (furniture.json `seats`)
     hearth_piping = ("#9A5433", matte),
     picture = ("#2B2C2E", satin),
     art_print = ("#C9B79C", matte),

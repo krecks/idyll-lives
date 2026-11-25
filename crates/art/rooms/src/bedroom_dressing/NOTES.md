@@ -33,7 +33,7 @@ until checked in play.
   brass pivots at 0.95 m, a crest with a finial. Centred on its tile (its old part was 5 cm back).
 - **`dressingTable`** — its mirror against the wall, the pouf at the front (`.centre(0.0, -0.003)`; turned round
   on 2026-10-14: it stood the other way, as its old part, the stool against the wall and the player looking at
-  the mirror's back). The pouf at depth +0.22, its top 0.45 m (characters.ts `SEATS` h 0.45, fwd 0.22, `back`:
+  the mirror's back). The pouf at depth +0.22, its top 0.45 m (furniture.json `seats` h 0.45, fwd 0.22, `back`:
   the sitter faces the object's back, to the mirror); the table (top 0.76 m) behind it on four tapered brass legs,
   two drawer cases either side of the kneehole, the oval mirror on a brass stand at the back edge, its wooden back
   on the wall face. On the top: two perfume bottles and a jewellery box. The build makes it as it first stood

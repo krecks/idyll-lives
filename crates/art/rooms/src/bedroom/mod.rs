@@ -4,7 +4,7 @@
 //! and the daybed (`model.bedDaybed`). Notes: NOTES.md.
 //!
 //! Each bed's mattress is centred on its footprint, its top at the height the renderer lays sleepers at
-//! (characters.ts `BEDS`; `BUNKS` for the bunk's two). Its head end stands on the wall's face (depth -0.93, `WALL`):
+//! (furniture.json `beds`; `bunks` for the bunk's two). Its head end stands on the wall's face (depth -0.93, `WALL`):
 //! headboards, posts and rails stop there, thinner or a few cm forward, so the bed's bounds stand a little forward
 //! of the middle (the Model's `centre`). The game lays its own quilt over each sleeper on the beds in
 //! `BLANKET_BEDS`, so a bed's duvet isn't a second cover over them: its top third (`duvet_flap`) folds back over the
