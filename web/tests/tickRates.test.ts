@@ -3,7 +3,7 @@
 // layout to hand. `bun test`.
 import { describe, expect, test } from 'bun:test';
 import { clockGain, maxAlpha } from '../src/core/bridge';
-import { gameMinutesPerSecond, minutesPerTick, readLayout, tickRates } from '../src/core/snapshot';
+import { gameMinutesPerSecond, minutesPerTick, readLayout, tickClock, tickRates } from '../src/core/snapshot';
 import { SUPER_SPEED as GAME_SUPER_SPEED } from '../src/game/speed';
 import { PLAYBACK_RATE, playbackRate, SUPER_SPEED } from '../src/render/shared/gameSpeed';
 import { constant, DRIVE_SCALE, rustConst, TICKS_PER_MINUTE, TICKS_PER_SECOND } from './snapshotLayout';
@@ -37,6 +37,16 @@ describe('tick rates', () => {
     expect(minutesPerTick({ ticksPerMinute: 20 })).toBe(1 / 20);
     expect(gameMinutesPerSecond({ ticksPerSecond: 20, ticksPerMinute: 20 })).toBe(1);
     expect(gameMinutesPerSecond({ ticksPerSecond: 60, ticksPerMinute: 75 })).toBeCloseTo(0.8, 12);
+  });
+
+  test("a tick's day and time are the sim's clock: from 08:00 on day 1 (`clock.rs`), as a pasted state's save shows them", () => {
+    expect(rustConst('START_MINUTE', 'clock.rs')).toBe('8 * 60');
+    expect(tickClock(0)).toEqual({ day: 1, minute: 8 * 60 });
+    // Day 6, 09:40 (a state the bench tool made): not 01:40, the time since tick 0 alone.
+    const tick = (5 * 1440 + 9 * 60 + 40 - 8 * 60) * TICKS_PER_MINUTE;
+    expect(tickClock(tick)).toEqual({ day: 6, minute: 9 * 60 + 40 });
+    // Midnight is the next day's first minute.
+    expect(tickClock(16 * 60 * TICKS_PER_MINUTE)).toEqual({ day: 2, minute: 0 });
   });
 
   test('the frame clock keeps to real time at any step rate, as it was at 20 steps a second', () => {

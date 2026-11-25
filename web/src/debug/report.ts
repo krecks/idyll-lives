@@ -10,7 +10,7 @@ import type { CameraPose } from '../render/types';
 import { writeSave, type SaveRecord } from '../persistence/saves';
 import { recentLog, type LogEntry } from './log';
 import { within } from '../core/async';
-import { minutesPerTick, tickRates } from '../core/snapshot';
+import { tickClock } from '../core/snapshot';
 
 export interface DebugReport {
   /** What the report is about, typed by the player (may be empty). */
@@ -159,14 +159,15 @@ export async function loadState(text: string, name = 'Pasted state'): Promise<{ 
     throw new Error("That isn't a game state (no tick, households and residents).");
   }
   const player = state.households.findIndex((h: { player: boolean }) => h.player);
-  const minutes = Math.floor(state.tick * minutesPerTick(tickRates));
+  // As the sim's clock reads it (from 08:00 on day 1), so the menu's Continue shows the state's time.
+  const { day, minute } = tickClock(state.tick);
   const record: SaveRecord = {
     id: 'debug-state',
     name: `Debug: ${name}`,
     household: state.households[player]?.name ?? '',
     members: state.sims.filter((s: { household: number }) => s.household === player).map((s: { name: string }) => s.name),
-    day: Math.floor(minutes / 1440) + 1,
-    minute: minutes % 1440,
+    day,
+    minute: Math.floor(minute),
     savedAt: Date.now(),
     thumbnail: null,
     autosave: false,
