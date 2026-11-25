@@ -8,6 +8,7 @@ use super::{F, M};
 use artkit::forms::{catmull, rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, V3, cos, exp, pow, radians, sin, sqrt};
+use artkit::mesh::UvWay;
 use artkit::motion::{Rock, Squash, path, rock, squash};
 use artkit::parts::{hinged, join, measure, new_parts, turn};
 use artkit::place::Facing;
@@ -630,6 +631,8 @@ pub fn bean_bag() -> Vec<Obj> {
             material = M.bag
         );
         bag.edit(|o| {
+            // laid face by face (a slumped blob: laid round its upright, its dome and dent would stretch)
+            o.uv = UvWay::Box;
             // the dent the sitter has left, in front of the back
             for v in &mut o.mesh.verts {
                 let (x, y, z) = (v.x as f64, v.y as f64, v.z as f64);
