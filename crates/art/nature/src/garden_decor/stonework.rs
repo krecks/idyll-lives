@@ -98,7 +98,8 @@ pub fn birdbath() -> Vec<Obj> {
         0.012,
         at = (0, 0, 0.792),
         material = M.water,
-        verts = 40
+        verts = 40,
+        bevel = 0.004
     );
     torus!(
         "ripple",
@@ -172,7 +173,8 @@ pub fn fountain() -> Vec<Obj> {
         0.014,
         at = (0, 0, 0.29),
         material = M.water,
-        verts = 32
+        verts = 32,
+        bevel = 0.004
     );
     revolve!(
         "stem",
@@ -184,11 +186,17 @@ pub fn fountain() -> Vec<Obj> {
             (0.1, 0.38),
             (0.092, 0.45),
             (0.1, 0.5),
-            (0.115, 0.52),
+            // (the collar and the top's arrises rounded: no turn of 60°)
+            (0.112, 0.515),
+            (0.115, 0.522),
+            (0.112, 0.528),
             (0.105, 0.535),
             (0.13, 0.56),
             (0.2, 0.6),
-            (0.21, 0.625),
+            (0.208, 0.617),
+            (0.21, 0.622),
+            (0.2085, 0.6245),
+            (0.204, 0.625),
             (0.0, 0.625)
         ],
         material = M.stone,
@@ -249,7 +257,8 @@ pub fn fountain() -> Vec<Obj> {
         0.012,
         at = (0, 0, 0.73),
         material = M.water,
-        verts = 32
+        verts = 32,
+        bevel = 0.004
     );
     for k in 0..4 {
         let a = TAU * k as f64 / 4.0;

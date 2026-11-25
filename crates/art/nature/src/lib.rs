@@ -55,6 +55,20 @@ pub fn bevel_first(names: &[&str]) {
     }
 }
 
+/// Bakes the scale of the parts whose names start with one of `names` into their meshes now, as the join would,
+/// so their textured finish is laid on the shape as drawn: a squashed boulder's UVs made before its scale stretch
+/// the texture by as much as it was squashed.
+pub fn bake_scale(names: &[&str]) {
+    for part in artkit::scene::meshes() {
+        let name = part.name();
+        if names.iter().any(|n| name.starts_with(n)) {
+            let scale = part.scale();
+            part.edit(|p| p.mesh.transform(&artkit::math::M4::diagonal(scale)));
+            part.set_scale((1.0, 1.0, 1.0));
+        }
+    }
+}
+
 /// The group's families by their names on the command line (`cargo art <name>`).
 pub fn families() -> Vec<(&'static str, Family)> {
     vec![
