@@ -17,20 +17,30 @@ interface WorkerScope {
 }
 
 const scope = self as WorkerScope;
-/** Asks wait for the synthesis to load, in the order they came. A load that fails throws in here, and the page's
- * `onerror` makes the sounds there instead. */
+/** Asks wait for the synthesis to load, in the order they came. A load that fails is thrown out of the worker (a
+ * rejection alone wouldn't reach the page), and the page's `onerror` makes the sounds there instead. */
 let ready = loadSynth();
+ready.catch((err: unknown) =>
+  setTimeout(() => {
+    throw err;
+  }),
+);
 
 scope.onmessage = (e) => {
   const q = e.data;
   ready = ready.then(() => {
-    if ('bird' in q) {
-      const samples = songSamples(q.bird, q.version, q.rate);
-      scope.postMessage({ ...q, samples }, [samples.buffer]);
-      return;
+    // One sound that fails stays silent (the page's synthesis would fail it too); the rest still come.
+    try {
+      if ('bird' in q) {
+        const samples = songSamples(q.bird, q.version, q.rate);
+        scope.postMessage({ ...q, samples }, [samples.buffer]);
+        return;
+      }
+      const made = makeSound(q.kind, q.rate);
+      if (made instanceof Float32Array) scope.postMessage({ kind: q.kind, rate: q.rate, left: made }, [made.buffer]);
+      else scope.postMessage({ kind: q.kind, rate: q.rate, left: made.left, right: made.right }, [made.left.buffer, made.right.buffer]);
+    } catch (err) {
+      console.error('[sound] could not make', 'bird' in q ? `a ${q.bird.species} song` : q.kind, err);
     }
-    const made = makeSound(q.kind, q.rate);
-    if (made instanceof Float32Array) scope.postMessage({ kind: q.kind, rate: q.rate, left: made }, [made.buffer]);
-    else scope.postMessage({ kind: q.kind, rate: q.rate, left: made.left, right: made.right }, [made.left.buffer, made.right.buffer]);
   });
 };
