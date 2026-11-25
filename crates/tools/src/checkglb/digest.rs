@@ -281,11 +281,13 @@ impl Take {
     }
 }
 
-/// One primitive: its material's name, its attributes' kinds, and its triangles as a sorted list, each the three
+/// One primitive: its material (all of it for the whole digest, so two materials of one name can't trade places
+/// unseen; its name for a part's), its attributes' kinds, and its triangles as a sorted list, each the three
 /// corners' bytes (hashed to 16) from its smallest corner on. Anything but triangles is hashed as it is written.
 fn primitive(g: &Glb, prim: &J, take: Take) -> R<Hash> {
     let mut h = Hasher::new("primitive");
     let material = match prim.get("material") {
+        Some(m) if take == Take::All => canon(item(&g.gltf, "materials", m)?),
         Some(m) => item(&g.gltf, "materials", m)?
             .get("name")
             .map(J::key)
@@ -603,6 +605,37 @@ mod tests {
         assert_eq!(t.parents, [Some(1), Some(2), None, Some(1), None]);
         assert!(tree(&j(r#"{"nodes": [{"children": [1]}, {"children": [0]}]}"#)).is_err());
         assert!(tree(&j(r#"{"nodes": [{"children": [7]}]}"#)).is_err());
+    }
+
+    #[test]
+    fn two_materials_of_one_name_trading_places_are_not_the_same() {
+        let bin: Vec<u8> = [0f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
+        let file = |materials: &str| {
+            let json = format!(
+                r#"{{"nodes": [{{"name": "a", "mesh": 0}}, {{"name": "b", "mesh": 1}}],
+                "meshes": [{{"primitives": [{{"attributes": {{"POSITION": 0}}, "material": 0}}]}},
+                {{"primitives": [{{"attributes": {{"POSITION": 0}}, "material": 1}}]}}],
+                "materials": {materials},
+                "bufferViews": [{{"byteOffset": 0, "byteLength": 36}}],
+                "accessors": [{{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3}}]}}"#
+            );
+            digest(&parse_glb(&glb(&json, &bin)).unwrap()).unwrap()
+        };
+        let (red, blue) = (
+            r#"{"name": "paint", "pbrMetallicRoughness": {"baseColorFactor": [1, 0, 0, 1]}}"#,
+            r#"{"name": "paint", "pbrMetallicRoughness": {"baseColorFactor": [0, 0, 1, 1]}}"#,
+        );
+        assert_ne!(
+            file(&format!("[{red}, {blue}]")),
+            file(&format!("[{blue}, {red}]"))
+        );
+        assert_eq!(
+            file(&format!("[{red}, {blue}]")),
+            file(&format!("[{red}, {blue}]"))
+        );
     }
 
     #[test]

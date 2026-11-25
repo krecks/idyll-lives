@@ -16,7 +16,7 @@
 //! files it writes are pinned by their SHA-256 (`llmfetch.rs`).
 
 use crate::download::sha256_hex;
-use crate::fp16::{bytes_field, fields, string_field, varint_field};
+use crate::fp16::{FLOAT, bytes_field, fields, string_field, varint, varint_field};
 use std::collections::HashMap;
 
 /// Positions the attention can be at after the cut: the longest prompt and reply together.
@@ -30,7 +30,6 @@ const ALIGN: usize = 4096;
 
 /// `TensorProto.data_location` EXTERNAL.
 const EXTERNAL: u64 = 1;
-const FLOAT: u64 = 1;
 
 /// The smaller model: its graph, its weights file, and what changed.
 pub struct Slim {
@@ -75,8 +74,8 @@ fn read(buf: &[u8]) -> Result<Initializer<'_>, String> {
             (1, 2) => {
                 // Packed dims.
                 let mut at = 0;
-                for d in packed_varints(f.payload, &mut at)? {
-                    t.dims.push(d);
+                while at < f.payload.len() {
+                    t.dims.push(varint(f.payload, &mut at)?);
                 }
             }
             (13, 2) => {
@@ -117,26 +116,6 @@ fn read(buf: &[u8]) -> Result<Initializer<'_>, String> {
         t.length = length.ok_or_else(|| format!("ONNX: {} has no external data length", t.name))?;
     }
     Ok(t)
-}
-
-/// Varints packed one after another (a packed repeated field's payload).
-fn packed_varints(buf: &[u8], at: &mut usize) -> Result<Vec<u64>, String> {
-    let mut out = Vec::new();
-    while *at < buf.len() {
-        let mut value: u64 = 0;
-        let mut shift = 0;
-        loop {
-            let b = *buf.get(*at).ok_or("protobuf: truncated packed varint")?;
-            *at += 1;
-            value |= u64::from(b & 0x7f) << shift;
-            if b < 0x80 {
-                break;
-            }
-            shift += 7;
-        }
-        out.push(value);
-    }
-    Ok(out)
 }
 
 /// The initializer with these dims and this place in the weights file.

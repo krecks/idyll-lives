@@ -21,6 +21,7 @@ for (const f of readdirSync(out)) if (f.endsWith('.glb') || f === 'built.json') 
 const list = await samples();
 let [triangles, bytes] = [0, 0];
 for (const s of list) {
+  if (!s.meshes.some((m) => m.indices.length)) throw new Error(`${s.key} draws nothing`);
   const glb = glbOf(s.meshes);
   writeFileSync(join(out, `${s.key}.glb`), glb);
   bytes += glb.length;

@@ -15,11 +15,17 @@ pub fn counts(rows: &[SizeRow]) -> BTreeMap<String, u64> {
 }
 
 /// What `--check` fails on, against `baseline`'s `reference` section: a row with more findings than it holds, or
-/// any where it holds none (new objects are strict); one with fewer (stale: `--update-baseline` lowers it); and an
-/// id it holds that no row has.
+/// any where it holds none (new objects are strict); one with fewer (stale: `--update-baseline` lowers it); an
+/// id it holds that no row has; and a row whose model couldn't be measured (one with no model is not judged).
 pub fn judged(rows: &[SizeRow], baseline: &Baseline) -> Vec<String> {
     let mut out = Vec::new();
-    for r in rows.iter().filter(|r| r.problem.is_none()) {
+    for r in rows {
+        if let Some(p) = r.problem.as_deref() {
+            if p.starts_with("unmeasured") && p != "unmeasured: no model" {
+                out.push(format!("`{}`: {p}", r.id));
+            }
+            continue;
+        }
         let count = r.outside.len() as u64;
         let what = r.outside.join("; ");
         match baseline.judge(CHECK, &r.id, count) {

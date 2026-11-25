@@ -82,6 +82,8 @@ try {
     for (let i = 0; i < 1200 && (await minute()) < until; i++) await page.waitForTimeout(150);
   }
   await page.evaluate(() => window.__osw.send({ type: 'setSpeed', speed: 0 }));
+  const reached = await minute();
+  if (reached < goal) throw new Error(`the clock stopped at minute ${reached.toFixed(0)}, not ${goal}: no scene saved`);
   await page.waitForTimeout(500);
   const state = await page.evaluate(async () => (await import('/src/ui/services.ts')).services.controls.currentState());
   const home = await page.evaluate(() => {

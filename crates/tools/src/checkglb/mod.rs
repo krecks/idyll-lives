@@ -45,8 +45,6 @@ use py::{
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::f64::consts::PI;
 
-pub use py::repr_str as py_repr_str;
-
 /// Triangles at full detail by the model's largest side (m): (up to, target, most). About the
 /// primitive parts' median and 90th percentile in each class, so a model costs what the
 /// primitive models cost today (docs/design/objects.md, "Budgets").

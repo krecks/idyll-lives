@@ -7,13 +7,11 @@
 //! The JSON is edited as text through a parser that keeps every value's span (byte offsets), never re-serialised.
 
 use std::collections::{HashMap, HashSet};
-use std::fmt::Write as _;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-pub const HELP: &str = r#"usage: content [-h] [--group GROUP] [--label LABEL] [--to TO] [--dry-run]
-               [--content CONTENT] [--plan PLAN]
-               {list,in,out} [ids ...]
+pub const HELP: &str = r#"usage: cargo content list|in|out [<id>...] [--group <group>] [--label <label>]
+                     [--to <category>/<group>] [--dry-run] [--content <dir>] [--plan <dir>]
 
 Moves catalog items into Validate and back (sign-off), by id, editing the content JSON as text.
 
@@ -32,38 +30,17 @@ right after (`git add -p`).
         Sign-off: back home. Without --to, each item goes back to its "Home" in the category
         tables (docs/objects/*.md: `living / seating`; `living / —` is the category with no group).
         Validate groups left empty are dropped; the last one leaving is reported (then remove the
-        category and its icon, docs/objects/README.md).
+        category and its icon).
 
     Options: --dry-run (print the diff, write nothing), --content <dir> (default
-    web/public/content: base.json and its includes), --plan <dir> (default docs/objects/).
+    web/public/content: base.json and its includes), --plan <dir> (default docs/objects/),
+    -h/--help (this text).
 
 Free turning: whether a 1x1 item may turn freely comes from its category (`objectRules.freeRotation`
 in base.json) unless the item says `"freeRotation": true|false`. Going into Validate, an item that
 turns freely at home gets `"freeRotation": true` when Validate itself doesn't turn freely, so it keeps
 turning while it's checked; signing off carries an item's own `"freeRotation"` back with it unchanged.
-
-positional arguments:
-  {list,in,out}
-  ids
-
-options:
-  -h, --help         show this help message and exit
-  --group GROUP
-  --label LABEL
-  --to TO
-  --dry-run
-  --content CONTENT
-  --plan PLAN
 "#;
-
-/// The repo root (the Python script's `ROOT`).
-pub fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("crates/tools sits two below the root")
-        .to_path_buf()
-}
 
 /// A path as Python's `Path(s)` spells it: no `.` components, no doubled or trailing slashes.
 pub fn py_path(s: &str) -> PathBuf {
@@ -78,49 +55,6 @@ pub fn py_path(s: &str) -> PathBuf {
     }
 }
 
-/// Python's `str.isspace` (what `\s` and `strip()` match): Unicode White_Space plus U+001C..U+001F.
-fn py_space(c: char) -> bool {
-    c.is_whitespace() || ('\x1c'..='\x1f').contains(&c)
-}
-
-fn py_strip(s: &str) -> &str {
-    s.trim_matches(py_space)
-}
-
-/// Python's `str.splitlines()`.
-fn py_splitlines(s: &str) -> Vec<&str> {
-    let mut out = Vec::new();
-    let mut start = 0;
-    let mut it = s.char_indices().peekable();
-    while let Some((i, c)) = it.next() {
-        let brk = matches!(
-            c,
-            '\n' | '\r'
-                | '\x0b'
-                | '\x0c'
-                | '\x1c'
-                | '\x1d'
-                | '\x1e'
-                | '\u{85}'
-                | '\u{2028}'
-                | '\u{2029}'
-        );
-        if brk {
-            out.push(&s[start..i]);
-            let mut next = i + c.len_utf8();
-            if c == '\r' && it.peek().map(|&(_, n)| n) == Some('\n') {
-                it.next();
-                next += 1;
-            }
-            start = next;
-        }
-    }
-    if start < s.len() {
-        out.push(&s[start..]);
-    }
-    out
-}
-
 /// `Path.read_text()`: UTF-8 with universal newlines (`\r\n` and `\r` read as `\n`).
 fn read_text(path: &Path) -> Result<String, String> {
     let raw = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -131,30 +65,9 @@ fn read_text(path: &Path) -> Result<String, String> {
     })
 }
 
-/// `json.dumps(s)` for a string: `ensure_ascii`, so non-ASCII as `\uXXXX` (surrogate pairs above the BMP).
-pub fn json_str(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('"');
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            '\x08' => out.push_str("\\b"),
-            '\x0c' => out.push_str("\\f"),
-            ' '..='~' => out.push(c),
-            _ => {
-                let mut units = [0u16; 2];
-                for u in c.encode_utf16(&mut units) {
-                    let _ = write!(out, "\\u{u:04x}");
-                }
-            }
-        }
-    }
-    out.push('"');
-    out
+/// A JSON string literal (UTF-8 as it is, as the content files have it).
+fn json_str(s: &str) -> String {
+    serde_json::to_string(s).expect("a string serialises")
 }
 
 mod json;
@@ -329,14 +242,14 @@ pub fn back_to_table(plan: &Path) -> Result<HashMap<String, (String, Option<Stri
     for md in mds {
         let text = read_text(&md)?;
         let mut column: Option<usize> = None;
-        for line in py_splitlines(&text) {
+        for line in text.lines() {
             // A list instead: "- `a`, `b`: bathroom / sinks;".
             if let Some(m) = listed_re.captures(line) {
-                let group = py_strip(&m[3]);
+                let group = m[3].trim();
                 for id in tick_re.captures_iter(&m[1]) {
                     homes.entry(id[1].to_string()).or_insert_with(|| {
                         (
-                            py_strip(&m[2]).to_string(),
+                            m[2].trim().to_string(),
                             (!no_group(group)).then(|| group.to_string()),
                         )
                     });
@@ -346,10 +259,11 @@ pub fn back_to_table(plan: &Path) -> Result<HashMap<String, (String, Option<Stri
                 column = None;
                 continue;
             }
-            let cells: Vec<&str> = py_strip(line)
+            let cells: Vec<&str> = line
+                .trim()
                 .trim_matches('|')
                 .split('|')
-                .map(py_strip)
+                .map(str::trim)
                 .collect();
             if let Some(heading) = ["Home", "Back to"].into_iter().find(|h| cells.contains(h)) {
                 column = cells.iter().position(|c| *c == heading);
@@ -361,7 +275,7 @@ pub fn back_to_table(plan: &Path) -> Result<HashMap<String, (String, Option<Stri
             let id = tick_re.captures(cells[0]);
             let home: Vec<&str> = cells[col].split('/').collect();
             if let (Some(id), 2) = (id, home.len()) {
-                let (cat, group) = (py_strip(home[0]), py_strip(home[1]));
+                let (cat, group) = (home[0].trim(), home[1].trim());
                 homes.insert(
                     id[1].to_string(),
                     (
@@ -380,7 +294,7 @@ pub fn label_of(group: &str) -> String {
     let mut parts = vec![String::new()];
     let mut prev_sep = false;
     for c in group.chars() {
-        if py_space(c) || c == '_' || c == '-' {
+        if c.is_whitespace() || c == '_' || c == '-' {
             if !prev_sep {
                 parts.push(String::new());
             }
@@ -409,15 +323,6 @@ pub use cli::{Args, Exit, main_with, parse_args, run};
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn dumps_like_python() {
-        let u = "\\u";
-        assert_eq!(
-            json_str("Caf\u{e9} \u{2615} \u{1f600} \"q\" \\ \n\x7f"),
-            format!("\"Caf{u}00e9 {u}2615 {u}d83d{u}de00 \\\"q\\\" \\\\ \\n{u}007f\"")
-        );
-    }
 
     #[test]
     fn labels() {
@@ -450,11 +355,5 @@ mod tests {
         ed.replace(n.get("a").unwrap(), "9");
         ed.replace(n.get("a").unwrap(), "8");
         assert!(ed.new_text(Path::new("x")).is_err());
-    }
-
-    #[test]
-    fn splitlines() {
-        assert_eq!(py_splitlines("a\r\nb\rc\n\nd"), ["a", "b", "c", "", "d"]);
-        assert_eq!(py_splitlines("a\n"), ["a"]);
     }
 }

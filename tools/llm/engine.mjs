@@ -12,7 +12,7 @@ import { gunzipSync } from 'node:zlib';
 
 const web = new URL('../../web/', import.meta.url);
 const require = createRequire(new URL('package.json', web));
-export const ort = require('onnxruntime-web');
+const ort = require('onnxruntime-web');
 // Its ES module (`require.resolve` finds the CommonJS build next to it).
 const { Tokenizer } = await import(require.resolve('@huggingface/tokenizers').replace(/\.cjs$/, '.mjs'));
 export const { generate, PrefixCache, countTokens, sentencesIn } = await import(new URL('src/llm/generate.ts', web).href);

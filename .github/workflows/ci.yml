@@ -13,8 +13,9 @@
 # for each: Rust, and target/ linked to a build kept on the machine and shared by every job). With
 # one runner they go one after another; a second runner registered with the same labels takes them
 # side by side again (the generated worlds alone take 12 to 18 minutes on GitHub's runners, every
-# one a Big one). `changes` and `test` only read the trees and the results, and stay on GitHub's
-# runners, so the decision and the verdict don't queue behind the work. `test` waits for the four
+# one a Big one), on the same machine only with a CI_TARGET_DIR of its own (tools/ci-runner.sh).
+# `changes` and `test` only read the trees and the results, and stay on GitHub's runners, so the
+# decision and the verdict don't queue behind the work. `test` waits for the four
 # and passes only when all four did (the generated worlds skipped counts as passed where they don't
 # run): the name the main branch's ruleset requires.
 #

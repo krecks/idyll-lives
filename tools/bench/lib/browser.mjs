@@ -31,7 +31,7 @@ export async function playwright() {
 }
 
 /** The window every bench page has: 1920 × 1080 at device pixel ratio 1. */
-export const VIEWPORT = { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 };
+const VIEWPORT = { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 };
 /** What a kept browser clears before each page: everything the site stores, not the HTTP or shader caches. */
 export const SITE_STORAGE = 'cookies,file_systems,indexeddb,local_storage,service_workers,cache_storage';
 
@@ -72,6 +72,15 @@ export async function benchContext(browser, options = VIEWPORT) {
   const context = await browser.newContext(options);
   await context.addInitScript(quiet);
   return context;
+}
+
+/** A new page in a window of its own (a kept browser's `newPage` opens a tab in its first window instead). */
+export async function newWindow(context) {
+  const cdp = await context.newCDPSession(context.pages()[0]);
+  const page = context.waitForEvent('page');
+  await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
+  await cdp.detach();
+  return page;
 }
 
 /**
@@ -170,7 +179,7 @@ export async function serveBuild(where, { prod = false, port } = {}) {
 const PAGE_KEYS = ['bench', 'quality', 'renderer', 'res', 'diag', 'big', 'options', 'tile', 'hud'];
 
 /** A page's identity among kept pages: its origin and `PAGE_KEYS` (the diagnostics as a set). */
-export function pageKey(url) {
+function pageKey(url) {
   const u = new URL(url);
   const p = u.searchParams;
   return [u.origin, ...PAGE_KEYS.map((k) => `${k}=${k === 'diag' ? (p.get(k) ?? '').split(',').filter(Boolean).sort().join(',') : (p.get(k) ?? '')}`)].join('&');
@@ -222,7 +231,7 @@ export async function openBench(context, base, query, { attached = false, timeou
  * A pose as the bench's URL flags spell it (`cam=over&over=centre&radius=400&hour=13`, render.mjs's `POSES`): the hour
  * to light it at (undefined: as it is) and the pose for `__bench.pose`.
  */
-export function poseOf(query) {
+function poseOf(query) {
   const p = new URLSearchParams(query);
   const num = (k) => (p.has(k) ? Number(p.get(k)) : undefined);
   const pose = { cam: p.get('cam') ?? 'orbit', at: num('at'), radius: num('radius'), beta: num('beta'), alpha: num('alpha'), tx: num('tx'), tz: num('tz'), over: p.get('over') === 'centre' ? 'centre' : 'home', walls: p.get('walls'), townCentre: p.get('townCentre') === '1' };

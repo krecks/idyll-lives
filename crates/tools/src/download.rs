@@ -167,10 +167,20 @@ pub fn pack(from: &Path, to: &Path) -> Result<(), String> {
         ),
         flate2::Compression::new(9),
     );
-    std::io::copy(&mut input, &mut enc).map_err(|e| format!("{}: {e}", from.display()))?;
-    enc.finish()
-        .map_err(|e| format!("{}: {e}", part.display()))?;
+    let packed = std::io::copy(&mut input, &mut enc)
+        .map_err(|e| format!("{}: {e}", from.display()))
+        .and_then(|_| {
+            // Flushed here, not on drop: a write that fails must not delete `from`.
+            enc.finish()
+                .map_err(|e| e.to_string())
+                .and_then(|w| w.into_inner().map_err(|e| e.to_string()))
+                .map_err(|e| format!("{}: {e}", part.display()))
+        });
     drop(input);
+    if let Err(e) = packed {
+        let _ = std::fs::remove_file(&part);
+        return Err(e);
+    }
     std::fs::rename(&part, to).map_err(|e| format!("{}: {e}", to.display()))?;
     std::fs::remove_file(from).map_err(|e| format!("{}: {e}", from.display()))
 }

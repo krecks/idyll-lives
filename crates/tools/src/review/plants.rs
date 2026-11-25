@@ -21,7 +21,7 @@ pub(super) fn measure_plants(
     }
     let files = species::model_files(&s.paths)?;
     let assets = Path::new(&s.paths.assets);
-    let base: Value = serde_json::from_str(&s.read("web/public/assets/manifest.json")?)
+    let base = checkglb::json::loads_text(s.read("web/public/assets/manifest.json")?.as_bytes())
         .map_err(|e| format!("manifest.json: {e}"))?;
     let finishes = crate::colours::finishes(&base, assets);
     let atlas = Atlas::read(&s.root.to_string_lossy())?;

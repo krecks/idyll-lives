@@ -1577,3 +1577,4 @@ try {
   stop();
 }
 console.log(faults ? `create: ${faults} fault(s); pictures in ${out}` : `create: clean; pictures in ${out}`);
+process.exitCode = faults ? 1 : 0;

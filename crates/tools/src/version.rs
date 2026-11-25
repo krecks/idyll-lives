@@ -6,7 +6,7 @@
 //!   cargo release-version 0.3.0    set all three to 0.3.0 (then: commit, `git tag v0.3.0`; pushing the tag
 //!                          publishes the game, see .github/workflows/pages.yml)
 
-use crate::characters::repo_root;
+use crate::repo_root;
 use regex::Regex;
 use std::path::Path;
 
@@ -83,6 +83,10 @@ fn run(next: Option<&str>) -> Result<i32, String> {
     {
         return Err(format!("Not a version: {next}"));
     }
+    // Every member in Cargo.lock before any file is written: no half-set version.
+    if let Some((name, _)) = lock_versions.iter().find(|(_, v)| v.is_none()) {
+        return Err(format!("No {name} in Cargo.lock"));
+    }
     // Only the version line changes: the file keeps its formatting (it is JSON.stringify's own).
     let pkg_next = replace_once(
         &pkg_text,
@@ -98,10 +102,7 @@ fn run(next: Option<&str>) -> Result<i32, String> {
     )
     .map_err(|e| format!("{}: {e}", cargo_path.display()))?;
     let mut next_lock = lock;
-    for (name, v) in &lock_versions {
-        if v.is_none() {
-            return Err(format!("No {name} in Cargo.lock"));
-        }
+    for (name, _) in &lock_versions {
         next_lock = entry_re(name)
             .replace(&next_lock, format!("${{1}}{next}${{3}}"))
             .to_string();

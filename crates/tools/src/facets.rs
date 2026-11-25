@@ -17,10 +17,13 @@
 //! cargo review facets [--all] [--check]
 //! ```
 
+use crate::checkglb::glb::{Glb, R, accessor, item, key as key_of, parse_glb};
+use crate::checkglb::json::loads_bytes;
+use crate::checkglb::py::J;
+use crate::checkglb::{applied, node_matrices, override_of, primitives};
 use crate::vec3::{cross, dot, length, sub};
-use serde_json::Value as J;
 use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// How far a curve may stand off its chord before its outline shows flat sides, in metres.
 pub const SAGITTA: f64 = 0.0015;
@@ -170,252 +173,69 @@ pub struct Found {
     pub triangles: usize,
 }
 
-type Matrix = [[f64; 4]; 4];
-
-const IDENTITY: Matrix = [
-    [1.0, 0.0, 0.0, 0.0],
-    [0.0, 1.0, 0.0, 0.0],
-    [0.0, 0.0, 1.0, 0.0],
-    [0.0, 0.0, 0.0, 1.0],
-];
-
-fn mul(a: &Matrix, b: &Matrix) -> Matrix {
-    let mut m = [[0.0; 4]; 4];
-    for (r, row) in m.iter_mut().enumerate() {
-        for (c, v) in row.iter_mut().enumerate() {
-            *v = (0..4).map(|k| a[r][k] * b[k][c]).sum();
-        }
-    }
-    m
-}
-
-fn floats(v: Option<&J>, n: usize) -> Option<Vec<f64>> {
-    let a = v?.as_array()?;
-    (a.len() == n).then(|| a.iter().map(|x| x.as_f64().unwrap_or(0.0)).collect())
-}
-
-/// A node's own matrix (row-major): its `matrix`, or its translation, rotation and scale.
-fn local(node: &J) -> Matrix {
-    if let Some(m) = floats(node.get("matrix"), 16) {
-        let mut out = IDENTITY;
-        for (r, row) in out.iter_mut().enumerate() {
-            for (c, v) in row.iter_mut().enumerate() {
-                *v = m[c * 4 + r]; // (glTF writes columns first)
-            }
-        }
-        return out;
-    }
-    let t = floats(node.get("translation"), 3).unwrap_or_else(|| vec![0.0; 3]);
-    let q = floats(node.get("rotation"), 4).unwrap_or_else(|| vec![0.0, 0.0, 0.0, 1.0]);
-    let s = floats(node.get("scale"), 3).unwrap_or_else(|| vec![1.0; 3]);
-    let (x, y, z, w) = (q[0], q[1], q[2], q[3]);
-    let rot = [
-        [
-            1.0 - 2.0 * (y * y + z * z),
-            2.0 * (x * y - z * w),
-            2.0 * (x * z + y * w),
-        ],
-        [
-            2.0 * (x * y + z * w),
-            1.0 - 2.0 * (x * x + z * z),
-            2.0 * (y * z - x * w),
-        ],
-        [
-            2.0 * (x * z - y * w),
-            2.0 * (y * z + x * w),
-            1.0 - 2.0 * (x * x + y * y),
-        ],
-    ];
-    let mut out = IDENTITY;
-    for r in 0..3 {
-        for c in 0..3 {
-            out[r][c] = rot[r][c] * s[c];
-        }
-        out[r][3] = t[r];
-    }
-    out
-}
-
-/// A `.glb`'s JSON and binary chunks.
-fn chunks(file: &Path) -> Result<(J, Vec<u8>), String> {
-    let data = std::fs::read(file).map_err(|e| format!("{}: {e}", file.display()))?;
-    let word = |at: usize| {
-        data.get(at..at + 4)
-            .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize)
-    };
-    let (mut json, mut bin, mut at) = (None, Vec::new(), 12);
-    while let (Some(n), Some(kind)) = (word(at), word(at + 4)) {
-        let chunk = data
-            .get(at + 8..at + 8 + n)
-            .ok_or_else(|| format!("{}: a chunk ends early", file.display()))?;
-        match kind {
-            0x4E4F534A => {
-                json = Some(
-                    serde_json::from_slice(chunk)
-                        .map_err(|e| format!("{}: {e}", file.display()))?,
-                )
-            }
-            0x004E4942 => bin = chunk.to_vec(),
-            _ => {}
-        }
-        at += 8 + n;
-    }
-    Ok((
-        json.ok_or_else(|| format!("{}: not a .glb", file.display()))?,
-        bin,
-    ))
-}
-
-/// An accessor's elements as numbers, `width` to each (floats and unsigned integers, as a source file has them).
-fn accessor(gltf: &J, bin: &[u8], index: &J, width: usize) -> Option<Vec<f64>> {
-    let acc = gltf.get("accessors")?.get(index.as_u64()? as usize)?;
-    let view = gltf
-        .get("bufferViews")?
-        .get(acc.get("bufferView")?.as_u64()? as usize)?;
-    let size = match acc.get("componentType")?.as_u64()? {
-        5126 | 5125 => 4,
-        5123 => 2,
-        5121 => 1,
-        _ => return None,
-    };
-    let float = acc.get("componentType")?.as_u64()? == 5126;
-    let offset = |o: &J| o.get("byteOffset").and_then(J::as_u64).unwrap_or(0) as usize;
-    let stride = view
-        .get("byteStride")
-        .and_then(J::as_u64)
-        .filter(|&s| s > 0)
-        .map_or(size * width, |s| s as usize);
-    let count = acc.get("count")?.as_u64()? as usize;
-    let start = offset(view) + offset(acc);
-    let mut out = Vec::with_capacity(count * width);
-    for i in 0..count {
-        for k in 0..width {
-            let at = start + i * stride + k * size;
-            let b = bin.get(at..at + size)?;
-            out.push(match (size, float) {
-                (4, true) => f32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f64,
-                (4, false) => u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f64,
-                (2, _) => u16::from_le_bytes([b[0], b[1]]) as f64,
-                _ => b[0] as f64,
-            });
-        }
-    }
-    Some(out)
-}
-
-/// A material's finish, by the entry's `materials` map or its own name (`leaf@foliage`), without the prefix.
-fn finish_of(materials: Option<&J>, name: &str) -> String {
-    materials
-        .and_then(|map| map.get(name).or_else(|| map.get("*")))
-        .and_then(|o| o.get("finish"))
-        .and_then(J::as_str)
-        .map(|k| k.trim_start_matches("material.finish.").to_string())
-        .or_else(|| {
-            let tail = name.split_once('@')?.1;
-            Some(tail.split('#').next().unwrap_or(tail).to_string())
-        })
-        .unwrap_or_default()
-}
-
-/// A model's facets: `materials` is its manifest entry's map, `gltf` and `bin` its file's chunks.
-pub fn of_model(key: &str, family: &str, materials: Option<&J>, gltf: &J, bin: &[u8]) -> Found {
+/// A model's facets: `materials` is its manifest entry's map, `g` its file.
+pub fn of_model(key: &str, family: &str, materials: Option<&J>, g: &Glb) -> R<Found> {
     let mut found = Found {
         key: key.to_string(),
         family: family.to_string(),
         ..Found::default()
     };
-    let nodes = gltf
-        .get("nodes")
-        .and_then(J::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_default();
-    let list = |o: &J, k: &str| -> Vec<usize> {
-        o.get(k)
-            .and_then(J::as_array)
-            .map(|a| {
-                a.iter()
-                    .filter_map(|v| v.as_u64().map(|v| v as usize))
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
-    let scene = gltf.get("scene").and_then(J::as_u64).unwrap_or(0) as usize;
-    let mut todo: Vec<(usize, Matrix)> = gltf
-        .get("scenes")
-        .and_then(|s| s.get(scene))
-        .map(|s| list(s, "nodes"))
-        .unwrap_or_default()
-        .into_iter()
-        .map(|i| (i, IDENTITY))
-        .collect();
-    let mut steps = 0;
-    while let Some((i, parent)) = todo.pop() {
-        steps += 1;
-        let Some(node) = nodes.get(i).filter(|_| steps < 100_000) else {
-            continue;
-        };
-        let world = mul(&parent, &local(node));
-        todo.extend(list(node, "children").into_iter().map(|c| (c, world)));
-        let Some(mesh) = node
-            .get("mesh")
-            .and_then(J::as_u64)
-            .and_then(|m| gltf.get("meshes")?.get(m as usize))
-        else {
-            continue;
-        };
-        let part = node.get("name").and_then(J::as_str).unwrap_or("");
-        for prim in mesh
-            .get("primitives")
-            .and_then(J::as_array)
-            .map(Vec::as_slice)
-            .unwrap_or_default()
-        {
-            if prim.get("mode").and_then(J::as_u64).unwrap_or(4) != 4 {
+    for p in node_matrices(&g.gltf, None, None)? {
+        let part = item(&g.gltf, "nodes", &J::Int(p.node as i64))?
+            .get("name")
+            .and_then(J::str)
+            .unwrap_or("");
+        for prim in primitives(&g.gltf, &p.mesh)? {
+            if prim
+                .get("mode")
+                .and_then(J::num)
+                .is_some_and(|m| m.f() != 4.0)
+            {
                 continue;
             }
-            let attribute = |name: &str| {
-                accessor(gltf, bin, prim.get("attributes")?.get(name)?, 3)
-                    .map(|v| v.as_chunks::<3>().0.to_vec())
+            let attributes = key_of(prim, "attributes")?;
+            // An attribute's elements as points: as drawn (`world`) or as the file has them.
+            let points = |name: &str, world: bool| -> R<Option<Vec<V3>>> {
+                let Some(i) = attributes.get(name) else {
+                    return Ok(None);
+                };
+                Ok(accessor(g, i)?.map(|rows| {
+                    rows.iter()
+                        .map(|r| match world {
+                            true => applied(&p.m, r),
+                            false => [0, 1, 2].map(|k| r.get(k).map_or(0.0, |v| v.f())),
+                        })
+                        .collect()
+                }))
             };
-            let (Some(positions), Some(normals)) = (attribute("POSITION"), attribute("NORMAL"))
+            let (Some(positions), Some(normals)) =
+                (points("POSITION", true)?, points("NORMAL", false)?)
             else {
                 continue;
             };
-            let positions: Vec<V3> = positions
-                .iter()
-                .map(|p| {
-                    let mut q = [0.0; 3];
-                    for (r, v) in q.iter_mut().enumerate() {
-                        *v = world[r][0] * p[0]
-                            + world[r][1] * p[1]
-                            + world[r][2] * p[2]
-                            + world[r][3];
-                    }
-                    q
-                })
-                .collect();
             let indices: Vec<u32> = match prim.get("indices") {
-                Some(i) => accessor(gltf, bin, i, 1)
+                Some(i) => accessor(g, i)?
                     .unwrap_or_default()
                     .iter()
-                    .map(|&v| v as u32)
+                    .map(|r| r.first().map_or(u32::MAX, |v| v.f() as u32))
                     .collect(),
                 None => (0..positions.len() as u32).collect(),
             };
             let triangles: Vec<[u32; 3]> = indices.as_chunks::<3>().0.to_vec();
             found.triangles += triangles.len();
-            let material = prim
-                .get("material")
-                .and_then(J::as_u64)
-                .and_then(|m| {
-                    gltf.get("materials")?
-                        .get(m as usize)?
-                        .get("name")?
-                        .as_str()
-                })
-                .unwrap_or("");
-            let finish = finish_of(materials, material);
-            let leaves = finish == "foliage" || finish == "leafcards";
+            let material = match prim.get("material") {
+                Some(i) => item(&g.gltf, "materials", i)?
+                    .get("name")
+                    .and_then(J::str)
+                    .unwrap_or(""),
+                None => "",
+            };
+            // Its finish as the game maps it (`checkglb::override_of`).
+            let finish = override_of(materials.unwrap_or(&J::Null), material);
+            let leaves = matches!(
+                finish.get("finish").and_then(J::str),
+                Some("material.finish.foliage" | "material.finish.leafcards")
+            );
             let mut sum = Sum::default();
             for f in facets(&positions, &normals, &triangles) {
                 sum.add(&f);
@@ -430,11 +250,7 @@ pub fn of_model(key: &str, family: &str, materials: Option<&J>, gltf: &J, bin: &
             }
         }
     }
-    found
-}
-
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    Ok(found)
 }
 
 /// Every model the manifests under `assets` name (not their far versions), measured.
@@ -443,19 +259,19 @@ pub fn survey(assets: &Path) -> Result<Vec<Found>, String> {
     crate::colours::manifests(assets, &mut files);
     let mut out = Vec::new();
     for file in files {
-        let manifest: J = serde_json::from_slice(
-            &std::fs::read(&file).map_err(|e| format!("{}: {e}", file.display()))?,
-        )
-        .map_err(|e| format!("{}: {e}", file.display()))?;
+        let read =
+            |path: &Path| std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()));
+        let manifest =
+            loads_bytes(&read(&file)?).map_err(|e| format!("{}: {e}", file.display()))?;
         let dir = file.parent().unwrap_or(assets);
-        let Some(entries) = manifest.get("entries").and_then(J::as_object) else {
+        let Some(entries) = manifest.get("entries").and_then(J::entries) else {
             continue;
         };
         for (key, entry) in entries {
             let Some(url) = entry
                 .get("url")
-                .and_then(J::as_str)
-                .filter(|_| entry.get("type").and_then(J::as_str) == Some("model"))
+                .and_then(J::str)
+                .filter(|_| entry.get("type").and_then(J::str) == Some("model"))
             else {
                 continue;
             };
@@ -464,8 +280,10 @@ pub fn survey(assets: &Path) -> Result<Vec<Found>, String> {
                 .parent()
                 .and_then(|p| p.file_name())
                 .map_or(String::new(), |n| n.to_string_lossy().into_owned());
-            let (gltf, bin) = chunks(&glb)?;
-            out.push(of_model(key, &family, entry.get("materials"), &gltf, &bin));
+            let found = parse_glb(&read(&glb)?)
+                .and_then(|g| of_model(key, &family, entry.get("materials"), &g))
+                .map_err(|e| format!("{}: {e}", glb.display()))?;
+            out.push(found);
         }
     }
     Ok(out)
@@ -561,7 +379,7 @@ pub fn main(args: &[String]) -> i32 {
         args.iter().any(|a| a == "--all"),
         args.iter().any(|a| a == "--check"),
     );
-    let found = match survey(&root().join("web/public/assets")) {
+    let found = match survey(&crate::repo_root().join("web/public/assets")) {
         Ok(found) => found,
         Err(e) => {
             eprintln!("review facets: {e}");
@@ -714,7 +532,13 @@ mod tests {
             ],
         });
         let materials = json!({ "*": { "finish": "material.finish.wood" }, "leaf": { "finish": "material.finish.foliage" } });
-        let found = of_model("model.x", "living", Some(&materials), &gltf, &bin);
+        let j = |v: serde_json::Value| loads_bytes(v.to_string().as_bytes()).unwrap();
+        let g = Glb {
+            gltf: j(gltf),
+            bin,
+            size: 0,
+        };
+        let found = of_model("model.x", "living", Some(&j(materials)), &g).unwrap();
         assert_eq!(found.triangles, 32);
         assert_eq!(found.round.edges, 8);
         assert_eq!(found.leaves.edges, 8);
@@ -736,7 +560,7 @@ mod tests {
 
     #[test]
     fn the_shipped_models_are_read() {
-        let found = survey(&root().join("web/public/assets")).unwrap();
+        let found = survey(&crate::repo_root().join("web/public/assets")).unwrap();
         assert!(found.len() > 600, "{} models", found.len());
         assert!(found.iter().all(|f| f.triangles > 0));
         // (A report for now: what the kit's rounder defaults and the soft forms bring down.)

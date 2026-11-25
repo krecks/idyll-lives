@@ -11,7 +11,7 @@
 
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Deserialize)]
 struct List {
@@ -89,10 +89,6 @@ pub fn missing<'a>(src: &Path, anchors: &'a [Anchor]) -> Vec<&'a Anchor> {
         .collect()
 }
 
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
 pub fn main_with(args: &[String]) -> i32 {
     if !args.is_empty() {
         eprintln!("usage: cargo check-chunks");
@@ -102,7 +98,7 @@ pub fn main_with(args: &[String]) -> i32 {
             2
         };
     }
-    let root = root();
+    let root = crate::repo_root();
     let list = root.join("tools/render/chunks.json");
     let anchors = match std::fs::read_to_string(&list)
         .map_err(|e| format!("{}: {e}", list.display()))
@@ -201,7 +197,8 @@ mod tests {
 
     #[test]
     fn the_repo_s_list_reads() {
-        let text = std::fs::read_to_string(root().join("tools/render/chunks.json")).unwrap();
+        let text =
+            std::fs::read_to_string(crate::repo_root().join("tools/render/chunks.json")).unwrap();
         let anchors = anchors(&text).unwrap();
         assert!(anchors.len() >= 235, "only {} anchors", anchors.len());
         assert!(

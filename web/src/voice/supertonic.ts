@@ -1,6 +1,6 @@
 /**
  * One line of speech with Supertone's Supertonic 3, the same way everywhere: the voice worker
- * (`tts.worker.ts`) and the Node tools (`tools/voice/check.mjs`, `samples.mjs`) call this, so the
+ * (`tts.worker.ts`) and the Node tools (`tools/voice/check.mjs`) call this, so the
  * checks hear exactly what the game plays. Plain TypeScript with type-only imports (Node runs it
  * by stripping the types). Ported from Supertone's reference code (`web/helper.js`,
  * github.com/supertone-inc/supertonic).

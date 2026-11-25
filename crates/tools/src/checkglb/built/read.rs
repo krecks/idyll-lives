@@ -178,21 +178,7 @@ impl Pictures {
 }
 
 /// sRGB (0..1) as linear light, and back.
-pub fn linear(v: f64) -> f64 {
-    if v <= 0.04045 {
-        v / 12.92
-    } else {
-        ((v + 0.055) / 1.055).powf(2.4)
-    }
-}
-
-pub fn srgb(v: f64) -> f64 {
-    if v <= 0.003_130_8 {
-        v * 12.92
-    } else {
-        1.055 * v.powf(1.0 / 2.4) - 0.055
-    }
-}
+pub use crate::tex::{to_lin as linear, to_srgb as srgb};
 
 /// A sample's parts, read from its `.glb` as the dump writes one (tools/built/glb.ts): a node a part, its mesh's one
 /// primitive, the node's `extras`.

@@ -6,11 +6,12 @@
  * the same numbers (\`hash\`), so one run a pose is enough, and two builds compare frame for frame.
  *
  *   bun tools/bench/steps.mjs --state town-day --poses centre:24,centre:60,home:24 [--frames 600] [--ticks 1]
- *     [--backends webgl,webgpu] [--runs 1] [--quality medium] [--port <p> | --url http://127.0.0.1:5317] [--out dir]
+ *     [--backends webgl,webgpu] [--runs 1] [--quality medium] [--cold] [--port <p> | --url http://127.0.0.1:5317] [--out dir]
  *
  * \`--state\`: a state by name (\`debug-states/<name>.json\`, else \`web/public/bench/<name>.json.gz\`: \`state.mjs --name\`).
  * A pose is \`home\` or \`centre\` and the camera's distance (m), from the game's opening angle. \`--runs 2\` runs each pose
- * twice, the state loaded again in the same page between: what proves the counts repeat. Prints a line a pose and
+ * twice, the state loaded again in the same page between: what proves the counts repeat. \`--cold\`: no uncounted warm-up
+ * run of each pose first, so the first counted run builds what it draws for the first time. Prints a line a pose and
  * backend (draws a frame: mean, least, most; the sun's still picture drawn again; the fingerprint) and writes every
  * frame's counts to \`bench-results/steps-<time>/\` (or \`--out\`), with the page's load times (\`__bench.load\`).
  */

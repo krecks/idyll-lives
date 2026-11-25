@@ -73,7 +73,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { attach, benchContext, keepInfo, launch, openBench, ROOT, serve, step, twoFrames, WEB } from './lib/browser.mjs';
+import { attach, benchContext, keepInfo, launch, newWindow, openBench, ROOT, serve, step, twoFrames, WEB } from './lib/browser.mjs';
 import { benchBuild } from './lib/build.mjs';
 import { worldFlags } from './worldFlags.mjs';
 
@@ -368,15 +368,6 @@ async function browserFor(o) {
   return browsers.get(kind);
 }
 
-/** A new page in a window of its own (a kept browser's `newPage` opens a tab in its first window instead). */
-async function newWindow(context) {
-  const cdp = await context.newCDPSession(context.pages()[0]);
-  const page = context.waitForEvent('page');
-  await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
-  await cdp.detach();
-  return page;
-}
-
 /** Moves a page's window far off to the right (`--left`). */
 async function place(context, page, left) {
   try {
@@ -477,13 +468,16 @@ async function matrix(o) {
               n++;
               process.stdout.write(`[${n}/${total}] ${label} … `);
               let result;
+              let opened = null;
               try {
-                const { page, done } = await open(o, query, throttle, '__benchResult', (warmup + runSecs) * 1000 + 240_000);
-                result = await page.evaluate(() => window.__benchResult);
-                await done();
+                opened = await open(o, query, throttle, '__benchResult', (warmup + runSecs) * 1000 + 240_000);
+                result = await opened.page.evaluate(() => window.__benchResult);
               } catch (err) {
                 result = { ok: false, error: String(err), label };
+              } finally {
+                await opened?.done();
               }
+              if (!result.ok) failed++;
               Object.assign(result, { cell: { preset, backend, scenario, throttle, diag, throughput, run } });
               results.push(result);
               console.log(result.ok ? `${result.fps.toFixed(1)} fps, frame p50 ${result.interval?.p50.toFixed(1)} ms, CPU ${result.cpu?.frame.avg.toFixed(1)} ms, GPU ${result.gpu.frame ? result.gpu.frame.avg.toFixed(1) : 'n/a'} ms` : `failed: ${result.error}`);
@@ -504,7 +498,7 @@ function table(o, results) {
   const { scene, res, throughput, secs, warmup, runs } = o;
   const median = (xs) => {
     const s = xs.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
-    return s.length ? s[Math.floor((s.length - 1) / 2)] : NaN;
+    return s.length ? (s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2 : NaN;
   };
   const cells = new Map();
   for (const r of results) {
@@ -584,6 +578,7 @@ async function shots(o) {
             // A kept page shows whatever pose it last had: the first pose too is stepped to.
             await step(opened.page, opened.kept ? list : list.slice(1), shoot, { before: opened.kept ? null : () => shoot(opened.page, first) });
           } catch (err) {
+            failed++;
             console.log(`${list.map(file).join(', ')}: failed: ${err}`);
           } finally {
             await opened?.done();
@@ -611,17 +606,21 @@ async function pageShots(o) {
         const file = `${name}-${backend}${diag === 'none' ? '' : `-${diag}`}.png`;
         process.stdout.write(`${file} … `);
         const query = [p.query, backend === 'webgl' ? 'renderer=webgl' : '', diag === 'none' ? '' : `diag=${diag.replaceAll('+', ',')}`, extra].filter(Boolean).join('&');
+        let opened = null;
         try {
-          const { page, done } = await open(o, query, 1, '__ready', 240_000, p.path);
+          opened = await open(o, query, 1, '__ready', 240_000, p.path);
+          const { page } = opened;
           if (p.prepare) await page.evaluate(p.prepare);
           // A moment for late loads (hair, props), then two more frames, then the picture.
           await page.waitForTimeout(1500);
           await twoFrames(page);
           await page.screenshot({ path: join(out, file) });
-          await done();
           console.log('ok');
         } catch (err) {
+          failed++;
           console.log(`failed: ${err}`);
+        } finally {
+          await opened?.done();
         }
       }
     }

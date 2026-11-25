@@ -91,6 +91,8 @@ pub(crate) fn gate(paths: &Paths, dir: &str, keys: &[String]) -> Report {
     let mut samples = Vec::new();
     // The near samples' looks, each measured once for all its far versions.
     let mut looks: HashMap<String, Look> = HashMap::new();
+    // The samples that could not be measured: no count of theirs, but not stale either.
+    let mut unmeasured: Vec<&str> = Vec::new();
     for sample in index
         .samples
         .iter()
@@ -140,6 +142,7 @@ pub(crate) fn gate(paths: &Paths, dir: &str, keys: &[String]) -> Report {
             Err(err) => {
                 failed += 1;
                 text += &format!("FAIL {}\n       error: {err}\n", sample.key);
+                unmeasured.push(&sample.key);
                 continue;
             }
         };
@@ -218,14 +221,15 @@ pub(crate) fn gate(paths: &Paths, dir: &str, keys: &[String]) -> Report {
         }
         samples.push(m);
     }
-    // The baseline's own keys: one that is no sample a check ran on is stale (counted as none found).
+    // The baseline's own keys: one that is no sample a check ran on is stale (counted as none found), unless the
+    // sample is there but could not be measured (its counts are kept, so `--update-baseline` doesn't drop them).
     let mut stale = Vec::new();
     if keys.is_empty() {
         for check in CHECKS {
             let ran = counts.entry(check.into()).or_default();
             for key in baseline
                 .keys(check)
-                .filter(|k| !ran.contains_key(*k))
+                .filter(|k| !ran.contains_key(*k) && !unmeasured.contains(k))
                 .collect::<Vec<_>>()
             {
                 stale.push(format!(

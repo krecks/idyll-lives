@@ -3,8 +3,8 @@
 use super::*;
 
 /// A plant's `row` (its kind's `species` in `reference`) with its model measured (`species::measure`): what is
-/// outside the block, or the kind's `h` and `w` strictly, joins its findings; a model that can't be read is its
-/// problem. A row of no such kind is left as it is.
+/// outside the block, or the kind's `h` and `w` strictly, joins its findings, as does a model that can't be read
+/// for its species. A row of no such kind is left as it is.
 pub fn species_row(
     row: &mut SizeRow,
     reference: &Reference,
@@ -21,7 +21,7 @@ pub fn species_row(
                 .extend(species::findings(sp, k.h, k.w, &shape, atlas));
             row.species = Some(shape);
         }
-        Err(e) => row.problem = Some(format!("unmeasured: {e}")),
+        Err(e) => row.outside.push(format!("species unmeasured: {e}")),
     }
 }
 

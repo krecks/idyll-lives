@@ -236,7 +236,7 @@ mod tests {
     /// shipped manifest and street.
     #[test]
     fn the_shipped_surfaces_read() {
-        let root = crate::content::root();
+        let root = crate::repo_root();
         let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
         let reference = Reference::parse(&read(REFERENCE)).unwrap();
         let manifest: Value = serde_json::from_str(&read(MANIFEST)).unwrap();

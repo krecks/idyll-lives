@@ -8,7 +8,7 @@
 //! a roughness between two of them is neither.
 //!
 //! Read by `cargo tex materials` and its test (every finish the tool writes), by `cargo review colours`
-//! (the metals' colours), and there for the gate (a pack entry's own `roughness` and `metallic`: `own_faults`).
+//! (the metals' colours).
 
 use serde_json::Value as J;
 use std::path::Path;
@@ -123,11 +123,7 @@ pub fn linear(hex: &str) -> Option<[f64; 3]> {
     let mut out = [0.0; 3];
     for (i, c) in out.iter_mut().enumerate() {
         let v = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()? as f64 / 255.0;
-        *c = if v <= 0.04045 {
-            v / 12.92
-        } else {
-            ((v + 0.055) / 1.055).powf(2.4)
-        };
+        *c = crate::tex::to_lin(v);
     }
     Some(out)
 }
@@ -249,23 +245,6 @@ pub fn finish_faults(entry: &J, arm: Option<[f64; 2]>) -> Vec<String> {
     out
 }
 
-/// What is wrong with a material's own `roughness` and `metallic` over its plain finish (a model entry's
-/// `materials`: polished marble over `gloss`), given the finish's entry.
-pub fn own_faults(finish: &J, own: &J) -> Vec<String> {
-    let number = |name: &str, default: f64| {
-        own.get(name)
-            .or_else(|| finish.get(name))
-            .and_then(J::as_f64)
-            .unwrap_or(default)
-    };
-    match metal_of(number("metallic", 0.0)) {
-        Ok(metal) => plain_fault(number("roughness", 0.8), metal)
-            .into_iter()
-            .collect(),
-        Err(e) => vec![e],
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,20 +352,6 @@ mod tests {
         let bare = json!({ "texture": "t.jpg", "arm": "arm.jpg" });
         assert!(finish_faults(&bare, Some([0.9, 0.0])).is_empty());
         assert!(finish_faults(&bare, Some([0.9, 0.4]))[0].contains("40 % metal"));
-    }
-
-    #[test]
-    fn a_material_s_own_over_its_finish() {
-        let gloss = json!({ "roughness": 0.12 });
-        assert!(own_faults(&gloss, &json!({ "roughness": 0.2 })).is_empty());
-        assert!(own_faults(&gloss, &json!({ "roughness": 0.28 }))[0].contains("0.28"));
-        // The finish's roughness as a metal's: 0.12 is chrome.
-        assert!(own_faults(&gloss, &json!({ "metallic": 1 })).is_empty());
-        assert!(
-            own_faults(&json!({ "roughness": 0.9 }), &json!({ "metallic": 1 }))[0]
-                .contains("metal roughness")
-        );
-        assert!(own_faults(&gloss, &json!({ "metallic": 0.3 }))[0].contains("0 or 1"));
     }
 
     #[test]

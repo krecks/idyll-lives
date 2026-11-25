@@ -7,7 +7,7 @@ pub(super) fn roof(n: &Noise, size: usize) -> Surface {
     let ch = t / rows as f64;
     let ng = n.layer(1);
     let nb = n.layer(2);
-    paint(size, size, t, &[(0.004, 4.0), (0.03, 2.0)], true, |u, v| {
+    paint(size, size, t, &[(0.004, 4.0), (0.03, 2.0)], |u, v| {
         // Ragged butt line (top of each course in the image); side joints wander a little.
         let jag =
             fbm(&nb, u, v, 160, 4, 3) * 0.008 / t + fbm(&nb.layer(1), u, v, 30, 3, 2) * 0.006 / t;

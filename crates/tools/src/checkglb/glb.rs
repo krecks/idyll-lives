@@ -188,17 +188,14 @@ pub fn first_value(g: &Glb, accessor: &J, last: bool) -> R<Option<Vec<f64>>> {
     )?))
 }
 
-/// Every element of a float accessor (a clip's keys).
-pub fn values(g: &Glb, accessor: &J) -> R<Vec<Vec<f64>>> {
-    let acc = item(&g.gltf, "accessors", accessor)?;
-    let view = item(&g.gltf, "bufferViews", key(acc, "bufferView")?)?;
-    let n = clip_width(acc)?;
-    let stride = stride(view, 4 * n as i64)?;
-    let at = int(view, "byteOffset", 0)? + int(acc, "byteOffset", 0)?;
-    let count = count(acc)?;
-    (0..count.max(0))
-        .map(|k| floats(&g.bin, at + k * stride, n))
-        .collect()
+/// Every element of a clip's accessor (its keys: floats, or integers normalised as `accessor` reads them).
+pub fn values(g: &Glb, index: &J) -> R<Vec<Vec<f64>>> {
+    clip_width(item(&g.gltf, "accessors", index)?)?;
+    Ok(accessor(g, index)?
+        .ok_or("a clip's keys can't be read here (compressed, sparse)")?
+        .into_iter()
+        .map(|e| e.into_iter().map(Num::f).collect())
+        .collect())
 }
 
 /// Every element of an accessor (floats, or integers read as the spec says: normalised if flagged), or
@@ -357,7 +354,8 @@ pub(crate) mod tests {
             {"bufferView": 3, "componentType": 5123, "type": "SCALAR", "count": 2},
             {"bufferView": 4, "componentType": 5120, "normalized": true, "type": "VEC2", "count": 1},
             {"bufferView": 5, "componentType": 5126, "type": "SCALAR", "count": 1},
-            {"componentType": 5126, "type": "SCALAR", "count": 1}]}"#;
+            {"componentType": 5126, "type": "SCALAR", "count": 1},
+            {"bufferView": 1, "componentType": 5122, "normalized": true, "type": "SCALAR", "count": 2}]}"#;
         let g = parse_glb(&glb(json, &bin)).unwrap();
         let read = |i: i64| accessor(&g, &J::Int(i)).unwrap();
         assert_eq!(
@@ -372,6 +370,9 @@ pub(crate) mod tests {
         assert_eq!(read(5), None, "compressed");
         assert_eq!(read(6), None, "no buffer view");
         assert_eq!(values(&g, &J::Int(0)).unwrap(), vec![vec![1.5, -2.0, 0.25]]);
+        // A clip's normalised shorts (quantised keys) as the numbers they stand for.
+        assert_eq!(values(&g, &J::Int(7)).unwrap(), vec![vec![1.0], vec![-1.0]]);
+        assert!(values(&g, &J::Int(5)).is_err(), "compressed");
         assert_eq!(
             first_value(&g, &J::Int(0), true).unwrap(),
             Some(vec![1.5, -2.0, 0.25])

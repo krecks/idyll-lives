@@ -58,11 +58,13 @@ step() {
       # (Gone even when a test fails, which ends the script; the path taken now, as `out` is this
       # step's own.)
       trap "rm -rf '$out'" EXIT
-      "${bun_ci[@]}" tools/housegen/sample.ts "$out/houses.json"
+      # (`--no-timing`: their time budgets were measured on an M3 Pro, so a slower or busy machine
+      # doesn't fail the gate; the timings are still printed.)
+      "${bun_ci[@]}" tools/housegen/sample.ts "$out/houses.json" --no-timing
       # Worlds three per kind (every one Big), the same seed base making the same worlds.
       local base=${SEED_BASE:-0}
       echo "Sample worlds of seed base $base."
-      "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --seed-base "$base"
+      "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --seed-base "$base" --no-timing
       if ! HOUSES="$out/houses.json" WORLDS="$out/worlds.json" cargo test -p sim-core --locked --test sim -- --ignored generated_houses:: generated_worlds::; then
         echo "The generated-world checks failed on seed base $base (again: SEED_BASE=$base tools/ci-local.sh generated)." >&2
         exit 1

@@ -20,15 +20,18 @@ fn check_judges_each_measured_row_by_the_baseline() {
         row("a", 2, None),
         row("b", 0, None),
         row("c", 0, Some("unmeasured: cannot read it")),
+        row("d", 0, Some("unmeasured: no model")),
     ];
     assert_eq!(
         counts(&rows),
         BTreeMap::from([("a".to_string(), 2), ("b".to_string(), 0)])
     );
-    // At its count: held; none and none held: clean; unmeasured: not judged; an id no row has: stale.
+    // At its count: held; none and none held: clean; unmeasured: an error, but not with no model; an id no row
+    // has: stale.
     assert_eq!(
         judged(&rows, &b),
         [
+            "`c`: unmeasured: cannot read it",
             "`gone`: in the baseline, but no object or model the review measured: take it out (`cargo review sizes --update-baseline`)"
         ]
     );
@@ -38,8 +41,9 @@ fn check_judges_each_measured_row_by_the_baseline() {
         row("c", 0, Some("unmeasured: x")),
         row("gone", 0, None),
     ];
-    let errors = judged(&rows, &b);
-    assert_eq!(errors.len(), 3, "{errors:?}");
+    let mut errors = judged(&rows, &b);
+    assert_eq!(errors.len(), 4, "{errors:?}");
+    assert_eq!(errors.remove(2), "`c`: unmeasured: x");
     assert!(errors[0].starts_with(
         "`a`: 3 outside its kind's range, 2 in the baseline: fix the new ones: finding 0; "
     ));

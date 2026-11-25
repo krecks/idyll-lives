@@ -431,7 +431,7 @@ pub(super) fn flattened_in_view(
 
 /// `overrides.get(name, named_finish(name) or overrides.get('*'))`: a material's entry in `materials`
 /// (None: unmapped).
-pub(super) fn override_of(overrides: &J, name: &str) -> J {
+pub(crate) fn override_of(overrides: &J, name: &str) -> J {
     match overrides.get(name) {
         Some(ov) => ov.clone(),
         None => named_finish(name)
