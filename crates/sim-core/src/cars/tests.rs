@@ -4,6 +4,14 @@ use super::*;
 /// meets another) keeps the points it came up by: rounding the corner takes out only those
 /// about it. (A work taxi's lane in Applewold, seed base 19: its corner's way in was the step
 /// back, and the 130 m of road before it went, the taxi driving straight across the grass.)
+/// Each seat's own door is the first it tries, a taxi's seats (1 to 4) too.
+#[test]
+fn a_seats_own_door_is_tried_first() {
+    for seat in 0..=4 {
+        assert_eq!(motion::DOOR_ORDER[seat.min(3)][0], own_door(seat));
+    }
+}
+
 #[test]
 fn a_corner_after_a_step_back_keeps_the_road_before_it() {
     let lane: Vec<[f32; 2]> = vec![
