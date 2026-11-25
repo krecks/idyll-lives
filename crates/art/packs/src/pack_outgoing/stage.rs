@@ -1,6 +1,7 @@
 //! The karaoke stage and the video-call corner.
 
 use super::common::{_speaker, M, WALL};
+use crate::ease::{EASE, eased};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -170,14 +171,17 @@ pub fn karaoke_stage() -> Vec<Obj> {
             // floor spots at the stage's front corners, angled up at the singers, in their yokes
             revolve!(
                 format!("spot{s}"),
-                &[
-                    (0.0, -0.07),
-                    (0.05, -0.07),
-                    (0.06, 0.03),
-                    (0.066, 0.05),
-                    (0.058, 0.05),
-                    (0.0, 0.04)
-                ],
+                &eased(
+                    &[
+                        (0.0, -0.07),
+                        (0.05, -0.07),
+                        (0.06, 0.03),
+                        (0.066, 0.05),
+                        (0.058, 0.05),
+                        (0.0, 0.04)
+                    ],
+                    EASE
+                ),
                 at = f.at(sf * 0.83, 0.23, 0.33),
                 material = M.dark,
                 segments = 14,
@@ -496,7 +500,8 @@ pub fn video_call_nook() -> Vec<Obj> {
             &[
                 (0.0, 0.0),
                 (0.04, 0.0),
-                (0.055, 0.1),
+                (0.054, 0.097),
+                (0.0515, 0.1), // (its rim's outer corner cut)
                 (0.05, 0.1),
                 (0.0, 0.09)
             ],
@@ -538,8 +543,18 @@ pub fn video_call_nook() -> Vec<Obj> {
                 [(0.21, -0.2), (0.21, 0.2), (-0.21, 0.2), (-0.21, -0.2)],
             ),
             (
-                0.025,
+                0.021,
                 [(0.22, -0.21), (0.22, 0.21), (-0.22, 0.21), (-0.22, -0.21)],
+            ),
+            // (its rim chamfered 4 mm)
+            (
+                0.025,
+                [
+                    (0.216, -0.206),
+                    (0.216, 0.206),
+                    (-0.216, 0.206),
+                    (-0.216, -0.206),
+                ],
             ),
         ]
         .iter()
@@ -556,7 +571,7 @@ pub fn video_call_nook() -> Vec<Obj> {
             0.44,
             0.36,
             0.06,
-            (0, 0.7, -0.26),
+            (0, 0.7, -0.25),
             M.cushion,
             rot = (-8, 0, 0),
             round = 0.028,
@@ -578,7 +593,7 @@ pub fn video_call_nook() -> Vec<Obj> {
             fsweep!(
                 f,
                 format!("back_post{lx}"),
-                &[(lx, 0.36, -0.22), (lx, 0.6, -0.255)],
+                &[(lx, 0.36, -0.22), (lx, 0.6, -0.245)],
                 0.012,
                 M.wood,
                 verts = 6
