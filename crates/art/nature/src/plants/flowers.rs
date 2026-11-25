@@ -483,7 +483,7 @@ pub fn marigolds() -> Vec<Obj> {
             seed = i as f64 * 0.7
         );
     }
-    fit_to(&meshes(), 0.885, 0.34, 0.84);
+    fit_to(&meshes(), 0.885, 0.334, 0.84);
     settle(&[join_all("marigolds")])
 }
 
@@ -494,7 +494,7 @@ pub fn pansies() -> Vec<Obj> {
         ("bloom", "#5B3A8E"),
         ("bloom2", "#F2C94C"),
         ("bloom3", "#3F5FB0"),
-        ("bloom4", "#8E2A4A"),
+        ("bloom4", "#8E2A3A"),
         ("bloom5", "#F4F0E8"),
         ("centre", "#F2C94C"),
         ("centre_dark", "#3A2A4E"),
@@ -572,14 +572,16 @@ pub fn lilies() -> Vec<Obj> {
     let p = palette(&[
         ("bloom", "#F07A2A"),
         ("bloom2", "#F5EFE4"),
-        ("bloom3", "#E98AA8"),
+        // (a rose-red, as Asiatic lilies come: orange, red or yellow)
+        ("bloom3", "#E8586C"),
     ]);
     let m = |name: &str| p.get(name);
     let mut rng = Random::new(58);
     let top = mound!(&p);
     let cols = [m("bloom"), m("bloom2"), m("bloom3")];
     for (i, (x, y, a)) in spiral!(6, 0.27, &mut rng).into_iter().enumerate() {
-        let h = rng.uniform(0.71, 0.87);
+        // (Asiatic lilies flower at 1-1.5 m)
+        let h = rng.uniform(0.71, 0.87) * 1.2;
         let tip = v3(x * 1.15, y * 1.15, h);
         stalk!(
             format!("stem{i}"),
@@ -653,7 +655,7 @@ pub fn lilies() -> Vec<Obj> {
             rings = 3
         );
     }
-    fit_to(&meshes(), 0.84, 0.939, 0.869);
+    fit_to(&meshes(), 0.84, 1.08, 0.869);
     settle(&[join_all("lilies")])
 }
 

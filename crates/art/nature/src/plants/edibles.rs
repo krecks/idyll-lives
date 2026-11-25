@@ -708,7 +708,7 @@ pub fn herbs() -> Vec<Obj> {
             );
         }
     };
-    _fit_with_part("sprigs", "herbs", basil, at, "harvest", (0.84, 1.01, 0.46))
+    _fit_with_part("sprigs", "herbs", basil, at, "harvest", (0.84, 0.98, 0.46))
 }
 
 /// Pumpkin patch: a patch of soil, vines with curling tendrils, big lobed leaves on long stalks and a yellow

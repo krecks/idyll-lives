@@ -793,7 +793,7 @@ pub fn palm() -> Vec<Obj> {
     }
     // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
     crate::chamfer(&["pot", "saucer"]);
-    fit_to(&meshes(), 0.770, 0.893, 0.693);
+    fit_to(&meshes(), 0.770, 0.905, 0.693);
     settle(&[join_all("palm")])
 }
 
@@ -884,17 +884,18 @@ pub fn orchid() -> Vec<Obj> {
     cylinder!(
         "stake",
         0.003,
-        0.36,
-        at = (-0.03, 0.01, ys + 0.18),
+        0.39,
+        at = (-0.03, 0.01, ys + 0.195),
         material = p.get("wood"),
         verts = low(5, 3)
     );
     let spike: Vec<V3> = [
         (0.0, 0.0, ys),
         (-0.03, 0.01, ys + 0.18),
-        (-0.06, 0.0, ys + 0.34),
-        (-0.16, -0.01, ys + 0.43),
-        (-0.27, -0.02, ys + 0.4),
+        // (a moth orchid in flower stands 0.46-0.61 m)
+        (-0.06, 0.0, ys + 0.37),
+        (-0.16, -0.01, ys + 0.46),
+        (-0.27, -0.02, ys + 0.43),
     ]
     .into_iter()
     .map(V3::from)
@@ -936,7 +937,7 @@ pub fn orchid() -> Vec<Obj> {
     }
     // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
     crate::chamfer(&["pot", "saucer"]);
-    fit_to(&meshes(), 0.431, 1.198, 0.381);
+    fit_to(&meshes(), 0.431, 1.228, 0.381);
     settle(&[join_all("orchid")])
 }
 

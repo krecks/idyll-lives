@@ -107,10 +107,10 @@ pub fn family() -> Family {
                 (0.734, 0.979, 0.792),
             )
             .key("model.garden.bostonFern")),
-            pot(Model::new("palm", houseplants::palm, (0.770, 0.893, 0.693))
+            pot(Model::new("palm", houseplants::palm, (0.770, 0.905, 0.693))
                 .key("model.garden.palm")),
             pot(
-                Model::new("orchid", houseplants::orchid, (0.431, 1.198, 0.381))
+                Model::new("orchid", houseplants::orchid, (0.431, 1.228, 0.381))
                     .key("model.garden.orchid")
                     .palette(plain_leaves(BASE.palette())),
             ),
@@ -153,7 +153,7 @@ pub fn family() -> Family {
                 &[("bloom", "Petals")],
             ),
             bed(
-                Model::new("marigolds", flowers::marigolds, (0.885, 0.34, 0.84))
+                Model::new("marigolds", flowers::marigolds, (0.885, 0.334, 0.84))
                     .key("model.garden.marigolds"),
                 &[],
             ),
@@ -163,7 +163,7 @@ pub fn family() -> Family {
                 &[],
             ),
             bed(
-                Model::new("lilies", flowers::lilies, (0.84, 0.939, 0.869))
+                Model::new("lilies", flowers::lilies, (0.84, 1.08, 0.869))
                     .key("model.garden.lilies"),
                 &[],
             ),
@@ -296,7 +296,7 @@ pub fn family() -> Family {
             .paint(&[("bed", "Bed")])
             .motions(json!({"growth": "grow"})),
             shrub(
-                Model::new("herbs", edibles::herbs, (0.84, 1.01, 0.46)).key("model.garden.herbs"),
+                Model::new("herbs", edibles::herbs, (0.84, 0.98, 0.46)).key("model.garden.herbs"),
             )
             .paint(&[("body", "Bed")])
             .motions(json!({"uses": {"pickHerbs": "harvest"}})),
