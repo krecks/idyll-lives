@@ -6,7 +6,7 @@ use super::*;
 /// object's are).
 pub fn decompose(m: &M4) -> (V3, V3, V3) {
     let (loc, q, scale) = loc_quat_size(m);
-    (loc, quat_to_eul(q), scale)
+    (loc, q.to_euler(EulerOrder::XYZ), scale)
 }
 
 /// A matrix's place, turn and scale as an object set to it takes them (`BKE_object_apply_mat4`): the turn a
@@ -24,17 +24,11 @@ pub fn decompose_quat(m: &M4, euler: Option<EulerOrder>) -> (V3, Quat, V3) {
         y: -delta.y,
         z: -delta.z,
     };
-    let q = Quat {
-        w: q[0],
-        x: q[1],
-        y: q[2],
-        z: q[3],
-    };
     (loc, inverse * q, scale)
 }
 
 /// `mat4_to_loc_rot_size`, the turn through `mat3_normalized_to_quat`.
-fn loc_quat_size(m: &M4) -> (V3, [f32; 4], V3) {
+fn loc_quat_size(m: &M4) -> (V3, Quat, V3) {
     let col = |c: usize| V3::new(m.0[c][0], m.0[c][1], m.0[c][2]);
     let (mut rot, mut size) = ([V3::ZERO; 3], [0.0_f32; 3]);
     for c in 0..3 {
@@ -48,10 +42,10 @@ fn loc_quat_size(m: &M4) -> (V3, [f32; 4], V3) {
             size[c] = -size[c];
         }
     }
-    let q = mat3_normalized_to_quat([rot[0].array(), rot[1].array(), rot[2].array()]);
+    let [w, x, y, z] = mat3_normalized_to_quat([rot[0].array(), rot[1].array(), rot[2].array()]);
     (
         V3::new(m.0[3][0], m.0[3][1], m.0[3][2]),
-        q,
+        Quat { w, x, y, z },
         V3::new(size[0], size[1], size[2]),
     )
 }
@@ -132,38 +126,4 @@ fn mat3_normalized_to_quat(mut m: [[f32; 3]; 3]) -> [f32; 4] {
         }
     }
     q
-}
-
-/// Blender's `quat_to_eulO` for the XYZ order: through the turn's matrix, the smaller of its two Euler readings.
-fn quat_to_eul(q: [f32; 4]) -> V3 {
-    let m = crate::math::Quat {
-        w: q[0],
-        x: q[1],
-        y: q[2],
-        z: q[3],
-    }
-    .to_matrix()
-    .0;
-    let atan2f = math::atan2f;
-    let cy = py::hypot(m[0][0] as f64, m[0][1] as f64) as f32;
-    let (e1, e2) = if cy > 0.0000375_f64 as f32 {
-        (
-            [
-                atan2f(m[1][2], m[2][2]),
-                atan2f(-m[0][2], cy),
-                atan2f(m[0][1], m[0][0]),
-            ],
-            [
-                atan2f(-m[1][2], -m[2][2]),
-                atan2f(-m[0][2], -cy),
-                atan2f(-m[0][1], -m[0][0]),
-            ],
-        )
-    } else {
-        let e = [atan2f(-m[2][1], m[1][1]), atan2f(-m[0][2], cy), 0.0];
-        (e, e)
-    };
-    let d = |e: [f32; 3]| e[0].abs() + e[1].abs() + e[2].abs();
-    let e = if d(e1) > d(e2) { e2 } else { e1 };
-    V3::new(e[0], e[1], e[2])
 }
