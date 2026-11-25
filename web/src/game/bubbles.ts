@@ -93,11 +93,11 @@ export class BubbleLayer {
         this.hide(bubble);
         continue;
       }
+      if (bubble.shown !== text || bubble.key !== key) bubble.icon.style.display = key ? '' : 'none';
       if (bubble.shown !== text) {
         bubble.shown = text;
         bubble.text.textContent = text;
         bubble.body.classList.toggle('has-text', !!text);
-        bubble.icon.style.display = key ? '' : 'none';
         if (!key) bubble.body.dataset.tone = 'topic';
       }
       if (bubble.key !== key) {

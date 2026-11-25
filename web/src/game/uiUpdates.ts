@@ -54,16 +54,9 @@ export class UiMirror {
   private applySims(u: UiUpdate): SimView[] | null {
     if (!u.full && !u.sims && !u.simsGone) return null;
     for (const id of u.simsGone ?? []) this.sims.delete(id);
-    let arrived = false;
-    for (const patch of u.sims ?? []) {
-      const old = this.sims.get(patch.id);
-      arrived ||= !old;
-      this.sims.set(patch.id, patched(old, patch));
-    }
-    const list = [...this.sims.values()];
-    // In id order, as the worker lists them (someone new can take an old slot).
-    if (arrived) list.sort((a, b) => a.id - b.id);
-    return list;
+    for (const patch of u.sims ?? []) this.sims.set(patch.id, patched(this.sims.get(patch.id), patch));
+    // In id order, as the worker lists them (someone new can take an old slot: the map's order isn't).
+    return [...this.sims.values()].sort((a, b) => a.id - b.id);
   }
 
   private applyRelationships(u: UiUpdate): RelationshipView[] | null {

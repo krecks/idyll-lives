@@ -39,7 +39,7 @@ export type Command =
   /**
    * `turn`: degrees past the facing, for objects that turn freely (0..89); `offset`: centimetres
    * (x, z) off the middle of the footprint (up to `MAX_OFFSET` each way; things on a wall only
-   * along it); `size`: its own size (centimetres across and deep before turning, `MIN_SIZE` to
+   * along it); `size`: its own size (centimetres across and deep before turning, sim-core `MIN_SIZE` to
    * `MAX_SIZE` tiles; it takes them rounded up to whole tiles); `tall`: centimetres taller
    * (negative: shorter) than its kind.
    */
@@ -1589,11 +1589,6 @@ export function storeyShown(k: number, view: number): boolean {
 
 /** How far an object can stand off the middle of its footprint (centimetres per axis; sim-core `MAX_OFFSET`). */
 export const MAX_OFFSET = 50;
-/** Resizing (sim-core `MAX_SIZE`, `MIN_SIZE`, `MAX_TALLER`, `MAX_SHORTER`): tiles each way at most, centimetres each way at least, centimetres taller and shorter. */
-export const MAX_SIZE = 6;
-export const MIN_SIZE = 10;
-export const MAX_TALLER = 200;
-export const MAX_SHORTER = 100;
 
 /** Where an object's middle stands (tiles): the middle of its footprint, moved by its `offset`. */
 export function objectCentre(o: { x: number; z: number; w: number; d: number; offset?: [number, number] }): { x: number; z: number } {
