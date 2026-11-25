@@ -265,6 +265,7 @@ pub(super) fn plant_bowl(
             if i % 2 != 0 { M.plant } else { M.leaf_light },
             profile = [(0.0, -0.022), (0.004, 0.0), (0.0, 0.022), (-0.002, 0.0)],
             up = (0, 0, 1),
+            angle = 180.0, // a leaf: thin, its margins shade round
             resolution = 2,
             scale = [0.3, 1.0, 0.25]
         );

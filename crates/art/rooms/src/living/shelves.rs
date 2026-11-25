@@ -331,6 +331,7 @@ pub(super) fn plant(x: f64, y: f64, z: f64, r: f64, h: f64, pot: Mat, leaves: f6
             if i % 2 != 0 { M.leaf_light } else { M.plant },
             profile = [(0.0, -0.016), (0.003, 0.0), (0.0, 0.016), (-0.002, 0.0)],
             up = (0, 0, 1),
+            angle = 180.0, // a leaf: thin, its margins shade round
             resolution = 2,
             scale = [0.3, 1.0, 0.2]
         );
