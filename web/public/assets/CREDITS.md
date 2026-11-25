@@ -175,7 +175,8 @@ The gloomy pack models (`models/pack_gloomy/recordCabinet.glb`, `cello.glb`, `jo
 `windowSeat.glb`, `soakingTub.glb`, override pack `packs/pack_gloomy/manifest.json`) are built by
 `crates/art/packs/src/pack_gloomy` on `artkit` and exported as `.glb` (glTF, original, CC0). The cabinet's
 lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp over a
-rippling pool, the window seat's cushion sinks and the tub fills.
+rippling pool, the window seat's cushion sinks and the tub fills. Their hard edges eased to the play camera's pixel
+(2026-11-25).
 
 The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `puzzleTable.glb`,
 `bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
@@ -202,7 +203,8 @@ The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, 
 `organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
 built by `crates/art/packs/src/pack_neat` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
-slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens.
+slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens. Their hard edges eased
+to the play camera's pixel and the docks, desk and console to their real sizes (2026-11-25).
 
 The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.glb`, `mocktailCart.glb`,
 `rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
@@ -235,12 +237,13 @@ The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `
 built by `crates/art/packs/src/pack_kind` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves while it is used: the oven door drops with the tea towel over its handle, a coin drops into the jar, the rocker rocks, the teapot pours,
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
-narrower, its poufs either side of it facing each other (2026-10-21).
+narrower, its poufs either side of it facing each other (2026-10-21). Their hard edges eased to the play camera's
+pixel (2026-11-25).
 
 The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
 `vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built by `crates/art/packs/src/pack_lazy` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
-plate's deck shakes and the tablet tilts up.
+plate's deck shakes and the tablet tilts up. Their hard edges eased to the play camera's pixel (2026-11-25).
 
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, the cleaning things `vacuumCleaner.glb`, `mopBucket.glb`, `broomDustpan.glb` and

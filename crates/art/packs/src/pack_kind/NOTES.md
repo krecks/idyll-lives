@@ -116,3 +116,10 @@ cargo art pack_kind --preview  # previews/pack_kind/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 The hearth settee's pillows are sewn flat and stuffed (`waist`), its seat and back cushions `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `hearthSettee`, `knittingRocker`, `songbirdFeeder`; 18,904 to 19,000 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the play camera showed is eased (18 to 0): the settee's arms' and the rocker's crest's ends eased,
+the throw folded round the crest, the jar's pedestal, cork and pot and the ferns' pots rounded, the rug's outer braid
+chamfered. The counter's wall shelf, bakes and stock pot, the jar's pot plant and the tea table's rug, poufs and ferns
+are drawn `aside`, not the pieces' sizes; the tea table is a small coffee table (docs/review/reference.json).
