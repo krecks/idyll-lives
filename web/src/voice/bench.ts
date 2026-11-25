@@ -161,7 +161,7 @@ export async function perf(options: VoiceBenchOptions = {}): Promise<VoiceReport
   try {
     const started = performance.now();
     const loaded = new Promise<void>((resolve, reject) => (ready = { resolve, reject }));
-    worker.postMessage({ type: 'load', base: import.meta.env.BASE_URL, language: 'en', device, measure: true } satisfies ToVoiceWorker);
+    worker.postMessage({ type: 'load', base: import.meta.env.BASE_URL, device, measure: true } satisfies ToVoiceWorker);
     await loaded;
     const loadMs = performance.now() - started;
     const gpuLoaded = (await gpu()).gpuLive;

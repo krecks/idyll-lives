@@ -60,6 +60,9 @@ const pending = new Map<number, { resolve: (r: GenResult | null) => void; reject
 /** Times the model was unloaded: a start still waiting for its turn is then void. */
 let stops = 0;
 let waiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
+/** Times the model lost its graphics device and was started again this session. */
+const MAX_RESTARTS = 3;
+let restarts = 0;
 const BUSY_WINDOW_MS = 5000;
 const counters = { loadMs: 0, replies: 0, skipped: 0, lastPrefillMs: 0, lastCachedShare: 0, lastTokPerS: 0, tokens: 0, decodeMs: 0, recent: [] as { at: number; ms: number }[] };
 
@@ -101,6 +104,13 @@ function onMessage(msg: FromLlmWorker): void {
     waiters = [];
     stop();
     llmStatus.state = 'error';
+    // The graphics device was lost: a new worker takes over, a few times a session at most.
+    if (msg.restart && restarts < MAX_RESTARTS) {
+      restarts++;
+      console.warn('[llm] the language model failed; starting it again:', msg.message);
+      llmStatus.state = 'off';
+      void ensureLlm().catch(() => {});
+    }
   }
 }
 
@@ -129,7 +139,7 @@ export async function ensureLlm(device: OrtDevice = llmStatus.device): Promise<v
     llmStatus.progress = 0;
     llmStatus.error = '';
     llmStatus.state = 'loading';
-    post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL, device });
+    post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL, device: llmStatus.device });
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
 }

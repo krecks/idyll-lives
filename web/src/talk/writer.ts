@@ -51,6 +51,8 @@ export interface WriterLog {
 export class LlmWriter {
   readonly log: WriterLog[] = [];
   private readonly debug = new URLSearchParams(location.search).has('debug');
+  /** The persona read ahead last: dropped when another is read, so they don't queue ahead of lines. */
+  private priming: AbortController | null = null;
 
   constructor(
     private readonly text: TalkText,
@@ -67,7 +69,10 @@ export class LlmWriter {
     const moment = gatherMoment(this.text, this.sources, req, frame);
     if (!moment) return;
     const built = buildMessages(this.text, moment.persona, moment.situation, { kind: 'emotion', emotion: 'calm' }, []);
-    if (built) void generateText(built.messages, { maxTokens: 1 }, { reply: built.reply, lead: built.lead, deadline: Date.now() + PRIME_MS }).catch(() => null);
+    if (!built) return;
+    this.priming?.abort();
+    this.priming = new AbortController();
+    void generateText(built.messages, { maxTokens: 1 }, { reply: built.reply, lead: built.lead, deadline: Date.now() + PRIME_MS, signal: this.priming.signal }).catch(() => null);
   }
 
   async write(req: LineRequest, frame: FrameState, signal: AbortSignal): Promise<Line | null> {
