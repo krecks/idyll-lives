@@ -315,6 +315,14 @@ $effect.root(() => {
   });
 });
 
+// Another tab changed the settings: taken here too, or this tab's next write would undo them.
+// (Written back, they are the same text, which raises no event: the tabs don't go back and forth.)
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (persist && e.key === STORAGE_KEY) Object.assign(settings, load());
+  });
+}
+
 /** Back to the defaults: every setting, or just `keys` (one page of Settings). */
 export function resetSettings(keys?: readonly (keyof Settings)[]): void {
   if (!keys) return void Object.assign(settings, DEFAULT_SETTINGS, { tipsSeen: [] });
