@@ -296,8 +296,8 @@ pub(super) fn plant(x: f64, y: f64, z: f64, r: f64, h: f64, pot: Mat, leaves: f6
             leaves * s,
             (x + dx * leaves, y + h + dy * leaves, z + dz * leaves),
             if i % 2 == 0 { M.plant } else { M.leaf_light },
-            segments = 10,
-            rings = 6
+            segments = 8,
+            rings = 5
         );
         jitter!(
             clump,
@@ -558,7 +558,8 @@ pub fn bookshelf() -> Vec<Obj> {
             d,
             (s * 0.4325, 0.95, zm),
             M.oak,
-            bevel = 0.006
+            bevel = 0.006,
+            bevel_segments = 1
         );
     }
     fbox!(F, "top", 0.9, 0.035, d, (0, 1.9, zm), M.oak, bevel = 0.006);
@@ -590,7 +591,8 @@ pub fn bookshelf() -> Vec<Obj> {
         d - 0.012,
         (0, 0.0875, zm + 0.006),
         M.oak,
-        bevel = 0.003
+        bevel = 0.003,
+        bevel_segments = 1
     );
     fbox!(
         F,
@@ -612,7 +614,8 @@ pub fn bookshelf() -> Vec<Obj> {
             d - 0.012,
             (0, y - 0.0125, zm + 0.006),
             M.oak,
-            bevel = 0.003
+            bevel = 0.003,
+            bevel_segments = 1
         );
         fbox!(
             F,
@@ -694,7 +697,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
             d,
             (s * (w / 2.0 - t / 2.0), h / 2.0, zm),
             M.oak,
-            bevel = 0.003
+            bevel = 0.003,
+            bevel_segments = 1
         );
     }
     fbox!(
@@ -706,7 +710,7 @@ pub fn bookcase_wide() -> Vec<Obj> {
         (0, h - 0.015, zm),
         M.oak,
         bevel = 0.006,
-        bevel_segments = 2
+        bevel_segments = 1
     );
     fbox!(
         F,
@@ -736,7 +740,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
         d,
         (0, 0.04 + t / 2.0, zm),
         M.oak,
-        bevel = 0.002
+        bevel = 0.002,
+        bevel_segments = 1
     );
     fbox!(
         F,
@@ -764,7 +769,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
         d + 0.025,
         (0, 0.8, zm + 0.0125),
         M.oak,
-        bevel = 0.004
+        bevel = 0.004,
+        bevel_segments = 1
     );
     for x in [-0.69, -0.23, 0.23, 0.69] {
         fbox!(
@@ -775,7 +781,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
             0.02,
             (x, 0.425, zf + 0.01),
             M.oak,
-            bevel = 0.006
+            bevel = 0.006,
+            bevel_segments = 1
         );
         fbox!(
             F,
@@ -786,7 +793,7 @@ pub fn bookcase_wide() -> Vec<Obj> {
             (x, 0.425, zf + 0.022),
             M.oak,
             bevel = 0.005,
-            bevel_segments = 2
+            bevel_segments = 1
         );
         let kx = x + if x == -0.69 || x == 0.23 { 0.18 } else { -0.18 };
         knob("knob", kx, 0.66, zf + 0.026, M.brass);
@@ -801,7 +808,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
                 d - 0.012,
                 (x0 + 0.454, y, zm + 0.004),
                 M.oak,
-                bevel = 0.002
+                bevel = 0.002,
+                bevel_segments = 1
             );
             fbox!(
                 F,

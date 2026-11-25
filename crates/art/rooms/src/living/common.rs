@@ -291,7 +291,7 @@ pub fn taper_leg(
         mat,
         r,
         splay.unwrap_or((0.008_f64.copysign(x), 0.008_f64.copysign(z))),
-        10,
+        8, // 4 cm across: within 1.5 mm of round
     )
 }
 
@@ -498,7 +498,8 @@ pub fn hardback(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, 
         h - 2.0 * PAGES_IN,
         pd,
         (x, y + h / 2.0, front - bu - SPINE - pd / 2.0),
-        M.pages
+        M.pages,
+        bevel = 0.0 // set in between the boards: no edge of it stands free
     );
     if band {
         fextrude!(
@@ -514,19 +515,28 @@ pub fn hardback(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, 
     }
 }
 
-/// One book standing on `y`, `t` thick, its spine at `front`: the cover, the page block just showing on top, and
+/// One book standing on `y`, `t` thick, its spine at `front`: the cover, the page block showing on top, and
 /// a gilt band across some spines.
 #[allow(clippy::too_many_arguments)]
 pub fn book(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, band: bool) {
     fbox!(F, "book", t, h, d, (x, y + h / 2.0, front - d / 2.0), cover);
-    fbox!(
-        F,
+    // the page block's top just over the cover's (its sides, a millimetre high, nobody sees)
+    let (u, z0, z1, top) = (
+        (t - 0.006) / 2.0,
+        front - d + 0.002,
+        front - 0.01,
+        y + h + 0.001,
+    );
+    mesh(
         "pages",
-        t - 0.006,
-        0.004,
-        d - 0.012,
-        (x, y + h, front - d / 2.0 - 0.004),
-        M.pages
+        &[
+            (x - u, top, z0),
+            (x + u, top, z0),
+            (x + u, top, z1),
+            (x - u, top, z1),
+        ],
+        &[vec![0, 1, 2, 3]],
+        M.pages,
     );
     if band {
         fbox!(

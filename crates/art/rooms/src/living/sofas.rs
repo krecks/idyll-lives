@@ -513,6 +513,7 @@ pub fn box_sofa(
                 Cushion {
                     rot: P3::from((-9, 0, 0)),
                     puff: 0.03,
+                    flat: Some(3), // its crown within 3 mm (a pixel at the play camera)
                     ..Cushion::default()
                 },
             );
