@@ -1,6 +1,6 @@
 //! The home bouldering wall, the interactive spin bike, the rebound trampoline and the streetball hoop.
 
-use super::common::{HOLDS, M, WALL, lofted};
+use super::common::{HOLDS, M, WALL, ease_ends, lofted};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, cosd, radians, sin, sind};
@@ -376,7 +376,7 @@ pub fn spin_bike() -> Vec<Obj> {
             bevel = 0.01,
             bevel_segments = 1
         );
-        fsweep!(
+        let swept = fsweep!(
             f,
             "seat_post",
             &[(0, 0.1, -0.02), (0, 0.34, -0.02)],
@@ -385,6 +385,7 @@ pub fn spin_bike() -> Vec<Obj> {
             profile = rounded_rect(0.1, 0.12, 0.035, 2),
             up = (1, 0, 0)
         );
+        ease_ends(swept);
         fextrude!(
             f,
             "back_shell",
@@ -409,7 +410,7 @@ pub fn spin_bike() -> Vec<Obj> {
             round = 1
         );
         // the main beam, curving up from the rear stabiliser to the flywheel's foot
-        fsweep!(
+        let swept = fsweep!(
             f,
             "beam",
             &[
@@ -424,6 +425,7 @@ pub fn spin_bike() -> Vec<Obj> {
             up = (1, 0, 0),
             resolution = 2
         );
+        ease_ends(swept);
         for (z, w) in [(-0.66, 0.6), (0.86, 0.56)] {
             fsweep!(
                 f,
@@ -447,7 +449,7 @@ pub fn spin_bike() -> Vec<Obj> {
                 );
             }
         }
-        fsweep!(
+        let swept = fsweep!(
             f,
             "front_leg",
             &[(0, 0.04, 0.86), (0, 0.12, 0.76), (0, 0.18, 0.66)],
@@ -457,6 +459,7 @@ pub fn spin_bike() -> Vec<Obj> {
             up = (1, 0, 0),
             resolution = 2
         );
+        ease_ends(swept);
         // the flywheel's rounded housing, the orange wheel showing in each side with its spokes
         revolve!(
             "housing",
@@ -500,7 +503,7 @@ pub fn spin_bike() -> Vec<Obj> {
                 );
             }
         }
-        fsweep!(
+        let swept = fsweep!(
             f,
             "housing_foot",
             &[(0, 0.04, cz), (0, cy - 0.12, cz)],
@@ -509,6 +512,7 @@ pub fn spin_bike() -> Vec<Obj> {
             profile = rounded_rect(0.2, 0.22, 0.05, 2),
             up = (1, 0, 0)
         );
+        ease_ends(swept);
         for s in [-1.0, 1.0] {
             // the side grips by the seat: bent tube, foam grips
             kit::tube!(
@@ -656,20 +660,23 @@ pub fn spin_bike() -> Vec<Obj> {
             (0, cy, cz),
             M.steel,
             rot = (0, 90, 0),
-            verts = 12
+            verts = 12,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         for (s, ang) in [(-1.0, 60.0), (1.0, 240.0)] {
             let (ey, ez) = (cy + 0.13 * sind(ang), cz + 0.13 * cosd(ang));
-            fsweep!(
+            let crank = fsweep!(
                 f,
                 numbered("crank"),
                 &[(s * 0.12, cy, cz), (s * 0.122, ey, ez)],
                 0,
                 M.steel,
-                profile = rounded_rect(0.014, 0.034, 0.007, 1),
+                profile = rounded_rect(0.014, 0.034, 0.007, 2),
                 up = (1, 0, 0),
                 scale = [1.0, 0.75]
             );
+            ease_ends(crank);
             fcyl!(
                 f,
                 numbered("spindle"),
@@ -953,7 +960,9 @@ pub fn streetball_hoop() -> Vec<Obj> {
                 (s * 0.24, 0.05, WALL + 0.05),
                 M.dark,
                 rot = (0, 90, 0),
-                verts = 14
+                verts = 14,
+                bevel = 0.004,
+                bevel_segments = 1
             );
             fcyl!(
                 f,
@@ -976,7 +985,7 @@ pub fn streetball_hoop() -> Vec<Obj> {
             verts = 12,
             round = 1
         );
-        kit::tube!(
+        let upper = kit::tube!(
             f,
             "pole_upper",
             &[(0.0, 1.26, -0.217), (0.0, 2.32, -0.16)],
@@ -985,6 +994,7 @@ pub fn streetball_hoop() -> Vec<Obj> {
             verts = 12,
             round = 1
         );
+        ease_ends(upper);
         revolve!(
             "collar",
             &[
@@ -1044,9 +1054,9 @@ pub fn streetball_hoop() -> Vec<Obj> {
         fextrude!(
             f,
             "board",
-            &rounded_rect(0.84, 0.54, 0.03, 2),
+            &rounded_rect(0.84, 0.62, 0.03, 2),
             0.035,
-            (0, 2.555, -0.02),
+            (0, 2.595, -0.02),
             M.board,
             bevel = 0.006,
             bevel_segments = 1
@@ -1054,11 +1064,11 @@ pub fn streetball_hoop() -> Vec<Obj> {
         fextrude!(
             f,
             "border",
-            &rounded_rect(0.86, 0.56, 0.035, 2),
+            &rounded_rect(0.86, 0.64, 0.035, 2),
             0.045,
-            (0, 2.555, -0.02),
+            (0, 2.595, -0.02),
             M.pad_red,
-            holes = vec![rounded_rect(0.79, 0.49, 0.01, 1)],
+            holes = vec![rounded_rect(0.79, 0.57, 0.01, 1)],
             bevel = 0.008,
             bevel_segments = 1
         );

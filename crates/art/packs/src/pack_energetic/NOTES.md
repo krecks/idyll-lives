@@ -36,7 +36,7 @@ parts, clips, motions, paint and draws as before. Triangles in the table below (
   knob; a padded sleeve; braces up to the board; the board, its border and the target square extruded with holes;
   a tapered rim bracket and plate; the net's strands spiralling down both ways from the rim into diamonds; three
   seams on the ball.
-- `powerBlender`: the worktop's front rolled (postformed, one sweep); frame-and-panel doors and drawer
+- `powerBlender`: the worktop's front rolled (postformed, one slab extruded along its length, its edges eased); frame-and-panel doors and drawer
   (`kit::shaker!`) with bar pulls; a lofted motor with turned dials; a squared, lofted jug with a spout and handle;
   a lofted fruit bowl, fruit with stalks, two curved bananas; a board with a hanging hole, lemon halves and a
   knife; straws in the glasses; the lid turned with its cap.
@@ -103,3 +103,20 @@ cargo art pack_energetic --preview  # previews/pack_energetic/<id>.png, <id>@<cl
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `boulderingWall`, `recoveryPod`, `spinBike`, `streetballHoop`; 16,636 to 16,732 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate found (20) is gone:
+- **Power blender:** the worktop is extruded from its postformed profile with 4 mm eased edges (its ends were cut
+  flat); the jug's seat eased; the smoothie's top and the fruit bowl's rim rolled over (the bowl's rim a 4 mm round
+  into its inside).
+- **Spin bike:** the swept beam, front leg, flywheel foot, seat post and cranks have their flat ends eased 4 mm
+  (`common::ease_ends`: a bevel of the cap rims alone); the cranks' profile rounded in two steps a corner (it made a
+  90° ridge); the axle's ends eased.
+- **Streetball hoop:** the wheels' and the upper pole's ends eased; the board 8 cm taller upwards (0.62 m; the rim
+  stays at 2.4 m, as `clips/shot.ts` `STREET_RIM` has it), so it stands 2.92 m, a driveway hoop's height.
+- **Contrast shower:** the towel's fold over its hook rolls round (5 steps).
+
+The blender and the shower keep their 4 draw calls (Q-05): the shower's swinging glass door and its growing rain
+are parts of their own beside the still glass panes; the blender's lid lifts off while the smoothie swirls inside the
+glass jug, each a part of its own. Three would mean dropping a moving part.
