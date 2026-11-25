@@ -219,7 +219,7 @@ pub fn daisies() -> Vec<Obj> {
         }
     }
     // (short stems: along their path, their ends stretched the texture over 2x)
-    crate::box_uvs(&["stem"]);
+    artkit::uv::box_named(&["stem"]);
     fit_to(&meshes(), 0.84, 0.15, 0.84);
     settle(&[join_all("daisies")])
 }
@@ -344,7 +344,7 @@ pub fn sunflowers() -> Vec<Obj> {
             segments = low(10, 5)
         );
     }
-    crate::box_uvs(&["stalk", "petiole", "back"]);
+    artkit::uv::box_named(&["stalk", "petiole"]);
     fit_to(&meshes(), 0.84, 2.108, 0.907);
     settle(&[join_all("sunflowers")])
 }

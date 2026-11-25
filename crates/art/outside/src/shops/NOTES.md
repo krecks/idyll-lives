@@ -97,7 +97,7 @@ No change to the build: its soft boxes take the shared form's new shape (the sha
 ## Edges at the play camera (2026-11-25)
 
 The gate's `edges` found 107 (grocery shelves 84, shop counter 15, bakery case 8); none now, none accepted. The
-sandwich packs (`prism`) take the crate's `eased` (a 4 mm chamfer on turns over 50°); the lettuce slice and the
+sandwich packs (`prism`) take `artkit::bevel::eased` (a 4 mm chamfer on turns over 50°); the lettuce slice and the
 sticker standing a millimetre proud of a pack's faces are square (their sides are inside it, so a chamfer only cost
 triangles: the shelves stay under 8,000). The counter's worktop and magazine rack ends and the bakery case's ends
 are eased too.

@@ -1,7 +1,6 @@
 //! The rose-gold vanity and the moonlight gramophone.
 
 use super::common::{_rose, _rose_leaves, M, WALL};
-use crate::ease::{EASE, eased};
 use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::kit;
@@ -13,6 +12,7 @@ use artkit::{
     fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, rod, settle, slide, soft, spin,
     sweep, swing, torus,
 };
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the rose-gold vanity (1x1): a dressing table with an oval mirror, a pouf before it ---------------------
 pub fn vanity() -> Vec<Obj> {
@@ -93,7 +93,7 @@ pub fn vanity() -> Vec<Obj> {
             ],
             up = (0, 1, 0)
         );
-        bevel_edges(frame, EASE, 1, 60.0, &EdgeOrder::Corners); // its moulding's arrises
+        bevel_edges(frame, AUTO_WIDTH, 1, 60.0, &EdgeOrder::Corners); // its moulding's arrises
         fcyl!(
             f,
             "mirror_back",
@@ -226,7 +226,7 @@ pub fn vanity() -> Vec<Obj> {
                     (0.026, 0.14),
                     (0.0, 0.13)
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             at = f.at(0.1, 0.76, -0.36),
             material = M.ivory,
@@ -601,7 +601,7 @@ pub fn gramophone() -> Vec<Obj> {
         ];
         revolve!(
             "horn",
-            &eased(&horn, EASE),
+            &eased(&horn, AUTO_WIDTH),
             at = f.at(0.0, 1.01, -0.32), // (2026-11-25: 4 cm lower, a gramophone's height)
             material = M.horn,
             segments = 28,

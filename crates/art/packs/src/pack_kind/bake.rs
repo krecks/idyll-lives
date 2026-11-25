@@ -1,13 +1,13 @@
 //! The neighbourly baking counter and the community giving jar.
 
 use super::common::{M, WALL, bush};
-use crate::ease::{EASE, eased};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, sin, sind, sqrt};
 use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, settle, slide, swing, torus};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the neighbourly baking counter (2x1): a cream retro range beside a sage counter laid with bakes --------
 const RANGE: (f64, f64, f64, f64) = (0.6, 0.62, 0.92, 0.6); // x, width, hob height, depth
@@ -890,7 +890,7 @@ pub fn giving_jar() -> Vec<Obj> {
                     (0.18, 0.86),
                     (0.0, 0.86),
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             M.pedestal,
             segments = 28
@@ -954,7 +954,7 @@ pub fn giving_jar() -> Vec<Obj> {
                     (0.103, 0.05),
                     (0.0, 0.05),
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             M.cork,
             segments = 22
@@ -1122,7 +1122,7 @@ pub fn giving_jar() -> Vec<Obj> {
                     (0.07, 0.148),
                     (0.0, 0.148),
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             M.terracotta,
             segments = 18

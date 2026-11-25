@@ -338,7 +338,7 @@ pub fn open_book<X: Coord, Y: Coord, Z: Coord>(
                     .collect()
                 })
                 .collect();
-            crate::eased(loft!(
+            artkit::bevel::eased(loft!(
                 format!("{name}_pages{s}"),
                 &sections,
                 material = M.page
@@ -374,7 +374,7 @@ pub fn open_book<X: Coord, Y: Coord, Z: Coord>(
 
 /// A small potted plant standing at game (x, y, z).
 pub fn plant(name: &str, x: f64, y: f64, z: f64, r: f64) {
-    crate::eased(revolve!(
+    artkit::bevel::eased(revolve!(
         format!("{name}_pot"),
         &[
             (0.0, 0.0),

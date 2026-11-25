@@ -1,7 +1,6 @@
 //! The raised veggie bed (2x1): a cedar box of lettuces, carrots, a courgette and staked tomatoes.
 
 use super::common::{_flower, _rosette, M};
-use crate::ease::{EASE, ease_ends};
 use artkit::forms::{rect, rounded_rect};
 use artkit::json::float_repr;
 use artkit::kit;
@@ -11,6 +10,7 @@ use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
+use artkit::{bevel::ease, shapes::AUTO_WIDTH};
 use artkit::{
     fbox, fsphere, fsweep, jitter, leaf, loft, revolve, ring, rock, soft, squash, stages, star,
     sweep,
@@ -121,16 +121,20 @@ fn _bed_box(f: &GameFrame) {
     jitter!(soil, 0.006, size = 0.08, seed = 2.0, up = 1.0);
     for x in TOMATOES {
         // the stakes, tapering to their tops
-        ease_ends(fsweep!(
-            f,
-            format!("stake{}", float_repr(x)),
-            &[(x, SOIL - 0.02, -0.22), (x, H + 0.85, -0.22)],
-            0.0,
-            M.cedar_dark,
-            profile = rounded_rect(0.022, 0.022, EASE, 1),
-            up = (0, 1, 0),
-            scale = [1.0, 0.7]
-        ));
+        ease(
+            fsweep!(
+                f,
+                format!("stake{}", float_repr(x)),
+                &[(x, SOIL - 0.02, -0.22), (x, H + 0.85, -0.22)],
+                0.0,
+                M.cedar_dark,
+                profile = rounded_rect(0.022, 0.022, AUTO_WIDTH, 1),
+                up = (0, 1, 0),
+                scale = [1.0, 0.7]
+            ),
+            60.0,
+            1,
+        );
     }
     fsweep!(
         f,

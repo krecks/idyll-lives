@@ -306,7 +306,7 @@ pub fn spring_rider() -> Vec<Obj> {
                 verts = 6
             );
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "base_plate",
             0.13,
@@ -330,7 +330,7 @@ pub fn spring_rider() -> Vec<Obj> {
     });
     join(&still, "spring", Some(P3::from((0, 0, 0))));
     let parts = new_parts(|| {
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "top_plate",
             0.12,
@@ -746,7 +746,7 @@ pub fn merry_go_round() -> Vec<Obj> {
                 );
             }
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "centre_disc",
             0.2,

@@ -35,7 +35,7 @@ foliage in another (on `wood` it was four, and `check-glb` warned).
 
 | Model | Size (w × h × d) | Triangles | Draws |
 |---|---|---|---|
-| `model.plant` | 0.77 × 0.83 × 0.79 m | 1,884 | 1 |
+| `model.plant` | 0.77 × 0.83 × 0.79 m | 2,280 | 1 |
 | `model.garden.monstera` | 0.78 × 0.91 × 0.79 m | 1,576 | 1 |
 | `model.garden.fiddleFig` | 0.53 × 1.63 × 0.53 m | 2,080 | 2 |
 | `model.garden.snakePlant` | 0.40 × 1.29 × 0.41 m | 1,452 | 2 |
@@ -220,7 +220,7 @@ New helpers (now in `artkit::botany`, which the trees, the street and the garden
 
 | Model | Before → after (far) | What it has now |
 |---|---|---|
-| `plant` | 2,588 → 1,884 | rolled-rim pot on a saucer, heart leaves on arching stalks, young rolled leaves |
+| `plant` | 2,588 → 1,884 → 2,280 (pot chamfered) | rolled-rim pot on a saucer, heart leaves on arching stalks, young rolled leaves |
 | `monstera` | 2,840 → 1,576 | moss pole, leaves split from the edge, aerial roots |
 | `fiddleFig` | 1,924 → 2,080 | bark trunk with a wobble, 22 wavy fiddle-shaped leaves on stalks, footed pot |
 | `snakePlant` | 1,220 → 1,452 | sword blades with pale yellow edges, young blades |
@@ -305,10 +305,11 @@ UVs. What changed so each plant prints no warning:
 
 - **Sunflowers:** their petals (`bloom`, `bloom2`) are on `foliage` (`leafy_petals`, the build's palette and the
   model's): a petal is a leaf's thin sheet, and sways with the plant (144 rims were found as edges). The stalks',
-  petioles' and the heads' green backs' foliage is laid a box a face (`crate::box_uvs`): the backs, turned then tilted,
-  stretched it over 2×.
-- **Pots:** botany's `vessel` cuts a pot's rim square, so the snake plant's, the cacti's, the palm's, the orchid's, the
-  fern's, the geraniums' and the topiary's pots and saucers are chamfered 4 mm (`crate::chamfer`); the orchid's
+  petioles' (`uv::box_named`) and the heads' green backs' (botany's `cupped`) foliage is laid a box a face: the backs,
+  turned then tilted, stretched it over 2×.
+- **Pots:** botany's `vessel` and `pot` chamfer a pot's and a saucer's square-cut rims 4 mm (the snake plant's, the
+  cacti's, the palm's, the orchid's, the fern's, the geraniums' and the topiary's; since the kernel pass, the fiddle-leaf
+  fig's, the monstera's, the potted plant's and the lemon tree's too); the orchid's
   pedestal's top, the succulents' bowl's rim and the bonsai's tray's rim are rounded in their profiles (a bevel on a
   wood or round-UV part smears its UVs).
 - **Cacti:** the barrel's ribs six points each (rounded ridges, no turn of 60°): 2,840 triangles.

@@ -81,7 +81,7 @@ pub fn bakery_case() -> Vec<Obj> {
                 .chain(front_arc.iter().copied())
                 .chain([(-0.45, 1.29)])
                 .collect();
-            crate::eased(fextrude!(
+            artkit::bevel::eased(fextrude!(
                 f,
                 format!("end{s}"),
                 &outline,

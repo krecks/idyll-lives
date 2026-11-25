@@ -234,7 +234,7 @@ pub fn hotel_reception() -> Vec<Obj> {
         }
         fbox!(F, "kick_strip", 1.8, 0.05, 0.006, (0, 0.06, 0.393), M.brass);
         // the marble ledge, its nose rounded, on a walnut moulding
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "ledge",
             &[
@@ -273,7 +273,7 @@ pub fn hotel_reception() -> Vec<Obj> {
         );
         bell("bell", 0.3, y, 0.3);
         // a banker's lamp: a brass base and stem, the green glass shade
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "lamp_base",
             &[
                 (0.0, 0.0),
@@ -286,7 +286,7 @@ pub fn hotel_reception() -> Vec<Obj> {
             material = M.brass,
             segments = 20
         ));
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "lamp_stem",
             0.01,
@@ -358,7 +358,7 @@ pub fn hotel_reception() -> Vec<Obj> {
         for r in 0..3 {
             for c in 0..4 {
                 let (hx, hy) = (kx - 0.195 + c as f64 * 0.13, WORK + 0.56 - r as f64 * 0.19);
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("hook{r}{c}"),
                     0.006,
@@ -379,7 +379,7 @@ pub fn hotel_reception() -> Vec<Obj> {
                         (hx, hy - 0.035, -0.345),
                         M.brass
                     );
-                    crate::eased(revolve!(
+                    artkit::bevel::eased(revolve!(
                         format!("fob{r}{c}"),
                         &[
                             (0.0, 0.0),
@@ -494,7 +494,7 @@ pub fn duty_desk() -> Vec<Obj> {
             M.frame,
             bevel = 0.005
         );
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "grille",
             &[(0.0, 0.0), (0.06, 0.0), (0.06, 0.008), (0.0, 0.008)],
             at = F.at(0, y + 0.42, zs + 0.004),
@@ -546,7 +546,7 @@ pub fn duty_desk() -> Vec<Obj> {
             M.radio,
             bevel = 0.01
         );
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "aerial",
             0.006,
@@ -714,7 +714,7 @@ pub fn teller_counter() -> Vec<Obj> {
                     (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.054, -0.3),
                     M.note
                 );
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("coins{s}{k}"),
                     0.014,

@@ -31,7 +31,7 @@ pub fn _bag_ring(y: f64, hw: f64, hd: f64, pinch: f64) -> Vec<(f64, f64, f64)> {
         (-hw + pinch, 0.0),
     ];
     for corner in [9, 6, 4, 1] {
-        pts = crate::common::round_at(&pts, corner, 0.004);
+        pts = artkit::forms::round_at(&pts, corner, 0.004);
     }
     pts.pop();
     pts.iter().rev().map(|&(px, pz)| (px, y, pz)).collect()
@@ -656,7 +656,7 @@ pub fn tasting_board() -> Vec<Obj> {
 
 /// An oval serving platter, 40 by 28 cm, its rim rolled.
 fn _platter() {
-    let profile = crate::common::round_at(
+    let profile = artkit::forms::round_at(
         &[
             (0.0, 0.0),
             (0.15, 0.0),

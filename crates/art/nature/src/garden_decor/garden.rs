@@ -736,7 +736,5 @@ pub fn boulder() -> Vec<Obj> {
             subdivisions = 1
         );
     }
-    // (the moss and the grass tufts squashed: their foliage laid on them as they are drawn)
-    crate::bake_scale(&["moss", "lichen", "tuft"]);
     settle(&[join_all("boulder")])
 }

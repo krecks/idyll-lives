@@ -11,7 +11,7 @@ pub fn compost_bin() -> Vec<Obj> {
     let (z0, z1) = (cz - d / 2.0, cz + d / 2.0);
     for x in [-w / 2.0 + 0.03, w / 2.0 - 0.03] {
         for z in [z0 + 0.03, z1 - 0.03] {
-            crate::boxed(fbox!(
+            fbox!(
                 F,
                 numbered("post"),
                 0.06,
@@ -21,7 +21,7 @@ pub fn compost_bin() -> Vec<Obj> {
                 M.bin,
                 bevel = low(0.008, 0.0),
                 bevel_segments = 1
-            ));
+            );
             if !is_low() {
                 // each post's top cut to a shallow point
                 cone!(

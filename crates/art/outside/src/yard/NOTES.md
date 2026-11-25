@@ -227,8 +227,8 @@ The gate's `edges` found 72 (greenhouse 24, city bike 10, e-bike 9, cargo bike 7
 washing line 3, road bike, rain barrel and kids' bike 2); none now, none accepted. The saddles are twelve round and
 shaded smooth round their rows (eight round, their flattened sides turned past 60°); the greenhouse's rafters and
 vent rafters take a 4 mm chamfer; the city bike's basket, the e-bike's motor, the shed's window box and brackets, the
-rain barrel's and the washing line's revolves, sweeps and lofts are eased (the crate's `eased`). The compost bin's
-posts lay their wood's UVs on the chamfered post (`boxed`: carried, the chamfers smeared the grain).
+rain barrel's and the washing line's revolves, sweeps and lofts are eased (`artkit::bevel::eased`). The compost bin's
+posts lay their wood's UVs on the chamfered post (as the kernel lays any box's: carried, the chamfers smeared the grain).
 
 Sizes: the mountain bike's bars are 0.72 m across (a mountain bike's 720-800 mm; they were 0.60), its depth 0.725.
 

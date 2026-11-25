@@ -1,13 +1,13 @@
 //! The candlelit bistro table and the heart-shaped petal tub.
 
 use super::common::{_candle, _flame, _rose, _rose_leaves, _velvet_chair, _wine_glass, M};
-use crate::ease::{EASE, eased};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::math::{Axis, M4, P3, PI, V3, atan2, cos, pow, radians, sin, sqrt};
 use artkit::parts::{join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 use artkit::{fsphere, fsweep, grow, leaf, loft, revolve, ring, settle, torus};
 
 // --- the candlelit bistro table (2x1): a diner at each end (x = +-0.62, z = 0.1) facing in across the top -------
@@ -204,7 +204,7 @@ pub fn candlelit_table() -> Vec<Obj> {
                     (0.011, 0.18),
                     (0.0, 0.17)
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             at = f.at(0, top, TZ),
             material = M.glassy,
@@ -491,7 +491,7 @@ pub fn heart_tub() -> Vec<Obj> {
                     (0.05, 0.3),
                     (0.0, 0.29)
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             at = f.at(0.7, 0, 0.82),
             material = M.ivory,

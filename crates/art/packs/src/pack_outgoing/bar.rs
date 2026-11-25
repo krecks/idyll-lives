@@ -1,7 +1,7 @@
 //! The home party bar and the conversation sectional.
 
 use super::common::{_bottle, _glass, _stool, BOTTLES, M, WALL};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
@@ -324,7 +324,7 @@ fn _bar_top(f: &GameFrame) {
         verts = 12,
         round = 1
     );
-    ease_ends(tower);
+    ease(tower, 60.0, 1);
     revolve!(
         "tap_flange",
         &[

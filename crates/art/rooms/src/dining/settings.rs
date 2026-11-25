@@ -168,7 +168,7 @@ pub fn flowers<X: Coord>(
     let k = h / 0.18;
     turned(
         &format!("{prefix}vase"),
-        &crate::common::eased(
+        &artkit::forms::eased(
             &[
                 (0.0, 0.0),
                 (0.032, 0.0),

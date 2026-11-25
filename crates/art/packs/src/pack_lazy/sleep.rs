@@ -1,7 +1,6 @@
 //! The snoozecloud adjustable bed and the daydream nap pod.
 
 use super::common::{_sphere_band, M};
-use crate::ease::{EASE, eased};
 use artkit::forms::smooth_outline;
 use artkit::math::{Axis, P3, cos, pow, radians, sin, sqrt};
 use artkit::parts::{hinged, join, new_parts, numbered};
@@ -10,6 +9,7 @@ use artkit::scene::Obj;
 use artkit::{
     fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, revolve, settle, soft, swing, torus,
 };
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the snoozecloud adjustable bed (2x2): two sleepers side by side, mattress top 0.49, head at the back ----
 const HINGE_Z: f64 = -0.42; // the head section's front edge (depth), where it rises from
@@ -301,7 +301,7 @@ pub fn nap_pod() -> Vec<Obj> {
                     (0.06, 0.24),
                     (0.0, 0.24),
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             M.chrome,
             segments = 20

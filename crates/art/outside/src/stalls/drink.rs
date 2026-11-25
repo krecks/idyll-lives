@@ -134,7 +134,7 @@ pub fn vending_drink() -> Vec<Obj> {
                 M.label,
                 verts = 16
             );
-            crate::eased(fextrude!(
+            artkit::bevel::eased(fextrude!(
                 f,
                 format!("button{i}"),
                 &rounded_rect(0.1, 0.05, 0.012, 2),

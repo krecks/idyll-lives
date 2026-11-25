@@ -82,7 +82,7 @@ fn pediment(f: &GameFrame, name: &str, face: i32, along_z: bool, material: Mat, 
     ];
     let face = face as f64;
     if along_z {
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             name,
             &pts,
@@ -99,7 +99,7 @@ fn pediment(f: &GameFrame, name: &str, face: i32, along_z: bool, material: Mat, 
             crown
         );
     } else {
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             name,
             &pts,

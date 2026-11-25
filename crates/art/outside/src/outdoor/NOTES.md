@@ -205,7 +205,7 @@ The hammock's pillow is sewn flat and stuffed (its sides drawn in 1.2 cm between
 
 The gate's `edges` found 58 (patio set 45, swing set 4, picnic table, grill station and fire pit 2, the round table,
 bar and grill 1); none now, none accepted. The bistro chairs' seat slats take the 4 mm chamfer the table's have and
-their back slats the crate's `eased` (a 4 mm chamfer on turns over 50°); the grills' and fire pit's revolves, sweeps,
+their back slats `artkit::bevel::eased` (a 4 mm chamfer on turns over 50°); the grills' and fire pit's revolves, sweeps,
 lofts and extrusions that named no bevel are eased, as are the hood's slabs (`across`), every `slab` top, the round
 table's top, the picnic basket and the swing seats. The jug's lip rounds over in two more rings (no bevel builds on
 its spout) and the kettle's ash catcher's rim is 11 mm (15 mm read as a cut edge).

@@ -325,7 +325,7 @@ pub fn painting_classic() -> Vec<Obj> {
             F,
             "bead",
             &rect(iw + 0.016, ih + 0.016, yc, 0.0),
-            &crate::common::eased_loop(
+            &artkit::forms::eased_loop(
                 &[
                     (0.0, 0.0),
                     (0.0, 0.008),
@@ -522,7 +522,7 @@ pub fn canvas_abstract() -> Vec<Obj> {
             F,
             "frame",
             &rect(w, h, yc, 0.0),
-            &crate::common::eased_loop(
+            &artkit::forms::eased_loop(
                 &[
                     (0.0, 0.0),
                     (0.0, 0.048),
@@ -848,7 +848,7 @@ pub fn wall_shelf() -> Vec<Obj> {
                 F,
                 "picture",
                 &rect(0.18, 0.24, top1 + 0.12, -0.25),
-                &crate::common::eased_loop(
+                &artkit::forms::eased_loop(
                     &[
                         (0.0, 0.0),
                         (0.0, 0.014),

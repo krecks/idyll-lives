@@ -843,7 +843,7 @@ fn crown(name: &str, x: f64, front_z: f64, back: f64, y: f64, material: Mat, h: 
     let c = (h / 2.0, (0.01 - out) / 2.0);
     let centred: Vec<(f64, f64)> = prof.iter().map(|&(u, v)| (v - c.1, u - c.0)).collect();
     // (eased with height as its v: what it leaves sharp is its bottom, on the cornice)
-    let prof: Vec<(f64, f64)> = crate::common::eased(&centred, 0.004)
+    let prof: Vec<(f64, f64)> = artkit::forms::eased(&centred, 0.004)
         .iter()
         .map(|&(v, u)| (u, v))
         .collect();

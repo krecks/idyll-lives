@@ -2,7 +2,7 @@
 
 use super::common::{M, STRIPES, WALL2, bulb, pleats, slab, tumbler};
 use super::music::tilt;
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, atan2, cosd, degrees, pow, sin, sind, sqrt};
@@ -36,15 +36,19 @@ pub fn rainbow_hammock() -> Vec<Obj> {
     let beam = rounded_rect(0.07, 0.09, 0.02, 1);
     let still = new_parts(|| {
         // the base beam, its ends rounded, and the two posts curving up and out from it to the hooks
-        ease_ends(fsweep!(
-            f,
-            "beam",
-            &[(-(POST_X - 0.1), 0.05, 0.0), (POST_X - 0.1, 0.05, 0.0)],
-            0,
-            M.wood,
-            profile = &beam,
-            up = (0, 0, 1)
-        ));
+        ease(
+            fsweep!(
+                f,
+                "beam",
+                &[(-(POST_X - 0.1), 0.05, 0.0), (POST_X - 0.1, 0.05, 0.0)],
+                0,
+                M.wood,
+                profile = &beam,
+                up = (0, 0, 1)
+            ),
+            60.0,
+            1,
+        );
         for s in [-1.0, 1.0] {
             fsweep!(
                 f,

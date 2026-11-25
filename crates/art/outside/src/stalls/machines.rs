@@ -94,7 +94,7 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
         bevel = 0.008,
         bevel_segments = 1
     );
-    crate::eased(fextrude!(
+    artkit::bevel::eased(fextrude!(
         f,
         "keypad",
         &rounded_rect(0.18, 0.5, 0.015, 2),
@@ -255,7 +255,7 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
         M.tray
     );
     // the window's frame: a rounded bezel round the glass
-    crate::eased(fextrude!(
+    artkit::bevel::eased(fextrude!(
         f,
         "bezel",
         &rounded_rect(w + 0.03, WIN_Y.1 - WIN_Y.0 + 0.03, 0.02, 2),

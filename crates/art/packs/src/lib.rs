@@ -3,8 +3,6 @@
 
 use artkit::family::Family;
 
-pub mod ease;
-
 pub mod pack_bookworm;
 pub mod pack_cheerful;
 pub mod pack_couch_potato;

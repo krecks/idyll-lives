@@ -1,10 +1,10 @@
 //! What the nature lover pack is built from: its palette, flower pots, leaf rosettes and flower faces.
 
-use crate::ease::EASE;
 use artkit::materials::Mat;
 use artkit::place::GameFrame;
 use artkit::py::hypot;
 use artkit::rand::Random;
+use artkit::shapes::AUTO_WIDTH;
 use artkit::{fsphere, leaf, palette, revolve, star};
 
 palette! { M:
@@ -107,7 +107,10 @@ pub fn _pot(
     let lathe = if d >= 0.17 {
         let toward = |a: (f64, f64), b: (f64, f64)| {
             let l = hypot(b.0 - a.0, b.1 - a.1);
-            (a.0 + (b.0 - a.0) / l * EASE, a.1 + (b.1 - a.1) / l * EASE)
+            (
+                a.0 + (b.0 - a.0) / l * AUTO_WIDTH,
+                a.1 + (b.1 - a.1) / l * AUTO_WIDTH,
+            )
         };
         let [p0, p1, p2, p3, p4, p5, p6] = lathe;
         vec![

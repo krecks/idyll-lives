@@ -25,11 +25,12 @@
 //!
 //! A bevel is asked for (`bevel_edges`, a builder's `bevel`) and given later, as Blender's modifier is: the part
 //! keeps its mesh, which a build can still push about, scale or cut, and is rounded as it is when it is joined
-//! (`parts::join`), measured or written. A textured part's UVs are made on the mesh as it is then and carried
-//! onto the bevel as Blender carries them (`carried`).
+//! (`parts::join`), measured or written. A textured part's box or round UVs are made on the bevelled mesh, so a
+//! strip takes the texture as a face of its own (unlike Blender, which carries them from the faces it cut: a strip of
+//! one segment then has no area in UV); UVs made already are carried as Blender carries them (`carried`).
 //!
-//! What isn't built says so: an edge whose bevel ends at a vertex no other bevelled edge reaches, and a patch of
-//! five segments or more.
+//! What isn't built says so: an edge whose bevel ends at a vertex no other bevelled edge reaches (`bevelled`; a part's
+//! bevel, `bevel_edges`, leaves such edges sharp instead), and a patch of five segments or more.
 
 use crate::math::{PI, V3, angle_normalized, cosf, dot_v3, len_v3, mul_v3_fl, normalize_v3, sinf};
 use crate::mesh::{Mesh, edge, normal_newell, normal_tri};
@@ -50,6 +51,7 @@ const FULLNESS: [f32; 4] = [0.0, 0.559, 0.642, 0.551];
 mod bevelled;
 mod charts;
 mod corner;
+mod ease;
 mod entry;
 mod fans;
 mod geometry;
@@ -64,6 +66,7 @@ mod work;
 pub use bevelled::*;
 use charts::*;
 use corner::*;
+pub use ease::*;
 pub use entry::*;
 use fans::*;
 use geometry::*;
