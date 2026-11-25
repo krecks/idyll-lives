@@ -80,7 +80,7 @@ pub fn step(surface: &str, wear: &str, version: u32, rate: f64) -> Option<Vec<f3
     steps::make(surface, wear, version, rate)
 }
 
-/// One version of a bird's song (its voice: species, seed, pitch, pace and nearness).
+/// One version of a bird's song (its voice: species, seed, pitch, pace and nearness); none: no such species.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen]
 pub fn song(
@@ -91,7 +91,7 @@ pub fn song(
     near: f64,
     version: u32,
     rate: f64,
-) -> Vec<f32> {
+) -> Option<Vec<f32>> {
     let voice = birdsong::Voice {
         species: species.to_string(),
         seed,
@@ -108,14 +108,8 @@ pub fn room(size: &str, rate: f64) -> Option<Sound> {
     rooms::response(size, rate).map(|s| sound(Made::Stereo(s)))
 }
 
-/// `x` through a two-pole filter as a Web Audio `BiquadFilterNode` computes it (`kind`: lowpass, highpass or
-/// bandpass); `looped`: `x` is a loop.
+/// `x` through a low-pass filter as a Web Audio `BiquadFilterNode` computes it; `looped`: `x` is a loop.
 #[wasm_bindgen]
-pub fn filter(x: &[f32], rate: f64, kind: &str, frequency: f64, q: f64, looped: bool) -> Vec<f32> {
-    let kind = match kind {
-        "highpass" => Filter::Highpass,
-        "bandpass" => Filter::Bandpass,
-        _ => Filter::Lowpass,
-    };
-    sound::node_filter(x, rate, kind, frequency, q, looped)
+pub fn lowpass(x: &[f32], rate: f64, frequency: f64, q: f64, looped: bool) -> Vec<f32> {
+    sound::node_filter(x, rate, Filter::Lowpass, frequency, q, looped)
 }
