@@ -222,15 +222,27 @@ pub fn pass_away(w: &mut World, i: usize) {
     }
     w.events.push_detail(w.tick, EventKind::Died, i, None, None);
     w.depart(i, GoneWhy::Died);
-    // The last grown-up of a household gone, its children go to family out of town: nobody would
-    // look after them, earn or pay the rent. (Not the player's: they play on with the children.)
+    // The last grown-up of a household gone, its children go to their other parent in town, else
+    // to family out of town: nobody would look after them, earn or pay the rent. (Not the
+    // player's: they play on with the children.)
     let h = w.sims[i].household as usize;
     let left = members(w, h);
     if !w.households[h].player && !left.iter().any(|&j| w.sims[j].adult(&w.content)) {
         for j in left {
-            w.events
-                .push_detail(w.tick, EventKind::MovedAway, j, None, None);
-            w.depart(j, GoneWhy::MovedAway);
+            let parent = (0..w.sims.len()).find(|&p| {
+                w.sims[p].here()
+                    && w.sims[p].adult(&w.content)
+                    && w.relationships.kin(j, p) == Kin::Parent
+            });
+            if let Some(p) = parent {
+                let to = w.sims[p].household as usize;
+                moving::move_to(w, j, to);
+                w.events.push(w.tick, EventKind::MovedInWith, j, p, None);
+            } else {
+                w.events
+                    .push_detail(w.tick, EventKind::MovedAway, j, None, None);
+                w.depart(j, GoneWhy::MovedAway);
+            }
         }
     }
 }

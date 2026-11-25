@@ -322,6 +322,34 @@ fn a_single_parent_doesnt_move_in_with_a_partner_leaving_a_child_alone() {
 }
 
 #[test]
+fn a_partner_moves_in_with_a_single_parent() {
+    // Cy lives with Kit next door, room there for Ada; Ada lives alone (nobody's the player).
+    let town = single_parent()
+        .replace(r#""player":true"#, r#""player":false"#)
+        .replace(
+            r#"{"def":"bed","x":12,"z":2}"#,
+            r#"{"def":"double","x":12,"z":2},{"def":"bed","x":17,"z":2}"#,
+        );
+    let mut w = World::from_json(&with_stages(), &town, 1).unwrap();
+    days(&mut w, 2);
+    assert_eq!(w.sims[0].household, 1, "Ada moved in with Cy and Kit");
+    assert_eq!(w.sims[1].household, 1);
+}
+
+#[test]
+fn a_child_whose_last_grown_up_dies_goes_to_their_other_parent_in_town() {
+    // Kit lives with Cy next door; Kit's mother Ada lives in town.
+    let town = town("", r#",{"a":2,"b":0,"preset":"parent"}"#).replace(
+        r#""name":"Di","x":15.5,"z":5.5,"age":28"#,
+        r#""name":"Kit","x":15.5,"z":5.5,"age":5"#,
+    );
+    let mut w = World::from_json(&with_stages(), &town, 1).unwrap();
+    sim_core::lifecycle::pass_away(&mut w, 1);
+    assert!(w.sims[2].here(), "Kit left town");
+    assert_eq!(w.sims[2].household, 0, "Kit went to Ada");
+}
+
+#[test]
 fn children_whose_last_grown_up_dies_go_to_family_out_of_town() {
     let mut w = World::from_json(&with_stages(), &single_parent(), 1).unwrap();
     sim_core::lifecycle::pass_away(&mut w, 1);

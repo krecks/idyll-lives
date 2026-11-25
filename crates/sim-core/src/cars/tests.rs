@@ -253,6 +253,36 @@ fn a_car_whose_driver_left_town_comes_home_after_a_newcomer_takes_the_slot() {
     assert!(!w.taxis.rode.iter().any(|r| r.0 == d as u32));
 }
 
+/// A slot a car on a trip still names as its driver (it goes on while in the picture) isn't given
+/// to a newcomer, who would be taken for them.
+#[test]
+fn a_trip_drivers_slot_isnt_given_to_a_newcomer() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    w.cars[0].trip = Some(Trip {
+        driver: 0,
+        plot: 0,
+        directed: false,
+        at: [0.0, 0.0],
+        yaw: 0.0,
+    });
+    w.depart(0, crate::world::GoneWhy::MovedAway);
+    let spawn: crate::lot::SimSpawn =
+        serde_json::from_value(serde_json::json!({"name": "Newt", "x": 25.5, "z": 3.5})).unwrap();
+    assert_ne!(w.spawn_at(&spawn, true).unwrap(), 0);
+}
+
+/// A car loading for a driver who leaves town parks at once (those in it have gone on).
+#[test]
+fn a_car_loading_for_a_driver_who_leaves_parks() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    w.cars[0].state = CarState::Boarding;
+    w.cars[0].driver = Some(0);
+    w.cars[0].aboard = vec![1];
+    w.depart(0, crate::world::GoneWhy::MovedAway);
+    assert_eq!(w.cars[0].state, CarState::Parked);
+    assert!(w.cars[0].aboard.is_empty());
+}
+
 #[test]
 fn only_owners_drive() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();

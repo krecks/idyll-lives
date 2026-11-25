@@ -172,20 +172,23 @@ pub(super) fn has_room_for_partner(w: &World, h: usize) -> bool {
 /// at work doesn't matter: they come back to the new home. Out on a visit or an outing, not
 /// that day (moved, they were taken from the host's home ten minutes in), nor out on a trip by
 /// car, there or back (`cars::on_trip`: moved at the wheel, they got out where the car stood, and
-/// it waited in the road for them for good). Nor the last grown-up at home with a child: the
-/// child would be left on their own (no sitter booked, the rent run up with nobody earning).
+/// it waited in the road for them for good). Nor, if they are the one who goes, the last
+/// grown-up at home with a child (`leaves_a_child`).
 pub(super) fn may_move(w: &World, i: usize) -> bool {
     let s = &w.sims[i];
-    let adult = |j: &usize| w.sims[*j].adult(&w.content);
     s.here()
         && s.visiting.is_none()
         && !crate::cars::on_trip(&w.cars, s)
         && s.adult(&w.content)
         && (w.player_moves || !w.households[s.household as usize].player)
-        && {
-            let home = members(w, s.household as usize);
-            home.iter().all(adult) || home.iter().any(|&j| j != i && adult(&j))
-        }
+}
+
+/// Whether `i` is the last grown-up at home with a child: moved away, the child would be left on
+/// their own (no sitter booked, the rent run up with nobody earning).
+fn leaves_a_child(w: &World, i: usize) -> bool {
+    let adult = |j: usize| w.sims[j].adult(&w.content);
+    let home = members(w, w.sims[i].household as usize);
+    home.iter().any(|&j| !adult(j)) && !home.iter().any(|&j| j != i && adult(j))
 }
 
 /// A home nobody lives in (a house or a flat; not a park, not the player's home), with beds for
@@ -315,12 +318,26 @@ pub(super) fn moving(w: &mut World, rules: &crate::content::MovingRules) {
                 (false, true) => Some(a),
                 (false, false) => None,
             };
+            // Not one who would leave a child at home alone: their partner moves in with them
+            // instead if there's room (not out of the player's home, which comes first).
+            let mover = match mover {
+                Some(m) if leaves_a_child(w, m) => {
+                    let other = if m == a { b } else { a };
+                    let room = if other == a { into_b } else { into_a };
+                    let player = w.households[w.sims[other].household as usize].player;
+                    (room && !player && !leaves_a_child(w, other)).then_some(other)
+                }
+                m => m,
+            };
             if let Some(m) = mover {
                 let partner = if m == a { b } else { a };
                 let to = w.sims[partner].household as usize;
                 move_to(w, m, to);
                 w.events
                     .push(tick, EventKind::MovedInWith, m, partner, None);
+            } else if into_a || into_b || leaves_a_child(w, a) || leaves_a_child(w, b) {
+                // (The one with room to go would leave a child alone, or both moving would: they
+                // stay as they are.)
             } else if let Some(plot) = vacant_plot(w, 2) {
                 let name = w.households[ha].name.clone();
                 let h = household_for(w, plot, &name);

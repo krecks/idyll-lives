@@ -51,6 +51,8 @@ A state made by `state.mjs` has the town and the households the page makes from 
 
 Use states and fixed steps for what is counted or pictured (draws, triangles, the sun map's redraws, pictures before and after a change, A against B in one build); the real-time bench and `gameplay.mjs` for what the wall clock measures (frame times, the GPU's time, loading, memory, how the sim keeps up). Against 0.8.3 a state can't be shared (it can't read save 42, nor play in fixed steps): each build makes its own state from the same code at the same tick with its own `state.mjs`, and the base runs in real time. A camera moving with the wall clock (the bench's `orbit`, `roam`, `zoom` paths) doesn't repeat in fixed steps: hold it (`cam=over`, `hold=1`).
 
+Every script launches Chromium with `lib/browser.mjs`'s `launchArgs` (since 2026-11-25 `create`, `land`, `loading`, `profile`, `scene`, `menu-still`, `room` and `gameplay` too, which had their own): WebGPU with its developer features (full-precision GPU timestamps) and, on macOS, ANGLE on Metal, Chromium's default there, so their results from before should compare with later ones (not measured: if an A/B against an older run looks off, set the flag back in that script).
+
 A script of one's own (`lib/browser.mjs`; no reload per pose, no 15–45 s sleeps; builds measured one after another, not side by side, as each wants every core):
 
 ```js

@@ -37,8 +37,15 @@ impl World {
         if !self.lot.in_bounds(x.floor() as i32, z.floor() as i32) {
             return Err(Error::new(format!("resident '{name}' spawns off the lot")));
         }
+        // (Not a slot a car on a trip still names as its driver: it goes on while in the picture,
+        // and the newcomer would be taken for them. It ends once out of sight, `cars::update`.)
         let slot = if reuse {
-            self.sims.iter().position(|s| !s.here())
+            let driving = |i: usize| {
+                self.cars
+                    .iter()
+                    .any(|c| c.trip.as_ref().is_some_and(|t| t.driver as usize == i))
+            };
+            (0..self.sims.len()).find(|&i| !self.sims[i].here() && !driving(i))
         } else {
             None
         };
@@ -317,6 +324,11 @@ impl World {
         for car in &mut self.cars {
             if car.driver == Some(id) {
                 car.driver = None;
+                // (Loading for them: those in it have gone on, as for a driver called away.)
+                if car.state == crate::cars::CarState::Boarding {
+                    car.state = crate::cars::CarState::Parked;
+                    car.aboard.clear();
+                }
             }
             car.aboard.retain(|&a| a != id);
             car.done.retain(|&a| a != id);

@@ -277,7 +277,12 @@ async function openSession(
     if (!saved) throw new Error('That save no longer exists.');
     source = { save: saved.data };
     household = saved.household;
-    gameId = gameOnLoading(saved, await listSaves());
+    // (The list unread, the save goes on as its own game: it opens all the same.)
+    const opened = saved;
+    gameId = await listSaves().then(
+      (saves) => gameOnLoading(opened, saves),
+      () => opened.game ?? opened.id,
+    );
   }
 
   progress('Starting the simulation', 0.15);
