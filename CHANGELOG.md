@@ -2,7 +2,7 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
-## Unreleased
+## 0.8.4 — 2026-11-26
 
 - **Curtains gather when drawn:** drawn at night, the curtains' cloth is let out as real curtains are, in narrower folds, instead of stretching its weave and its folds wide; open, they look as they did. The model gate now measures a part's texture at its most stretched as well as at rest.
 - **Lighter bark:** the oak's, the pine's and the maples' trunks are no longer near black: their bark is as light as real bark of those trees (the willow's and the spruce's a little lighter too).

@@ -28,49 +28,49 @@ dependencies = [
 
 [[package]]
 name = "art-nature"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "artkit",
 ]
 
 [[package]]
 name = "art-outside"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "artkit",
 ]
 
 [[package]]
 name = "art-packs"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "artkit",
 ]
 
 [[package]]
 name = "art-rooms"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "artkit",
 ]
 
 [[package]]
 name = "art-things"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "artkit",
 ]
 
 [[package]]
 name = "art-wet"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "artkit",
 ]
 
 [[package]]
 name = "artkit"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "libm",
 ]
@@ -438,7 +438,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "ll-art"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "art-nature",
  "art-outside",
@@ -452,7 +452,7 @@ dependencies = [
 
 [[package]]
 name = "ll-tools"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "artkit",
  "basisu_c_sys",
@@ -873,7 +873,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "sim-core"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "serde",
  "serde_json",
@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "sim-wasm"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "serde_json",
  "sim-core",
@@ -918,14 +918,14 @@ dependencies = [
 
 [[package]]
 name = "sound"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "libm",
 ]
 
 [[package]]
 name = "sound-wasm"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "sound",
  "wasm-bindgen",
@@ -1049,7 +1049,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voice"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "flate2",
  "serde_json",
@@ -1057,7 +1057,7 @@ dependencies = [
 
 [[package]]
 name = "voice-wasm"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "voice",
  "wasm-bindgen",
