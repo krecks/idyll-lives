@@ -36,10 +36,31 @@ impl World {
             EdgeAxis::V => ((e.x - 1, e.z), (e.x, e.z)),
             EdgeAxis::Dp | EdgeAxis::Dn => ((e.x, e.z), (e.x, e.z)),
         };
+        // Only things near the edits are looked at (a town has tens of thousands): each check is
+        // of a thing on a tile beside an edge, or one off it by its front tile, its body (off its
+        // tiles' middle by at most `MAX_OFFSET`) or its overhang (`may_reach` allows for that).
+        let [x0, z0, x1, z1] = edits.iter().fold(
+            [i32::MAX, i32::MAX, i32::MIN, i32::MIN],
+            |[x0, z0, x1, z1], e| [x0.min(e.x), z0.min(e.z), x1.max(e.x + 1), z1.max(e.z + 1)],
+        );
+        let m = self.content.overhang_reach();
+        let near: Vec<&ObjectInstance> = self
+            .objects
+            .iter()
+            .filter(|o| o.may_reach([x0 - 2, z0 - 2, x1 + 2, z1 + 2], m))
+            .collect();
         let object_at = |x: i32, z: i32| {
-            self.objects.iter().position(|o| {
+            near.iter().any(|o| {
                 let (w, d) = o.size(&self.content);
                 x >= o.x && z >= o.z && x < o.x + w && z < o.z + d
+            })
+        };
+        // What hangs on the wall at this grid edge (`horizontal`: an `h` edge).
+        let (near, content) = (&near, &self.content);
+        let hung_on = move |horizontal: bool, x: i32, z: i32| {
+            near.iter().filter(move |o| {
+                content.objects[o.def].layer == Layer::Wall
+                    && o.back_edges(content).contains(&(horizontal, x, z))
             })
         };
         // A wall drawn by this edit on the same line, right next to `e`.
@@ -86,9 +107,8 @@ impl World {
             }
             if e.kind != EdgeKind::Open
                 && let Some(dir) = diagonal
-                && (object_at(a.0, a.1).is_some()
-                    || self
-                        .objects
+                && (object_at(a.0, a.1)
+                    || near
                         .iter()
                         .any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
             {
@@ -112,7 +132,7 @@ impl World {
             }
             if e.kind != EdgeKind::Open
                 && diagonal.is_none()
-                && self.objects.iter().any(|o| {
+                && near.iter().any(|o| {
                     o.wall_edges(&self.content)
                         .chain(o.body_edges(&self.content))
                         .chain(o.overhang_edges(&self.content))
@@ -125,14 +145,14 @@ impl World {
             }
             if !matches!(target, Edge::Wall | Edge::Window)
                 && diagonal.is_none()
-                && self.hangs_on(e.axis == EdgeAxis::H, e.x, e.z)
+                && hung_on(e.axis == EdgeAxis::H, e.x, e.z).next().is_some()
             {
                 return Err(Error::new("something hangs on that wall: move it first"));
             }
             // Nor does the wall come down (or become a door or a window) behind what stands against it.
             if target != Edge::Wall
                 && diagonal.is_none()
-                && let Some(o) = self.objects.iter().find(|o| {
+                && let Some(o) = near.iter().find(|o| {
                     self.content.objects[o.def].against_wall
                         && o.back_edges(&self.content)
                             .contains(&(e.axis == EdgeAxis::H, e.x, e.z))
@@ -146,8 +166,7 @@ impl World {
             // Only curtains and the like hang over a window.
             if target == Edge::Window
                 && diagonal.is_none()
-                && let Some(o) = self
-                    .hung_on(e.axis == EdgeAxis::H, e.x, e.z)
+                && let Some(o) = hung_on(e.axis == EdgeAxis::H, e.x, e.z)
                     .find(|o| !self.content.objects[o.def].over_window)
             {
                 let name = self.content.objects[o.def].name.to_lowercase();
