@@ -23,7 +23,7 @@ export type FromVoiceWorker =
   | { type: 'audio'; id: number; samples: Float32Array; visemes: Float32Array; ms: number; timing: LineTiming }
   /**
    * A line that failed (`id`), or the engine couldn't load or the worker failed. `restart`: the
-   * engine broke while making a line (a WebAssembly trap); a new worker can take over.
+   * engine broke while making a line (a WebAssembly trap) or the graphics device was lost; a new worker can take over.
    */
   | { type: 'error'; id?: number; message: string; restart?: boolean }
   /** Bytes in GPU buffers now and at their peak (`measure`; 0 without it). */

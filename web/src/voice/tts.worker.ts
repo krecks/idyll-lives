@@ -209,5 +209,7 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   };
   // The sessions and the engine have their own copies.
   for (const f of files) forget(f.url);
+  // A lost graphics device (a driver reset, the GPU's memory gone) never comes back here: a new worker takes over.
+  void gpu?.lost.then((info) => scope.postMessage({ type: 'error', message: `graphics device lost: ${info.message}`, restart: true }));
   scope.postMessage({ type: 'ready', ms: performance.now() - start });
 }

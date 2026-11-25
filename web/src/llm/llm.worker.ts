@@ -130,5 +130,7 @@ async function load(base: string, model: ModelSpec, device: OrtDevice): Promise<
     positions: model.positions,
   };
   spec = model;
+  // A lost graphics device (a driver reset, the GPU's memory gone) never comes back here: a new worker takes over.
+  if (device === 'gpu') void (await ort.env.webgpu.device).lost.then((info) => scope.postMessage({ type: 'error', message: `graphics device lost: ${info.message}`, restart: true }));
   scope.postMessage({ type: 'ready', ms: performance.now() - start });
 }
