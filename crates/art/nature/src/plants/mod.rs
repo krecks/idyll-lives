@@ -245,7 +245,7 @@ pub fn family() -> Family {
             .habitat("bush")
             .paint(&[("blossom", "Flowers")]),
             shrub(
-                Model::new("rosebush", shrubs::rosebush, (0.771, 0.903, 0.722))
+                Model::new("rosebush", shrubs::rosebush, (0.755, 1.054, 0.733))
                     .key("model.garden.rosebush"),
             )
             .habitat("bush")
@@ -259,7 +259,7 @@ pub fn family() -> Family {
             .paint(&[("blossom", "Flowers")])
             .motions(json!({"uses": {"trim": "trim"}})),
             shrub(
-                Model::new("lavender", grasses::lavender, (0.607, 0.865, 0.63))
+                Model::new("lavender", grasses::lavender, (0.49, 0.56, 0.55))
                     .key("model.garden.lavender"),
             )
             .paint(&[("bloom", "Flowers")])
@@ -273,7 +273,7 @@ pub fn family() -> Family {
                     .key("model.garden.grass"),
             ),
             shrub(
-                Model::new("hosta", grasses::hosta, (0.621, 0.842, 0.675))
+                Model::new("hosta", grasses::hosta, (0.621, 0.395, 0.675))
                     .key("model.garden.hosta"),
             ),
             // G4: edibles
