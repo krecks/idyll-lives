@@ -26,13 +26,12 @@ function sample(tag: string, more: string[] = []): string {
 const seeds = (text: string) => (JSON.parse(text) as { seed: number }[]).map((w) => w.seed);
 
 test('sampling the same worlds twice makes the same files', () => {
-  const [first, second] = [sample('a'), sample('b')];
+  // (Twice: once by default, once at seed base 0, which is the default, CI's worlds: the first of a place seeded
+  // 104729 and its name's length. Two runs, not three: each is a big world, about 20 s.)
+  const [first, zero] = [sample('a'), sample('zero', ['--seed-base', '0'])];
   expect(first.length).toBeGreaterThan(0);
-  expect(second === first).toBe(true);
-  // (Seed base 0 is the default, CI's worlds: the first of a place seeded 104729 and its name's length.)
-  const zero = sample('zero', ['--seed-base', '0']);
-  expect(zero === first).toBe(true);
   expect(seeds(first)).toEqual([104729 + 'country'.length]);
+  expect(zero === first).toBe(true);
 }, 120_000);
 
 test('another seed base samples other worlds, the same each time', () => {
