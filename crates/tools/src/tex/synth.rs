@@ -891,6 +891,32 @@ mod tests {
         }
     }
 
+    /// A stone that crosses the wrap is one stone: drawn in the tile's coordinates its texture jumps there, and
+    /// summed over the column the wrap's step is larger than any column's inside (at its size: smaller, the
+    /// joints the cells' borders bunch near weigh more).
+    #[test]
+    fn a_flagstone_is_whole_across_the_wrap() {
+        const N: usize = 1024;
+        let albedo = generate("path_flagstone", N).albedo;
+        let at = |x: usize, y: usize, c: usize| albedo.px[(y * N + x) * 3 + c] as i32;
+        let col = |a: usize, b: usize| -> i32 {
+            (0..N * 3)
+                .map(|i| (at(a, i / 3, i % 3) - at(b, i / 3, i % 3)).abs())
+                .sum()
+        };
+        let row = |a: usize, b: usize| -> i32 {
+            (0..N * 3)
+                .map(|i| (at(i / 3, a, i % 3) - at(i / 3, b, i % 3)).abs())
+                .sum()
+        };
+        let (cw, ci) = (col(0, N - 1), (1..N).map(|x| col(x, x - 1)).max().unwrap());
+        let (rw, ri) = (row(0, N - 1), (1..N).map(|y| row(y, y - 1)).max().unwrap());
+        assert!(
+            cw <= ci && rw <= ri,
+            "wrap steps {cw}, {rw} > interior {ci}, {ri}"
+        );
+    }
+
     #[test]
     fn normal_of_flat_height_is_flat() {
         let mut h = HeightMap::new(8, 8);

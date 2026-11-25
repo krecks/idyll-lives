@@ -5,18 +5,20 @@ use std::f64::consts::{FRAC_1_SQRT_2, SQRT_2};
 
 /// The two nearest feature points of a periodic jittered grid (\`nx\` x \`ny\` cells over the tile), in cell
 /// units, and the nearest one's cell. \`f2 - f1\` is about twice the distance to the cell's border, so a
-/// cell shrunk by it is an angular chip (terrazzo, cork granules).
+/// cell shrunk by it is an angular chip (terrazzo, cork granules). \`off\` is the point's offset from the nearest
+/// feature point (cell units), the same on both sides of the tile's wrap: the cell's own coordinates.
 pub(super) struct Voronoi {
     pub f1: f64,
     pub f2: f64,
     pub cell: (i64, i64),
+    pub off: (f64, f64),
 }
 
 pub(super) fn voronoi(n: &Noise, u: f64, v: f64, nx: i64, ny: i64, salt: u32) -> Voronoi {
     let x = u.rem_euclid(1.0) * nx as f64;
     let y = v.rem_euclid(1.0) * ny as f64;
     let (cx, cy) = (x.floor() as i64, y.floor() as i64);
-    let (mut f1, mut f2, mut cell) = (f64::INFINITY, f64::INFINITY, (0, 0));
+    let (mut f1, mut f2, mut cell, mut off) = (f64::INFINITY, f64::INFINITY, (0, 0), (0.0, 0.0));
     for dy in -1..=1 {
         for dx in -1..=1 {
             let (i, j) = (cx + dx, cy + dy);
@@ -28,12 +30,13 @@ pub(super) fn voronoi(n: &Noise, u: f64, v: f64, nx: i64, ny: i64, salt: u32) ->
                 f2 = f1;
                 f1 = d;
                 cell = (wi, wj);
+                off = (x - px, y - py);
             } else if d < f2 {
                 f2 = d;
             }
         }
     }
-    Voronoi { f1, f2, cell }
+    Voronoi { f1, f2, cell, off }
 }
 
 /// One block of a herringbone laid at 45° to the tile's edges: its key (unique on the tile, for its
@@ -536,6 +539,8 @@ pub(super) fn encaustic(n: &Noise, size: usize) -> Surface {
             let d1 = ax + ay;
             let star_red = (cx + cy).rem_euclid(2) == 0;
             let (wx, wy) = (cx.rem_euclid(k), cy.rem_euclid(k));
+            // From the grid's corner nearest (m): the ground's pieces lie round it, across four cells.
+            let (gx, gy) = (lx - half.copysign(lx), ly - half.copysign(ly));
             // Which piece, its colour, and the distance to its edge (m).
             let (piece, col, edge) = if d1 >= half {
                 // The ground round the grid's corner: four small squares on point about a dot.
@@ -543,7 +548,6 @@ pub(super) fn encaustic(n: &Noise, size: usize) -> Surface {
                     (cx + (lx > 0.0) as i64).rem_euclid(k),
                     (cy + (ly > 0.0) as i64).rem_euclid(k),
                 );
-                let (gx, gy) = (lx - half.copysign(lx), ly - half.copysign(ly));
                 let to_dot = gx.abs().max(gy.abs()) - ENCAUSTIC_DOT;
                 if to_dot < 0.0 {
                     ((kx, ky * 8 + 6), slate, -to_dot)
@@ -584,7 +588,8 @@ pub(super) fn encaustic(n: &Noise, size: usize) -> Surface {
             let clay = fbm(&ng.layer(1), u, v, 200, 200, 2);
             let mottle = fbm(&ng.layer(2), u, v, 40, 40, 3);
             // Each piece fired a little differently: its own shade, sometimes a cloud across it.
-            let cloud = fbm_free(&ng.layer(4), lx * 30.0 + r(3) * 50.0, ly * 30.0, 3);
+            let (ox, oy) = if d1 >= half { (gx, gy) } else { (lx, ly) };
+            let cloud = fbm_free(&ng.layer(4), ox * 30.0 + r(3) * 50.0, oy * 30.0, 3);
             let mut c = mul(
                 col,
                 1.0 + (r(0) - 0.5) * 0.10 + 0.05 * clay + 0.08 * mottle + 0.12 * cloud,

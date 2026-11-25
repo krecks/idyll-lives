@@ -119,7 +119,11 @@ pub(super) fn flagstone(n: &Noise, size: usize) -> Surface {
             // The stone: its bedding (a direction of its own), riven ledges, clouds of colour.
             let ang = r(1) * std::f64::consts::PI;
             let (ca, sa) = (ang.cos(), ang.sin());
-            let (x, y) = (u * t + r(2) * 20.0, v * t + r(3) * 20.0);
+            // (In the stone's own metres: the tile's, from u and v, would jump at its wrap inside a stone.)
+            let (x, y) = (
+                vor.off.0 * cell + r(2) * 20.0,
+                vor.off.1 * cell + r(3) * 20.0,
+            );
             let (lx, ly) = (x * ca + y * sa, -x * sa + y * ca);
             let bed = fbm_free(&ns, lx * 3.0, ly * 18.0, 4);
             let riven = fbm_free(&ns.layer(1), lx * 6.0, ly * 6.0, 4);
