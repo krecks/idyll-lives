@@ -25,11 +25,50 @@ pub fn eased(profile: &[(f64, f64)], r: f64) -> Vec<(f64, f64)> {
             out.push(p);
             continue;
         }
-        let steps = (turn / 50.0).ceil() as usize;
-        out.extend(artkit::kit::fillet(&[a, p, c], r, steps)[1..=steps + 1].iter());
+        out.extend(arc(a, p, c, r, turn));
     }
     out.push(profile[profile.len() - 1]);
     out
+}
+
+/// The corner `p` between legs from `a` and to `c`, turning `turn` degrees, rounded on a circular arc of radius
+/// about `r` (less where a leg is short): points every 40° of it or less, so no two chords turn 60°.
+fn arc(a: (f64, f64), p: (f64, f64), c: (f64, f64), r: f64, turn: f64) -> Vec<(f64, f64)> {
+    use artkit::math::{atan2, cos, radians, sin, tan};
+    let (l1, l2) = ((a.0 - p.0).hypot(a.1 - p.1), (c.0 - p.0).hypot(c.1 - p.1));
+    let (u1, u2) = (
+        ((a.0 - p.0) / l1, (a.1 - p.1) / l1),
+        ((c.0 - p.0) / l2, (c.1 - p.1) / l2),
+    );
+    let half = radians(180.0 - turn) / 2.0; // half the angle between the legs
+    let t = (r / tan(half)).min(l1 / 2.0).min(l2 / 2.0);
+    let radius = t * tan(half);
+    let (bx, by) = (u1.0 + u2.0, u1.1 + u2.1);
+    let b = bx.hypot(by);
+    let far = t / cos(half);
+    let centre = (p.0 + bx / b * far, p.1 + by / b * far);
+    let (p1, p2) = (
+        (p.0 + u1.0 * t, p.1 + u1.1 * t),
+        (p.0 + u2.0 * t, p.1 + u2.1 * t),
+    );
+    let (f1, f2) = (
+        atan2(p1.1 - centre.1, p1.0 - centre.0),
+        atan2(p2.1 - centre.1, p2.0 - centre.0),
+    );
+    let mut sweep = f2 - f1;
+    while sweep > std::f64::consts::PI {
+        sweep -= std::f64::consts::TAU;
+    }
+    while sweep < -std::f64::consts::PI {
+        sweep += std::f64::consts::TAU;
+    }
+    let steps = (turn / 40.0).ceil() as usize;
+    (0..=steps)
+        .map(|i| {
+            let f = f1 + sweep * i as f64 / steps as f64;
+            (centre.0 + radius * cos(f), centre.1 + radius * sin(f))
+        })
+        .collect()
 }
 
 /// A closed profile (u, v) with each corner that turns 60° or more rounded to about `r`, as `eased` does, its first
@@ -158,7 +197,7 @@ mod eased_tests {
             ],
             0.003,
         );
-        assert!(rim.len() == 7 && rim.contains(&(0.06, 0.02)) && rim.contains(&(0.05, 0.0)));
+        assert!(rim.len() == 8 && rim.contains(&(0.06, 0.02)) && rim.contains(&(0.05, 0.0)));
         assert!(
             rim.iter()
                 .all(|&(u, v)| u <= 0.06 + 1e-6 && v <= 0.1 + 1e-6)

@@ -92,10 +92,11 @@ pub fn chair_windsor() -> Vec<Obj> {
                 0.0,
                 0.012 * (1.0 - r2) * (1.0 - 0.6 * pow(py::max(0.0, pz), 2.0)) - pommel,
             );
+            // (its round rim, a bead 4.5 cm through, stands 2.25 cm past this: the seat keeps its size)
             row.push((
-                px * 0.235,
+                px * 0.2125,
                 0.4475 - dish,
-                SZ + 0.002 + pz * 0.225 - 0.02 * (1.0 - px * px) * py::max(0.0, -pz),
+                SZ + 0.002 + pz * 0.2025 - 0.02 * (1.0 - px * px) * py::max(0.0, -pz),
             ));
         }
         grid.push(row);

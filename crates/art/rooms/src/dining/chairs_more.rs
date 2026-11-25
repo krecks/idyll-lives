@@ -1,7 +1,9 @@
 //! K8 continued: the upholstered, bentwood, folding and carver chairs and the dining bench.
 
 use super::chairs::UP;
-use super::common::{apron, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, turned};
+use super::common::{
+    apron, bowed_pad, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, turned,
+};
 use super::{F, M, SZ};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -356,21 +358,16 @@ pub fn chair_folding() -> Vec<Obj> {
         round = 0.012,
         puff = 0.005
     );
-    let tilt = radians(25.0);
-    fsweep!(
-        F,
+    // the back: a padded board, its ends rounded, bowed round the sitter and leant back 25°
+    bowed_pad(
         "back",
-        &[
-            (-0.205, 0.77, SZ - 0.165),
-            (0.0, 0.77, SZ - 0.18),
-            (0.205, 0.77, SZ - 0.165)
-        ],
-        0.0,
+        0.41,
+        0.2,
+        0.022,
+        (0.0, 0.77, SZ - 0.165),
+        0.015,
+        25.0,
         M.seat_teal,
-        profile = rounded_rect(0.2, 0.022, 0.01, 2),
-        up = (0.0, sin(tilt), cos(tilt)),
-        resolution = 5,
-        angle = 60
     );
     finish("chairFolding")
 }

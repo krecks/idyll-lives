@@ -164,23 +164,28 @@ pub fn flowers<X: Coord>(
     leaves: bool,
     segments: usize,
 ) {
+    // its belly scaled to its height (drawn for 18 cm: a shorter vase's belly stays under its neck), its lip eased
+    let k = h / 0.18;
     turned(
         &format!("{prefix}vase"),
-        &[
-            (0.0, 0.0),
-            (0.032, 0.0),
-            (0.036, 0.006),
-            (0.034, 0.012),
-            (0.05, 0.05),
-            (0.046, 0.11),
-            (0.03, h - 0.035),
-            (0.027, h - 0.012),
-            (0.033, h - 0.002),
-            (0.031, h),
-            (0.024, h),
-            (0.022, h - 0.02),
-            (0.0, h - 0.03),
-        ],
+        &crate::common::eased(
+            &[
+                (0.0, 0.0),
+                (0.032, 0.0),
+                (0.036, 0.006),
+                (0.034, 0.012),
+                (0.05, 0.05 * k),
+                (0.046, 0.11 * k),
+                (0.03, h - 0.035),
+                (0.027, h - 0.012),
+                (0.033, h - 0.002),
+                (0.031, h),
+                (0.024, h),
+                (0.022, h - 0.02),
+                (0.0, h - 0.03),
+            ],
+            0.0015,
+        ),
         (x, y, z),
         M.vase,
         segments,
@@ -466,7 +471,7 @@ fn ladder_chair(prefix: &str, frame: Mat, seat: Mat, pad: Mat, metal: bool) {
     let y = back_h - 0.07;
     crest(
         &format!("{prefix}rail0"),
-        if metal { 0.19 } else { 0.185 },
+        0.18, // its ends in the posts (a tube's middle: the rail's corners stay inside it)
         y,
         post_z(y) - if metal { 0.004 } else { 0.0 },
         0.1,

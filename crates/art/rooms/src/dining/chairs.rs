@@ -1,11 +1,13 @@
 //! K8: chairs and stools. The stools' seats are a part of their own, swivelling on a hub; the chairs are still.
 
-use super::common::{apron, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, turned};
+use super::common::{
+    apron, bowed_pad, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, turned,
+};
 use super::{F, M, SZ};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
-use artkit::math::{cos, cosd, pow, radians, sin, sind};
+use artkit::math::{cosd, pow, sind};
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -211,21 +213,16 @@ pub(super) fn stool(
                     false,
                 );
             }
-            let tilt = radians(8.0);
-            fsweep!(
-                F,
+            // a padded board, its ends rounded, bowed round the sitter and leant back 8°
+            bowed_pad(
                 "back",
-                &[
-                    (-0.18, seat_h + 0.24, z - 0.152),
-                    (0.0, seat_h + 0.24, z - 0.178),
-                    (0.18, seat_h + 0.24, z - 0.152)
-                ],
-                0.0,
+                0.36,
+                0.14,
+                0.03,
+                (0.0, seat_h + 0.24, z - 0.152),
+                0.026,
+                8.0,
                 seat,
-                profile = rounded_rect(0.14, 0.03, 0.013, 2),
-                up = (0.0, sin(tilt), cos(tilt)),
-                resolution = 5,
-                angle = 60
             );
         }
     });
@@ -235,10 +232,11 @@ pub(super) fn stool(
     meshes()
 }
 
-/// Bar stool (catalog): an oak stool with a sage seat, top at 0.74 (sitters at 0.72), centred.
+/// Bar stool (catalog): an oak stool with a sage seat, top at 0.715 (sitters at 0.695), centred.
 pub fn bar_stool() -> Vec<Obj> {
+    // its top at 0.715: a counter stool's, a hand under the 0.95 worktops it stands at (EN 1116; sitters at 0.695)
     stool(
-        0.74,
+        0.715,
         0.0,
         M.frame_oak,
         M.seat_sage,
