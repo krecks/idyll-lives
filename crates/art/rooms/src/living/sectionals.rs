@@ -1,13 +1,13 @@
 //! L1 continued: the designer sofa, the three-seater, the sectional's modules and its chaise.
 
-use super::common::{Cushion, cushion, panel, plain, seat, settled, taper_leg};
+use super::common::{Cushion, cushion, panel, plain, seat, settled, swept, taper_leg};
 use super::sofas::run;
 use super::{F, M};
-use artkit::forms::rounded_rect;
+use artkit::forms::{catmull, rounded_rect};
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::P3;
+use artkit::math::{P3, V3};
 use artkit::parts::{join, new_parts};
 use artkit::scene::Obj;
 use artkit::soft::SoftBox;
@@ -85,21 +85,25 @@ pub fn sofa_design() -> Vec<Obj> {
                 plain(0.04),
             );
             // the arm cap: a brass strip rounded over the arm, its front end rolled down
-            fsweep!(
-                F,
-                format!("arm_cap{s}"),
-                &[
-                    (sf * 0.88, 0.555, z - 0.33),
-                    (sf * 0.88, 0.556, z + 0.3),
-                    (sf * 0.88, 0.55, z + 0.36),
-                    (sf * 0.88, 0.53, z + 0.375)
-                ],
-                0.0,
+            // straight to the roll, curved over it (one span 60 cm long would overshoot the roll and fold it)
+            let given = [
+                (sf * 0.88, 0.556, z + 0.24),
+                (sf * 0.88, 0.556, z + 0.3),
+                (sf * 0.88, 0.55, z + 0.36),
+                (sf * 0.88, 0.53, z + 0.375),
+            ]
+            .map(|(x, y, z)| V3::from(F.at(x, y, z)));
+            let mut pts = vec![V3::from(F.at(sf * 0.88, 0.555, z - 0.33))];
+            pts.extend(catmull(&given, 2, false).0);
+            swept(
+                &format!("arm_cap{s}"),
+                &pts,
+                &rounded_rect(0.11, 0.022, 0.01, 2),
+                &vec![1.0; pts.len()],
+                V3::from((1, 0, 0)),
+                60.0,
+                0.003,
                 M.brass,
-                profile = rounded_rect(0.11, 0.022, 0.01, 2),
-                up = (1, 0, 0),
-                resolution = 2,
-                angle = 60
             );
             for lz in [z - 0.3, z + 0.3] {
                 let dz = if lz > z { 0.035 } else { -0.035 };

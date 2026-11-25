@@ -387,6 +387,36 @@ pub(super) fn prism(
     mesh(name, &verts, &prism_faces(outline.len()), material)
 }
 
+/// `prism`, the edges round its two end faces chamfered `c` (the outline set in at each end, all of it `c` in): a
+/// rail's arrises eased.
+pub(super) fn eased_bar(
+    name: &str,
+    outline: &[(f64, f64)],
+    (a0, a1): (f64, f64),
+    c: f64,
+    material: Mat,
+) -> Obj {
+    let small = crate::common::inset(outline, c);
+    let k = outline.len() as u32;
+    let mut verts: Vec<(f64, f64, f64)> = Vec::new();
+    for (a, o) in [
+        (a0, &small),
+        (a0 + c, &outline.to_vec()),
+        (a1 - c, &outline.to_vec()),
+        (a1, &small),
+    ] {
+        verts.extend(o.iter().map(|&(p, q)| (a, q, p)));
+    }
+    let mut faces = vec![(0..k).collect::<Vec<u32>>(), (3 * k..4 * k).rev().collect()];
+    for r in 0..3 {
+        for i in 0..k {
+            let (j, at) = ((i + 1) % k, r * k);
+            faces.push(vec![at + i, at + j, at + k + j, at + k + i]);
+        }
+    }
+    mesh(name, &verts, &faces, material)
+}
+
 /// A quarter-round board from y0 to y1: its corner on (cx, cz), round from +x (along the wall) to the front.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn quarter(

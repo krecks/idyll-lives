@@ -305,7 +305,9 @@ pub fn coffee_table_glass() -> Vec<Obj> {
                 0.39,
                 (x, 0.2, z),
                 M.chrome,
-                verts = 12
+                verts = 12,
+                bevel = 0.003,
+                bevel_segments = 1
             );
             fcyl!(
                 F,
@@ -344,6 +346,7 @@ pub fn coffee_table_glass() -> Vec<Obj> {
             (0.26, 0.04),
             (0.29, 0.024),
             (0.3, 0.026),
+            (0.3015, 0.0255), // the lip rolled in
             (0.304, 0.02),
         ],
         M.vase,

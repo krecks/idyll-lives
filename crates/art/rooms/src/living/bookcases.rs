@@ -3,7 +3,7 @@
 
 use super::common::disc;
 use super::shelves::{
-    WALL, book_row, bookcase, frame_photo, plant, prism, quarter, tips_out, vase,
+    WALL, book_row, bookcase, eased_bar, frame_photo, plant, quarter, tips_out, vase,
 };
 use super::{F, M};
 use artkit::forms::rounded_rect;
@@ -392,7 +392,7 @@ pub fn ladder_shelf() -> Vec<Obj> {
         (ladder_back(LADDER_H), LADDER_H),
     ];
     for x in [-0.3, 0.3] {
-        prism("rail", &outline, x - 0.0175, x + 0.0175, M.oak, true);
+        eased_bar("rail", &outline, (x - 0.0175, x + 0.0175), 0.004, M.oak);
     }
     let mut tops = Vec::new();
     for (i, y) in [0.36, 0.76, 1.14, 1.5].into_iter().enumerate() {
