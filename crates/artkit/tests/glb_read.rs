@@ -185,6 +185,51 @@ fn a_file_cut_short_or_not_a_glb_is_an_error_not_a_panic() {
     assert!(glb::read(&odd).is_err());
 }
 
+/// A .glb of one primitive, its POSITION accessor 0 and its indices 1, and a BIN of 4 bytes.
+fn with_accessors(accessors: [&str; 2]) -> Vec<u8> {
+    let mut json = format!(
+        r#"{{"asset":{{"version":"2.0"}},"meshes":[{{"primitives":[{{"attributes":{{"POSITION":0}},"indices":1}}]}}],"accessors":[{}],"bufferViews":[{{"buffer":0,"byteLength":4}}],"buffers":[{{"byteLength":4}}]}}"#,
+        accessors.join(",")
+    );
+    while json.len() % 4 != 0 {
+        json.push(' ');
+    }
+    let mut out = b"glTF".to_vec();
+    for n in [2, 12 + 8 + json.len() + 8 + 4, json.len()] {
+        out.extend((n as u32).to_le_bytes());
+    }
+    out.extend(b"JSON");
+    out.extend(json.as_bytes());
+    out.extend(4u32.to_le_bytes());
+    out.extend(b"BIN\0");
+    out.extend([0; 4]);
+    out
+}
+
+#[test]
+fn a_count_past_the_buffer_is_an_error_not_an_abort() {
+    let positions = |count: u64, view: &str| {
+        format!(r#"{{{view}"componentType":5126,"count":{count},"type":"VEC3"}}"#)
+    };
+    let indices = |count: u64, view: &str| {
+        format!(r#"{{{view}"componentType":5125,"count":{count},"type":"SCALAR"}}"#)
+    };
+    let view = r#""bufferView":0,"#;
+    assert!(glb::read(&with_accessors([&positions(0, view), &indices(0, view)])).is_ok());
+    let huge = 100_000_000_000_000;
+    for v in [view, ""] {
+        let (p, i) = (positions(huge, v), indices(huge, v));
+        assert!(
+            glb::read(&with_accessors([&p, &indices(0, view)])).is_err(),
+            "{p}"
+        );
+        assert!(
+            glb::read(&with_accessors([&positions(0, view), &i])).is_err(),
+            "{i}"
+        );
+    }
+}
+
 /// Every .glb under web/public/assets/models.
 fn committed() -> Vec<std::path::PathBuf> {
     let root =

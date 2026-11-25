@@ -84,11 +84,14 @@ struct Layout {
     /// numbers an element
     pub(super) per: usize,
     pub(super) count: usize,
-    /// (first byte, bytes from one element to the next); none without a buffer view (all zeros)
+    /// (first byte, bytes from one element to the next), inside the buffer; none without a buffer view (all zeros)
     pub(super) place: Option<(usize, usize)>,
 }
 
-fn layout(j: &Json, index: usize) -> Result<Layout, String> {
+/// The most bytes an accessor's elements may take: a count past it is refused before anything is made of it.
+const MOST: usize = 1 << 28;
+
+fn layout(j: &Json, bin: &[u8], index: usize) -> Result<Layout, String> {
     let acc = list(j, "accessors")
         .get(index)
         .ok_or_else(|| format!("no accessor {index}"))?;
@@ -111,6 +114,9 @@ fn layout(j: &Json, index: usize) -> Result<Layout, String> {
         5125 | 5126 => 4,
         _ => return Err(format!("accessor {index}: component type {kind}")),
     };
+    if count.checked_mul(per * size).is_none_or(|b| b > MOST) {
+        return Err(format!("accessor {index}: {count} elements"));
+    }
     let Some(view_at) = int(acc.get("bufferView")) else {
         return Ok(Layout {
             kind,
@@ -126,8 +132,20 @@ fn layout(j: &Json, index: usize) -> Result<Layout, String> {
     if int(view.get("buffer")).unwrap_or(0) != 0 {
         return Err("a second buffer: only the .glb's own is read".into());
     }
-    let start = int(view.get("byteOffset")).unwrap_or(0) + int(acc.get("byteOffset")).unwrap_or(0);
+    let start = int(view.get("byteOffset"))
+        .unwrap_or(0)
+        .saturating_add(int(acc.get("byteOffset")).unwrap_or(0));
     let stride = int(view.get("byteStride")).unwrap_or(size * per);
+    let end = match count.checked_sub(1) {
+        Some(last) => last
+            .checked_mul(stride)
+            .and_then(|x| x.checked_add(start))
+            .and_then(|x| x.checked_add(per * size)),
+        None => Some(0),
+    };
+    if end.is_none_or(|end| end > bin.len()) {
+        return Err(format!("accessor {index} runs past the buffer"));
+    }
     Ok(Layout {
         kind,
         size,
@@ -145,7 +163,7 @@ pub(super) fn accessor(j: &Json, bin: &[u8], index: usize) -> Result<(Vec<f32>, 
         per,
         count,
         place,
-    } = layout(j, index)?;
+    } = layout(j, bin, index)?;
     let normalized = list(j, "accessors")[index].get("normalized") == Some(&Json::Bool(true));
     let Some((start, stride)) = place else {
         return Ok((vec![0.0; count * per], per));
@@ -154,9 +172,7 @@ pub(super) fn accessor(j: &Json, bin: &[u8], index: usize) -> Result<(Vec<f32>, 
     for e in 0..count {
         for k in 0..per {
             let at = start + e * stride + k * size;
-            let b = bin
-                .get(at..at + size)
-                .ok_or_else(|| format!("accessor {index} runs past the buffer"))?;
+            let b = &bin[at..at + size];
             let v = match kind {
                 5120 => {
                     let x = b[0] as i8 as f32;
@@ -195,26 +211,23 @@ fn indices(j: &Json, bin: &[u8], index: usize) -> Result<Vec<u32>, String> {
         per,
         count,
         place,
-    } = layout(j, index)?;
+    } = layout(j, bin, index)?;
     if per != 1 || !matches!(kind, 5121 | 5123 | 5125) {
         return Err(format!("accessor {index}: indices of type {kind}"));
     }
     let Some((start, stride)) = place else {
         return Ok(vec![0; count]);
     };
-    (0..count)
+    Ok((0..count)
         .map(|e| {
-            let at = start + e * stride;
-            let b = bin
-                .get(at..at + size)
-                .ok_or_else(|| format!("accessor {index} runs past the buffer"))?;
-            Ok(match size {
+            let b = &bin[start + e * stride..];
+            match size {
                 1 => b[0] as u32,
                 2 => u16::from_le_bytes([b[0], b[1]]) as u32,
                 _ => u32::from_le_bytes([b[0], b[1], b[2], b[3]]),
-            })
+            }
         })
-        .collect()
+        .collect())
 }
 
 fn grouped<const N: usize>(
