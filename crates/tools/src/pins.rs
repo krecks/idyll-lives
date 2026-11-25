@@ -3,8 +3,8 @@
 //! `tools/pins/pins.json` names a file and, optionally, a part of it:
 //!
 //! - `region`: the lines between `pin:<region> begin` and `pin:<region> end` comments (exclusive);
-//! - `const`: an `export const <NAME>` statement, from its line to where its brackets close (those in comments and
-//!   strings aside).
+//! - `const`: an `export const <NAME>` statement, from its line to where its brackets close (those in comments,
+//!   strings and regex literals aside).
 //!
 //! ```text
 //! cargo pins                      check every pin (exit 1 on a difference)
@@ -47,6 +47,23 @@ fn word(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '$'
 }
 
+/// Whether a `/` after `before` starts a regex literal rather than dividing: at the start, after an operator or
+/// an opening bracket, or after `return`; after `++`/`--` (a value) it divides.
+fn regex_may_start(before: &str) -> bool {
+    let before = before.trim_end();
+    if before.ends_with("++") || before.ends_with("--") {
+        return false;
+    }
+    before.is_empty()
+        || before.ends_with([
+            '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '<', '>', '+', '-', '*',
+            '%', '~', '^',
+        ])
+        || before
+            .strip_suffix("return")
+            .is_some_and(|b| !b.chars().next_back().is_some_and(word))
+}
+
 /// The pinned text of a file's content, or what is wrong with the pin.
 pub fn pinned_text(
     content: &str,
@@ -87,9 +104,11 @@ pub fn pinned_text(
         .ok_or_else(|| format!("no `export const {name}`"))?;
     let mut depth = 0i32;
     let mut opened = false;
-    // Brackets and semicolons in comments and strings don't count: `inside` is `/` in a `//`
-    // comment, `*` in a `/* */` one (its text from `from` on), or the quote of a string.
-    let (mut inside, mut from, mut escaped) = (None, 0, false);
+    // Brackets and semicolons in comments, strings and regex literals don't count: `inside` is `/` in a `//`
+    // comment, `*` in a `/* */` one (its text from `from` on), `r` in a regex (`class` in its `[...]`), or the
+    // quote of a string. `holes` keeps the depth each open template `${` was met at.
+    let (mut inside, mut from, mut escaped, mut class) = (None, 0, false, false);
+    let mut holes: Vec<i32> = Vec::new();
     for (i, c) in content[start..].char_indices() {
         let at = start + i;
         let next = at + c.len_utf8();
@@ -101,6 +120,16 @@ pub fn pinned_text(
             Some('/' | '*') => {}
             Some(_) if escaped => escaped = false,
             Some(_) if c == '\\' => escaped = true,
+            Some('r') => match c {
+                '[' => class = true,
+                ']' => class = false,
+                '/' if !class => inside = None,
+                _ => {}
+            },
+            Some('`') if c == '$' && content[next..].starts_with('{') => {
+                holes.push(depth);
+                inside = None;
+            }
             Some(quote) if c == quote => inside = None,
             Some(_) => {}
             None => match c {
@@ -108,12 +137,24 @@ pub fn pinned_text(
                     inside = content[next..].chars().next();
                     from = next + 1;
                 }
+                '/' if regex_may_start(&content[start..at]) => inside = Some('r'),
                 '\'' | '"' | '`' => inside = Some(c),
                 '(' | '{' | '[' => {
                     depth += 1;
                     opened = true;
                 }
-                ')' | '}' | ']' => depth -= 1,
+                ')' | '}' | ']' => {
+                    depth -= 1;
+                    if depth < 0 {
+                        return Err(format!(
+                            "`export const {name}` closes a bracket it never opened"
+                        ));
+                    }
+                    if c == '}' && holes.last() == Some(&depth) {
+                        holes.pop();
+                        inside = Some('`');
+                    }
+                }
                 ';' if depth == 0 => return Ok(content[start..next].to_string()),
                 _ => {}
             },
@@ -308,6 +349,34 @@ mod tests {
         assert_eq!(
             pinned_text(after, None, Some("D")).unwrap(),
             "export const D = f(1) // done"
+        );
+    }
+
+    #[test]
+    fn regexes_and_nested_templates_hold_no_brackets() {
+        let whole = |text: &str, name: &str| {
+            assert_eq!(pinned_text(text, None, Some(name)).unwrap(), text, "{name}");
+        };
+        whole(r#"export const Q = s.replace(/['"]/g, '');"#, "Q");
+        whole(r"export const S = [/\/*/, /[/]/];", "S");
+        whole(
+            "export const R = () => {\n  return /[({]/.test(x);\n};",
+            "R",
+        );
+        whole(r"export const T = (x) => /\)/.test(x);", "T");
+        // A `/` after a value divides.
+        whole("export const V = f(a) / 2 / (b[0] / 3);", "V");
+        // Each `/` divides; read as a regex it would swallow `g(2))` and leave `f(` open.
+        for v in ["i++", "j--", "f(a)", "b[0]", "x", "7"] {
+            whole(&format!("export const W = f({v} / g(2)) / 4;"), "W");
+        }
+        whole("export const X = (n) => /[(]/.test(n);", "X");
+        whole("export const N = `a ${x ? `(${y})` : '}'} b`;", "N");
+        whole("export const M = `${{ a: 1 }.a}`;", "M");
+        assert!(
+            pinned_text("export const U = 1\n}\nnext;", None, Some("U"))
+                .unwrap_err()
+                .contains("never opened")
         );
     }
 
