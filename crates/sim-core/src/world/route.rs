@@ -556,19 +556,26 @@ pub(crate) fn progress(
                     .interactions
                     .get(interaction)
             {
-                match crate::staff::hold(
+                let hold = crate::staff::hold(
                     ctx,
                     sim.being_served,
                     &mut sim.serve_wait,
                     object,
                     inter,
                     ticks,
-                ) {
-                    // Paid as they're served (not on arrival: someone called away while they
-                    // wait has paid nothing).
-                    Some(crate::staff::Hold::Serve) if *elapsed == 0.0 => {
-                        sim.pending_spend += ctx.cost_of(object, inter).max(0);
+                );
+                // Paid once, as they're served, or as the use goes on with nobody serving after
+                // all (not on arrival: someone called away while they wait has paid nothing); if
+                // the money's gone since, not at all.
+                if sim.owes > 0 && matches!(hold, None | Some(crate::staff::Hold::Serve)) {
+                    let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
+                    if !affordable(sim.owes, funds) {
+                        sim.owes = 0;
+                        return end_activity(sim, content, objects);
                     }
+                    sim.pending_spend += std::mem::take(&mut sim.owes);
+                }
+                match hold {
                     None | Some(crate::staff::Hold::Serve) => {}
                     Some(crate::staff::Hold::Wait) => return,
                     Some(crate::staff::Hold::GiveUp) => return end_activity(sim, content, objects),

@@ -727,6 +727,7 @@ pub(crate) fn start_task(
         sim.partner_wait = 0;
     }
     sim.serve_wait = 0;
+    sim.owes = 0;
     sim.pose = Pose::Stand;
     sim.current = Some(Activity {
         task,

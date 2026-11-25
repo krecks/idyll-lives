@@ -193,6 +193,9 @@ pub struct Sim {
     pub(crate) being_served: bool,
     /// Ticks they've waited at a post for its server (`staff::hold`). Not saved.
     pub(crate) serve_wait: u32,
+    /// What the use they're at a post for costs, still unpaid: paid once as they're served, or
+    /// as it goes on with nobody serving after all (`world::route`). Not saved.
+    pub(crate) owes: i64,
     /// The bike (or e-scooter) they're on their way to for work or school, and the one they're
     /// on (`ride.rs`): an object at home, its slot theirs until they're back. Not saved (after a
     /// load it's at its place and they walk).

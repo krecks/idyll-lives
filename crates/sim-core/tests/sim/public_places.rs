@@ -1455,6 +1455,142 @@ fn a_customer_called_away_while_waiting_pays_nothing() {
     assert_eq!(w.households[0].funds, funds - 5, "only the one served paid");
 }
 
+/// The market's stall, `sims` sent to buy its fruit.
+fn at_the_stall(w: &mut World, market: u32, sims: &[u32]) -> u32 {
+    w.autonomy = false;
+    let stall = w
+        .objects
+        .iter()
+        .find(|o| {
+            w.content.objects[o.def].id == "marketStall" && w.plot_at(o.x, o.z) == Some(market)
+        })
+        .unwrap()
+        .id;
+    let fruit = interaction(w, stall, "fruit");
+    for &sim in sims {
+        w.apply(Command::Use {
+            sim,
+            object: stall,
+            interaction: fruit,
+        })
+        .unwrap();
+    }
+    stall
+}
+
+/// Resident `s`'s minutes at `stall`'s use, if that's what they're at.
+fn at_stall(w: &World, s: usize, stall: u32) -> Option<f32> {
+    match w.sims[s].current().map(|a| (a.task.kind, &a.phase)) {
+        Some((TaskKind::Use { object, .. }, Phase::Using { elapsed })) if object == stall => {
+            Some(*elapsed)
+        }
+        _ => None,
+    }
+}
+
+/// Ticks until resident `s` is at `stall`'s use (10 minutes at most).
+fn until_at_stall(w: &mut World, s: usize, stall: u32) {
+    for _ in 0..10 * TICKS_PER_MINUTE {
+        if at_stall(w, s, stall).is_some() {
+            return;
+        }
+        w.tick_once();
+    }
+}
+
+/// Ada waits at the stall as something is put where its stallholder stands: with nobody to serve
+/// her she helps herself, and still pays for the fruit.
+#[test]
+fn a_customer_whose_post_loses_its_server_still_pays() {
+    let (mut w, market) = town_beside("market");
+    let stall = at_the_stall(&mut w, market, &[0]);
+    let funds = w.households[0].funds;
+    until_at_stall(&mut w, 0, stall);
+    assert_eq!(at_stall(&w, 0, stall), Some(0.0), "Ada waits at the stall");
+    let at = sim_core::staff::place(&w.content, &w.objects[stall as usize])
+        .unwrap()
+        .0;
+    let (x, z) = (at[0].floor() as i32, at[1].floor() as i32);
+    assert!(
+        (0..4).any(|rot| w.place_object("plant", x, z, rot).is_ok()),
+        "a plant where the stallholder stands"
+    );
+    minutes(&mut w, 1);
+    assert!(
+        w.staff.server_of(stall).is_none(),
+        "nobody serves there now"
+    );
+    assert!(
+        at_stall(&w, 0, stall).is_some_and(|e| e > 0.0),
+        "Ada helps herself"
+    );
+    assert_eq!(w.households[0].funds, funds - 5, "and pays");
+}
+
+/// Ada gets to the stall with the money, but it's gone by the time she's served: she goes
+/// without, and the household doesn't go below nothing.
+#[test]
+fn a_customer_who_cannot_pay_when_served_goes_without() {
+    let (mut w, market) = town_beside("market");
+    let stall = at_the_stall(&mut w, market, &[0]);
+    until_at_stall(&mut w, 0, stall);
+    assert_eq!(at_stall(&w, 0, stall), Some(0.0), "Ada waits at the stall");
+    w.households[0].funds = 2;
+    minutes(&mut w, 10);
+    assert_eq!(w.households[0].funds, 2, "nothing paid");
+    assert!(at_stall(&w, 0, stall).is_none(), "nor bought");
+}
+
+/// Fruit from the stall made a game for two: Ada, served, waits for Bo to get to his place
+/// (paid once for all that time), then Bo is served: five each.
+#[test]
+fn a_served_use_is_paid_once() {
+    let (mut w, market) = town_beside_edited("market", 2, |c| {
+        let stall = c["objects"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|o| o["id"] == "marketStall")
+            .unwrap();
+        for i in stall["interactions"].as_array_mut().unwrap() {
+            if i["id"] == "fruit" {
+                i["partner"] = json!(true);
+                i.as_object_mut().unwrap().remove("eat");
+            }
+        }
+    });
+    // (Both at the market first, Ada beside the stall, Bo at the gate, to be found to play.)
+    w.autonomy = false;
+    let stall = object(&w, "marketStall");
+    let front = w.objects[stall as usize].front_tile(&w.content);
+    let gate = w.plots[market as usize].home_point();
+    for (sim, [x, z]) in [(0, [front.0 as f32 + 0.5, front.1 as f32 + 0.5]), (1, gate)] {
+        w.apply(Command::MoveTo { sim, x, z }).unwrap();
+    }
+    for _ in 0..30 * TICKS_PER_MINUTE {
+        if (0..2).all(|s| w.sims[s].current().is_none() && w.sims[s].queue().next().is_none()) {
+            break;
+        }
+        w.tick_once();
+    }
+    let stall = at_the_stall(&mut w, market, &[0]);
+    let k = w.staff.server_of(stall).unwrap();
+    let funds = w.households[0].funds;
+    let mut waited = 0;
+    for _ in 0..40 * TICKS_PER_MINUTE {
+        w.tick_once();
+        if w.staff.servers[k].serving == Some(0) && at_stall(&w, 0, stall) == Some(0.0) {
+            waited += 1;
+        }
+    }
+    assert!(
+        waited > 1,
+        "Ada was served and waited for Bo ({waited} ticks)"
+    );
+    let paid = funds - w.households[0].funds;
+    assert_eq!(paid, 10, "five each, once");
+}
+
 /// Last orders: Ada sets off for the ice cream cart a minute before it closes (20:00) and gets there
 /// after; the seller waits for her and serves her, then goes home.
 #[test]
