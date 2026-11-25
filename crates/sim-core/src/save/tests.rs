@@ -291,9 +291,7 @@ pub(super) fn damaged_saves_are_refused_on_loading() {
 /// lost without a word, or the next one added would have no id to take.
 #[test]
 pub(super) fn bad_item_ids_are_refused() {
-    let item = |id: u32| {
-        serde_json::json!({"id": id, "def": "x", "at": "floor", "x": 1, "z": 1, "quality": 1.0, "madeAt": 0, "household": 0})
-    };
+    let item = |id: u32| serde_json::json!({"id": id, "def": "x", "at": "floor", "x": 1, "z": 1, "quality": 1.0, "madeAt": 0, "household": 0});
     // (An item the content doesn't know is dropped: give the content one.)
     let content = CONTENT.replacen(
         r#""needs":"#,

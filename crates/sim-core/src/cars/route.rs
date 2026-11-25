@@ -852,7 +852,6 @@ impl Route {
         }
         legs.timed(!home, home)
     }
-
 }
 
 /// A merge off a ramp onto a motorway's carriageway (`Route::merges`) is claimed from this far up
