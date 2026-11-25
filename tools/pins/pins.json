@@ -121,9 +121,9 @@
     {
       "name": "living-town-lens",
       "file": "web/src/render/shared/lens.ts",
-      "sha256": "fabc07f980ee07eba00d74a487656cba2939765420b756aece40b55b12575044",
-      "by": "docs/cleanup",
-      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
+      "sha256": "ff203630bcdc724712a9b3ed53e1bc0d8b5340704680031349b1e3afec1d86bf",
+      "by": "audit/web-src",
+      "reason": "same maths: townBlend's inline clamped smoothstep is now game/noise smoothstep (415118fcf)",
       "region": "living-town-lens"
     },
     {
