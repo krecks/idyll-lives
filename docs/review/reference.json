@@ -11340,11 +11340,15 @@
           ]
         },
         "blossom": {
-          "colour": "pink/white",
+          "colour": "pink/white with a yellow centre",
           "hue": [
             [
               320,
               355
+            ],
+            [
+              40,
+              65
             ]
           ],
           "months": [
