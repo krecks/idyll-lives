@@ -24,6 +24,9 @@ Run the checker after every change (see [Checking a pack](#checking-a-pack)).
   in `dist/content/` changes nothing until you rebuild, or delete `dist/bundle.json` (the game
   then fetches the files one by one). The dev server has no bundle, and an art pack loaded with
   `?pack=` is fetched.
+- **Taking a pack out:** in a save made with it, a resident's traits and perks the content no longer has
+  are dropped as it loads, and so are the later of two traits that now conflict and
+  the perks past the budget; a gender it no longer has becomes the first one.
 
 ## Merge rules
 
