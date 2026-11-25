@@ -8,7 +8,7 @@
  */
 
 import { Tokenizer } from '@huggingface/tokenizers';
-import { fetchOnce, forget, openCache, openRuntimeCache, prune } from '../ml/assets';
+import { fetchFiles, forget, type ModelFile } from '../ml/assets';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions, type OrtDevice } from '../ml/ort';
 import { formatChat, type ChatMessage } from './chat';
 import { forCpu } from './cpuGraph';
@@ -78,32 +78,11 @@ async function load(base: string, model: ModelSpec, device: OrtDevice): Promise<
   if (device === 'gpu' && !(await hasWebGpu())) throw new Error('the language model needs a graphics card that supports WebGPU here');
   const dir = new URL(model.url, new URL(base, location.href)).href;
   const { graph, data } = model;
-  // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt runtime would
-  // otherwise come back stale from the cache; those are fetched fresh there.
-  const files: { url: string; size: number; sha256?: string; built?: boolean; runtime?: boolean }[] = [
+  const files: ModelFile[] = [
     { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true, runtime: true },
     ...[model.tokenizer, model.tokenizerConfig, graph, ...(data ? [data] : [])].map(([name, size, sha256]) => ({ url: dir + name, size, sha256 })),
   ];
-  const total = files.reduce((n, f) => n + f.size, 0);
-  const done = files.map(() => 0);
-  const report = () => scope.postMessage({ type: 'progress', loaded: done.reduce((a, b) => a + b, 0), total });
-  // The runtime in the cache both workers share (`openRuntimeCache`), the rest in this one's.
-  const [cache, runtime] = await Promise.all([openCache(CACHE_PREFIX, CACHE), openRuntimeCache()]);
-  const bytes = await Promise.all(
-    files.map((f, i) =>
-      fetchOnce(
-        f.built && import.meta.env.DEV ? null : f.runtime ? runtime : cache,
-        f.url,
-        (n) => {
-          done[i] = Math.min(n, f.size);
-          report();
-        },
-        f.sha256,
-      ),
-    ),
-  );
-  void prune(cache, files.filter((f) => !f.runtime).map((f) => f.url));
-  void prune(runtime, [ORT_WASM.url]);
+  const bytes = await fetchFiles(CACHE_PREFIX, CACHE, files, (loaded, total) => scope.postMessage({ type: 'progress', loaded, total }));
   const [ortWasm, tokenizerJson, tokenizerConfig, graphBytes, dataBytes] = bytes;
   const ort = await importOrt();
   configureOrt(ort, ortWasm, device);

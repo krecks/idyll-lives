@@ -10,7 +10,7 @@
  * without downloading.
  */
 
-import { fetchOnce, forget, gunzipText, openCache, openRuntimeCache, prune } from '../ml/assets';
+import { fetchFiles, forget, gunzip, type ModelFile } from '../ml/assets';
 import { gpuBuffers, trackGpuBuffers } from '../ml/gpuMemory';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
@@ -143,35 +143,14 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   if (device === 'gpu' && !(await hasWebGpu())) throw new Error('voices need a graphics card that supports WebGPU');
   void dropOldCaches();
   const names = Object.keys(MODELS) as (keyof typeof MODELS)[];
-  // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt wasm would
-  // otherwise come back stale from the cache; those are fetched fresh there.
-  const files: { url: string; size: number; sha256?: string; built?: boolean; runtime?: boolean }[] = [
+  const files: ModelFile[] = [
     { url: ORT_WASM.url, size: ORT_WASM.bytes, built: true, runtime: true },
     { url: wasmUrl, size: VOICE_WASM_BYTES, built: true },
     ...names.map((k) => ({ url: `${base}voice/${MODEL_DIR}${MODELS[k][0]}`, size: MODELS[k][1], sha256: MODELS[k][2] })),
     ...SMALL.map(([name, size, sha256]) => ({ url: `${base}voice/${name}`, size, sha256 })),
     ...STYLE_IDS.map((id) => ({ url: `${base}voice/${MODEL_DIR}${id}.json`, size: STYLE_BYTES, sha256: STYLE_SHA256[id] })),
   ];
-  const total = files.reduce((n, f) => n + f.size, 0);
-  const done = files.map(() => 0);
-  const report = () => scope.postMessage({ type: 'progress', loaded: done.reduce((a, b) => a + b, 0), total });
-  // The runtime in the cache both workers share (`openRuntimeCache`), the rest in this one's.
-  const [cache, runtime] = await Promise.all([openCache(CACHE_PREFIX, CACHE), openRuntimeCache()]);
-  const bytes = await Promise.all(
-    files.map((f, i) =>
-      fetchOnce(
-        f.built && import.meta.env.DEV ? null : f.runtime ? runtime : cache,
-        f.url,
-        (n) => {
-          done[i] = Math.min(n, f.size);
-          report();
-        },
-        f.sha256,
-      ),
-    ),
-  );
-  void prune(cache, files.filter((f) => !f.runtime).map((f) => f.url));
-  void prune(runtime, [ORT_WASM.url]);
+  const bytes = await fetchFiles(CACHE_PREFIX, CACHE, files, (loaded, total) => scope.postMessage({ type: 'progress', loaded, total }));
   const [ortWasm, wasm, ...rest] = bytes;
   const models = rest.slice(0, names.length);
   const [config, indexer, lexicon, ...styles] = rest.slice(names.length);
@@ -197,7 +176,7 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
     config: json<Config>(config),
     indexer: json<number[]>(indexer),
     styles: new Map(STYLE_IDS.map((id, i) => [id, parseStyle(json<StyleFile>(styles[i]))])),
-    phonemizer: new Voice(await gunzipText(lexicon)),
+    phonemizer: new Voice(new TextDecoder().decode(await gunzip(lexicon))),
     upload: gpu
       ? (data, dims) => {
           // Sized up to 16 bytes: the runtime's kernels read four floats at a time.
