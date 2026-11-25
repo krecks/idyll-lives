@@ -100,17 +100,8 @@
         "green_light": {
           "finish": "material.finish.satin"
         },
-        "leaf": {
-          "finish": "material.finish.foliage"
-        },
-        "leaf_dark": {
-          "finish": "material.finish.foliage"
-        },
-        "leaf_light": {
-          "finish": "material.finish.foliage"
-        },
-        "leaf_pale": {
-          "finish": "material.finish.foliage"
+        "green_pale": {
+          "finish": "material.finish.satin"
         },
         "lilac": {
           "finish": "material.finish.satin"
@@ -472,22 +463,16 @@
       },
       "motions": {
         "uses": {
-          "unwind": [
-            {
-              "clip": "door_open",
-              "hold": 1.5,
-              "out": 1.5
-            },
-            "vent_open"
-          ],
-          "orchids": [
-            {
-              "clip": "door_open",
-              "hold": 1.5,
-              "out": 1.5
-            },
-            "vent_open"
-          ]
+          "unwind": {
+            "clip": "door_open",
+            "hold": 1.5,
+            "out": 1.5
+          },
+          "orchids": {
+            "clip": "door_open",
+            "hold": 1.5,
+            "out": 1.5
+          }
         }
       },
       "paint": [

@@ -44,7 +44,7 @@ pub fn family() -> Family {
                     "growth": "grow"
                 }))
                 .paint(&[("cedar", "Wood"), ("cedar_dark", "Posts & rails")]),
-            Model::new("pottingBench", bench::potting_bench, (1.76, 1.785, 0.6))
+            Model::new("pottingBench", bench::potting_bench, (1.76, 1.74, 0.6))
                 .key("model.natureLover.pottingBench")
                 .centre(0.0, -0.13)
                 .motions(json!({"uses": {"potSeedlings": "seedling", "tieBouquet": "bouquet"}}))
@@ -63,7 +63,7 @@ pub fn family() -> Family {
                 .centre(0.0, 0.011)
                 .motions(json!({"uses": {"rinse": "water_on"}}))
                 .paint(&[("cedar_wood", "Wood"), ("copper", "Copper")]),
-            Model::new("mossTerrarium", terrarium::moss_terrarium, (0.48, 1.174, 0.698))
+            Model::new("mossTerrarium", terrarium::moss_terrarium, (0.4, 1.174, 0.4))
                 .key("model.natureLover.mossTerrarium")
                 .centre(0.03, 0.049)
                 .motions(json!({"uses": {"mist": "lid_open"}}))
@@ -71,10 +71,10 @@ pub fn family() -> Family {
             Model::new("glasshouse", glasshouse::glasshouse, (1.887, 2.481, 1.86))
                 .key("model.natureLover.glasshouse")
                 // the door lets the resident in and shuts behind them (`hold`), and opens again to let them out
-                // (`out`); the vent stays open while they're in
+                // (`out`)
                 .motions(json!({"uses": {
-                    "unwind": [{"clip": "door_open", "hold": 1.5, "out": 1.5}, "vent_open"],
-                    "orchids": [{"clip": "door_open", "hold": 1.5, "out": 1.5}, "vent_open"]
+                    "unwind": {"clip": "door_open", "hold": 1.5, "out": 1.5},
+                    "orchids": {"clip": "door_open", "hold": 1.5, "out": 1.5}
                 }}))
                 .paint(&[("cedar", "Wood"), ("frame", "Frame"), ("cushion", "Cushions")]),
         ],

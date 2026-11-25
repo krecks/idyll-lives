@@ -15428,7 +15428,7 @@
     "garden.geraniums": "potGeraniums",
     "garden.herbs": "planter",
     "raisedBed": "raisedVegBed",
-    "natureLover.veggieBed": "raisedVegBed",
+    "natureLover.veggieBed": "vegPlot",
     "shedSmall": "shed",
     "greenhouse": "greenhouse",
     "natureLover.glasshouse": "greenhouse",

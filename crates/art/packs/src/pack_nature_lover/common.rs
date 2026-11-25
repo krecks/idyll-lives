@@ -1,5 +1,7 @@
 //! What the nature lover pack is built from: its palette, flower pots, leaf rosettes and flower faces.
 
+use crate::ease::EASE;
+use artkit::py::hypot;
 use artkit::materials::Mat;
 use artkit::place::GameFrame;
 use artkit::rand::Random;
@@ -51,6 +53,7 @@ palette! { M:
     green = ("#5E8F4E", satin),
     green_light = ("#78A85A", satin),
     green_dark = ("#4F8A45", satin),
+    green_pale = ("#9BCB5A", satin), // the potting bench's pale greens (its textured draw: none, 3 draws)
     stem = ("#5C7A3A", satin),
     // fruit, flowers and birds
     tomato = ("#D9483B", gloss, roughness(0.3)),
@@ -90,17 +93,40 @@ pub fn _pot(
 ) -> f64 {
     let r = d / 2.0;
     let seg = segments.unwrap_or(if d < 0.15 { 10 } else { 14 });
+    let lathe = [
+        (r * 0.72, 0.0),
+        (r * 0.94, h * 0.78),
+        (r * 1.06, h * 0.8),
+        (r * 1.08, h * 0.9),
+        (r * 1.04, h),
+        (r * 0.9, h),
+        (r * 0.86, h * 0.8),
+    ];
+    // its rim's top chamfered where it is as wide as an edge the gate finds (12 mm, from 17 cm across): each of
+    // its two corners cut once, into turns under the gate's 60° (the corners below it are hollows or look down)
+    let lathe = if d >= 0.17 {
+        let toward = |a: (f64, f64), b: (f64, f64)| {
+            let l = hypot(b.0 - a.0, b.1 - a.1);
+            (a.0 + (b.0 - a.0) / l * EASE, a.1 + (b.1 - a.1) / l * EASE)
+        };
+        let [p0, p1, p2, p3, p4, p5, p6] = lathe;
+        vec![
+            p0,
+            p1,
+            p2,
+            p3,
+            toward(p4, p3),
+            toward(p4, p5),
+            toward(p5, p4),
+            toward(p5, p6),
+            p6,
+        ]
+    } else {
+        lathe.to_vec()
+    };
     revolve!(
         name,
-        &[
-            (r * 0.72, 0.0),
-            (r * 0.94, h * 0.78),
-            (r * 1.06, h * 0.8),
-            (r * 1.08, h * 0.9),
-            (r * 1.04, h),
-            (r * 0.9, h),
-            (r * 0.86, h * 0.8)
-        ],
+        &lathe,
         at = f.at(x, y, z),
         material = material.unwrap_or(M.terra),
         segments = seg
@@ -111,7 +137,6 @@ pub fn _pot(
             &[
                 (r * 0.9, h * 0.8),
                 (r * 0.88, h * 0.86),
-                (r * 0.5, h * 0.88),
                 (0.0, h * 0.9)
             ],
             at = f.at(x, y, z),
