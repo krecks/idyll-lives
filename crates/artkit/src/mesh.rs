@@ -251,13 +251,7 @@ impl Mesh {
             for &n in &corners[f.start as usize..(f.start + f.len) as usize] {
                 sum += n;
             }
-            let d = dot_v3(sum, sum);
-            if d > 1.0e-35 {
-                let length = d.sqrt();
-                V3::new(sum.x / length, sum.y / length, sum.z / length)
-            } else {
-                V3::ZERO
-            }
+            crate::normals::unit(sum)
         };
         Some(self.faces.iter().map(unit).collect())
     }
@@ -307,7 +301,7 @@ impl Mesh {
 
     /// The mesh's triangles as Blender draws and casts rays at them: (face, its three corners' places among the
     /// face's corners). A quad is cut from its first corner to its third, unless that folds it; a polygon of
-    /// more by clipping ears as Blender clips them (`tri::polygon`), from its normal by Newell's sum: the same
+    /// more by clipping ears as Blender clips them (`polyfill::ngon`), from its normal by Newell's sum: the same
     /// triangles in the same order, each from the same corner.
     pub fn triangles(&self) -> Vec<(u32, [u32; 3])> {
         let mut out = Vec::with_capacity(self.loops.len());
@@ -326,7 +320,7 @@ impl Mesh {
                     }
                 }
                 _ => out.extend(
-                    crate::tri::polygon(&p, normal_of(&p))
+                    crate::polyfill::ngon(&p, normal_of(&p))
                         .into_iter()
                         .map(|t| (f as u32, t)),
                 ),
@@ -478,73 +472,86 @@ impl Mesh {
     /// `bmesh.ops.remove_doubles(verts=all, dist)`: the points within `dist` of one another become one, and the
     /// faces that lose a side by it lose a corner (or go, under three).
     pub fn remove_doubles(&mut self, dist: f32) {
-        let target = crate::weld::doubles(&self.verts, dist);
-        if target
-            .iter()
-            .enumerate()
-            .all(|(i, &t)| t < 0 || t as usize == i)
-        {
-            return;
-        }
-        self.weld(&target);
+        self.weld(&crate::weld::doubles(&self.verts, dist));
     }
 
-    /// Merges each vertex with a `target` other than itself (or none: -1) into it.
+    /// Merges each vertex with a `target` other than itself (or none: -1) into it: a face that loses a side by it
+    /// loses a corner (or goes, under three, or as another face's double), and the corners left keep their UVs
+    /// and normals, the edges left their sharpness, the points their shading.
     pub(crate) fn weld(&mut self, target: &[i32]) {
-        let to = |v: u32| {
-            if target[v as usize] >= 0 {
-                target[v as usize] as u32
-            } else {
-                v
-            }
+        let to = |v: u32| match target[v as usize] {
+            t if t >= 0 => t as u32,
+            _ => v,
         };
-        // the vertices left, in order
-        let mut new_index = vec![u32::MAX; self.verts.len()];
-        let mut verts = Vec::new();
-        for (i, v) in self.verts.iter().enumerate() {
-            if to(i as u32) == i as u32 {
-                new_index[i] = verts.len() as u32;
-                verts.push(*v);
-            }
+        if (0..self.verts.len() as u32).all(|v| to(v) == v) {
+            return;
         }
+        let mut index = vec![u32::MAX; self.verts.len()];
         let mut out = Mesh {
-            verts,
             mats: self.mats.clone(),
+            uv_metres: self.uv_metres,
             ..Mesh::default()
         };
-        let mut seen: BTreeSet<Vec<u32>> = BTreeSet::new();
-        for f in 0..self.faces.len() {
-            if self.corners(f).iter().all(|&v| to(v) == v) {
-                let mut key: Vec<u32> = self
-                    .corners(f)
-                    .iter()
-                    .map(|&v| new_index[v as usize])
-                    .collect();
-                key.sort_unstable();
-                seen.insert(key);
+        let mut kept_points = Vec::new();
+        for v in 0..self.verts.len() {
+            if to(v as u32) == v as u32 {
+                index[v] = out.verts.len() as u32;
+                out.verts.push(self.verts[v]);
+                kept_points.push(v);
             }
         }
+        out.card_shade = pick(&self.card_shade, &kept_points);
+        out.ao = pick(&self.ao, &kept_points);
+        let sorted = |c: &[u32]| {
+            let mut key = c.to_vec();
+            key.sort_unstable();
+            key
+        };
+        // the faces no merge touches are there first: one that becomes the double of any of them goes
+        let mut seen: BTreeSet<Vec<u32>> = BTreeSet::new();
         for f in 0..self.faces.len() {
+            let c = self.corners(f);
+            if c.iter().all(|&v| to(v) == v) {
+                seen.insert(sorted(
+                    &c.iter().map(|&v| index[v as usize]).collect::<Vec<_>>(),
+                ));
+            }
+        }
+        let mut corners: Vec<usize> = Vec::new();
+        for f in 0..self.faces.len() {
+            let face = self.faces[f];
             let c: Vec<u32> = self.corners(f).iter().map(|&v| to(v)).collect();
             let changed = self.corners(f).iter().zip(&c).any(|(a, b)| a != b);
             // a corner whose side has closed up goes: the one before the side
-            let kept: Vec<u32> = (0..c.len())
+            let kept: Vec<usize> = (0..c.len())
                 .filter(|&i| c[i] != c[(i + 1) % c.len()])
-                .map(|i| new_index[c[i] as usize])
                 .collect();
-            let distinct: BTreeSet<u32> = kept.iter().copied().collect();
-            if kept.len() < 3 || distinct.len() != kept.len() {
+            let verts: Vec<u32> = kept.iter().map(|&i| index[c[i] as usize]).collect();
+            let distinct: BTreeSet<u32> = verts.iter().copied().collect();
+            if verts.len() < 3 || distinct.len() != verts.len() {
                 continue;
             }
-            if changed {
-                // (one that has become another face's double goes too)
-                let mut key = kept.clone();
-                key.sort_unstable();
-                if !seen.insert(key) {
-                    continue;
-                }
+            if changed && !seen.insert(sorted(&verts)) {
+                continue;
             }
-            out.push_face(&kept, self.faces[f].mat, self.faces[f].smooth);
+            out.push_face(&verts, face.mat, face.smooth);
+            corners.extend(kept.iter().map(|&i| face.start as usize + i));
+        }
+        out.uvs = pick(&self.uvs, &corners);
+        out.normals = pick(&self.normals, &corners);
+        out.stored = pick(&self.stored, &corners);
+        let mut left: BTreeSet<(u32, u32)> = BTreeSet::new();
+        for f in 0..out.faces.len() {
+            let c = out.corners(f);
+            for i in 0..c.len() {
+                left.insert(edge(c[i], c[(i + 1) % c.len()]));
+            }
+        }
+        for &(a, b) in &self.sharp {
+            let e = edge(index[to(a) as usize], index[to(b) as usize]);
+            if e.0 != e.1 && left.contains(&e) {
+                out.sharp.insert(e);
+            }
         }
         *self = out;
     }
@@ -565,6 +572,11 @@ impl Mesh {
         }
         Some((lo, hi))
     }
+}
+
+/// The items of `have` at `at`, in that order.
+fn pick<T: Copy>(have: &Option<Vec<T>>, at: &[usize]) -> Option<Vec<T>> {
+    have.as_ref().map(|h| at.iter().map(|&i| h[i]).collect())
 }
 
 /// A polygon's normal as Blender works it out (straight up for one of no area, a triangle or a quad too).
@@ -614,7 +626,7 @@ pub fn normal_newell(p: &[V3]) -> V3 {
     if len == 0.0 { V3::Z } else { unit }
 }
 
-fn newell(p: &[V3]) -> V3 {
+pub(crate) fn newell(p: &[V3]) -> V3 {
     let mut n = V3::ZERO;
     let mut prev = p[p.len() - 1];
     for &cur in p {

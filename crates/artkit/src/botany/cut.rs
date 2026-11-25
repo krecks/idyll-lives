@@ -2,7 +2,6 @@
 //! cut from: families/plants.py's detail pass.
 
 use crate::botany::leaf::profile;
-use crate::botany::polyfill;
 use crate::far::is_low;
 use crate::materials::Mat;
 use crate::math::{
@@ -10,6 +9,7 @@ use crate::math::{
     sqrt, v3,
 };
 use crate::mesh::{Mesh, edge, normal_of};
+use crate::polyfill;
 use crate::scene::{self, Obj};
 use crate::shapes::options;
 use std::collections::{BTreeMap, BTreeSet};

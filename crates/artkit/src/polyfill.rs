@@ -435,7 +435,7 @@ pub(crate) fn fill(coords: &[[f32; 2]]) -> Vec<[u32; 3]> {
 }
 
 /// Two vectors square to the unit vector `n` and to each other: the plane a face of that normal is flattened onto.
-fn ortho_basis(n: V3) -> (V3, V3) {
+pub(crate) fn ortho_basis(n: V3) -> (V3, V3) {
     let f = n.x * n.x + n.y * n.y;
     if f > f32::EPSILON {
         let d = 1.0 / f.sqrt();
@@ -450,11 +450,11 @@ fn ortho_basis(n: V3) -> (V3, V3) {
     }
 }
 
-fn flat(p: V3, (n1, n2): (V3, V3)) -> [f32; 2] {
+pub(crate) fn flat(p: V3, (n1, n2): (V3, V3)) -> [f32; 2] {
     [dot_v3(n1, p), dot_v3(n2, p)]
 }
 
-fn cross_tri_v2(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2]) -> f32 {
+pub(crate) fn cross_tri_v2(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2]) -> f32 {
     (v1[0] - v2[0]) * (v2[1] - v3[1]) + (v1[1] - v2[1]) * (v3[0] - v2[0])
 }
 
@@ -468,27 +468,30 @@ fn len_v2v2(a: [f32; 2], b: [f32; 2]) -> f32 {
 }
 
 /// What turning the cut 2-4 of the flat quad 1, 2, 3, 4 into 1-3 would gain: under zero if the two triangles
-/// either side of 1-3 are rounder (area over perimeter) than those either side of 2-4.
-fn turn_gain(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2], v4: [f32; 2]) -> f32 {
+/// either side of 1-3 are rounder (area over perimeter) than those either side of 2-4; and the quad's area
+/// (BLI_polyfill_beautify_quad_rotate_calc_ex).
+pub(crate) fn turn_gain(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2], v4: [f32; 2]) -> (f32, f32) {
     // (very small faces still count as having an area)
     let eps_zero_area = 1e-12_f32;
     let area_2x_234 = cross_tri_v2(v2, v3, v4);
     let area_2x_241 = cross_tri_v2(v2, v4, v1);
     let area_2x_123 = cross_tri_v2(v1, v2, v3);
     let area_2x_134 = cross_tri_v2(v1, v3, v4);
+    let area =
+        (area_2x_234.abs() + area_2x_241.abs() + area_2x_123.abs() + area_2x_134.abs()) / 8.0;
     // 1-3 can't be cut: its triangles would face opposite ways, or one would have no area
     if (area_2x_123 >= 0.0) != (area_2x_134 >= 0.0) {
-        return f32::MAX;
+        return (f32::MAX, area);
     }
     if area_2x_123.abs() <= eps_zero_area || area_2x_134.abs() <= eps_zero_area {
-        return f32::MAX;
+        return (f32::MAX, area);
     }
     // 2-4 can't: always turn
     if (area_2x_234 >= 0.0) != (area_2x_241 >= 0.0) {
-        return -f32::MAX;
+        return (-f32::MAX, area);
     }
     if area_2x_234.abs() <= eps_zero_area || area_2x_241.abs() <= eps_zero_area {
-        return -f32::MAX;
+        return (-f32::MAX, area);
     }
     let (len_12, len_23, len_34, len_41) = (
         len_v2v2(v1, v2),
@@ -501,7 +504,7 @@ fn turn_gain(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2], v4: [f32; 2]) -> f32 {
         + (area_2x_241.abs() / (len_41 + len_12 + len_24));
     let fac_13 = (area_2x_123.abs() / (len_12 + len_23 + len_13))
         + (area_2x_134.abs() / (len_34 + len_41 + len_13));
-    fac_24 - fac_13
+    (fac_24 - fac_13, area)
 }
 
 /// `turn_gain` for a quad in space, flattened onto the plane of its two triangles' mean.
@@ -531,7 +534,7 @@ fn turn_gain_v3(v1: V3, v2: V3, v3: V3, v4: V3) -> f32 {
     if sign(cross_tri_v2(b, c, d) / no_scale) + sign(cross_tri_v2(b, d, a) / no_scale) == 0 {
         return f32::MAX;
     }
-    turn_gain(a, b, c, d)
+    turn_gain(a, b, c, d).0
 }
 
 /// The triangles Blender's `triangulate` (quads by beauty, the others by clipping ears) makes of the face of
@@ -542,23 +545,28 @@ pub(crate) fn triangulate(p: &[V3], normal: V3) -> Vec<[u32; 3]> {
         0..=2 => Vec::new(),
         3 => vec![[0, 1, 2]],
         4 => {
-            let (v1, v2, v3, v4) = (p[1], p[2], p[3], p[0]);
-            let (d_12, d_23, d_34, d_41) = (v1 - v2, v2 - v3, v3 - v4, v4 - v1);
-            // a quad hollow at a corner is cut from that corner; else the cut that leaves the rounder triangles
-            let split_24 = if dot_v3(d_12.cross(d_23), d_34.cross(d_41)) < 0.0 {
-                true
-            } else if dot_v3(d_23.cross(d_34), d_41.cross(d_12)) < 0.0 {
-                false
-            } else {
-                turn_gain_v3(v1, v2, v3, v4) > 0.0
-            };
-            if split_24 {
+            if split_24(p) {
                 vec![[0, 1, 2], [0, 2, 3]]
             } else {
                 vec![[1, 2, 3], [1, 3, 0]]
             }
         }
         _ => ngon(p, normal),
+    }
+}
+
+/// Whether Blender's beauty cuts the quad `p` from its first corner to its third (bmesh names the corners from
+/// the second: 1, 2, 3 and the first as 4).
+pub(crate) fn split_24(p: &[V3]) -> bool {
+    let (v1, v2, v3, v4) = (p[1], p[2], p[3], p[0]);
+    let (d_12, d_23, d_34, d_41) = (v1 - v2, v2 - v3, v3 - v4, v4 - v1);
+    // a quad hollow at a corner is cut from that corner; else the cut that leaves the rounder triangles
+    if dot_v3(d_12.cross(d_23), d_34.cross(d_41)) < 0.0 {
+        true
+    } else if dot_v3(d_23.cross(d_34), d_41.cross(d_12)) < 0.0 {
+        false
+    } else {
+        turn_gain_v3(v1, v2, v3, v4) > 0.0
     }
 }
 
@@ -571,4 +579,50 @@ pub(crate) fn ngon(p: &[V3], normal: V3) -> Vec<[u32; 3]> {
     let basis = ortho_basis(-normal);
     let coords: Vec<[f32; 2]> = p.iter().map(|&v| flat(v, basis)).collect();
     fill(&coords)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math::v3;
+
+    #[test]
+    fn a_hexagon_is_clipped_at_every_other_corner() {
+        let p: Vec<V3> = (0..6)
+            .map(|i| {
+                let a = std::f64::consts::TAU * i as f64 / 6.0;
+                v3(a.cos(), a.sin(), 0.0)
+            })
+            .collect();
+        assert_eq!(
+            ngon(&p, V3::Z),
+            [[5, 0, 1], [1, 2, 3], [3, 4, 5], [1, 3, 5]]
+        );
+    }
+
+    #[test]
+    fn a_dented_polygon_is_filled_inside_its_outline() {
+        // an arrow head: the dent at corner 3
+        let p = [
+            v3(0, 0, 0),
+            v3(2, 0, 0),
+            v3(2, 2, 0),
+            v3(1, 0.5, 0),
+            v3(0, 2, 0),
+        ];
+        let tris = ngon(&p, V3::Z);
+        assert_eq!(tris.len(), 3);
+        let area: f64 = tris
+            .iter()
+            .map(|t| {
+                let (a, b, c) = (p[t[0] as usize], p[t[1] as usize], p[t[2] as usize]);
+                ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) as f64 / 2.0
+            })
+            .sum();
+        assert!(tris.iter().all(|t| {
+            let (a, b, c) = (p[t[0] as usize], p[t[1] as usize], p[t[2] as usize]);
+            (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) > 0.0
+        }));
+        assert!((area - 2.5).abs() < 1e-6, "{area}");
+    }
 }
