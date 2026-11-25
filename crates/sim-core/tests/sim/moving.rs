@@ -138,18 +138,26 @@ fn grown_children_move_into_a_house_of_their_own_or_leave_town() {
 }
 
 #[test]
-fn a_grown_child_moving_out_takes_their_own_child_along() {
-    // Eve (25, working) lives next door with her mother Di and her son Kit (5); the house for
-    // sale has two beds.
-    let content = CONTENT.replace(
-        r#""life":{"daysPerYear":2,"#,
-        r#""life":{"daysPerYear":2,"stages":[{"id":"child","from":0,"school":true},{"id":"adult","from":18}],"#,
-    );
+fn a_grown_child_moving_out_takes_their_own_children_along() {
+    // Eve (25, working) lives next door with her mother Di, her son Kit (5) and her baby Bo; the
+    // house for sale has two beds and no crib.
+    let content = CONTENT
+        .replace(
+            r#""life":{"daysPerYear":2,"#,
+            r#""life":{"daysPerYear":2,"stages":[{"id":"baby","from":0,"baby":true},{"id":"child","from":2,"school":true},{"id":"adult","from":18}],"#,
+        )
+        .replace(
+            r#""objects":[{"id":"bed""#,
+            r#""objects":[{"id":"crib","name":"Crib","price":350,"footprint":[2,1],"slots":1,"interactions":[
+                {"id":"lie","label":"Lie in the crib","minutes":720,"pose":"lie","baby":true,"autonomous":false,"effects":{"energy":1.0},"tags":["sleep"]}]},
+              {"id":"bed""#,
+        );
     let sims = r#",{"name":"Eve","x":16.5,"z":5.5,"age":25,"household":1,"job":{"career":"press.print","level":0}},
-                 {"name":"Kit","x":16.5,"z":6.5,"age":5,"household":1}"#;
+                 {"name":"Kit","x":16.5,"z":6.5,"age":5,"household":1},
+                 {"name":"Bo","x":17.5,"z":6.5,"age":0.2,"household":1}"#;
     let src = town(
         sims,
-        r#",{"a":3,"b":2,"preset":"parent"},{"a":4,"b":3,"preset":"parent"}"#,
+        r#",{"a":3,"b":2,"preset":"parent"},{"a":4,"b":3,"preset":"parent"},{"a":5,"b":3,"preset":"parent"}"#,
     )
     .replace(
         r#"{"def":"bed","x":22,"z":2}"#,
@@ -160,6 +168,13 @@ fn a_grown_child_moving_out_takes_their_own_child_along() {
     let h = w.sims[3].household as usize;
     assert_eq!(w.households[h].plot, Some(2), "Eve moved out");
     assert_eq!(w.sims[4].household as usize, h, "with Kit");
+    assert_eq!(w.sims[5].household as usize, h, "and Bo");
+    assert!(
+        w.objects
+            .iter()
+            .any(|o| o.x >= 20 && w.content.objects[o.def].id == "crib"),
+        "a crib for Bo in the new home"
+    );
 }
 
 #[test]
@@ -370,8 +385,19 @@ fn a_child_whose_last_grown_up_dies_goes_to_their_other_parent_in_town() {
     );
     let mut w = World::from_json(&with_stages(), &town, 1).unwrap();
     sim_core::lifecycle::pass_away(&mut w, 1);
-    assert!(w.sims[2].here(), "Kit left town");
+    assert!(w.sims[2].here(), "Kit stayed in town");
     assert_eq!(w.sims[2].household, 0, "Kit went to Ada");
+
+    // Ada's home already holds a household's most (4): Kit goes to family out of town instead.
+    let full = r#",{"name":"Gil","x":4.5,"z":6.5,"age":30},{"name":"Hal","x":4.5,"z":7.5,"age":30},
+                 {"name":"Ivy","x":4.5,"z":8.5,"age":30}"#;
+    let crowded = super::moving::town(full, r#",{"a":2,"b":0,"preset":"parent"}"#).replace(
+        r#""name":"Di","x":15.5,"z":5.5,"age":28"#,
+        r#""name":"Kit","x":15.5,"z":5.5,"age":5"#,
+    );
+    let mut w = World::from_json(&with_stages(), &crowded, 1).unwrap();
+    sim_core::lifecycle::pass_away(&mut w, 1);
+    assert!(!w.sims[2].here(), "Kit went to family out of town");
 }
 
 #[test]
