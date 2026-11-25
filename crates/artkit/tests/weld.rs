@@ -40,3 +40,26 @@ fn a_nan_point_does_not_run_the_sort_off_the_end() {
     let got = artkit::weld::doubles(&[V3::new(0.0, 0.0, 0.0), V3::new(f32::NAN, 0.0, 0.0)], 1e-6);
     assert_eq!(got.len(), 2);
 }
+
+#[test]
+fn merging_doubles_after_shading_keeps_the_sharp_edges() {
+    // a cube whose top face has its own copy (8) of corner 4: its two edges there have one face each until merged
+    let mut verts: Vec<V3> = (0..8)
+        .map(|i| V3::new((i & 1) as f32, (i >> 1 & 1) as f32, (i >> 2) as f32))
+        .collect();
+    verts.push(verts[4]);
+    let faces = [
+        vec![0, 2, 3, 1],
+        vec![8, 5, 7, 6],
+        vec![0, 1, 5, 4],
+        vec![2, 6, 7, 3],
+        vec![0, 4, 6, 2],
+        vec![1, 3, 7, 5],
+    ];
+    let mut mesh = artkit::mesh::Mesh::from_pydata(verts, &faces);
+    mesh.shade_smooth(30.0);
+    assert_eq!(mesh.sharp.len(), 10);
+    mesh.remove_doubles(1e-6);
+    assert_eq!(mesh.verts.len(), 8);
+    assert_eq!(mesh.sharp.len(), 10);
+}

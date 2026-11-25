@@ -11,9 +11,8 @@
 
 use crate::decimate;
 use crate::math::{M4, V3};
-use crate::mesh::{Mesh, edge as mesh_edge};
+use crate::mesh::Mesh;
 use crate::scene::{self, Obj};
-use std::collections::BTreeSet;
 
 /// `full` detail, or `reduced` while a far version is being built.
 pub fn low<T>(full: T, reduced: T) -> T {
@@ -74,7 +73,7 @@ pub fn decimate(mesh: &mut Mesh, ratio: f64, feet: f64, edge: f64) -> usize {
     // corners' frames): what the collapses carry
     mesh.normals = Some(crate::normals::corner_normals(mesh));
     mesh.stored = None;
-    merge_doubles(mesh, 1e-5);
+    mesh.remove_doubles(1e-5);
     let faces = mesh.triangle_verts();
     let reference = Surface::new(
         faces
@@ -171,97 +170,6 @@ pub fn locks(mesh: &Mesh, feet: f64, edge: f64) -> Vec<bool> {
             !free
         })
         .collect()
-}
-
-/// `bmesh.ops.remove_doubles` on a mesh that has what a joined one has: the points within `dist` of one another
-/// become one, a face that loses a side by it loses a corner (or goes, under three, or as another face's double),
-/// and the corners left keep their UVs and normals, the edges left their sharpness, the points their shading.
-fn merge_doubles(mesh: &mut Mesh, dist: f32) {
-    let target = crate::weld::doubles(&mesh.verts, dist);
-    let to = |v: u32| match target[v as usize] {
-        t if t >= 0 => t as u32,
-        _ => v,
-    };
-    if (0..mesh.verts.len() as u32).all(|v| to(v) == v) {
-        return;
-    }
-    let mut index = vec![u32::MAX; mesh.verts.len()];
-    let mut out = Mesh {
-        mats: mesh.mats.clone(),
-        uv_metres: mesh.uv_metres,
-        ..Mesh::default()
-    };
-    let mut kept_points = Vec::new();
-    for v in 0..mesh.verts.len() {
-        if to(v as u32) == v as u32 {
-            index[v] = out.verts.len() as u32;
-            out.verts.push(mesh.verts[v]);
-            kept_points.push(v);
-        }
-    }
-    let per_point = |have: &Option<Vec<f32>>| {
-        have.as_ref()
-            .map(|h| kept_points.iter().map(|&v| h[v]).collect::<Vec<f32>>())
-    };
-    out.card_shade = per_point(&mesh.card_shade);
-    out.ao = per_point(&mesh.ao);
-    let sorted = |c: &[u32]| {
-        let mut key = c.to_vec();
-        key.sort_unstable();
-        key
-    };
-    // the faces no merge touches are there first: one that becomes the double of any of them goes
-    let mut seen: BTreeSet<Vec<u32>> = BTreeSet::new();
-    for f in 0..mesh.faces.len() {
-        let c = mesh.corners(f);
-        if c.iter().all(|&v| to(v) == v) {
-            seen.insert(sorted(
-                &c.iter().map(|&v| index[v as usize]).collect::<Vec<_>>(),
-            ));
-        }
-    }
-    let mut corners: Vec<usize> = Vec::new();
-    for f in 0..mesh.faces.len() {
-        let face = mesh.faces[f];
-        let c: Vec<u32> = mesh.corners(f).iter().map(|&v| to(v)).collect();
-        let changed = mesh.corners(f).iter().zip(&c).any(|(a, b)| a != b);
-        // a corner whose side has closed up goes: the one before the side
-        let kept: Vec<usize> = (0..c.len())
-            .filter(|&i| c[i] != c[(i + 1) % c.len()])
-            .collect();
-        let verts: Vec<u32> = kept.iter().map(|&i| index[c[i] as usize]).collect();
-        let distinct: BTreeSet<u32> = verts.iter().copied().collect();
-        if verts.len() < 3 || distinct.len() != verts.len() {
-            continue;
-        }
-        if changed && !seen.insert(sorted(&verts)) {
-            continue;
-        }
-        out.push_face(&verts, face.mat, face.smooth);
-        corners.extend(kept.iter().map(|&i| face.start as usize + i));
-    }
-    out.uvs = mesh
-        .uvs
-        .as_ref()
-        .map(|uv| corners.iter().map(|&l| uv[l]).collect());
-    out.normals = mesh
-        .normals
-        .as_ref()
-        .map(|n| corners.iter().map(|&l| n[l]).collect());
-    let mut left: BTreeSet<(u32, u32)> = BTreeSet::new();
-    for f in 0..out.faces.len() {
-        let c = out.corners(f);
-        for i in 0..c.len() {
-            left.insert(mesh_edge(c[i], c[(i + 1) % c.len()]));
-        }
-    }
-    for &(a, b) in &mesh.sharp {
-        let e = mesh_edge(index[to(a) as usize], index[to(b) as usize]);
-        if e.0 != e.1 && left.contains(&e) {
-            out.sharp.insert(e);
-        }
-    }
-    *mesh = out;
 }
 
 /// Turns each of `mesh`'s triangles that the collapses turned round: one that faces against the `reference`
