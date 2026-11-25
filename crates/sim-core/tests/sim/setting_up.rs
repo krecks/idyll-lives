@@ -307,6 +307,23 @@ fn saved_while_carrying_it_the_parcel_is_back_at_the_door() {
 }
 
 #[test]
+fn a_setup_whose_sim_isnt_in_town_is_dropped_without_a_refund() {
+    let (mut w, content) = garden_home();
+    let object = something_new(&w);
+    yes(&mut w, 0, object);
+    assert!(until(&mut w, 60, |w| w.sims[0].held.is_some()), "carrying it");
+    assert_eq!(w.setups.len(), 1);
+    let funds = w.households[0].funds;
+    // A hand-edited save: the setup names a sim who isn't in town. The object is still there, so
+    // nothing was given back for it: refunding it would mint the money.
+    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    save["setups"][0]["sim"] = json!(99);
+    let w = World::from_save_json(&content, &save.to_string()).unwrap();
+    assert!(w.setups.is_empty(), "no setup for a sim who isn't there");
+    assert_eq!(w.households[0].funds, funds, "and nothing paid back");
+}
+
+#[test]
 fn with_nowhere_to_put_it_a_yes_buys_nothing() {
     let (mut w, _) = garden_home();
     let object = something_new(&w);
