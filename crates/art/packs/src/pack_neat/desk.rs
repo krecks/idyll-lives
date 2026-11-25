@@ -5,7 +5,7 @@ use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
-use artkit::parts::{join, new_parts, settle};
+use artkit::parts::{aside, join, new_parts, settle};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{
@@ -139,7 +139,7 @@ pub fn organizer_desk() -> Vec<Obj> {
             1.6,
             0.035,
             DD,
-            (0, 0.745, DZ),
+            (0, 0.7405, DZ), // (its top at 0.758)
             M.birch,
             bevel = 0.01,
             bevel_segments = 2
@@ -186,7 +186,7 @@ pub fn organizer_desk() -> Vec<Obj> {
             1.6,
             0.02,
             HD,
-            (0, 1.22, HZ),
+            (0, 1.198, HZ), // (the hutch's top at 1.208, within a desk's height)
             M.body,
             bevel = 0.004,
             bevel_segments = 1
@@ -195,9 +195,9 @@ pub fn organizer_desk() -> Vec<Obj> {
             f,
             "hutch_back",
             1.6,
-            0.5,
+            0.456,
             0.012,
-            (0, 1.0, HZ - HD / 2.0 + 0.004),
+            (0, 0.978, HZ - HD / 2.0 + 0.004),
             M.birch
         );
         for i in 0..6 {
@@ -205,15 +205,15 @@ pub fn organizer_desk() -> Vec<Obj> {
                 f,
                 format!("divider{i}"),
                 0.02,
-                0.48,
+                0.44,
                 HD,
-                (-0.79 + i as f64 * 0.316, 1.0, HZ),
+                (-0.79 + i as f64 * 0.316, 0.98, HZ),
                 M.body,
                 bevel = 0.003,
                 bevel_segments = 1
             );
         }
-        for (r, y) in [0.87, 1.105].into_iter().enumerate() {
+        for (r, y) in [0.87, 1.095].into_iter().enumerate() {
             for i in 0..5 {
                 let x = -0.632 + i as f64 * 0.316;
                 if (x, y) != BIN {
@@ -569,6 +569,11 @@ pub fn entry_console() -> Vec<Obj> {
                 _shoe(f, &format!("shoe{i}{ddx}"), x + ddx, 0.231, -0.27, m);
             }
         }
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // on top, a bowl and a vase of tulips; the back panel rising from the top with the mirror, the hooks, a tote and a
+    // scarf (a hall stand's): drawn, not the console's size
+    let over = new_parts(|| {
         // on top: a bowl, a vase of tulips
         revolve!(
             "bowl",
@@ -793,7 +798,7 @@ pub fn entry_console() -> Vec<Obj> {
         );
         jitter!(scarf, 0.003, size = 0.08, seed = 4.0);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&over, "over");
     // The key tray drawer: front, knob, the tray and keys inside: `tray` slides it out.
     let drawer = new_parts(|| {
         fbox!(
