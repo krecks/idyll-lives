@@ -32,7 +32,7 @@ pub fn family() -> Family {
         "pack_hotHeaded",
         M.palette(),
         vec![
-            Model::new("heavyBag", bag::heavy_bag, (0.86, 2.01, 0.86))
+            Model::new("heavyBag", bag::heavy_bag, (0.722, 2.002, 0.766))
                 .key("model.hotHeaded.heavyBag")
                 .centre(0.0, 0.0)
                 .motions(json!({"loops": {"pound": "swing"}}))
@@ -51,7 +51,7 @@ pub fn family() -> Family {
             Model::new(
                 "coolDownCushion",
                 calm::cool_down_cushion,
-                (0.9, 0.236, 0.9),
+                (0.86, 0.236, 0.86),
             )
             .centre(0.0, 0.02)
             .key("model.hotHeaded.coolDownCushion")

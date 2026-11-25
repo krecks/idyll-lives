@@ -2,11 +2,12 @@
 
 use super::WALL;
 use super::common::{M, chain};
+use crate::ease::{EASE, ease_ends, eased};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, radians, sin, sind};
 use artkit::motion::{Rock, rock};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
@@ -21,7 +22,8 @@ pub fn heavy_bag() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let (hx, hy, hz) = HOOK;
     let sq = rounded_rect(0.07, 0.07, 0.014, 2);
-    let still = new_parts(|| {
+    // the rubber floor mat it stands on: drawn, not the stand's size
+    let mat = new_parts(|| {
         fbox!(
             f,
             "mat",
@@ -33,17 +35,21 @@ pub fn heavy_bag() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
+    });
+    aside(&mat, "mat");
+    let still = new_parts(|| {
         // the T foot, its ends capped in rubber
-        fsweep!(
+        let foot = fsweep!(
             f,
             "foot_long",
-            &[(0, 0.042, -0.42), (0, 0.042, 0.34)],
+            &[(0, 0.042, -0.42), (0, 0.042, 0.335)],
             0,
             M.steel_dark,
             profile = rounded_rect(0.06, 0.08, 0.012, 2),
             up = (0, 0, 1)
         );
-        fsweep!(
+        ease_ends(foot);
+        let foot = fsweep!(
             f,
             "foot_cross",
             &[(-0.35, 0.042, -0.37), (0.35, 0.042, -0.37)],
@@ -52,7 +58,8 @@ pub fn heavy_bag() -> Vec<Obj> {
             profile = rounded_rect(0.06, 0.08, 0.012, 2),
             up = (0, 0, 1)
         );
-        for (x, z) in [(0.0, 0.345), (-0.355, -0.37), (0.355, -0.37)] {
+        ease_ends(foot);
+        for (x, z) in [(0.0, 0.34), (-0.355, -0.37), (0.355, -0.37)] {
             fbox!(
                 f,
                 numbered("foot_cap"),
@@ -156,8 +163,9 @@ pub fn heavy_bag() -> Vec<Obj> {
                 verts = 10,
                 round = 1
             );
+            // (closed from the middle of its back face, so every corner of it is eased)
             let prof = [
-                (0.018, 0.0),
+                (0.07, 0.0),
                 (0.13, 0.0),
                 (0.13, 0.045),
                 (0.115, 0.045),
@@ -166,6 +174,7 @@ pub fn heavy_bag() -> Vec<Obj> {
                 (0.04, 0.045),
                 (0.018, 0.045),
                 (0.018, 0.0),
+                (0.07, 0.0),
             ];
             kit::turned!(
                 f,
@@ -173,7 +182,7 @@ pub fn heavy_bag() -> Vec<Obj> {
                 s as f64 * 0.177 + (s > 0) as i32 as f64 * 0.045,
                 0.17,
                 -0.29,
-                &prof,
+                &eased(&prof, EASE),
                 m,
                 segments = 22,
                 rot = (0.0, 90.0, 0.0)
@@ -460,8 +469,8 @@ pub fn smash_bin() -> Vec<Obj> {
                     0.06,
                     (px, h / 2.0, pz),
                     M.crate_dark,
-                    bevel = 0.006,
-                    bevel_segments = 1
+                    bevel = 0.004,
+                    bevel_segments = 2
                 );
             }
         }
@@ -650,11 +659,13 @@ pub fn smash_bin() -> Vec<Obj> {
                 px,
                 y,
                 pz,
+                // (the rim a 4 mm band: too narrow for its edges to show hard)
                 &[
                     (0.0, 0.0),
                     (0.065, 0.0),
                     (0.12, 0.013),
-                    (0.112, 0.018),
+                    (0.12, 0.017),
+                    (0.113, 0.0185),
                     (0.06, 0.006),
                     (0.0, 0.006),
                 ],

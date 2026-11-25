@@ -1,6 +1,7 @@
 //! The cool-down meditation cushion, the grudge-to-gratitude writing desk and the glacier cold-plunge tub.
 
 use super::common::{M, fluted};
+use crate::ease::ease_ends;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{P3, PI, cosd, pow, sin, sind};
 use artkit::motion::{Squash, squash};
@@ -20,19 +21,19 @@ pub fn cool_down_cushion() -> Vec<Obj> {
         fcyl!(
             f,
             "mat",
-            0.45,
+            0.43,
             0.012,
             (0, 0.006, 0),
             M.calm_light,
-            verts = 48
+            verts = 40
         );
         torus!(
             "mat_edge",
-            0.44,
+            0.42,
             0.009,
             at = f.at(0, 0.012, 0),
             material = M.calm_deep,
-            major_segments = 48,
+            major_segments = 40,
             minor_segments = 3
         );
         // the zabuton: a plump mat, tufted at four points, piped round
@@ -72,7 +73,8 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             &[
                 (0.0, 0.0),
                 (0.1, 0.0),
-                (0.11, 0.008),
+                (0.108, 0.004),
+                (0.11, 0.012),
                 (0.105, 0.022),
                 (0.09, 0.026),
                 (0.0, 0.026),
@@ -141,8 +143,9 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             &[
                 (0.0, 0.0),
                 (0.06, 0.0),
-                (0.066, 0.008),
-                (0.062, 0.012),
+                (0.065, 0.006),
+                (0.064, 0.011),
+                (0.06, 0.0125),
                 (0.046, 0.006),
                 (0.0, 0.006),
             ],
@@ -160,6 +163,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
                 (0.04, 0.0),
                 (0.04, 0.064),
                 (0.037, 0.07),
+                (0.034, 0.0705),
                 (0.022, 0.064),
                 (0.0, 0.062),
             ],
@@ -195,7 +199,8 @@ pub fn cool_down_cushion() -> Vec<Obj> {
                 (0.045, 0.0),
                 (0.052, 0.07),
                 (0.062, 0.075),
-                (0.062, 0.1),
+                (0.062, 0.097),
+                (0.059, 0.1),
                 (0.054, 0.1),
                 (0.05, 0.092),
                 (0.0, 0.092),
@@ -556,7 +561,8 @@ pub fn grudge_journal() -> Vec<Obj> {
                 (0.04, 0.0),
                 (0.05, 0.07),
                 (0.056, 0.072),
-                (0.056, 0.085),
+                (0.056, 0.082),
+                (0.053, 0.085),
                 (0.048, 0.085),
                 (0.0, 0.08),
             ],
@@ -567,11 +573,11 @@ pub fn grudge_journal() -> Vec<Obj> {
         loft!(
             "cactus",
             &[
-                fluted(0.03, 0.82, 32, (cbx, cby), 8, 0.12),
-                fluted(0.037, 0.86, 32, (cbx, cby), 8, 0.12),
-                fluted(0.036, 0.91, 32, (cbx, cby), 8, 0.12),
-                fluted(0.026, 0.945, 32, (cbx, cby), 8, 0.12),
-                fluted(0.01, 0.962, 32, (cbx, cby), 8, 0.1)
+                fluted(0.03, 0.82, 48, (cbx, cby), 8, 0.12),
+                fluted(0.037, 0.86, 48, (cbx, cby), 8, 0.12),
+                fluted(0.036, 0.91, 48, (cbx, cby), 8, 0.12),
+                fluted(0.026, 0.945, 48, (cbx, cby), 8, 0.12),
+                fluted(0.01, 0.962, 48, (cbx, cby), 8, 0.1)
             ],
             material = M.cactus
         );
@@ -727,7 +733,7 @@ pub fn grudge_journal() -> Vec<Obj> {
                 )
             })
             .collect();
-        fsweep!(
+        let back = fsweep!(
             f,
             "chair_back",
             &rail,
@@ -736,6 +742,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             profile = rounded_rect(0.26, 0.04, 0.016, 2),
             up = (0, 0, 1)
         );
+        ease_ends(back);
         let low: Vec<(f64, f64, f64)> = rail.iter().map(|&(x, y, z)| (x, y - 0.155, z)).collect();
         fsweep!(
             f,
