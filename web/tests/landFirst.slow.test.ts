@@ -4,43 +4,14 @@
 // painted over bridged to the villages across it, a river cross a village on every quarter (none with no villages),
 // a city too big for any quarter told so; the land as step 1 left it, and its level, kept away from the town (no jump in height
 // between the steps); and a land the player shaped still taking a town, its town file carrying that land. `SLOW_TESTS=1 bun test tests/landFirst.slow.test.ts`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { networks } from './support/roads';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { isSeparated } from '../src/core/roadKinds';
-import { nearest } from '../src/game/roads';
-
-const WEB = new URL('../', import.meta.url).pathname;
-
-/** Per road, its network, as the sim joins them (an end within half the wider road's width and a metre of the other's middle). */
-function networks(roads: readonly RoadPlan[]): number {
-  const parent = roads.map((_, i) => i);
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
-  roads.forEach((r, i) => {
-    for (const end of [r.points[0], r.points[r.points.length - 1]]) {
-      roads.forEach((o, j) => {
-        if (j !== i && nearest(o.points, end[0], end[1]).dist <= Math.max(o.width, r.width) / 2 + 1) parent[find(i)] = find(j);
-      });
-    }
-  });
-  return new Set(roads.map((_, i) => find(i))).size;
-}
 
 describe('the land first, then the town', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { assembleTown, generateWorld, plotRect, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { randomHousehold } = await import('../src/game/household');
@@ -50,15 +21,13 @@ describe('the land first, then the town', async () => {
   const { decodeLand, LAND_CELL, landHash } = await import('../src/game/land');
   const { WORLD_KINDS } = await import('../src/game/world');
   const { editedProblems } = await import('../src/game/edit/checked');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type TownResult = import('../src/game/townJobs').TownResult;
   type WorldOptions = import('../src/game/world').WorldOptions;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   const landOf = (world: string, seed: number, options?: Partial<WorldOptions>): NeighbourhoodDraft => {
     const made = runTownJob(content, t, { kind: 'land', world, seed, ...(options ? { options } : {}) });

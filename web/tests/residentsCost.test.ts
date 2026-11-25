@@ -8,32 +8,19 @@
 // (What this caught when written: the hair, the eyes and the shadow-only copies kept every resident built, drawn or
 // not, and one hidden counted as far off, so its low-detail body was drawn too; and anyone posed within the preset's
 // resident radius, 140 m, drew the sun's map again, though it covers 30–70 m.)
-import { afterAll, describe, expect, test } from 'bun:test';
-import { readFileSync, existsSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { standInView } from './support/residentView';
+import { loadContent, usePublicFetch } from './support/content';
 import { TICK_RATES } from './snapshotLayout';
 
-const WEB = new URL('../', import.meta.url).pathname;
 /** A shadow test as `SunShadows.reaches` gives it: a square round (x, z), with a long shadow's 8 m round it. */
 const square = (x: number, z: number, half: number) => (px: number, pz: number) => Math.abs(px - x) <= half + 8 && Math.abs(pz - z) <= half + 8;
 
 describe('residents not drawn', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
   const { DEFAULT_ORBIT, LENS, RADIUS_LIMITS } = await import('../src/render/shared/lens');
-  const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   const pose = await import('../src/render/shared/characters/pose');
   type ResidentProp = import('../src/render/shared/characters/view').ResidentProp;
@@ -42,7 +29,7 @@ describe('residents not drawn', async () => {
   type FrameState = import('../src/core/bridge').FrameState;
   type SimInfo = import('../src/core/protocol').SimInfo;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
 
   interface Part {
@@ -56,17 +43,12 @@ describe('residents not drawn', async () => {
   const cam = [0, 1.6, 6];
   /** Its drawing's height (px) and vertical field of view (rad). */
   const lens = { height: 720, fov: 0.8 };
-  const view: View = {
-    init: () => {},
-    setMorphs: () => {},
-    uploadPoses: () => {},
-    uploadPoseRows: () => {},
+  const view: View = standInView<Part, object, ResidentProp>({
     createPart(body, part, shadow) {
       const p = { name: `${body.name}:${part}`, shadow, rows: new Float32Array(0), count: 0 };
       parts.push(p);
       return p;
     },
-    partEnabled: () => {},
     setPartRows(p, rows) {
       p.rows = rows;
       p.count = rows.length / 4;
@@ -75,25 +57,11 @@ describe('residents not drawn', async () => {
       p.rows = rows;
       p.count = count;
     },
-    quiltMaterial: () => {},
-    createQuilt: () => ({}),
-    quiltRows: () => {},
-    quiltEnabled: () => {},
-    createRing: () => {},
-    ringMoved: () => {},
-    props: new TemplateCache<ResidentProp | null>({ retell: () => {}, gone: () => false, hide: () => {}, dispose: () => {} }),
-    async buildProp(key) {
-      return { key, matrices: new Float32Array(MAX_CHARACTERS * 16), top: [0, 0, 0] as const };
-    },
-    showProp: () => {},
-    onModelFile: () => () => {},
-    fileColour: async () => undefined,
     camera(out) {
       [out[0], out[1], out[2], out[3], out[4]] = [cam[0], cam[1], cam[2], lens.height, lens.fov];
       return true;
     },
-    onDispose: () => {},
-  };
+  });
 
   /** Six residents along x, a metre and a half apart. */
   const N = 6;

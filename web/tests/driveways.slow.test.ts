@@ -7,10 +7,9 @@
 // between (across a trail on the way, which a car's way on doesn't count). From the sample worlds
 // the generated-world checks failed on (`tools/worlds/sample.ts`, made here the same way).
 import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { CLASSIC, type ClassicKind } from './support/classicWorlds';
 
-const WEB = new URL('../', import.meta.url).pathname;
 /** sim-core `cars::OBLIQUE`: the least cosine of a driveway's line to its road's side. */
 const OBLIQUE = 0.5;
 
@@ -85,34 +84,21 @@ function wayOutProblems(file: TownFile): string[] {
 
 describe('driveways', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
+  usePublicFetch();
   const realRandom = Math.random;
   afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
     Math.random = realRandom;
   });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { generateFromSpec } = await import('../src/game/macro');
   const { mulberry32 } = await import('../src/game/noise');
-  type Templates = import('../src/game/town').Templates;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** A world's town file as `tools/worlds/sample.ts` makes it (its households seeded by its seed, the player in the first empty house). */
   const townFile = (kind: ClassicKind, seed: number): TownFile => {

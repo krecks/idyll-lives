@@ -3,41 +3,24 @@
 // them), and the world, its preview and its houses come out as `generateWorld`, `previewWorld` and
 // `houseTemplate` make them for the same seed (its land graded under its town: `landFollow.ts` `settleLand`), its steps told as it goes (step 1's progress); a town
 // file as `assembleTown` makes it, its dice (friends, rivals) from the job's own seed.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('town jobs', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { generateWorld, houseTemplate, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { previewWorld } = await import('../src/game/townPreview');
   const { runTownJob } = await import('../src/game/townJobs');
   const { settleLand } = await import('../src/game/landFollow');
   const { defaultsOf } = await import('../src/game/world');
-  type Templates = import('../src/game/town').Templates;
   type TownJob = import('../src/game/townJobs').TownJob;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   /** A job as the worker runs it: sent, run, and its result sent back. */
   const inWorker = (job: TownJob) => structuredClone(runTownJob(content, t, structuredClone(job)));
 

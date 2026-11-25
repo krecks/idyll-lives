@@ -2,39 +2,22 @@
 // content and house layouts: on tile edges of the ground, never on a wall, across a path or driveway or
 // in a doorway; the same whichever lot the player takes; tidy (one fence on a shared edge, its corners
 // met); laid out the same on lots turned a quarter; and written into the town file as runs.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { WorldOptions } from '../src/core/protocol';
 import { CLASSIC } from './support/classicWorlds';
 
-const WEB = new URL('../', import.meta.url).pathname;
-
 describe('garden fences', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { generateWorld, layoutTown, useTownContent, vacantSlots } = await import('../src/game/town');
   const { generateFromSpec } = await import('../src/game/macro');
   const { fenceRuns, townFences } = await import('../src/game/gardenFences');
-  type Templates = import('../src/game/town').Templates;
   type TownFence = import('../src/game/gardenFences').TownFence;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const key = (f: { axis: string; x: number; z: number }) => `${f.axis}:${f.x}:${f.z}`;
   // (Each laid out once with nobody's lot the player's: the tests below share it.)
   // (The countryside's town and its city, and farmland.)

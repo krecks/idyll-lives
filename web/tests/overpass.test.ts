@@ -5,6 +5,7 @@
  * decks: `roads.test.ts`.)
  */
 import { describe, expect, test } from 'bun:test';
+import { line, points } from './support/geometry';
 import type { RoadPlan, WorldStructure } from '../src/core/protocol';
 import { Geo } from '../src/render/shared/geometry';
 import { allBarriers, barrier, deckLevels, insideOf, liftedStretches, MOTORWAY, motorwayPairs, OVERPASS, signSpots, without } from '../src/render/shared/motorway';
@@ -14,14 +15,6 @@ import { overpass, Painter, pierStations } from '../src/render/shared/street';
 import * as F from '../src/render/roadHierarchyFixture';
 
 const h = F.roadHierarchy();
-const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
-
-/** The vertices of a mesh, as (x, y, z). */
-function points(g: Geo): [number, number, number][] {
-  const out: [number, number, number][] = [];
-  for (let i = 0; i < g.pos.length; i += 3) out.push([g.pos[i], g.pos[i + 1], g.pos[i + 2]]);
-  return out;
-}
 
 describe("a motorway's two carriageways", () => {
   test('are found as a pair, each with the other on its inside', () => {

@@ -12,6 +12,7 @@
  *   chosen from there (brick upstairs over siding, another roof).
  */
 import { describe, expect, test } from 'bun:test';
+import { streetOptions as options } from './support/streetWorld';
 import type { Opening, PlotInfo, PorchInfo, WallEdge, WorldStructure } from '../src/core/protocol';
 import { Cut, type Geo, LOOK } from '../src/render/shared/geometry';
 import type { HousePart, HousePlanner as Planner, SilhouetteSpec } from '../src/render/shared/house';
@@ -136,7 +137,6 @@ describe('porches and looks', async () => {
       meta: { kind: 'town', name: 'Test', streets: [], paths, facing: [2, 2], seed: 1, home: 0 },
     } as unknown as WorldStructure;
   }
-  const options = { has: () => true, entry: () => undefined, lived: false };
   const view = (p: PlotInfo) => ({ x: p.x, z: p.z, w: p.w, d: p.d });
 
   test("the street gives the viewed lot its house's porch, and the player's house in the menus' town too", async () => {

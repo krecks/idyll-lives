@@ -10,8 +10,8 @@
 // steep refused up front, its climb measured as `measureLand` measures it; the hint on bare land. The road hierarchy: an
 // avenue's live checks, a one-way street drawn with arrows along it the way cars go (flipped on the card), the
 // motorway not crossed. `bun test`.
-import { afterAll, describe, expect, mock, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, mock, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
 import type { Edited } from '../src/game/edit/edited';
@@ -665,28 +665,13 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
 // checks and by drawStreet. Every reason the live checks give (the slope is not one) is
 // drawStreet's own; drawStreet refuses nothing the live checks pass but what they leave to it.
 describe('on a generated world', async () => {
-  const WEB = new URL('../', import.meta.url).pathname;
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content: RealContent } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { generateWorld, useTownContent } = await import('../src/game/town');
   const { mulberry32 } = await import('../src/game/noise');
   const { townIssues } = await import('../src/ui/townedit/problems');
-  const real = await RealContent.load('http://localhost/content/base.json');
+  const real = await loadContent();
   useTownContent(real);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const templates: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(real), lampTiles: real.lampTiles, windowTiles: real.windowTiles };
+  const templates = await templatesOf(real);
   const world = generateWorld(real, templates, 'river', 4242, undefined, undefined, { town: 'village', villages: 'few' });
 
   test('every live verdict is drawStreet’s, within the per-move budget', () => {

@@ -6,28 +6,13 @@
 // lot removed and added again settles like the original; a lot removed moves the land only round itself (the
 // planes the town was laid with kept: `open.gentle`) and no road; an edit's settle on the biggest worlds is timed.
 // `SLOW_TESTS=1 bun test tests/editSettle.slow.test.ts`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { inWorkerOf, loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
-
-const WEB = new URL('../', import.meta.url).pathname;
 
 describe("step 2's settle", async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { runTownJob } = await import('../src/game/townJobs');
   const { settleLand } = await import('../src/game/landFollow');
@@ -43,19 +28,14 @@ describe("step 2's settle", async () => {
   const { heightAt, LAND_CELL, NONE } = await import('../src/game/land');
   const { builtSurfaceOf } = await import('../src/render/shared/builtSurface');
   const { lengths, nearest, pointAt } = await import('../src/game/roads');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
-  type TownJob = import('../src/game/townJobs').TownJob;
-  type TownResult = import('../src/game/townJobs').TownResult;
   type WorldOptions = import('../src/game/world').WorldOptions;
   type Pt = import('../src/game/roads').Pt;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
-  /** A job as the worker runs it: sent, run, and its result sent back. */
-  const inWorker = <K extends TownJob['kind']>(job: Extract<TownJob, { kind: K }>) => structuredClone(runTownJob(content, t, structuredClone(job))) as Extract<TownResult, { kind: K }>;
+  const inWorker = await inWorkerOf(content, t);
   /** A town laid on a place's land (the `land` and `town` jobs), with its plan. */
   const laid = (world: string, seed: number, options: Partial<WorldOptions>) => {
     const land = inWorker({ kind: 'land', world, seed, options });

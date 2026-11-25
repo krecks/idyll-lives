@@ -8,13 +8,11 @@
  * with it (`motorwayProblems`) and every crossing on both roads under a deck. `SLOW_TESTS=1 bun test
  * tests/motorwayFit.slow.test.ts`; `bun tools/worlds/map.ts <dir> 2 --classic` draws the same worlds' maps.
  */
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { motorwayProblems } from '../src/game/motorway';
 import { deckSpans } from '../src/game/roads';
-
-const WEB = new URL('../', import.meta.url).pathname;
 
 /** Per place (a classic kind as `classic <kind>`): the worlds with a motorway at least, and their villages at least. */
 const FLOOR: Record<string, [number, number]> = {
@@ -38,29 +36,14 @@ const FLOOR: Record<string, [number, number]> = {
 };
 
 describe('the motorway, before the villages', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { generateFromSpec, landDraft, layOn } = await import('../src/game/macro');
   const { CLASSIC, WORLD_KINDS } = await import('../src/game/world');
-  type Templates = import('../src/game/town').Templates;
   type Draft = import('../src/game/town').NeighbourhoodDraft;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** A world's motorway (whether it has one) and its villages; what is wrong with its motorway. */
   const judged = (d: Draft) => {

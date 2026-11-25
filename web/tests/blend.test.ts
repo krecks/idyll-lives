@@ -18,40 +18,18 @@
 // moved the held pose to the lie's own root, 7 cm in a frame, and 1 cm more turned the way they get up to. And at 60
 // sim steps a second, put straight onto a bed, the body crossed a whole step's glide in one frame, 20 cm (a glide
 // over a step, not `GLIDE_SECONDS`); and hidden part way up from a seat, it came back on its way off it, 68 cm.)
-import { afterAll, describe, expect, test } from 'bun:test';
-import { readFileSync, existsSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { standInView } from './support/residentView';
+import { loadContent, usePublicFetch } from './support/content';
+import { readFileSync } from 'node:fs';
 import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
 describe('residents crossfade continuity', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, {
-    location: {
-      href: 'http://localhost/',
-      search: '',
-      origin: 'http://localhost',
-      pathname: '/',
-    },
-  });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(
-      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
-      'http://localhost/',
-    );
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  // (Both are process-wide: put the real ones back for whatever runs next.)
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
-  const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   const { slotPlace } = await import('../src/render/shared/objectMotion');
   const rig = await import('../src/render/shared/characters/rig');
@@ -69,49 +47,18 @@ describe('residents crossfade continuity', async () => {
   type ObjectPlacement = import('../src/core/protocol').ObjectPlacement;
   type SimInfo = import('../src/core/protocol').SimInfo;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
 
   /** The pose texture and nothing else: this test reads the bones, it draws nothing. */
   let poses: Float32Array = new Float32Array(0);
   let width = 0;
-  const view: View = {
+  const view: View = standInView({
     init(_set, data, w) {
       poses = data;
       width = w;
     },
-    setMorphs: () => {},
-    uploadPoses: () => {},
-    uploadPoseRows: () => {},
-    createPart: () => ({}),
-    partEnabled: () => {},
-    setPartRows: () => {},
-    partRows: () => {},
-    quiltMaterial: () => {},
-    createQuilt: () => ({}),
-    quiltRows: () => {},
-    quiltEnabled: () => {},
-    createRing: () => {},
-    ringMoved: () => {},
-    props: new TemplateCache<import('../src/render/shared/characters/view').ResidentProp | null>({
-      retell: () => {},
-      gone: () => false,
-      hide: () => {},
-      dispose: () => {},
-    }),
-    async buildProp(key) {
-      return {
-        key,
-        matrices: new Float32Array(MAX_CHARACTERS * 16),
-        top: [0, 0, 0] as const,
-      };
-    },
-    showProp: () => {},
-    onModelFile: () => () => {},
-    fileColour: async () => undefined,
-    camera: () => false,
-    onDispose: () => {},
-  };
+  });
 
   // --- the lot: a chair, a counter, a walker's tile, and a Sim carrying a load ------------------
   const P = Pose;

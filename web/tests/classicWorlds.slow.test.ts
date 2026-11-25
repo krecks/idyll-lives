@@ -17,12 +17,10 @@
 // the villages (2026-11-24: its course chosen with the main town alone, none costing a village; the villages kept
 // clear of it, its gates chosen by them; no side T where another area's street comes up end to end). A change that
 // moves one on purpose re-pins it here.
-import { afterAll, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
 import { CLASSIC, type ClassicKind } from './support/classicWorlds';
-
-const WEB = new URL('../', import.meta.url).pathname;
 
 /** Each world: its kind, its seed, and the first 16 hex digits of its draft's SHA-256. */
 const GOLDEN: [ClassicKind, number, string][] = [
@@ -63,27 +61,12 @@ const GOLDEN: [ClassicKind, number, string][] = [
 ];
 
 describe('classic worlds', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { generateFromSpec } = await import('../src/game/macro');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const hash = (text: string) => createHash('sha256').update(text).digest('hex').slice(0, 16);
 
   for (const [kind, seed, want] of GOLDEN) {
