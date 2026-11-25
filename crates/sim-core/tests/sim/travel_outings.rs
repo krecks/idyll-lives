@@ -414,3 +414,79 @@ fn nobody_sets_out_for_a_closed_place_and_those_there_go_home_as_it_shuts() {
         "still there well after it shut (seed, day, minute, resident): {stayed_late:?}"
     );
 }
+
+/// Sent to a place while busy, the visit queued behind a use at home that ends shortly before
+/// it shuts: when the use is over it shuts before they could get there (the way they'd go,
+/// half an hour by the taxi), so they don't set out (as the order would be refused then).
+#[test]
+fn a_visit_queued_till_too_late_to_get_there_before_it_shuts_isnt_set_out_for() {
+    let content = common::content();
+    let h = two_hamlets(&content, 31);
+    let mut w = World::from_json(&content, &h.town, 31).expect("the hamlets load");
+    let park = far_park(&w, &h);
+    let sim = w
+        .sims
+        .iter()
+        .position(|s| w.households[s.household as usize].player && s.adult(&w.content))
+        .expect("a grown-up of the player's");
+    let home = w.households[w.sims[sim].household as usize].plot;
+    // Something at home that takes a while, but much less than the way there.
+    let uses: Vec<(u32, usize)> = (0..w.objects.len())
+        .filter(|&o| w.plot_at(w.objects[o].x, w.objects[o].z) == home)
+        .flat_map(|o| {
+            let def = &w.content.objects[w.objects[o].def];
+            (0..def.interactions.len())
+                .filter(|&i| (10.0..=20.0).contains(&def.interactions[i].minutes))
+                .map(move |i| (o as u32, i))
+        })
+        .collect();
+    let (object, interaction) = uses
+        .into_iter()
+        .find(|&(object, interaction)| {
+            w.apply(sim_core::Command::Use {
+                sim: sim as u32,
+                object,
+                interaction,
+            })
+            .is_ok()
+        })
+        .expect("something at home to use for a while");
+    // The park shuts as soon as the order still fits: just as they could get there now.
+    let now = clock::minute_of_day(w.tick) as u16;
+    let close = (now + 1..now + 6 * 60)
+        .find(|&close| {
+            w.plots[park as usize].hours = Some(sim_core::world::PlotHours {
+                open: 0,
+                close,
+                days: 0b1111111,
+            });
+            w.apply(sim_core::Command::Visit {
+                sim: sim as u32,
+                plot: park,
+            })
+            .is_ok()
+        })
+        .expect("the visit is taken");
+    assert!(
+        close > now + 25,
+        "the way there takes {} minutes: too short to tell",
+        close - now
+    );
+    let (mut used, mut set_out) = (false, false);
+    common::until(&mut w, 60, |w| {
+        let s = &w.sims[sim];
+        let doing = s.current().map(|a| &a.task.kind);
+        used |=
+            matches!(doing, Some(&sim_core::world::TaskKind::Use { object: o, .. }) if o == object);
+        set_out |= matches!(doing, Some(&sim_core::world::TaskKind::Visit { plot }) if plot == park)
+            || s.visiting.is_some_and(|v| v.plot == park);
+        false
+    });
+    assert!(used, "they used object {object} ({interaction}) first");
+    assert!(
+        !set_out,
+        "they set out for the park after the use, though it shuts at {:02}:{:02}",
+        close / 60,
+        close % 60
+    );
+}

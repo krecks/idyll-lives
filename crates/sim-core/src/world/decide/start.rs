@@ -5,9 +5,9 @@ use crate::content::{HabitTime, Layer, Pose};
 use crate::conversation;
 use crate::world::{
     Access, Activity, Ctx, News, ObjectInstance, Phase, Sim, Task, TaskKind, access, closed_now,
-    conditions_met, exit_on_foot, fetch_source, footstool_slots, guest_may, habit, leisure_ride,
-    no_bike_out, open_ground_near, order_access, outing_fits_now, seat_near_object, taxi_from_home,
-    unfit, upper_barred, walk_route,
+    conditions_met, exit_on_foot, fetch_source, footstool_slots, guest_may, habit, leisure_eta,
+    leisure_ride, no_bike_out, open_ground_near, order_access, outing_fits_now, seat_near_object,
+    taxi_from_home, unfit, upper_barred, walk_route,
 };
 
 pub(crate) fn start_task(
@@ -54,11 +54,15 @@ pub(crate) fn start_task(
     {
         return;
     }
-    // Nobody sets off for a place shut now (its hours, `Plot::open_at`), asked to or not: one shut
-    // since it was chosen.
+    // Nobody sets off for a place shut now (its hours, `Plot::open_at`), or that shuts before they
+    // could get there the way they'd go (`leisure_eta`, as an order is refused), asked to or not:
+    // one shut since it was chosen, or a visit queued behind work or a long use.
     if let TaskKind::Visit { plot } = task.kind
         && sim.visiting.is_none_or(|v| v.plot != plot)
-        && !ctx.plots[plot as usize].open_at(ctx.day, ctx.minute)
+        && ctx.plots[plot as usize].hours.is_some()
+        && (!ctx.plots[plot as usize].open_at(ctx.day, ctx.minute)
+            || leisure_eta(sim, ctx, objects, plot)
+                .is_some_and(|eta| ctx.plots[plot as usize].open_for(ctx.day, ctx.minute) < eta))
     {
         return;
     }

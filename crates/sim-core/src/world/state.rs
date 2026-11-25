@@ -422,51 +422,9 @@ impl World {
         Ok(())
     }
     /// About how many minutes resident `i` would take to get to `plot` from where they are now,
-    /// the way they'd go (`leisure_way`: the car, a bike of theirs, the taxi, else on foot).
+    /// the way they'd go (`leisure_eta`).
     pub(super) fn leisure_eta_now(&self, i: usize, plot: u32) -> Option<f32> {
-        let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
-            return None;
-        };
-        let pos = self.nav().stairs.ground_pos(sim.pos);
-        let goer = Goer {
-            drives: crate::cars::can_drive(
-                &self.travel,
-                &self.households,
-                &self.plots,
-                &self.briefs,
-                &self.cars,
-                sim,
-            ),
-            bike: crate::ride::leisure_bike(
-                &self.content,
-                &self.object_index,
-                &self.briefs,
-                &self.households,
-                &self.objects,
-                sim,
-            )
-            .map(|(_, speed, min)| (speed, min)),
-        };
-        let door = p.arrival_point();
-        let taxi = self
-            .taxis
-            .takes(sim)
-            .then(|| {
-                crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door)
-            })
-            .flatten();
-        let (_, eta) = leisure_way(
-            &self.travel,
-            &self.content,
-            pos,
-            sim.walk_per_minute(&self.content),
-            plot,
-            door,
-            goer,
-            taxi,
-            &mut [None, None],
-        );
-        Some(eta)
+        leisure_eta(self.sims.get(i)?, &self.ctx(), &self.objects, plot)
     }
     /// The lots on the ground, in id order (`lots_of`).
     pub fn lots(&self) -> &[Plot] {
