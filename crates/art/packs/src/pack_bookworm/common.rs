@@ -1,12 +1,13 @@
 //! What the bookworm pack is built from: its palette, books, china and lamps shared by the six.
 
 use artkit::materials::Mat;
-use artkit::math::{cos, degrees, sin};
+use artkit::math::{cos, cosd, degrees, sin, sind};
 use artkit::parts::numbered;
 use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fsweep, kit, palette, revolve, torus};
+use artkit::math::P3;
+use artkit::{fbox, fcyl, fsweep, kit, object_of, palette, revolve, torus};
 
 palette! { M:
     body = ("#9A6A45", wood), // the library walnut: cases, shelves, the bureau; the main part
@@ -102,6 +103,67 @@ pub fn book(
     pages(fbox!(f, name, w, h, d, at, cover, rot = rot), lying)
 }
 
+/// A book as much of it shows: its spine, top and sides, the edges between them chamfered 4 mm, and its back
+/// (`back`) where it shows; its bottom (on a shelf or the book below) is left out, as is the back of one standing in
+/// a row (on the case's back). Turned `turn` degrees about its upright middle, paged as `pages` does. 30 triangles
+/// (20 in a row), where a whole chamfered box takes 44: a library wall holds some 190 books.
+#[allow(clippy::too_many_arguments)]
+fn shell_book(
+    f: &GameFrame,
+    name: &str,
+    w: f64,
+    h: f64,
+    d: f64,
+    at: (f64, f64, f64),
+    cover: Mat,
+    turn: f64,
+    back: bool,
+    lying: bool,
+) -> Obj {
+    let c = f.at(at.0, at.1, at.2);
+    let e = 0.004;
+    // (made about its middle in the kernel's axes: x left, y to the back, z up; the spine looks to -y)
+    let (x1, y1, z1) = (w / 2.0, d / 2.0, h / 2.0);
+    let (xa, ya, za) = (x1 - e, y1 - e, z1 - e);
+    let (tc, ts) = (cosd(turn), sind(turn));
+    let mut verts: Vec<P3> = Vec::new();
+    let mut faces: Vec<Vec<u32>> = Vec::new();
+    // a face through these corners, wound to look along `out`; none looking back where the back is left out
+    let mut face = |pts: &[(f64, f64, f64)], out: (f64, f64, f64)| {
+        if !back && out.1 > 0.0 {
+            return;
+        }
+        let at = verts.len() as u32;
+        let turned = |(x, y, z): (f64, f64, f64)| (x * tc - y * ts, x * ts + y * tc, z);
+        verts.extend(pts.iter().map(|&p| {
+            let (x, y, z) = turned(p);
+            P3::from((c.x + x, c.y + y, c.z + z))
+        }));
+        let (a, b, q) = (pts[0], pts[1], pts[2]);
+        let (u, v) = ((b.0 - a.0, b.1 - a.1, b.2 - a.2), (q.0 - a.0, q.1 - a.1, q.2 - a.2));
+        let n = (u.1 * v.2 - u.2 * v.1, u.2 * v.0 - u.0 * v.2, u.0 * v.1 - u.1 * v.0);
+        let mut ids: Vec<u32> = (at..at + pts.len() as u32).collect();
+        if n.0 * out.0 + n.1 * out.1 + n.2 * out.2 < 0.0 {
+            ids.reverse();
+        }
+        faces.push(ids);
+    };
+    face(&[(-xa, -ya, z1), (xa, -ya, z1), (xa, ya, z1), (-xa, ya, z1)], (0.0, 0.0, 1.0)); // the top
+    for s in [-1.0, 1.0] {
+        let (x, xi, y, yi) = (s * x1, s * xa, s * y1, s * ya);
+        face(&[(-xa, y, -z1), (xa, y, -z1), (xa, y, za), (-xa, y, za)], (0.0, s, 0.0)); // the spine, the back
+        face(&[(x, -ya, -z1), (x, ya, -z1), (x, ya, za), (x, -ya, za)], (s, 0.0, 0.0)); // a side
+        face(&[(-xa, y, za), (xa, y, za), (xa, yi, z1), (-xa, yi, z1)], (0.0, s, 1.0)); // spine or back to top
+        face(&[(x, -ya, za), (x, ya, za), (xi, ya, z1), (xi, -ya, z1)], (s, 0.0, 1.0)); // side to top
+        for t in [-1.0, 1.0] {
+            let (yt, yti) = (t * y1, t * ya);
+            face(&[(xi, yt, -z1), (x, yti, -z1), (x, yti, za), (xi, yt, za)], (s, t, 0.0)); // upright corner
+            face(&[(xi, yt, za), (x, yti, za), (xi, yti, z1)], (s, t, 1.0)); // a top corner
+        }
+    }
+    pages(object_of!(name, &verts, &faces, &[cover]), lying)
+}
+
 /// A row of books standing on `y` from `x0` towards `x1` (game), spines to the front, backs on `z_back`;
 /// the gap left at the end takes a short pile lying flat (`stack`) or a book leaning on the row (`lean`).
 #[allow(clippy::too_many_arguments)]
@@ -125,7 +187,7 @@ pub fn books(
         let d = depth * rnd.uniform(0.78, 1.0);
         let n = numbered("book");
         let cover = rnd.choice(&BOOKS);
-        book(
+        shell_book(
             f,
             &n,
             t,
@@ -133,7 +195,8 @@ pub fn books(
             d,
             (x + t / 2.0, y + h / 2.0, z_back + d / 2.0),
             cover,
-            (0.0, 0.0, 0.0),
+            0.0,
+            false,
             false,
         );
         x += t + 0.002;
@@ -201,17 +264,7 @@ pub fn pile(
         let bx = x + rnd.uniform(-0.01, 0.01);
         let cover = rnd.choice(&BOOKS);
         let turn = rnd.uniform(-10.0, 10.0);
-        book(
-            f,
-            &nm,
-            bw,
-            h,
-            bd,
-            (bx, y + h / 2.0, z),
-            cover,
-            (0.0, 0.0, turn),
-            true,
-        );
+        shell_book(f, &nm, bw, h, bd, (bx, y + h / 2.0, z), cover, turn, true, true);
         y += h;
     }
     y

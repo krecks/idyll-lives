@@ -52,7 +52,7 @@ pub fn family() -> Family {
                 .centre(0.0, -0.005)
                 .motions(json!({"uses": {"readByFire": "flames", "readAloud": "flames"}}))
                 .paint(&[("walnut", "Wood"), ("velvet", "Fabric"), ("rug", "Rug")]),
-            Model::new("bedsideStack", fire::bedside_stack, (0.626, 0.931, 0.73))
+            Model::new("bedsideStack", fire::bedside_stack, (0.6, 0.66, 0.451))
                 .key("model.bookworm.bedsideStack")
                 .centre(0.023, -0.06)
                 .motions(json!({"uses": {"chapter": "book_up"}}))
