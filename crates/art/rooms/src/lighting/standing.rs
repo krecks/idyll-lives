@@ -1,8 +1,6 @@
 //! LT2, the wall lights, and LT3, the floor lamps.
 
-use super::common::{
-    Drum, F, Lathe, M, WALL, bulb, check_at, drum, lathe, ring_at, socket, turn, turned,
-};
+use super::common::{Drum, F, Lathe, M, WALL, bulb, check_at, drum, lathe, ring_at, socket};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::kit;
@@ -17,8 +15,12 @@ use artkit::{fbox, fcyl, fextrude, fsphere, loft, settle, torus};
 /// bottom edges, on a wire fitter.
 pub fn wall_sconce() -> Vec<Obj> {
     new_parts(|| {
-        turned(
+        kit::turned!(
+            F,
             "plate",
+            0,
+            1.7,
+            WALL,
             &[
                 (0.0, 0.0),
                 (0.06, 0.0),
@@ -28,10 +30,9 @@ pub fn wall_sconce() -> Vec<Obj> {
                 (0.016, 0.022),
                 (0.0, 0.022),
             ],
-            (0, 1.7, WALL),
             M.brass,
-            20,
-            (90.0, 0.0, 0.0),
+            segments = 20,
+            rot = (90.0, 0.0, 0.0)
         );
         kit::tube!(
             F,
@@ -47,8 +48,12 @@ pub fn wall_sconce() -> Vec<Obj> {
             verts = 8,
             round = 3
         );
-        turn(
+        kit::turned!(
+            F,
             "cup",
+            0,
+            1.72,
+            -0.26,
             &[
                 (0.0, 0.0),
                 (0.012, 0.0),
@@ -58,9 +63,8 @@ pub fn wall_sconce() -> Vec<Obj> {
                 (0.02, 0.03),
                 (0.0, 0.03),
             ],
-            (0, 1.72, -0.26),
             M.brass,
-            14,
+            segments = 14
         );
         for a in [90, 210, 330] {
             let af = a as f64;
@@ -122,8 +126,12 @@ const ARM_SHADE: [(f64, f64); 9] = [
 /// thumb screws between them, and a tilted cone shade with a rolled rim and a switch on its crown.
 pub fn wall_lamp_arm() -> Vec<Obj> {
     new_parts(|| {
-        turned(
+        kit::turned!(
+            F,
             "plate",
+            0,
+            1.55,
+            WALL,
             &[
                 (0.0, 0.0),
                 (0.055, 0.0),
@@ -132,18 +140,20 @@ pub fn wall_lamp_arm() -> Vec<Obj> {
                 (0.022, 0.02),
                 (0.0, 0.02),
             ],
-            (0, 1.55, WALL),
             M.iron,
-            22,
-            (90.0, 0.0, 0.0),
+            segments = 22,
+            rot = (90.0, 0.0, 0.0)
         );
-        turned(
+        kit::turned!(
+            F,
             "pivot",
+            0,
+            1.55,
+            WALL + 0.018,
             &[(0.0, 0.0), (0.016, 0.0), (0.016, 0.03), (0.0, 0.03)],
-            (0, 1.55, WALL + 0.018),
             M.brass,
-            12,
-            (90.0, 0.0, 0.0),
+            segments = 12,
+            rot = (90.0, 0.0, 0.0)
         );
         kit::tube!(
             F,
@@ -366,8 +376,12 @@ pub fn wall_light_outdoor() -> Vec<Obj> {
 /// a brass harp bowing round the bulb to a finial, a drum shade with corded trims on a wire fitter, a pull chain.
 pub fn lamp() -> Vec<Obj> {
     new_parts(|| {
-        turn(
+        kit::turned!(
+            F,
             "foot",
+            0,
+            0,
+            0,
             &[
                 (0.0, 0.0),
                 (0.15, 0.0),
@@ -381,9 +395,8 @@ pub fn lamp() -> Vec<Obj> {
                 (0.018, 0.07),
                 (0.0, 0.07),
             ],
-            (0, 0, 0),
             M.stand,
-            32,
+            segments = 32
         );
         kit::tube!(
             F,
@@ -395,8 +408,12 @@ pub fn lamp() -> Vec<Obj> {
             round = 1
         );
         for y in [0.5, 1.0] {
-            turn(
-                &format!("collar{}", float_repr(y)),
+            kit::turned!(
+                F,
+                format!("collar{}", float_repr(y)),
+                0,
+                y - 0.015,
+                0,
                 &[
                     (0.0, 0.0),
                     (0.016, 0.0),
@@ -405,9 +422,8 @@ pub fn lamp() -> Vec<Obj> {
                     (0.016, 0.03),
                     (0.0, 0.03),
                 ],
-                (0, y - 0.015, 0),
                 M.brass,
-                14,
+                segments = 14
             );
         }
         socket("socket", 0.025, 0.08, (0, 1.435, 0), M.brass, 16);
@@ -459,8 +475,12 @@ pub fn lamp() -> Vec<Obj> {
             verts = 6,
             round = 3
         );
-        turn(
+        kit::turned!(
+            F,
             "finial",
+            0,
+            1.776,
+            0,
             &[
                 (0.0, 0.0),
                 (0.006, 0.0),
@@ -470,9 +490,8 @@ pub fn lamp() -> Vec<Obj> {
                 (0.005, 0.031),
                 (0.0, 0.032),
             ],
-            (0, 1.776, 0),
             M.brass,
-            14,
+            segments = 14
         );
         drum(
             "shade",
@@ -513,8 +532,12 @@ pub fn lamp() -> Vec<Obj> {
             verts = 4,
             round = 1
         );
-        turn(
+        kit::turned!(
+            F,
             "pull",
+            0.04,
+            1.292,
+            0,
             &[
                 (0.0, 0.0),
                 (0.004, 0.0),
@@ -523,9 +546,8 @@ pub fn lamp() -> Vec<Obj> {
                 (0.002, 0.02),
                 (0.0, 0.02),
             ],
-            (0.04, 1.292, 0),
             M.brass,
-            10,
+            segments = 10
         );
     });
     join_all("lamp");
@@ -548,8 +570,12 @@ pub fn floor_lamp_simple() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 2
         );
-        turn(
+        kit::turned!(
+            F,
             "boss",
+            0,
+            0.03,
+            0,
             &[
                 (0.0, 0.0),
                 (0.034, 0.0),
@@ -558,9 +584,8 @@ pub fn floor_lamp_simple() -> Vec<Obj> {
                 (0.014, 0.03),
                 (0.0, 0.03),
             ],
-            (0, 0.03, 0),
             M.iron,
-            16,
+            segments = 16
         );
         kit::tube!(
             F,
@@ -571,12 +596,15 @@ pub fn floor_lamp_simple() -> Vec<Obj> {
             verts = 10,
             round = 1
         );
-        turn(
+        kit::turned!(
+            F,
             "coupling",
+            0,
+            0.44,
+            0,
             &[(0.0, 0.0), (0.015, 0.0), (0.015, 0.03), (0.0, 0.03)],
-            (0, 0.44, 0),
             M.iron,
-            12,
+            segments = 12
         );
         fbox!(
             F,
@@ -700,8 +728,12 @@ pub fn lamp_floor_arc() -> Vec<Obj> {
     let (bx, bz) = ARC_BASE;
     let (sx, sz) = ARC_SHADE_AT;
     new_parts(|| {
-        turn(
+        kit::turned!(
+            F,
             "base",
+            bx,
+            0,
+            bz,
             &[
                 (0.0, 0.0),
                 (0.15, 0.0),
@@ -711,12 +743,15 @@ pub fn lamp_floor_arc() -> Vec<Obj> {
                 (0.07, 0.06),
                 (0.0, 0.06),
             ],
-            (bx, 0, bz),
             M.marble,
-            36,
+            segments = 36
         );
-        turn(
+        kit::turned!(
+            F,
             "foot_collar",
+            bx,
+            0.06,
+            bz,
             &[
                 (0.0, 0.0),
                 (0.032, 0.0),
@@ -725,15 +760,18 @@ pub fn lamp_floor_arc() -> Vec<Obj> {
                 (0.017, 0.04),
                 (0.0, 0.04),
             ],
-            (bx, 0.06, bz),
             M.arc,
-            16,
+            segments = 16
         );
         let mut arc = vec![(bx, 0.09, bz), (bx, 0.55, bz)];
         arc.extend((0..23).map(|k| bezier(&ARC, k as f64 / 22.0)));
         kit::tube!(F, "arc", &arc, 0.0125, M.arc, verts = 10, round = 2);
-        turn(
+        kit::turned!(
+            F,
             "sleeve",
+            bx,
+            0.92,
+            bz,
             &[
                 (0.0, 0.0),
                 (0.017, 0.0),
@@ -742,9 +780,8 @@ pub fn lamp_floor_arc() -> Vec<Obj> {
                 (0.017, 0.056),
                 (0.0, 0.056),
             ],
-            (bx, 0.92, bz),
             M.arc,
-            14,
+            segments = 14
         );
         fbox!(
             F,
@@ -842,8 +879,12 @@ pub fn lamp_floor_tripod() -> Vec<Obj> {
                 round = 1
             );
         }
-        turn(
+        kit::turned!(
+            F,
             "hub",
+            0,
+            1.24,
+            0,
             &[
                 (0.0, 0.0),
                 (0.02, 0.0),
@@ -854,9 +895,8 @@ pub fn lamp_floor_tripod() -> Vec<Obj> {
                 (0.014, 0.08),
                 (0.0, 0.08),
             ],
-            (0, 1.24, 0),
             M.brass,
-            16,
+            segments = 16
         );
         socket("socket", 0.02, 0.05, (0, 1.32, 0), M.brass, 12);
         bulb(
@@ -893,8 +933,12 @@ pub fn lamp_floor_tripod() -> Vec<Obj> {
 /// petalled rim on a cup.
 pub fn lamp_torchiere() -> Vec<Obj> {
     new_parts(|| {
-        turn(
+        kit::turned!(
+            F,
             "base",
+            0,
+            0,
+            0,
             &[
                 (0.0, 0.0),
                 (0.15, 0.0),
@@ -905,9 +949,8 @@ pub fn lamp_torchiere() -> Vec<Obj> {
                 (0.03, 0.05),
                 (0.0, 0.05),
             ],
-            (0, 0, 0),
             M.iron,
-            36,
+            segments = 36
         );
         kit::tube!(
             F,
@@ -919,8 +962,12 @@ pub fn lamp_torchiere() -> Vec<Obj> {
             round = 1
         );
         for y in [0.6, 1.15] {
-            turn(
-                &format!("collar{}", float_repr(y)),
+            kit::turned!(
+                F,
+                format!("collar{}", float_repr(y)),
+                0,
+                y,
+                0,
                 &[
                     (0.0, 0.0),
                     (0.017, 0.0),
@@ -929,9 +976,8 @@ pub fn lamp_torchiere() -> Vec<Obj> {
                     (0.017, 0.028),
                     (0.0, 0.028),
                 ],
-                (0, y, 0),
                 M.brass,
-                14,
+                segments = 14
             );
         }
         fbox!(
@@ -955,8 +1001,12 @@ pub fn lamp_torchiere() -> Vec<Obj> {
             rot = (90, 0, 0),
             verts = 12
         );
-        turn(
+        kit::turned!(
+            F,
             "cup",
+            0,
+            1.69,
+            0,
             &[
                 (0.0, 0.0),
                 (0.018, 0.0),
@@ -965,9 +1015,8 @@ pub fn lamp_torchiere() -> Vec<Obj> {
                 (0.044, 0.04),
                 (0.0, 0.04),
             ],
-            (0, 1.69, 0),
             M.brass,
-            16,
+            segments = 16
         );
         // the bowl: lofted from its foot to a rim of eight soft petals, and back down inside
         let b = F.at(0, 0, 0);

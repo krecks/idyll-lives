@@ -211,36 +211,6 @@ pub fn pear<A: Coord, C: Coord>(id: &str, r: f64, at: (A, f64, C), segments: usi
     )
 }
 
-/// A turned part: `profile` [(radius, up), ...] in metres from its foot at game point `at`, bottom first.
-pub fn turned<A: Coord, B: Coord, C: Coord>(
-    name: &str,
-    profile: &[(f64, f64)],
-    at: (A, B, C),
-    material: Mat,
-    segments: usize,
-    rot: (f64, f64, f64),
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = F.at(at.0, at.1, at.2),
-        material = material,
-        segments = segments,
-        rot = rot
-    )
-}
-
-/// A turned part, upright.
-pub fn turn<A: Coord, B: Coord, C: Coord>(
-    name: &str,
-    profile: &[(f64, f64)],
-    at: (A, B, C),
-    material: Mat,
-    segments: usize,
-) -> Obj {
-    turned(name, profile, at, material, segments, (0.0, 0.0, 0.0))
-}
-
 /// A level ring (a rolled rim, a wire, a bead) of radius `r` and thickness `t` round game point `at`.
 #[allow(clippy::too_many_arguments)]
 pub fn ring_at<A: Coord, B: Coord, C: Coord>(
@@ -512,8 +482,12 @@ pub fn trough(name: &str, r: f64, length: f64, t: f64, at: P3, material: Mat) ->
 
 /// A ceiling canopy: a shallow turned cup against the ceiling, `r` across and `h` deep, a cord grip below.
 pub fn canopy(name: &str, r: f64, h: f64, material: Mat, segments: usize, y: f64) -> Obj {
-    turn(
+    kit::turned!(
+        F,
         name,
+        0,
+        y - h,
+        0,
         &[
             (0.0, 0.0),
             (r * 0.22, 0.0),
@@ -525,9 +499,8 @@ pub fn canopy(name: &str, r: f64, h: f64, material: Mat, segments: usize, y: f64
             (r, h),
             (0.0, h),
         ],
-        (0, y - h, 0),
         material,
-        segments,
+        segments = segments
     )
 }
 
@@ -562,8 +535,12 @@ pub fn socket<A: Coord, C: Coord>(
     material: Mat,
     segments: usize,
 ) -> Obj {
-    turn(
+    kit::turned!(
+        F,
         name,
+        at.0,
+        at.1,
+        at.2,
         &[
             (0.0, 0.0),
             (r * 0.82, 0.0),
@@ -579,9 +556,8 @@ pub fn socket<A: Coord, C: Coord>(
             (r * 0.7, h),
             (0.0, h),
         ],
-        at,
         material,
-        segments,
+        segments = segments
     )
 }
 

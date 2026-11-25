@@ -1,6 +1,6 @@
 //! The four dressing things.
 
-use super::common::{F, M, ellipse, frame_loop, moulding, oval, pane, rounded, side_knob, turned};
+use super::common::{F, M, ellipse, frame_loop, moulding, oval, pane, rounded, side_knob};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
@@ -74,8 +74,10 @@ pub fn mirror() -> Vec<Obj> {
         bevel = 0.008,
         bevel_segments = 2
     );
-    turned(
+    kit::turned!(
+        F,
         "crest_finial",
+        0,
         0,
         0,
         &[
@@ -87,7 +89,7 @@ pub fn mirror() -> Vec<Obj> {
             (0.0, top + 0.096),
         ],
         M.frame,
-        16,
+        segments = 16
     );
     // two turned posts on their feet, a turned stretcher low between them
     for s in [-1, 1] {
@@ -123,9 +125,11 @@ pub fn mirror() -> Vec<Obj> {
             bevel = 0.008,
             bevel_segments = 2
         );
-        turned(
-            &format!("post{s}"),
+        kit::turned!(
+            F,
+            format!("post{s}"),
             x,
+            0,
             0,
             &[
                 (0.0, 0.05),
@@ -148,11 +152,13 @@ pub fn mirror() -> Vec<Obj> {
                 (0.0, 1.0),
             ],
             M.frame,
-            16,
+            segments = 16
         );
-        turned(
-            &format!("finial{s}"),
+        kit::turned!(
+            F,
+            format!("finial{s}"),
             x,
+            0,
             0,
             &[
                 (0.0, 0.996),
@@ -165,7 +171,7 @@ pub fn mirror() -> Vec<Obj> {
                 (0.0, 1.049),
             ],
             M.frame,
-            14,
+            segments = 14
         );
         // the pivot: an axle from the frame into the post, a turned brass knob outside it
         cylinder!(
@@ -209,7 +215,7 @@ pub fn mirror() -> Vec<Obj> {
 }
 
 // --- the dressing table: 1x1, a kneehole table on brass legs, an oval mirror, a pouf -------------------
-// Its mirror against the wall, the pouf at the front (depth +0.22, the seat 0.45 high: characters.ts SEATS,
+// Its mirror against the wall, the pouf at the front (depth +0.22, the seat 0.45 high: furniture.json `seats`,
 // `back`: the sitter faces the mirror). The numbers below are as it was first built, facing the wall (the
 // pouf at -0.22, the mirror at its far edge facing back at it); `dressing_table` turns it round at the end.
 
@@ -460,9 +466,11 @@ pub fn dressing_table() -> Vec<Obj> {
                 verts = 10,
                 round = 1
             );
-            turned(
-                &format!("upright_top{s}"),
+            kit::turned!(
+                F,
+                format!("upright_top{s}"),
                 sx * 0.33,
+                0,
                 OVAL_Z,
                 &[
                     (0.0, OVAL_Y + 0.025),
@@ -474,7 +482,7 @@ pub fn dressing_table() -> Vec<Obj> {
                     (0.0, OVAL_Y + 0.061),
                 ],
                 M.table_frame,
-                12,
+                segments = 12
             );
             rod!(
                 format!("pivot{s}"),

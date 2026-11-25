@@ -2,9 +2,10 @@
 //! caddies and curtains.
 
 use super::M;
-use super::common::{LATHE, Lathe, bends, lathe, tube, wall_rose};
+use super::common::{LATHE, Lathe, bends, lathe, wall_rose};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, TAU, V3, cos, cosd, sin, sind, v3};
 use artkit::parts::{join, new_parts};
@@ -352,15 +353,14 @@ pub fn hand_shower(
     material: Mat,
     hose_from: (f64, f64, f64),
 ) {
-    tube(
+    kit::tube!(
         f,
         "riser",
         &[(x, y0, z), (x, y1, z)],
         0.011,
         material,
-        10,
-        1,
-        1.0,
+        verts = 10,
+        round = 1
     );
     for y in [y0, y1] {
         wall_rose(
@@ -387,7 +387,7 @@ pub fn hand_shower(
         bevel_segments = 1
     );
     let hy = y0 + (y1 - y0) * 0.6;
-    tube(
+    kit::tube!(
         f,
         "hand_shower",
         &[
@@ -397,9 +397,9 @@ pub fn hand_shower(
         ],
         0.013,
         material,
-        10,
-        2,
-        [0.8, 1.0, 1.1],
+        verts = 10,
+        round = 2,
+        scale = [0.8, 1.0, 1.1]
     );
     let (hx, hy0, hz) = hose_from;
     fcyl!(
@@ -414,7 +414,7 @@ pub fn hand_shower(
         bevel = 0.006,
         bevel_segments = 1
     );
-    tube(
+    kit::tube!(
         f,
         "hose",
         &[
@@ -426,9 +426,7 @@ pub fn hand_shower(
         ],
         0.006,
         material,
-        6,
-        3,
-        1.0,
+        verts = 6
     );
 }
 
@@ -448,15 +446,14 @@ pub fn bar_mixer(f: &GameFrame, x: f64, y: f64, z: f64, w: f64, material: Mat) {
             14,
         );
     }
-    tube(
+    kit::tube!(
         f,
         "mixer",
         &[(x - w / 2.0, y, z + 0.045), (x + w / 2.0, y, z + 0.045)],
         0.022,
         material,
-        14,
-        1,
-        1.0,
+        verts = 14,
+        round = 1
     );
     for s in [-1, 1] {
         fcyl!(
@@ -497,7 +494,7 @@ pub fn caddy(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64, 
         bevel = 0.003,
         bevel_segments = 1
     );
-    tube(
+    kit::tube!(
         f,
         format!("{name}_rail"),
         &[
@@ -508,12 +505,11 @@ pub fn caddy(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64, 
         ],
         0.004,
         material,
-        6,
-        2,
-        1.0,
+        verts = 6,
+        round = 2
     );
     for s in [-1, 1] {
-        tube(
+        kit::tube!(
             f,
             format!("{name}_post{s}"),
             &[
@@ -522,9 +518,8 @@ pub fn caddy(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64, 
             ],
             0.003,
             material,
-            6,
-            1,
-            1.0,
+            verts = 6,
+            round = 1
         );
     }
 }

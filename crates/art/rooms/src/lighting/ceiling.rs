@@ -4,7 +4,7 @@
 
 use super::common::{
     CEILING, DOME, F, Lathe, M, bulb, canopy, check_at, hang, lathe, loft_at, near_light, pear,
-    ring_at, socket, turn,
+    ring_at, socket,
 };
 use artkit::forms::{Plane, rounded_rect, smooth_outline};
 use artkit::json::float_repr;
@@ -34,8 +34,12 @@ pub fn ceiling_pendant() -> Vec<Obj> {
             },
         );
         ring_at("dome_lip", 0.209, (0, 2.124, 0), 0.006, M.dome, 40, 6);
-        turn(
+        kit::turned!(
+            F,
             "collar",
+            0,
+            2.344,
+            0,
             &[
                 (0.0, 0.0),
                 (0.064, 0.0),
@@ -44,9 +48,8 @@ pub fn ceiling_pendant() -> Vec<Obj> {
                 (0.034, 0.018),
                 (0.0, 0.018),
             ],
-            (0, 2.344, 0),
             M.brass,
-            24,
+            segments = 24
         );
         pear("ceilingPendant", 0.04, (0, 2.162, 0), 14);
     });
@@ -80,8 +83,12 @@ pub fn ceiling_light() -> Vec<Obj> {
             verts = 8,
             round = 1
         );
-        turn(
+        kit::turned!(
+            F,
             "stem_collar",
+            0,
+            2.548,
+            0,
             &[
                 (0.0, 0.0),
                 (0.016, 0.0),
@@ -89,9 +96,8 @@ pub fn ceiling_light() -> Vec<Obj> {
                 (0.01, 0.02),
                 (0.0, 0.02),
             ],
-            (0, 2.548, 0),
             M.iron,
-            12,
+            segments = 12
         );
         // the hipped lid, curving up from its eaves to a knob
         loft_at(
@@ -254,8 +260,12 @@ pub fn chandelier() -> Vec<Obj> {
             minor_segments = 4
         );
         // the column, turned, its widest bulge the hub the arms spring from
-        turn(
+        kit::turned!(
+            F,
             "column",
+            0,
+            2.28,
+            0,
             &[
                 (0.0, 0.0),
                 (0.01, 0.0),
@@ -269,19 +279,25 @@ pub fn chandelier() -> Vec<Obj> {
                 (0.008, 0.22),
                 (0.0, 0.22),
             ],
-            (0, 2.28, 0),
             M.brass,
-            12,
+            segments = 12
         );
-        turn(
+        kit::turned!(
+            F,
             "collar",
+            0,
+            2.204,
+            0,
             &[(0.0, 0.0), (0.014, 0.0), (0.014, 0.012), (0.0, 0.012)],
-            (0, 2.204, 0),
             M.brass,
-            10,
+            segments = 10
         );
-        turn(
+        kit::turned!(
+            F,
             "finial",
+            0,
+            2.04,
+            0,
             &[
                 (0.0, 0.0),
                 (0.004, 0.0),
@@ -291,9 +307,8 @@ pub fn chandelier() -> Vec<Obj> {
                 (0.006, 0.05),
                 (0.0, 0.05),
             ],
-            (0, 2.04, 0),
             M.brass,
-            10,
+            segments = 10
         );
         ring_at("ring_low", 0.435, (0, 2.05, 0), 0.013, M.brass, 36, 4);
         ring_at("ring_high", 0.27, (0, 2.21, 0), 0.011, M.brass, 28, 4);
@@ -339,17 +354,20 @@ pub fn chandelier() -> Vec<Obj> {
             for k in 0..n {
                 let a = (360 * k) as f64 / n as f64 + if n == 6 { 15.0 } else { 0.0 };
                 let (x, z) = (ring * cosd(a), ring * sind(a));
-                turn(
-                    &format!("cup{}_{k}", float_repr(y)),
+                kit::turned!(
+                    F,
+                    format!("cup{}_{k}", float_repr(y)),
+                    x,
+                    y - r - 0.014,
+                    z,
                     &[
                         (0.0, 0.0),
                         (size, size * 0.6),
                         (size, size * 0.85),
                         (0.0, size * 0.85),
                     ],
-                    (x, y - r - 0.014, z),
                     M.brass,
-                    6,
+                    segments = 6
                 );
                 fsphere!(
                     F,
@@ -383,8 +401,12 @@ pub fn pendant_industrial() -> Vec<Obj> {
     new_parts(|| {
         hang("pendantIndustrial", 2.24, Some(M.iron), 0.06, None);
         socket("socket", 0.026, 0.05, (0, 2.205, 0), M.iron, 16);
-        turn(
+        kit::turned!(
+            F,
             "fitter",
+            0,
+            2.18,
+            0,
             &[
                 (0.0, 0.0),
                 (0.058, 0.0),
@@ -394,9 +416,8 @@ pub fn pendant_industrial() -> Vec<Obj> {
                 (0.03, 0.03),
                 (0.0, 0.03),
             ],
-            (0, 2.18, 0),
             M.iron,
-            24,
+            segments = 24
         );
         lathe(
             "dome",
@@ -433,8 +454,12 @@ pub fn ceiling_fan() -> Vec<Obj> {
             verts = 10,
             round = 1
         );
-        turn(
+        kit::turned!(
+            F,
             "ball_cover",
+            0,
+            2.725,
+            0,
             &[
                 (0.0, 0.0),
                 (0.016, 0.0),
@@ -443,12 +468,15 @@ pub fn ceiling_fan() -> Vec<Obj> {
                 (0.016, 0.03),
                 (0.0, 0.03),
             ],
-            (0, 2.725, 0),
             M.white,
-            14,
+            segments = 14
         );
-        turn(
+        kit::turned!(
+            F,
             "coupler",
+            0,
+            2.6,
+            0,
             &[
                 (0.0, 0.0),
                 (0.022, 0.0),
@@ -456,12 +484,15 @@ pub fn ceiling_fan() -> Vec<Obj> {
                 (0.016, 0.03),
                 (0.0, 0.03),
             ],
-            (0, 2.6, 0),
             M.white,
-            14,
+            segments = 14
         );
-        turn(
+        kit::turned!(
+            F,
             "motor",
+            0,
+            2.5,
+            0,
             &[
                 (0.0, 0.0),
                 (0.1, 0.0),
@@ -476,12 +507,15 @@ pub fn ceiling_fan() -> Vec<Obj> {
                 (0.04, 0.12),
                 (0.0, 0.12),
             ],
-            (0, 2.5, 0),
             M.white,
-            32,
+            segments = 32
         );
-        turn(
+        kit::turned!(
+            F,
             "switch_cup",
+            0,
+            2.46,
+            0,
             &[
                 (0.0, 0.0),
                 (0.076, 0.0),
@@ -490,9 +524,8 @@ pub fn ceiling_fan() -> Vec<Obj> {
                 (0.1, 0.04),
                 (0.0, 0.04),
             ],
-            (0, 2.46, 0),
             M.white,
-            28,
+            segments = 28
         );
         bulb(
             "ceilingFan",
@@ -735,8 +768,12 @@ pub fn paper_lantern() -> Vec<Obj> {
             verts = 6,
             round = 1
         );
-        turn(
+        kit::turned!(
+            F,
             "cap",
+            0,
+            y + 0.246,
+            0,
             &[
                 (0.0, 0.0),
                 (0.04, 0.0),
@@ -745,9 +782,8 @@ pub fn paper_lantern() -> Vec<Obj> {
                 (0.012, 0.016),
                 (0.0, 0.016),
             ],
-            (0, y + 0.246, 0),
             M.white,
-            16,
+            segments = 16
         );
         // the paper: a turned skin from the bottom opening to the top one, pinched in at each rib, and back down
         // inside, coarser, so it shows a lining through the openings

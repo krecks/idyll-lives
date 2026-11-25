@@ -1,9 +1,10 @@
 //! KD1: the high chair.
 
-use super::common::{P, place, still, turned};
+use super::common::{P, place, still};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::kit::fillet;
 use artkit::parts::{join, new_parts};
 use artkit::place::Facing;
@@ -213,9 +214,11 @@ pub fn high_chair() -> Vec<Obj> {
             M.tray_mat,
             plane = Facing::Top
         );
-        turned(
+        kit::turned!(
+            F,
             "bowl",
             0.13,
+            0.802,
             0.2,
             &[
                 (0.0, 0.0),
@@ -227,8 +230,7 @@ pub fn high_chair() -> Vec<Obj> {
                 (0.0, 0.012),
             ],
             M.toy_green,
-            12,
-            0.802,
+            segments = 12
         );
         fsweep!(
             F,

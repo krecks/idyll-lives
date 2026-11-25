@@ -6,12 +6,13 @@
 //! `water_on` way). Glass is its own draw call: tray, walls and metal (1), glass (1), the rain (1).
 
 use super::M;
-use super::common::{bends, bottle, tube, wall_rose};
+use super::common::{bends, bottle, wall_rose};
 use super::shower_parts::{
     bar_mixer, caddy, curtain, curtain_rings, frame, grate, hand_shower, head, rain, tiled_walls,
     tray,
 };
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::{Axis, cos, radians, sin};
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
@@ -109,8 +110,8 @@ pub fn shower() -> Vec<Obj> {
         wall_rose(
             &f, "arm_rose", 0, 2.03, -0.414, 0.025, M.fittings, 0.012, 14,
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "arm",
             &[
                 (0, 2.03, -0.41),
@@ -120,9 +121,7 @@ pub fn shower() -> Vec<Obj> {
             ],
             0.011,
             M.fittings,
-            10,
-            3,
-            1.0,
+            verts = 10
         );
         head(&f, "head", 0, 1.989, -0.15, 0.12, M.fittings, 0.022);
         // a corner shelf with two bottles
@@ -217,8 +216,8 @@ pub fn shower_stall() -> Vec<Obj> {
         tiled_walls(&f, -0.45, 0.45, -0.45, 0.45, 0.08, 2.08, 0.04, 0.25, 0.005);
         // an L-shaped rail at the open sides, bent round the corner; the curtain hangs along the whole side, and its
         // front is its own part
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "rail",
             &bends(
                 &[
@@ -231,9 +230,8 @@ pub fn shower_stall() -> Vec<Obj> {
             ),
             0.011,
             M.frame,
-            10,
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
         wall_rose(
             &f,
@@ -281,8 +279,8 @@ pub fn shower_stall() -> Vec<Obj> {
         );
         // a riser on the back wall up to a tilted head, a lever mixer, a wire caddy with bottles
         // (bent round 3.5 cm, wider than the tube: bent tighter, its inside folded through itself)
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "riser",
             &bends(
                 &[
@@ -295,9 +293,8 @@ pub fn shower_stall() -> Vec<Obj> {
             ),
             0.013,
             M.fittings,
-            10,
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
         fcyl!(
             f,
@@ -312,8 +309,8 @@ pub fn shower_stall() -> Vec<Obj> {
             bevel_segments = 2
         );
         wall_rose(&f, "mixer", -0.2, 1.05, -0.404, 0.05, M.fittings, 0.018, 20);
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "lever",
             &[
                 (-0.2, 1.05, -0.38),
@@ -323,9 +320,9 @@ pub fn shower_stall() -> Vec<Obj> {
             ],
             0.008,
             M.fittings,
-            8,
-            2,
-            [1.3, 1.1, 1.0, 0.8],
+            verts = 8,
+            round = 2,
+            scale = [1.3, 1.1, 1.0, 0.8]
         );
         caddy(&f, "caddy", 0.15, 1.15, -0.355, 0.24, 0.1, M.frame);
         bottle(

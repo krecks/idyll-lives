@@ -1,6 +1,6 @@
 //! The late-night microwave cart (1x1): a rolling cart, a microwave on top, frozen dinners below.
 
-use super::common::{_box, _can, _m, _wrapper, M, POP, cut_pocket};
+use super::common::{_box, _can, _wrapper, M, POP, cut_pocket};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::P3;
@@ -290,7 +290,7 @@ pub fn microwave_cart() -> Vec<Obj> {
                 0.045,
                 0.2,
                 (-0.16 + dx, yy + 0.0225, -0.22),
-                _m(POP[i % 6]),
+                POP[i % 6],
                 rot = (0.0, 0.0, turn),
                 round = 0.006,
                 round_segments = 1

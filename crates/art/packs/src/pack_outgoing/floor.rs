@@ -1,6 +1,6 @@
 //! The light-up dance floor and the party photo wall.
 
-use super::common::{_m, _speaker, M, PHOTOS, TILES, WALL};
+use super::common::{_speaker, M, PHOTOS, TILES, WALL};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -230,7 +230,7 @@ pub fn dance_floor() -> Vec<Obj> {
                     if (i + j) % 2 != parity {
                         continue;
                     }
-                    let m = _m(TILES[(i * 3 + j * 2) % TILES.len()]);
+                    let m = TILES[(i * 3 + j * 2) % TILES.len()];
                     let (x, z) = (
                         -1.5 * PITCH + PITCH * i as f64,
                         -1.5 * PITCH + PITCH * j as f64,
@@ -426,7 +426,7 @@ pub fn photo_wall() -> Vec<Obj> {
                 y,
                 zb + 0.017,
                 r as f64,
-                _m(PHOTOS[i]),
+                PHOTOS[i],
                 [M.pin_a, M.pin_b, M.sunny][i % 3],
             );
         }

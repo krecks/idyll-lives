@@ -1,8 +1,9 @@
 //! KD2: the play tent.
 
-use super::common::{Frame, P, add, mul, place, plane, slab, still, turned};
+use super::common::{Frame, P, add, mul, place, plane, slab, still};
 use super::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::{P3, PI, cos, radians, sin, sqrt};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{hinged, join};
@@ -117,9 +118,11 @@ pub fn play_tent() -> Vec<Obj> {
         );
     }
     // a round padded mat on the floor, two cushions on it
-    turned(
+    kit::turned!(
+        F,
         "floor_mat",
         0,
+        0.0,
         0,
         &[
             (0.0, 0.0),
@@ -130,8 +133,7 @@ pub fn play_tent() -> Vec<Obj> {
             (0.0, 0.031),
         ],
         M.tent_mat,
-        24,
-        0.0,
+        segments = 24
     );
     soft!(
         F,

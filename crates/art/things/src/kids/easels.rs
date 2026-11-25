@@ -1,8 +1,9 @@
 //! KD3: the chalkboard easel and the kids' easel.
 
-use super::common::{Frame, add, board, mul, place, rect, slab, still, turned};
+use super::common::{Frame, add, board, mul, place, rect, slab, still};
 use super::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, PI, cos, radians, sin, tan};
 use artkit::motion::{Ease, Grow, Path, grow, keys};
@@ -390,9 +391,11 @@ pub fn kids_easel() -> Vec<Obj> {
         .enumerate()
     {
         let x = -0.2 + 0.1 * k as f64;
-        turned(
-            &format!("pot{k}"),
+        kit::turned!(
+            F,
+            format!("pot{k}"),
             x,
+            0.495,
             0.21,
             &[
                 (0.0, 0.0),
@@ -403,8 +406,7 @@ pub fn kids_easel() -> Vec<Obj> {
                 (0.0, 0.006),
             ],
             M.paper,
-            12,
-            0.495,
+            segments = 12
         );
         fcyl!(
             F,
@@ -416,9 +418,11 @@ pub fn kids_easel() -> Vec<Obj> {
             verts = 12
         );
     }
-    turned(
+    kit::turned!(
+        F,
         "jar",
         0.22,
+        0.495,
         0.21,
         &[
             (0.0, 0.0),
@@ -429,8 +433,7 @@ pub fn kids_easel() -> Vec<Obj> {
             (0.0, 0.006),
         ],
         M.water,
-        12,
-        0.495,
+        segments = 12
     );
     for (k, (dx, dz, m)) in [
         (-0.01, 0.0, M.paint_red),

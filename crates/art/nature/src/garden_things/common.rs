@@ -1,12 +1,12 @@
 //! What the garden things are built from.
 
+use crate::ground::common::_mesh;
 use artkit::json::{self, Json};
 use artkit::materials::Mat;
 use artkit::math::V3;
-use artkit::mesh::Mesh;
 use artkit::palette;
 use artkit::place::GameFrame;
-use artkit::scene::{self, Obj};
+use artkit::scene::Obj;
 use std::cell::Cell;
 use std::sync::OnceLock;
 
@@ -172,16 +172,6 @@ pub fn _near_light(id: &str, y: f64) {
     );
 }
 
-/// A part of the points `verts` and `faces`, wound as they are given.
-pub fn _mesh(name: &str, verts: Vec<V3>, faces: &[Vec<u32>], material: Mat, smooth: bool) -> Obj {
-    let mut mesh = Mesh::from_pydata(verts, faces);
-    mesh.set_material(Some(material));
-    for f in &mut mesh.faces {
-        f.smooth = smooth;
-    }
-    scene::add(name, mesh)
-}
-
 /// A flat shape `outline` [(game x, height)], counter-clockwise seen from the front, standing from game depth
 /// `z0` back to `z1` (a gable, a gnomon).
 pub fn _prism(name: &str, outline: &[(f64, f64)], z0: f64, z1: f64, material: Mat) -> Obj {
@@ -196,7 +186,7 @@ pub fn _prism(name: &str, outline: &[(f64, f64)], z0: f64, z1: f64, material: Ma
         let j = (i + 1) % n;
         faces.push(vec![i, j, n + j, n + i]);
     }
-    let obj = _mesh(name, verts, &faces, material, false);
+    let obj = _mesh(name, verts, &faces, material, false, 0.0, false);
     obj.edit(|o| o.mesh.recalc_normals());
     obj
 }

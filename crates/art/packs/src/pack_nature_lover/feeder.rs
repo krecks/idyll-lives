@@ -1,6 +1,6 @@
 //! The bird feeder post (1x1): a cedar post, a feeder house on a tray, a seed tube, flowers round its foot.
 
-use super::common::{_flower, _m, _rosette, M};
+use super::common::{_flower, _rosette, M};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::math::{P3, TAU, cos, cosd, sin, sind};
@@ -363,7 +363,7 @@ pub fn bird_feeder() -> Vec<Obj> {
                     fy,
                     fz,
                     0.034,
-                    _m(["pink", "yellow", "lilac", "white"][(i + k) % 4]),
+                    [M.pink, M.yellow, M.lilac, M.white][(i + k) % 4],
                     Some(if (i + k) % 4 != 1 { M.yellow } else { M.carrot }),
                     5,
                     25.0,

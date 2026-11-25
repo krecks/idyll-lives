@@ -200,24 +200,6 @@ pub fn oval(
     )
 }
 
-/// A turned post at game (x, z): `profile` is [(radius, height)], bottom first.
-pub fn turned(
-    name: &str,
-    x: impl Coord,
-    z: impl Coord,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = F.at(x, 0, z),
-        material = material,
-        segments = segments
-    )
-}
-
 /// A turned knob on the side facing game x's sign `s`, its rose at game (x, y, z).
 pub fn side_knob(name: &str, x: f64, y: f64, z: impl Coord, r: f64, s: i32, material: Mat) -> Obj {
     let k = artkit::kit::knob!(F, name, x, y, z, r, material);

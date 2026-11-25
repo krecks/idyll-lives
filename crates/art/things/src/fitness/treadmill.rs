@@ -1,7 +1,8 @@
 //! The treadmill: belt along the depth, the console at the back; the runner faces the back.
 
 use super::M;
-use super::common::{on, rr};
+use super::common::on;
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::P3;
@@ -199,7 +200,7 @@ pub fn treadmill() -> Vec<Obj> {
                 &[(sf * 0.3, 0.2, -0.8), (sf * 0.3, 1.22, -0.62)],
                 0,
                 M.steel,
-                profile = rr(0.07, 0.045, 0.02, 2),
+                profile = rounded_rect(0.07, 0.045, 0.02, 2),
                 up = (0, 1, 0)
             );
             let bar = kit::fillet(

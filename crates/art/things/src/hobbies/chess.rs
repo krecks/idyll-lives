@@ -4,7 +4,9 @@
 //! square towards white while they play (`move`).
 
 use super::M;
-use super::common::{chair, flat_quads, rr, turned};
+use super::common::{chair, flat_quads};
+use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, V3, cosd, radians, sind, v3};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
@@ -154,7 +156,7 @@ pub fn chess_table() -> Vec<Obj> {
         fextrude!(
             f,
             "top",
-            &rr(0.48, 0.64, 0.03, 3),
+            &rounded_rect(0.48, 0.64, 0.03, 3),
             0.03,
             (0, 0.725, 0.25),
             M.table_wood,
@@ -210,8 +212,8 @@ pub fn chess_table() -> Vec<Obj> {
             bevel_segments = 1
         );
         // a turned pedestal on three swept snake feet
-        turned(
-            &f,
+        kit::turned!(
+            f,
             "pedestal",
             0,
             0.04,
@@ -233,8 +235,7 @@ pub fn chess_table() -> Vec<Obj> {
                 (0.0, 0.64),
             ],
             M.table_wood,
-            10,
-            P3::ONE,
+            segments = 10
         );
         for k in 0..3 {
             let a = (90 + 120 * k) as f64;
@@ -252,7 +253,7 @@ pub fn chess_table() -> Vec<Obj> {
                 &pts,
                 0,
                 M.table_wood,
-                profile = rr(0.05, 0.032, 0.012, 1),
+                profile = rounded_rect(0.05, 0.032, 0.012, 1),
                 scale = [1.0, 0.95, 0.75, 0.5, 0.48]
             );
         }

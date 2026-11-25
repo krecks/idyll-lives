@@ -2,7 +2,8 @@
 //! (content `held`), so the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them.
 
 use super::M;
-use super::common::{Along, dumbbell, plate, rr};
+use super::common::{dumbbell, plate};
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{P3, cos, radians, sin};
@@ -15,7 +16,7 @@ use artkit::{fbox, fcyl, fextrude, fsweep, settle, soft, squash, torus};
 
 /// The bar's middle on the J-hooks.
 const BAR: (i32, f64, f64) = (0, 1.02, -0.72);
-/// The pad's top (characters/furniture.json `beds.weightBench`).
+/// The pad's top (furniture.json `beds.weightBench`).
 const PAD_TOP: f64 = 0.44;
 /// `bar_off` waits while the lifter sits down on the bench (characters.ts: the `sitDown` clip but its last
 /// 0.35 s, 0.98 s), so the bar leaves the hooks as the game starts drawing it in the hands, lying back.
@@ -24,7 +25,7 @@ pub const BAR_DELAY: f64 = 0.8;
 pub fn weight_bench() -> Vec<Obj> {
     // 2 cm forward of its old part: the rack's back on the wall's face
     let f = GameFrame::new(0.02);
-    let tube_p = rr(0.06, 0.06, 0.008, 1);
+    let tube_p = rounded_rect(0.06, 0.06, 0.008, 1);
     let parts = new_parts(|| {
         // A flat bench, its pad at 0.44 m (a bench-press bench is 0.43–0.45, so the lifter's feet reach the floor
         // either side; review M-fitness-01: 0.50, with leg rollers at its foot where the shins would come down).
@@ -60,7 +61,7 @@ pub fn weight_bench() -> Vec<Obj> {
             &[(0, top - 0.14, -0.72), (0, top - 0.14, 0.48)],
             0,
             M.frame,
-            profile = rr(0.06, 0.12, 0.01, 1)
+            profile = rounded_rect(0.06, 0.12, 0.01, 1)
         );
         for z in [0.4, -0.62] {
             fsweep!(
@@ -69,7 +70,7 @@ pub fn weight_bench() -> Vec<Obj> {
                 &[(0, top - 0.11, z), (0, 0.05, z)],
                 0,
                 M.frame,
-                profile = rr(0.08, 0.08, 0.01, 1),
+                profile = rounded_rect(0.08, 0.08, 0.01, 1),
                 up = (1, 0, 0)
             );
             fsweep!(
@@ -78,7 +79,7 @@ pub fn weight_bench() -> Vec<Obj> {
                 &[(-0.23, 0.025, z), (0.23, 0.025, z)],
                 0,
                 M.frame,
-                profile = rr(0.05, 0.08, 0.01, 1)
+                profile = rounded_rect(0.05, 0.08, 0.01, 1)
             );
             for s in [-1, 1] {
                 soft!(
@@ -143,7 +144,7 @@ pub fn weight_bench() -> Vec<Obj> {
                 &[(sf * 0.36, 0.025, -0.95), (sf * 0.36, 0.025, -0.55)],
                 0,
                 M.frame,
-                profile = rr(0.05, 0.06, 0.008, 1)
+                profile = rounded_rect(0.05, 0.06, 0.008, 1)
             );
             for z in [-0.94, -0.56] {
                 soft!(
@@ -227,7 +228,7 @@ pub fn weight_bench() -> Vec<Obj> {
             &[(-0.33, 0.26, -0.8), (0.33, 0.26, -0.8)],
             0,
             M.frame,
-            profile = rr(0.05, 0.05, 0.008, 1)
+            profile = rounded_rect(0.05, 0.05, 0.008, 1)
         );
         // two hex dumbbells on the floor by the feet
         for x in [-0.3, 0.3] {
@@ -238,7 +239,6 @@ pub fn weight_bench() -> Vec<Obj> {
                 0.05,
                 0.842,
                 0.1,
-                Along::X,
             );
         }
     });
@@ -370,7 +370,7 @@ pub fn dumbbells() -> Vec<Obj> {
                 &frame,
                 0,
                 M.frame,
-                profile = rr(0.04, 0.04, 0.008, 1),
+                profile = rounded_rect(0.04, 0.04, 0.008, 1),
                 up = (1, 0, 0)
             );
             fsweep!(
@@ -379,7 +379,7 @@ pub fn dumbbells() -> Vec<Obj> {
                 &[(x, 0.015, -0.33), (x, 0.015, 0.11)],
                 0,
                 M.frame,
-                profile = rr(0.03, 0.05, 0.008, 1)
+                profile = rounded_rect(0.03, 0.05, 0.008, 1)
             );
             for z in [-0.32, 0.1] {
                 soft!(
@@ -467,7 +467,6 @@ pub fn dumbbells() -> Vec<Obj> {
                         y + 0.012 + w / 2.0,
                         z,
                         w,
-                        Along::X,
                     );
                 }
             }
@@ -478,7 +477,7 @@ pub fn dumbbells() -> Vec<Obj> {
             &[(-0.34, 0.12, -0.25), (0.34, 0.12, -0.25)],
             0,
             M.frame,
-            profile = rr(0.03, 0.03, 0.006, 1)
+            profile = rounded_rect(0.03, 0.03, 0.006, 1)
         );
         // the rubber floor mat in front, in tiles
         let mat = GameFrame::new(0.0);
@@ -520,7 +519,7 @@ pub fn dumbbells() -> Vec<Obj> {
     for (i, name) in [(2 * p, "dumbbell_l"), (2 * p + 1, "dumbbell_r")] {
         let w = bell(k, i);
         let at = (-0.27 + i as f64 * 0.18, y + 0.012 + w / 2.0, z);
-        let one = new_parts(|| dumbbell(&f, name, at.0, at.1, at.2, w, Along::X));
+        let one = new_parts(|| dumbbell(&f, name, at.0, at.1, at.2, w));
         pair.push(hinged(join(&one, name, None), f.at(at.0, at.1, at.2)));
     }
     settle!(centre = false);

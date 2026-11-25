@@ -1,7 +1,7 @@
 //! What the home gym is built from: the helpers fitness.py shared between its models.
 
 use super::M;
-pub use crate::common::{P, rr};
+pub use crate::common::P;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, cos, radians, sin};
 use artkit::place::{GameFrame, N};
@@ -70,30 +70,11 @@ pub fn plate(
     }
 }
 
-/// Which way a dumbbell lies.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Along {
-    X,
-    #[allow(dead_code)] // (the script's other way: no model lays one along the depth)
-    Z,
-}
-
 /// `_dumbbell`: a hex dumbbell: a knurled chrome handle and two hexagonal heads `w` across their flats, chamfered,
-/// with chrome end caps, lying along game x (or z).
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn dumbbell(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, along: Along) {
-    let rot: P3 = if along == Along::X {
-        (0, 90, 0).into()
-    } else {
-        (90, 0, 0).into()
-    };
-    let off = |k: f64| -> P {
-        if along == Along::X {
-            (x + k, y, z)
-        } else {
-            (x, y, z + k)
-        }
-    };
+/// with chrome end caps, lying along game x.
+pub fn dumbbell(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64) {
+    let rot: P3 = (0, 90, 0).into();
+    let off = |k: f64| -> P { (x + k, y, z) };
     fcyl!(
         f,
         format!("{name}_grip"),
@@ -137,10 +118,8 @@ pub fn dumbbell(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, along
             smooth = false
         );
         // a flat underneath, not a corner
-        if along == Along::X {
-            let turn = M4::rotation(radians(30.0), Axis::Z);
-            obj.edit(|o| o.mesh.transform(&turn));
-        }
+        let turn = M4::rotation(radians(30.0), Axis::Z);
+        obj.edit(|o| o.mesh.transform(&turn));
         fcyl!(
             f,
             format!("{name}_cap{s}"),

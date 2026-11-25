@@ -73,38 +73,6 @@ fn clothes(i: i64) -> Mat {
     [M.cloth1, M.cloth2, M.cloth3, M.cloth4][py::imod(i, 4) as usize]
 }
 
-/// A bar pull on two stand-offs, out from a front at game depth `face`.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-) -> Obj {
-    kit::pull!(
-        F,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        r = r,
-        out = out,
-        upright = upright
-    )
-}
-
-/// A turned knob, its rose on the front at game depth `at.2`.
-pub fn knob(name: &str, r: f64, at: (impl Coord, f64, f64), material: Mat) -> Obj {
-    kit::knob!(F, name, at.0, at.1, at.2, r, material)
-}
-
 /// A top `w` x `d`, `t` thick, its surface at `y`, its edges and corners rounded.
 #[allow(clippy::too_many_arguments)]
 pub fn top(name: &str, w: f64, t: f64, d: f64, y: f64, z: f64, material: Mat, r: f64) -> Obj {
