@@ -1,6 +1,7 @@
 //! What the romantic pack is built from: its palette, candles and their flames, roses and their leaves, a wine glass
 //! and the velvet slipper chair.
 
+use crate::ease::{EASE, eased};
 use artkit::forms::smooth_outline;
 use artkit::materials::{Mat, Mirror};
 use artkit::math::{Axis, M4, V3, radians};
@@ -156,18 +157,19 @@ pub fn _rose(
     yaw: f64,
 ) -> Vec<Obj> {
     let m = material.unwrap_or(M.rose);
+    // the outer petals' edge rolled over on a bloom big enough for its edge to show (each side 5 cm or more)
+    let edge: &[(f64, f64)] = if s >= 0.055 {
+        &[(0.99, 0.6), (0.985, 0.625), (0.95, 0.632)]
+    } else {
+        &[(1.0, 0.62)]
+    };
+    let mut outer = vec![(0.0, 0.0), (s * 0.55, s * 0.1), (s * 0.95, s * 0.45)];
+    outer.extend(edge.iter().map(|&(r, h)| (s * r, s * h)));
+    outer.extend([(s * 0.86, s * 0.58), (s * 0.5, s * 0.3), (0.0, s * 0.22)]);
     let made = vec![
         revolve!(
             format!("{name}_outer"),
-            &[
-                (0.0, 0.0),
-                (s * 0.55, s * 0.1),
-                (s * 0.95, s * 0.45),
-                (s * 1.0, s * 0.62),
-                (s * 0.86, s * 0.58),
-                (s * 0.5, s * 0.3),
-                (0.0, s * 0.22)
-            ],
+            &outer,
             material = m,
             segments = segments
         ),
@@ -239,17 +241,20 @@ pub fn _rose_leaves(
 pub fn _wine_glass(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, wine: bool) {
     revolve!(
         name,
-        &[
-            (0.0, 0.0),
-            (0.03, 0.0),
-            (0.03, 0.005),
-            (0.004, 0.01),
-            (0.004, 0.08),
-            (0.032, 0.11),
-            (0.035, 0.17),
-            (0.031, 0.17),
-            (0.0, 0.09)
-        ],
+        &eased(
+            &[
+                (0.0, 0.0),
+                (0.03, 0.0),
+                (0.03, 0.005),
+                (0.004, 0.01),
+                (0.004, 0.08),
+                (0.032, 0.11),
+                (0.035, 0.17),
+                (0.031, 0.17),
+                (0.0, 0.09)
+            ],
+            EASE
+        ),
         at = f.at(x, y, z),
         material = M.glassy,
         segments = 10

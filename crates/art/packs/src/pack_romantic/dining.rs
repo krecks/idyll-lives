@@ -1,6 +1,7 @@
 //! The candlelit bistro table and the heart-shaped petal tub.
 
 use super::common::{_candle, _flame, _rose, _rose_leaves, _velvet_chair, _wine_glass, M};
+use crate::ease::{EASE, eased};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::math::{Axis, M4, P3, PI, V3, atan2, cos, pow, radians, sin, sqrt};
@@ -48,7 +49,9 @@ fn _tablecloth(f: &GameFrame, top: f64, hw: f64, hd: f64, drop: f64) {
         &[
             ring(0.0, 0.0, 0.0, 0.0),
             ring(hw - 0.01, hd - 0.01, 0.0, 0.0),
+            ring(hw - 0.001, hd - 0.001, -0.0015, 0.0),
             ring(hw + 0.004, hd + 0.004, -0.006, 0.0),
+            ring(hw + 0.0058, hd + 0.0058, -0.013, 0.003),
             ring(hw + 0.006, hd + 0.006, -0.03, 0.006),
             ring(hw + 0.009, hd + 0.009, -drop * 0.6, 0.014),
             ring(hw + 0.014, hd + 0.014, -drop, 0.02),
@@ -61,20 +64,20 @@ fn _tablecloth(f: &GameFrame, top: f64, hw: f64, hd: f64, drop: f64) {
 
 pub fn candlelit_table() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let top = 0.775;
+    let top = 0.759; // the runner's top (2026-11-25: 1.6 cm lower, the cloth's top 0.756, a dining table's)
     let still = new_parts(|| {
         // a 0.8 x 0.72 top under a cloth that drops 12 cm all round, clear of the diners' knees
-        artkit::fbox!(f, "table_top", 0.8, 0.03, 0.72, (0, 0.745, TZ), M.oak);
-        _tablecloth(f, 0.772, 0.41, 0.38, 0.12);
+        artkit::fbox!(f, "table_top", 0.8, 0.03, 0.72, (0, 0.729, TZ), M.oak);
+        _tablecloth(f, 0.756, 0.41, 0.38, 0.12);
         fsweep!(
             f,
             "runner",
             &kit::fillet!(
                 &[
-                    (0.0, 0.67, TZ - 0.396),
-                    (0.0, 0.775, TZ - 0.393),
-                    (0.0, 0.775, TZ + 0.393),
-                    (0.0, 0.67, TZ + 0.396)
+                    (0.0, 0.654, TZ - 0.396),
+                    (0.0, 0.759, TZ - 0.393),
+                    (0.0, 0.759, TZ + 0.393),
+                    (0.0, 0.654, TZ + 0.396)
                 ],
                 0.012
             ),
@@ -88,7 +91,7 @@ pub fn candlelit_table() -> Vec<Obj> {
                 fsweep!(
                     f,
                     format!("table_leg{x}{dz}"),
-                    &[(x, 0.73, TZ + dz), (x, 0.0, TZ + dz)],
+                    &[(x, 0.714, TZ + dz), (x, 0.0, TZ + dz)],
                     0.02,
                     M.body,
                     verts = 10,
@@ -191,15 +194,18 @@ pub fn candlelit_table() -> Vec<Obj> {
         }
         revolve!(
             "bud_vase",
-            &[
-                (0.0, 0.0),
-                (0.025, 0.0),
-                (0.03, 0.05),
-                (0.012, 0.13),
-                (0.015, 0.18),
-                (0.011, 0.18),
-                (0.0, 0.17)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.025, 0.0),
+                    (0.03, 0.05),
+                    (0.012, 0.13),
+                    (0.015, 0.18),
+                    (0.011, 0.18),
+                    (0.0, 0.17)
+                ],
+                EASE
+            ),
             at = f.at(0, top, TZ),
             material = M.glassy,
             segments = 12
@@ -258,21 +264,68 @@ pub fn candlelit_table() -> Vec<Obj> {
 
 // --- the heart-shaped petal tub (2x2): two bathers sit in it at x = +-0.5 -----------------------------------
 
-/// The heart's outline in game (x, depth), its point to the front, scaled by `k` about its middle.
+/// The heart's outline in game (x, depth), its point to the front, scaled by `k` about its middle: `n` points even
+/// along it, its point and its dip rounded (moulded acrylic has no sharp corner).
 fn _heart(k: f64, n: usize) -> Vec<(f64, f64)> {
-    (0..n)
+    let at = |t: f64| {
+        let hx = 16.0 * pow(sin(t), 3.0);
+        let hy = 13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t);
+        (hx * 0.055, -(hy + 2.5) * 0.0552)
+    };
+    // even along its length (the curve's own points bunch at the point and the dip)
+    let fine: Vec<(f64, f64)> = (0..=4000).map(|i| at(2.0 * PI * i as f64 / 4000.0)).collect();
+    let mut run = vec![0.0];
+    for w in fine.windows(2) {
+        let (dx, dz) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+        run.push(run[run.len() - 1] + sqrt(dx * dx + dz * dz));
+    }
+    let total = run[run.len() - 1];
+    let mut j = 0;
+    let mut pts: Vec<(f64, f64)> = (0..n)
         .map(|i| {
-            let t = 2.0 * PI * i as f64 / n as f64;
-            let hx = 16.0 * pow(sin(t), 3.0);
-            let hy = 13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t);
-            (hx * 0.055 * k, -(hy + 2.5) * 0.0552 * k + 0.08)
+            let s = total * i as f64 / n as f64;
+            while run[j + 1] < s {
+                j += 1;
+            }
+            let t = (s - run[j]) / (run[j + 1] - run[j]);
+            let (a, b) = (fine[j], fine[j + 1]);
+            (a.0 + t * (b.0 - a.0), a.1 + t * (b.1 - a.1))
         })
-        .collect()
+        .collect();
+    // the dip (first) and the point (halfway) smoothed over the four points either side
+    let near = |i: usize| i.min(n - i) <= 4 || i.abs_diff(n / 2) <= 4;
+    for _ in 0..10 {
+        let was = pts.clone();
+        for (i, p) in pts.iter_mut().enumerate() {
+            if near(i) {
+                let (a, b) = (was[(i + n - 1) % n], was[(i + 1) % n]);
+                *p = ((a.0 + 2.0 * p.0 + b.0) / 4.0, (a.1 + 2.0 * p.1 + b.1) / 4.0);
+            }
+        }
+    }
+    pts.iter().map(|&(x, z)| (x * k, z * k + 0.08)).collect()
 }
 
 /// The heart outline scaled by `k` at height `y`, as a loft's ring (Blender points).
 fn _heart_ring(f: &GameFrame, k: f64, y: f64, n: usize) -> Vec<P3> {
     _heart(k, n).iter().map(|&(x, z)| f.at(x, y, z)).collect()
+}
+
+/// The heart outline scaled by `k`, then drawn in by `d` square to itself, at height `y`: a rim's roll stays the
+/// same width all round, where scaling about the middle narrows it at the point and the dip.
+fn _heart_in(f: &GameFrame, k: f64, d: f64, y: f64, n: usize) -> Vec<P3> {
+    let pts = _heart(k, n);
+    let m = pts.len();
+    (0..m)
+        .map(|i| {
+            let (a, b, p) = (pts[(i + m - 1) % m], pts[(i + 1) % m], pts[i]);
+            let (tx, tz) = (b.0 - a.0, b.1 - a.1);
+            let l = sqrt(tx * tx + tz * tz);
+            // inwards: the outline runs anticlockwise in (x, depth) seen from above
+            let (nx, nz) = (-tz / l, tx / l);
+            f.at(p.0 + d * nx, y, p.1 + d * nz)
+        })
+        .collect()
 }
 
 const RIM: f64 = 0.54;
@@ -284,13 +337,15 @@ pub fn heart_tub() -> Vec<Obj> {
     let hr = |k: f64, y: f64| _heart_ring(f, k, y, 72);
     let still = new_parts(|| {
         // the plinth, its edge eased; the shell in one loft: up the outside, over a rolled rim, down to the floor
+        let hi = |k: f64, d: f64, y: f64| _heart_in(f, k, d, y, 72);
         loft!(
             "plinth",
             &[
                 hr(1.03, 0.0),
                 hr(1.04, 0.01),
                 hr(1.04, 0.07),
-                hr(1.025, 0.08)
+                hi(1.04, 0.006, 0.077),
+                hi(1.04, 0.0135, 0.08)
             ],
             material = M.ivory
         );
@@ -300,11 +355,11 @@ pub fn heart_tub() -> Vec<Obj> {
                 hr(0.95, 0.075),
                 hr(0.96, 0.1),
                 hr(0.96, RIM - 0.03),
-                hr(0.955, RIM - 0.008),
-                hr(0.945, RIM),
+                hi(0.96, 0.0045, RIM - 0.008),
+                hi(0.96, 0.0135, RIM),
                 hr(0.86, RIM),
-                hr(0.845, RIM - 0.012),
-                hr(0.84, RIM - 0.04),
+                hi(0.86, 0.0135, RIM - 0.012),
+                hi(0.86, 0.018, RIM - 0.04),
                 hr(0.835, FLOOR + 0.04),
                 hr(0.815, FLOOR + 0.006),
                 hr(0.78, FLOOR),
@@ -424,15 +479,18 @@ pub fn heart_tub() -> Vec<Obj> {
         }
         revolve!(
             "floor_vase",
-            &[
-                (0.0, 0.0),
-                (0.06, 0.0),
-                (0.08, 0.15),
-                (0.05, 0.27),
-                (0.055, 0.3),
-                (0.05, 0.3),
-                (0.0, 0.29)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.06, 0.0),
+                    (0.08, 0.15),
+                    (0.05, 0.27),
+                    (0.055, 0.3),
+                    (0.05, 0.3),
+                    (0.0, 0.29)
+                ],
+                EASE
+            ),
             at = f.at(0.7, 0, 0.82),
             material = M.ivory,
             segments = 16
@@ -477,8 +535,8 @@ pub fn heart_tub() -> Vec<Obj> {
         loft!(
             "water",
             &[
-                _heart_ring(f, 0.845, FLOOR - 0.01, 48),
-                _heart_ring(f, 0.845, WATER, 48)
+                _heart_ring(f, 0.845, FLOOR - 0.01, 72),
+                _heart_ring(f, 0.845, WATER, 72)
             ],
             material = M.water
         );
