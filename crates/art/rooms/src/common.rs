@@ -35,7 +35,10 @@ pub fn eased(profile: &[(f64, f64)], r: f64) -> Vec<(f64, f64)> {
 /// about `r` (less where a leg is short): points every 40° of it or less, so no two chords turn 60°.
 fn arc(a: (f64, f64), p: (f64, f64), c: (f64, f64), r: f64, turn: f64) -> Vec<(f64, f64)> {
     use artkit::math::{atan2, cos, radians, sin, tan};
-    let (l1, l2) = ((a.0 - p.0).hypot(a.1 - p.1), (c.0 - p.0).hypot(c.1 - p.1));
+    let (l1, l2) = (
+        artkit::py::hypot(a.0 - p.0, a.1 - p.1),
+        artkit::py::hypot(c.0 - p.0, c.1 - p.1),
+    );
     let (u1, u2) = (
         ((a.0 - p.0) / l1, (a.1 - p.1) / l1),
         ((c.0 - p.0) / l2, (c.1 - p.1) / l2),
@@ -44,7 +47,7 @@ fn arc(a: (f64, f64), p: (f64, f64), c: (f64, f64), r: f64, turn: f64) -> Vec<(f
     let t = (r / tan(half)).min(l1 / 2.0).min(l2 / 2.0);
     let radius = t * tan(half);
     let (bx, by) = (u1.0 + u2.0, u1.1 + u2.1);
-    let b = bx.hypot(by);
+    let b = artkit::py::hypot(bx, by);
     let far = t / cos(half);
     let centre = (p.0 + bx / b * far, p.1 + by / b * far);
     let (p1, p2) = (
@@ -107,7 +110,7 @@ pub fn inset(outline: &[(f64, f64)], d: f64) -> Vec<(f64, f64)> {
     let side = if area > 0.0 { 1.0 } else { -1.0 }; // the inside is on the left going round
     let normal = |a: (f64, f64), b: (f64, f64)| {
         let (du, dv) = (b.0 - a.0, b.1 - a.1);
-        let l = du.hypot(dv);
+        let l = artkit::py::hypot(du, dv);
         (-dv / l * side, du / l * side)
     };
     (0..n)
@@ -115,7 +118,7 @@ pub fn inset(outline: &[(f64, f64)], d: f64) -> Vec<(f64, f64)> {
             let (p, prev, next) = (outline[i], outline[(i + n - 1) % n], outline[(i + 1) % n]);
             let (n1, n2) = (normal(prev, p), normal(p, next));
             let (mu, mv) = (n1.0 + n2.0, n1.1 + n2.1);
-            let m = mu.hypot(mv);
+            let m = artkit::py::hypot(mu, mv);
             // as far along the bisector as keeps both sides d in, but no more than 2d (a sharp corner)
             let k = (d / (m / 2.0).max(0.5)) / m;
             (p.0 + mu * k, p.1 + mv * k)
