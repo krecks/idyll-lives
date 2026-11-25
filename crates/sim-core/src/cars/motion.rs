@@ -2,6 +2,10 @@
 
 use super::*;
 
+/// The doors someone in each seat tries, their own first (`own_door`).
+pub(super) const DOOR_ORDER: [[usize; DOORS]; 4] =
+    [[0, 1, 2, 3], [1, 3, 0, 2], [3, 1, 2, 0], [2, 0, 3, 1]];
+
 impl Car {
     pub(crate) fn from_raw(raw: &CarRaw, household: u32) -> Self {
         Self {
@@ -99,15 +103,15 @@ impl Car {
         self.let_by = None;
     }
 
-    /// A taxi's route's length (ticks).
     /// A taxi's door for `seat` (`door`), else its own door's place whatever is there.
     pub(crate) fn taxi_door(&self, nav: &crate::path::NavGrid, seat: usize) -> (usize, [f32; 2]) {
         self.door(nav, seat).unwrap_or_else(|| {
-            let d = [1, 3, 2, 0][seat.min(3)];
+            let d = crate::cars::own_door(seat);
             (d, self.door_at(d))
         })
     }
 
+    /// A taxi's route's length (ticks).
     pub(crate) fn taxi_ticks(&self) -> f32 {
         self.route.as_ref().map_or(0.0, |r| r.1.ticks())
     }
@@ -275,12 +279,11 @@ impl Car {
         seat: usize,
         swing: &[f32],
     ) -> Option<(usize, [f32; 2])> {
-        const ORDER: [[usize; DOORS]; 4] = [[0, 1, 2, 3], [1, 3, 0, 2], [3, 1, 2, 0], [2, 0, 3, 1]];
         let own = self.tiles();
         let open = |x: i32, z: i32| {
             own.contains(&(x, z)) || (nav.tile_free(x, z) && nav.lot.room_at(x, z) == OUTDOORS)
         };
-        ORDER[seat.min(3)]
+        DOOR_ORDER[seat.min(3)]
             .into_iter()
             .map(|d| (d, self.door_at(d)))
             .find(|&(d, p)| {

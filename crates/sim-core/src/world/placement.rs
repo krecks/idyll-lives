@@ -418,24 +418,6 @@ impl World {
             })
     }
 
-    /// What hangs on the wall at this grid edge (`horizontal`: an `h` edge).
-    pub(crate) fn hung_on(
-        &self,
-        horizontal: bool,
-        x: i32,
-        z: i32,
-    ) -> impl Iterator<Item = &ObjectInstance> {
-        self.objects.iter().filter(move |o| {
-            self.content.objects[o.def].layer == Layer::Wall
-                && o.back_edges(&self.content).contains(&(horizontal, x, z))
-        })
-    }
-
-    /// Whether something hangs on the wall at this grid edge (`horizontal`: an `h` edge).
-    pub(crate) fn hangs_on(&self, horizontal: bool, x: i32, z: i32) -> bool {
-        self.hung_on(horizontal, x, z).next().is_some()
-    }
-
     /// Places object `def` if it fits. `stable`: its id from a save; otherwise it gets a fresh one.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn place(

@@ -421,7 +421,6 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         car.waits_for = e.behind.or(car.waits_for);
         return;
     }
-    let standing: Vec<Driving> = parked(&w.cars).collect();
     let World {
         cars,
         exits,
@@ -627,6 +626,8 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     }
     if progress > t {
         // (The last resort: never deeper into another car than it is.)
+        let standing: Vec<Driving> = parked(cars).collect();
+        let car = &mut cars[c];
         match guard(&body_now, &body_next, layer, others.iter().chain(&standing)) {
             Some(k) => {
                 traffic.guarded += 1;
@@ -640,6 +641,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         }
     }
     // (Where it is now, for those after it this tick: one coming in behind it sees it there.)
+    let car = &mut cars[c];
     let progress = car.progress;
     let shift = car.shift;
     if progress > t && progress < ticks {

@@ -200,12 +200,20 @@ impl World {
         match axis {
             EdgeAxis::H | EdgeAxis::V => {
                 let on = |edges: Vec<(EdgeAxis, i32, i32)>| edges.contains(&(axis, x, z));
-                if self.porches.iter().any(|p| on(p.inner_edges())) {
+                // (Only those it could be inside: tile `(x, z)` is one of the edge's two, and
+                // every porch tile is within two of its door's corner.)
+                let near = |p: &&Porch| p.x.abs_diff(x) <= 2 && p.z.abs_diff(z) <= 2;
+                if self
+                    .porches
+                    .iter()
+                    .filter(near)
+                    .any(|p| on(p.inner_edges()))
+                {
                     return Some("porch");
                 }
                 self.porch_pieces
                     .iter()
-                    .filter(|p| p.kind != PieceKind::Post)
+                    .filter(|p| p.kind != PieceKind::Post && p.covers(x, z))
                     .find(|p| on(inner_edges(&p.tiles())))
                     .map(|p| p.kind.name())
             }

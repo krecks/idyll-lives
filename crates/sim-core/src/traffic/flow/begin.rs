@@ -220,25 +220,18 @@ impl Traffic {
                         .any(|(_, o)| overlaps((c, &c.samples[mine(c, e.key)]), (o, &o.samples)))
                 }) && !first()
             };
+            let in_way: Vec<&(usize, Vec<u64>)> = pending.iter().filter(conflicting).collect();
             fifo.push((
                 i,
                 if red {
                     Vec::new()
                 } else {
-                    pending
-                        .iter()
-                        .filter(conflicting)
-                        .map(|(j, _)| self.asks[*j].key)
-                        .collect()
+                    in_way.iter().map(|(j, _)| self.asks[*j].key).collect()
                 },
             ));
             // (Whose bodies those it waits for wait for, it doesn't wait for: it'd wait for itself.)
-            let after: Vec<u64> = pending
-                .iter()
-                .filter(conflicting)
-                .flat_map(|(_, b)| b.iter().copied())
-                .collect();
-            let earlier = pending.iter().any(|p| conflicting(&p));
+            let after: Vec<u64> = in_way.iter().flat_map(|(_, b)| b.iter().copied()).collect();
+            let earlier = !in_way.is_empty();
             // 3. Those on the road not holding a claim: none in it (going its way too: don't
             // block the box), nor on the move into it; those holding one, not in its way; on its
             // far side, past its zone, nobody.

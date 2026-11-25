@@ -26,11 +26,8 @@ pub(crate) fn usable_here<'a>(sim: &Sim, ctx: &Ctx<'a>) -> std::borrow::Cow<'a, 
                 sim.pos,
                 ctx.content.autonomy.reach,
             );
-            let closed = |o: &u32| ctx.object_plot[*o as usize].is_some_and(shut);
-            if near.iter().any(closed) {
-                near.to_mut().retain(|o| !closed(o));
-            }
-            near
+            near.retain(|o| !ctx.object_plot[*o as usize].is_some_and(shut));
+            std::borrow::Cow::Owned(near)
         }
     }
 }

@@ -80,12 +80,9 @@ impl Content {
         Ok(())
     }
 
-    /// Validates a character's traits and perks against the rules and returns their combined effect.
-    pub fn character_modifiers(
-        &self,
-        traits: &[String],
-        perks: &[String],
-    ) -> Result<Modifiers, Error> {
+    /// Whether a new character has as many traits as the rules ask. (Not asked of a saved one:
+    /// it keeps the traits the content still knows, however few.)
+    pub fn check_trait_count(&self, traits: &[String]) -> Result<(), Error> {
         let rules = self.rules;
         if traits.len() < rules.min_traits || traits.len() > rules.max_traits {
             return Err(Error::new(format!(
@@ -95,6 +92,17 @@ impl Content {
                 traits.len()
             )));
         }
+        Ok(())
+    }
+
+    /// Validates a character's traits and perks against the rules (but their count,
+    /// `check_trait_count`) and returns their combined effect.
+    pub fn character_modifiers(
+        &self,
+        traits: &[String],
+        perks: &[String],
+    ) -> Result<Modifiers, Error> {
+        let rules = self.rules;
         let mut mods = Modifiers::default();
         for (i, id) in traits.iter().enumerate() {
             if traits[..i].contains(id) {

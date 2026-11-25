@@ -211,8 +211,9 @@ pub(super) fn childcare(w: &mut World, b: usize) {
 
 /// `i` is off to work or school (out of town on foot, on a bike, in the car), with `rest` ticks
 /// of the way still to go (`still_to_go`): away until it's over. Late for work when that gets
-/// them there more than `careerRules.lateGraceMinutes` after it starts.
-fn start_shift(w: &mut World, i: usize, rest: u64) {
+/// them there more than `careerRules.lateGraceMinutes` after it starts. (In a work taxi,
+/// `taxi::boarded`: `rest` is the ride and the way off the map.)
+pub(crate) fn start_shift(w: &mut World, i: usize, rest: u64) {
     let tick = w.tick;
     let content = &w.content;
     let mood = w.sims[i].mood(content);
@@ -241,12 +242,6 @@ fn start_shift(w: &mut World, i: usize, rest: u64) {
     sim.shift_from = start;
     sim.away_until = Some(end.max(start).max(tick + 1));
     sim.queue.clear();
-}
-
-/// `start_shift` for one who's got into a work taxi (`taxi::boarded`): `rest` ticks of the ride
-/// and the way off the map still to go.
-pub(crate) fn start_taxi_shift(w: &mut World, i: usize, rest: u64) {
-    start_shift(w, i, rest);
 }
 
 /// What's left of the way to work once they're off (`start_shift`), as their way was timed: the

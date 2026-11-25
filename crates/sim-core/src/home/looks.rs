@@ -22,36 +22,48 @@ pub(super) fn check_look(rules: &crate::content::BuildRules, e: &EdgeEdit) -> Re
     if matches!(e.kind, EdgeKind::Door | EdgeKind::Window) && e.form == Some(FORM_HALF) {
         return Err(Error::new("doors and windows need a full-height wall"));
     }
-    use crate::command::{MAX_HEAD, MIN_DOOR_HEAD, MIN_WINDOW};
     match e.kind {
-        _ if e.sill.is_none() && e.head.is_none() => {}
-        EdgeKind::Door if e.sill.is_some() => return Err(Error::new("a door starts at the floor")),
-        EdgeKind::Door
-            if e.head
-                .is_some_and(|h| !(MIN_DOOR_HEAD..=MAX_HEAD).contains(&h)) =>
-        {
+        EdgeKind::Door => check_opening(false, e.sill, e.head),
+        EdgeKind::Window => check_opening(true, e.sill, e.head),
+        _ if e.sill.is_none() && e.head.is_none() => Ok(()),
+        _ => Err(Error::new("only doors and windows have a sill or a top")),
+    }
+}
+
+/// Whether a door's or (`window`) a window's own sill and top, centimetres (absent: its style's),
+/// are a size it may have: as Build sets them, and as a save brings them back (`save::pack`).
+pub(crate) fn check_opening(
+    window: bool,
+    sill: Option<u16>,
+    head: Option<u16>,
+) -> Result<(), Error> {
+    use crate::command::{MAX_HEAD, MIN_DOOR_HEAD, MIN_WINDOW};
+    if !window {
+        if sill.is_some() {
+            return Err(Error::new("a door starts at the floor"));
+        }
+        if head.is_some_and(|h| !(MIN_DOOR_HEAD..=MAX_HEAD).contains(&h)) {
             return Err(Error::new(format!(
                 "a door is {} to {} m tall",
                 MIN_DOOR_HEAD as f32 / 100.0,
                 MAX_HEAD as f32 / 100.0
             )));
         }
-        EdgeKind::Window
-            if e.head.is_some_and(|h| h > MAX_HEAD)
-                || e.sill.is_some_and(|s| s + MIN_WINDOW > MAX_HEAD) =>
-        {
-            return Err(Error::new(format!(
-                "a window reaches {} m at most",
-                MAX_HEAD as f32 / 100.0
-            )));
-        }
-        EdgeKind::Window if matches!((e.sill, e.head), (Some(s), Some(h)) if s + MIN_WINDOW > h) => {
-            return Err(Error::new(format!(
-                "a window is at least {MIN_WINDOW} cm tall"
-            )));
-        }
-        EdgeKind::Door | EdgeKind::Window => {}
-        _ => return Err(Error::new("only doors and windows have a sill or a top")),
+        return Ok(());
+    }
+    if head.is_some_and(|h| h > MAX_HEAD) || sill.is_some_and(|s| s > MAX_HEAD - MIN_WINDOW) {
+        return Err(Error::new(format!(
+            "a window reaches {} m at most",
+            MAX_HEAD as f32 / 100.0
+        )));
+    }
+    // (The sill is at most `MAX_HEAD - MIN_WINDOW` here: adding to it can't overflow.)
+    if let (Some(s), Some(h)) = (sill, head)
+        && s + MIN_WINDOW > h
+    {
+        return Err(Error::new(format!(
+            "a window is at least {MIN_WINDOW} cm tall"
+        )));
     }
     Ok(())
 }

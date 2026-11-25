@@ -207,9 +207,9 @@
     {
       "name": "sim-lifecycle-moving",
       "file": "crates/sim-core/src/lifecycle/moving.rs",
-      "sha256": "f71b71cafb9722d9a2b7d882044b6e8cfe95877a4ead2978bead648c92f72e6c",
+      "sha256": "2ad3071d4fd0be2660e1ebae7bdab6fc17fbcb76a739a415075bd14b359b5cb9",
       "by": "audit",
-      "reason": "audit follow-up (after PR #132): a baby who moves house gets a crib in the new home (move_to calls cribs_for_babies), as one moving in does; the audit's accepted changes stand."
+      "reason": "sim-core audit: a home's beds come from the object index while it's current (same beds, same order); the earlier accepted changes stand."
     },
     {
       "name": "sim-lifecycle-arrival",

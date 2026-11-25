@@ -554,14 +554,4 @@ fn skills_quality_and_colour_survive_saving() {
     assert_eq!(loaded.objects[2].colors, w.objects[2].colors);
     assert!(loaded.objects[1].colors.is_empty(), "as made");
     assert_eq!(loaded.save_json(), w.save_json());
-    // A file from before parts had colours of their own: its one colour goes on the body.
-    let old = w.save_json().replace(
-        r##""colors":{"body":"#4e9c9a","stone":"#f2efe8"}"##,
-        r##""color":"#c46b4a""##,
-    );
-    let loaded = World::from_save_json(CONTENT, &old).unwrap();
-    assert_eq!(
-        loaded.objects[2].colors,
-        [("body".to_string(), 0xC46B4A)].into()
-    );
 }

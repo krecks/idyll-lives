@@ -33,6 +33,15 @@ impl World {
     /// A new resident; with `reuse`, in the first slot someone gone left (their story events
     /// then name them as a former resident), else in a new slot.
     pub(crate) fn spawn_at(&mut self, spawn: &SimSpawn, reuse: bool) -> Result<u32, Error> {
+        self.content
+            .check_trait_count(&spawn.traits)
+            .map_err(|e| Error::new(format!("{}: {e}", spawn.name)))?;
+        self.spawn_any(spawn, reuse)
+    }
+
+    /// `spawn_at` without the count of traits a new resident has: a saved one keeps the traits
+    /// the content still knows, however few.
+    pub(crate) fn spawn_any(&mut self, spawn: &SimSpawn, reuse: bool) -> Result<u32, Error> {
         let SimSpawn { name, x, z, .. } = spawn;
         if !self.lot.in_bounds(x.floor() as i32, z.floor() as i32) {
             return Err(Error::new(format!("resident '{name}' spawns off the lot")));

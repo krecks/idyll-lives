@@ -1359,9 +1359,9 @@ fn staff_are_not_residents_and_cost_nothing_but_what_is_bought() {
 }
 
 /// Bo, waiting behind Ada at the stall longer than `service.waitMinutes` (here a few seconds), gives up
-/// and gets his money back; Ada is served and pays.
+/// and pays nothing; Ada is served and pays.
 #[test]
-fn a_customer_who_waits_too_long_gives_up_and_is_paid_back() {
+fn a_customer_who_waits_too_long_gives_up_and_pays_nothing() {
     let (mut w, market) =
         town_beside_edited("market", 2, |c| c["service"]["waitMinutes"] = json!(0.2));
     w.autonomy = false;
@@ -1402,6 +1402,57 @@ fn a_customer_who_waits_too_long_gives_up_and_is_paid_back() {
         funds - 5,
         "the other paid nothing in the end"
     );
+}
+
+/// One of two at the stall is called away while the other is served: the one waiting has paid
+/// nothing, the one served pays once.
+#[test]
+fn a_customer_called_away_while_waiting_pays_nothing() {
+    let (mut w, market) = town_beside_with("market", 2);
+    w.autonomy = false;
+    let stall = w
+        .objects
+        .iter()
+        .find(|o| {
+            w.content.objects[o.def].id == "marketStall" && w.plot_at(o.x, o.z) == Some(market)
+        })
+        .unwrap()
+        .id;
+    let fruit = interaction(&w, stall, "fruit");
+    let funds = w.households[0].funds;
+    for s in [0, 1] {
+        w.apply(Command::Use {
+            sim: s,
+            object: stall,
+            interaction: fruit,
+        })
+        .unwrap();
+    }
+    let at_stall = |w: &World, s: usize| match w.sims[s].current().map(|a| (a.task.kind, &a.phase))
+    {
+        Some((TaskKind::Use { object, .. }, Phase::Using { elapsed })) if object == stall => {
+            Some(*elapsed)
+        }
+        _ => None,
+    };
+    let mut called = None;
+    for _ in 0..40 * TICKS_PER_MINUTE {
+        w.tick_once();
+        if called.is_none()
+            && let Some(s) = (0..2).find(|&s| {
+                at_stall(&w, s) == Some(0.0) && at_stall(&w, 1 - s).is_some_and(|e| e > 0.0)
+            })
+        {
+            w.apply(Command::Cancel {
+                sim: s as u32,
+                index: 0,
+            })
+            .unwrap();
+            called = Some(s);
+        }
+    }
+    assert!(called.is_some(), "one waited while the other was served");
+    assert_eq!(w.households[0].funds, funds - 5, "only the one served paid");
 }
 
 /// Last orders: Ada sets off for the ice cream cart a minute before it closes (20:00) and gets there
