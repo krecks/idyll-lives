@@ -121,7 +121,10 @@ mod tests {
                     };
                     for v in 0..birdsong::VERSIONS as u32 {
                         let what = format!("{} {v} at {rate}", sp.name);
-                        finite(&what, &birdsong::song(&bird, v, rate));
+                        finite(
+                            &what,
+                            &birdsong::song(&bird, v, rate).expect("a known species sings"),
+                        );
                     }
                 }
             }
