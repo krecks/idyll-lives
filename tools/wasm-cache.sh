@@ -11,7 +11,7 @@
 # by any other worktree of the repo) is copied from ~/.cache/idyll-lives/wasm-pkg/<pkg>/<key>/; otherwise it is
 # built here (cargo in this checkout's target/, then wasm-bindgen), kept there and copied. A build holds the key's
 # lock, so two worktrees asking for the same package at once build it once. LL_WASM_CACHE=0 builds without the
-# cache, as it always did, and so does CI ($CI set: Pages' `bun run wasm` on the self-hosted runner) unless
+# cache, as it always did, and so does CI ($CI set: Pages' `bun run wasm`) unless
 # LL_WASM_CACHE=1 says otherwise. LL_WASM_CACHE_DIR keeps the packages elsewhere.
 set -euo pipefail
 cd "$(dirname "$0")/.."
