@@ -78,3 +78,16 @@ fn a_models_own_palette_names_its_materials() {
         "wood"
     );
 }
+
+fn probe() -> Vec<Obj> {
+    cube!("probe", 0.4, bevel = 0);
+    artkit::parts::settle_all()
+}
+
+#[test]
+fn a_far_version_is_built_on_the_models_centre() {
+    let model = Model::new("probe", probe, (0.4, 0.4, 0.4))
+        .centre(0.0, 0.1)
+        .far_low();
+    artkit::family::make_far(&model, model.far.unwrap()).unwrap();
+}

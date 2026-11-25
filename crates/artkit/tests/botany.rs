@@ -945,3 +945,9 @@ fn a_species_own_tiles_move_only_the_cards_and_cores_pictures() {
     };
     crown("crown1.tiles", crown1, Some(tiles), &mut Off::default());
 }
+
+#[test]
+fn spreading_no_perches_keeps_none() {
+    let points = [V3::new(0.0, 0.0, 1.0), V3::new(1.0, 0.0, 0.0)];
+    assert!(perch::spread(&points, 0, 0.45).is_empty());
+}

@@ -285,11 +285,16 @@ pub fn make(model: &Model) -> Result<Vec<Obj>, String> {
 /// The far version of `model`, in the scene: its parts.
 pub fn make_far(model: &Model, far_build: Far) -> Result<Vec<Obj>, String> {
     scene::reset();
+    scene::with(|s| s.centre = model.centre);
     let built = match far_build {
         Far::Low => far::far_of(model.build),
         Far::Own(build) => build(),
-        Far::Ratio(ratio) => return make_decimated(model, ratio),
+        Far::Ratio(_) => (model.build)(),
     };
+    scene::with(|s| s.centre = [0.0, 0.0]);
+    if let Far::Ratio(ratio) = far_build {
+        return make_decimated(model, ratio, built);
+    }
     let objs = if built.is_empty() { meshes() } else { built };
     crate::bevel::apply_all(&objs);
     let name = format!("{}.far", model.id);
@@ -310,10 +315,7 @@ pub fn make_far(model: &Model, far_build: Far) -> Result<Vec<Obj>, String> {
 /// The far version of a model that asks for a share of its triangles (`far=0.25`), in the scene: the model built
 /// again, at rest and still, without what is hidden at rest (water grown from nothing), joined into one part named
 /// `<id>_far` and decimated but for its feet and its outermost faces (`far::decimated`).
-fn make_decimated(model: &Model, ratio: f64) -> Result<Vec<Obj>, String> {
-    scene::with(|s| s.centre = model.centre);
-    let built = (model.build)();
-    scene::with(|s| s.centre = [0.0, 0.0]);
+fn make_decimated(model: &Model, ratio: f64, built: Vec<Obj>) -> Result<Vec<Obj>, String> {
     let objs = if built.is_empty() { meshes() } else { built };
     let (hidden, shown): (Vec<Obj>, Vec<Obj>) = objs
         .iter()

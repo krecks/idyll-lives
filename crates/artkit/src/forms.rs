@@ -36,6 +36,7 @@ pub fn circle(r: f64, verts: usize) -> Vec<(f64, f64)> {
 pub fn rounded_rect(w: f64, h: f64, r: f64, corner: usize) -> Vec<(f64, f64)> {
     let min = |a: f64, b: f64| if b < a { b } else { a };
     let r = min(min(r, w / 2.0), h / 2.0);
+    let corner = corner.max(1); // (0 segments would turn by 0/0)
     let mut out = Vec::with_capacity(4 * (corner + 1));
     for (cx, cy, a0) in [
         (w / 2.0 - r, h / 2.0 - r, 0.0),

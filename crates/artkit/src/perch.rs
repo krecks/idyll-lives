@@ -98,7 +98,7 @@ pub fn bare(points: &[V3], headroom: f64) -> Vec<V3> {
 /// Up to `n` of `points` spread round the model: the highest first, then each the farthest from those kept (none
 /// nearer than `gap` metres to another). Deterministic.
 pub fn spread(points: &[V3], n: usize, gap: f64) -> Vec<V3> {
-    if points.is_empty() {
+    if points.is_empty() || n == 0 {
         return Vec::new();
     }
     let key = |p: &V3| (p.z, -p.x, -p.y);
