@@ -450,6 +450,7 @@ pub fn kids_bed_car() -> Vec<Obj> {
     // an aerofoil, thick at its leading edge (u up, v back from it)
     let wing = vec![
         (0.0, 0.0),
+        (0.0016, 0.0001), // (its leading edge round)
         (0.012, 0.004),
         (0.018, 0.02),
         (0.016, 0.045),
@@ -458,6 +459,7 @@ pub fn kids_bed_car() -> Vec<Obj> {
         (-0.004, 0.05),
         (-0.006, 0.02),
         (-0.004, 0.004),
+        (-0.0012, 0.0006),
     ];
     fsweep!(
         F,

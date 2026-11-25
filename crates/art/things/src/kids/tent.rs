@@ -72,7 +72,9 @@ pub fn play_tent() -> Vec<Obj> {
         .iter()
         .map(|&t| canvas_ring(t, 0.0, 4))
         .collect();
-    loft!("canvas", &canvas, material = M.canvas);
+    let cloth = loft!("canvas", &canvas, material = M.canvas);
+    // (its cloth laid on from the sides, not round it: round, it stretches up the narrowing cone)
+    cloth.edit(|o| o.uv = artkit::mesh::UvWay::Box);
     // a hem round its foot
     let hem: Vec<Vec<P3>> = [0.0, 0.045]
         .iter()

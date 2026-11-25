@@ -3,7 +3,9 @@
 use super::beds::bun;
 use super::common::{P, block, place, star, still, teddy, walls};
 use super::{F, M};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
+use artkit::shapes::SHARP;
 use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::math::{Axis, PI, TAU, cos, sin};
@@ -95,6 +97,8 @@ pub fn toy_box() -> Vec<Obj> {
             )
         );
     }
+    // the hand holds' cut edges eased
+    bevel_edges(box_walls, 0.003, 1, SHARP, &EdgeOrder::Corners);
     // a rounded rim along the walls' top edge, under the lid
     let rim = rounded_rect(0.775, 0.475, 0.018, 3);
     let path: Vec<P> = rim.iter().map(|&(u, v)| (u, 0.445, z + v)).collect();

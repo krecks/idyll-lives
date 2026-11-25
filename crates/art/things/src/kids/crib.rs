@@ -2,6 +2,7 @@
 
 use super::common::{heart, mattress, moon, place, star, still};
 use super::{F, M};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
@@ -246,7 +247,7 @@ fn changing_table() {
         0.04,
         3,
     );
-    fsweep!(
+    let guard = fsweep!(
         F,
         "guard",
         &pts,
@@ -255,6 +256,7 @@ fn changing_table() {
         profile = rounded_rect(0.08, 0.025, 0.011, 2),
         up = (0, 0, 1)
     );
+    bevel_edges(guard, 0.004, 1, 50.0, &EdgeOrder::Corners); // its ends' edges
 }
 
 /// The mobile: a turned hub on the arm's end, four arms curving down, and a toy on a string under each (a star,
