@@ -166,13 +166,15 @@ pub fn pot_plant(name: &str, x: f64, y: f64, z: f64, k: usize) {
             (r * 0.72, 0.0),
             (r * 0.95, r * 1.6),
             (r * 1.02, r * 1.62),
-            (r * 1.02, r * 1.8),
+            // the rim's top edge cut across 4 mm
+            (r * 1.02, r * 1.8 - 0.004),
+            (r * 1.02 - 0.004, r * 1.8),
             (r * 0.95, r * 1.8),
             (0.0, r * 1.7)
         ],
         at = F.at(x, y, z),
         material = M.terracotta,
-        segments = 12
+        segments = 10
     );
     let top = y + r * 1.75;
     let kf = k as f64;
@@ -281,7 +283,8 @@ pub fn plant_table() -> Vec<Obj> {
                     0.04,
                     (x, (top - 0.025) / 2.0, z),
                     M.galv,
-                    bevel = 0.004
+                    bevel = 0.004,
+                    bevel_segments = 1
                 );
             }
             fbox!(

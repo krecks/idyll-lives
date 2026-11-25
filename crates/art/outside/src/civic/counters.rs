@@ -134,7 +134,7 @@ pub fn teacher_desk() -> Vec<Obj> {
             segments = 14,
             rings = 10
         );
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "apple_stalk",
             0.003,
@@ -142,8 +142,8 @@ pub fn teacher_desk() -> Vec<Obj> {
             (0.25, t + 0.083, 0.16),
             M.soil,
             verts = 5
-        );
-        revolve!(
+        ));
+        crate::eased(revolve!(
             "pencil_pot",
             &[
                 (0.0, 0.0),
@@ -156,7 +156,7 @@ pub fn teacher_desk() -> Vec<Obj> {
             at = F.at(0.62, t, -0.2),
             material = M.pot,
             segments = 14
-        );
+        ));
         for k in 0..4 {
             let a = k as f64 * 1.6;
             rod(
@@ -169,7 +169,8 @@ pub fn teacher_desk() -> Vec<Obj> {
             );
         }
         let (gx, gz) = (-0.5, -0.12);
-        revolve!(
+        // (box UVs on the turned base: round about its axis, the grain stretched over its slopes near the middle)
+        crate::boxed(crate::eased(revolve!(
             "globe_base",
             &[
                 (0.0, 0.0),
@@ -183,13 +184,13 @@ pub fn teacher_desk() -> Vec<Obj> {
             at = F.at(gx, t, gz),
             material = M.walnut,
             segments = 16
-        );
+        )));
         let arc: Vec<(f64, f64, f64)> = (150..371)
             .step_by(20)
             .map(|d| radians(d as f64))
             .map(|a| (gx + 0.13 * sin(a), t + 0.23 + 0.13 * cos(a), gz))
             .collect();
-        fsweep!(
+        crate::eased(fsweep!(
             F,
             "globe_arc",
             &arc,
@@ -197,7 +198,7 @@ pub fn teacher_desk() -> Vec<Obj> {
             M.brass,
             profile = rounded_rect(0.006, 0.012, 0.0, 4),
             up = (0, 1, 0)
-        );
+        ));
         fsphere!(
             F,
             "globe",
@@ -260,7 +261,7 @@ pub fn lectern() -> Vec<Obj> {
             M.pew_oak,
             bevel = 0.01
         );
-        revolve!(
+        crate::eased(revolve!(
             "column",
             &[
                 (0.0, 0.11),
@@ -279,7 +280,7 @@ pub fn lectern() -> Vec<Obj> {
             ],
             material = M.pew_oak,
             segments = 16
-        );
+        ));
         // the desk: a sloping board on a box, its front to the church carved with a cross
         fextrude!(
             F,
@@ -344,7 +345,7 @@ pub fn lectern() -> Vec<Obj> {
             M.pew_oak,
             bevel = 0.006
         );
-        kit_moulding!(
+        crate::eased(kit_moulding!(
             F,
             "front_frame",
             &[(-0.25, 0.94), (0.25, 0.94), (0.25, 1.17), (-0.25, 1.17)],
@@ -357,7 +358,7 @@ pub fn lectern() -> Vec<Obj> {
             ],
             M.pew_oak,
             at = 0.24
-        );
+        ));
         fbox!(
             F,
             "cross_v",
@@ -449,7 +450,7 @@ pub fn bar_counter() -> Vec<Obj> {
         }
         for k in 0..6 {
             let x = -0.78 + k as f64 * 0.3;
-            revolve!(
+            crate::eased(revolve!(
                 format!("bottle{k}"),
                 &[
                     (0.0, 0.0),
@@ -462,7 +463,7 @@ pub fn bar_counter() -> Vec<Obj> {
                 at = F.at(x, 0.11, -0.25),
                 material = [M.leaf, M.beer, M.mag1][k % 3],
                 segments = 12
-            );
+            ));
         }
         for (i, x) in [-0.62, 0.0, 0.62].into_iter().enumerate() {
             kit_shaker!(
@@ -478,7 +479,7 @@ pub fn bar_counter() -> Vec<Obj> {
             );
         }
         // the top: a thick slab with a rounded nose to the drinkers, a bead under it
-        fextrude!(
+        crate::eased(fextrude!(
             F,
             "top",
             &[
@@ -495,8 +496,8 @@ pub fn bar_counter() -> Vec<Obj> {
             (0, top - 0.056, 0),
             M.mahogany,
             plane = Facing::Side
-        );
-        fsweep!(
+        ));
+        crate::eased(fsweep!(
             F,
             "cove",
             &[(-0.95, top - 0.068, 0.236), (0.95, top - 0.068, 0.236)],
@@ -510,7 +511,7 @@ pub fn bar_counter() -> Vec<Obj> {
                 (0.0, 0.0),
                 (0.006, -0.01)
             ]
-        );
+        ));
         // the brass foot rail on three brackets
         rod(
             "rail",
@@ -556,7 +557,7 @@ pub fn bar_counter() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            revolve!(
+            crate::eased(revolve!(
                 format!("pump{i}"),
                 &[
                     (0.0, 0.0),
@@ -571,8 +572,8 @@ pub fn bar_counter() -> Vec<Obj> {
                 at = F.at(x, top, -0.2),
                 material = M.bell,
                 segments = 16
-            );
-            fsweep!(
+            ));
+            crate::eased(fsweep!(
                 F,
                 format!("spout{i}"),
                 &[
@@ -584,8 +585,8 @@ pub fn bar_counter() -> Vec<Obj> {
                 M.bell,
                 resolution = 3,
                 verts = 8
-            );
-            revolve!(
+            ));
+            crate::eased(revolve!(
                 format!("handle{i}"),
                 &[
                     (0.0, 0.0),
@@ -599,7 +600,7 @@ pub fn bar_counter() -> Vec<Obj> {
                 at = F.at(x, top + 0.13, -0.2),
                 material = M.handle,
                 segments = 12
-            );
+            ));
             fbox!(
                 F,
                 format!("clip{i}"),
@@ -622,7 +623,7 @@ pub fn bar_counter() -> Vec<Obj> {
             M.towel
         );
         for (k, x) in [-0.45, 0.5].into_iter().enumerate() {
-            revolve!(
+            crate::eased(revolve!(
                 format!("pint{k}"),
                 &[
                     (0.0, 0.0),
@@ -635,8 +636,8 @@ pub fn bar_counter() -> Vec<Obj> {
                 at = F.at(x, top + 0.006, 0.2),
                 material = M.beer,
                 segments = 16
-            );
-            revolve!(
+            ));
+            crate::eased(revolve!(
                 format!("head{k}"),
                 &[
                     (0.0, 0.0),
@@ -648,7 +649,7 @@ pub fn bar_counter() -> Vec<Obj> {
                 at = F.at(x, top + 0.136, 0.2),
                 material = M.froth,
                 segments = 16
-            );
+            ));
         }
         for (k, x) in [-0.8, 0.82].into_iter().enumerate() {
             fbox!(

@@ -51,7 +51,8 @@ palette! { M:
 pub const F: GameFrame = GameFrame::new(0.0);
 pub const X: V3 = V3::new(1.0, 0.0, 0.0);
 
-/// A mesh object from points and faces (Blender world), its normals pointing out.
+/// A mesh object from points and faces (Blender world), its normals pointing out; flat, its hard edges eased (the crate's `eased`).
 pub fn mesh(name: &str, verts: Vec<V3>, faces: &[Vec<u32>], material: Mat, smooth: bool) -> Obj {
-    forms::object(name, verts, faces, Some(material), smooth, CLOSED, false)
+    let obj = forms::object(name, verts, faces, Some(material), smooth, CLOSED, false);
+    if smooth { obj } else { crate::eased(obj) }
 }

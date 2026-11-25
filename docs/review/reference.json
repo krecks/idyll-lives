@@ -8339,7 +8339,7 @@
       ]
     },
     "sunLounger": {
-      "label": "Sun lounger",
+      "label": "Sun lounger (lain on: its height is the renderer's beds table's, a mattress's)",
       "w": [
         0.55,
         0.8
@@ -8352,7 +8352,7 @@
         1.8,
         2.1
       ],
-      "seat": [
+      "mattress": [
         0.25,
         0.45
       ],
@@ -8561,7 +8561,7 @@
       ]
     },
     "firePit": {
-      "label": "Fire pit (seat: the stools or benches round it)",
+      "label": "Fire pit (no seat of its own: residents sit on the seats near it, content `seatNear`)",
       "w": [
         0.6,
         1.2
@@ -8573,10 +8573,6 @@
       "d": [
         0.6,
         1.2
-      ],
-      "seat": [
-        0.35,
-        0.48
       ],
       "uses": [
         "light a fire",
@@ -9090,7 +9086,7 @@
       ]
     },
     "washingLine": {
-      "label": "Washing line between posts",
+      "label": "Washing line between posts (on T-posts: two to four lines on arms 0.6-0.8 m across)",
       "w": [
         2,
         4
@@ -9101,7 +9097,7 @@
       ],
       "d": [
         0.1,
-        0.4
+        0.8
       ],
       "uses": [
         "hang out the washing",
@@ -12295,7 +12291,7 @@
       ]
     },
     "pingPongTable": {
-      "label": "Table tennis table",
+      "label": "Table tennis table (1.525 m across, its net's posts 15.25 cm outside each side: ITTF 2.6.2)",
       "w": [
         2.7,
         2.8
@@ -12306,7 +12302,7 @@
       ],
       "d": [
         1.5,
-        1.6
+        1.85
       ],
       "surface": [
         0.76,

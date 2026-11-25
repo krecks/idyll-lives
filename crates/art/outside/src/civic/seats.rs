@@ -179,7 +179,7 @@ pub fn school_desk() -> Vec<Obj> {
             (-0.08, 0.7225, 0.43),
             M.soil
         );
-        revolve!(
+        crate::eased(revolve!(
             "inkwell",
             &[
                 (0.0, 0.0),
@@ -192,8 +192,8 @@ pub fn school_desk() -> Vec<Obj> {
             at = F.at(0.2, 0.712, 0.445),
             material = M.pot,
             segments = 12
-        );
-        fcyl!(
+        ));
+        crate::eased(fcyl!(
             F,
             "ink",
             0.009,
@@ -201,7 +201,7 @@ pub fn school_desk() -> Vec<Obj> {
             (0.2, 0.7385, 0.445),
             M.ink,
             verts = 10
-        );
+        ));
         rod(
             "pen",
             (-0.2, 0.7275, 0.43),
@@ -428,7 +428,7 @@ pub fn waiting_bench() -> Vec<Obj> {
                 bevel = 0.006
             );
             for z in [-0.28, 0.2] {
-                fcyl!(
+                crate::eased(fcyl!(
                     F,
                     format!("glide{xs}{}", float_repr(z)),
                     0.022,
@@ -436,7 +436,7 @@ pub fn waiting_bench() -> Vec<Obj> {
                     (x, 0.006, z),
                     M.radio,
                     verts = 10
-                );
+                ));
             }
         }
         for (i, x) in [-1.0, 0.0, 1.0].into_iter().enumerate() {
@@ -522,7 +522,7 @@ pub fn exam_couch() -> Vec<Obj> {
                     M.white,
                     10,
                 );
-                fcyl!(
+                crate::eased(fcyl!(
                     F,
                     format!("foot{xs}{zs}"),
                     0.026,
@@ -530,7 +530,7 @@ pub fn exam_couch() -> Vec<Obj> {
                     (x, 0.015, z),
                     M.radio,
                     verts = 10
-                );
+                ));
             }
             rod(
                 &format!("rail{xs}"),
@@ -620,7 +620,7 @@ pub fn exam_couch() -> Vec<Obj> {
                 M.white
             );
         }
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "roll",
             0.045,
@@ -629,7 +629,7 @@ pub fn exam_couch() -> Vec<Obj> {
             M.paper,
             rot = (0, 90, 0),
             verts = 14
-        );
+        ));
         fbox!(
             F,
             "sheet_head",

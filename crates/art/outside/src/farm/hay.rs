@@ -1,6 +1,6 @@
 //! Hay: the round bale and the stack of square bales, and their far versions.
 
-use super::common::{F, M};
+use super::common::{F, M, eased};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::math::{TAU, cos, radians, sin};
@@ -53,7 +53,7 @@ pub fn hayBale() -> Vec<Obj> {
             let r = 0.05 + 0.45 * t;
             pts.push((sf * (hl - 0.002), y + r * sin(a), r * cos(a)));
         }
-        fsweep!(
+        eased(fsweep!(
             F,
             format!("spiral{s}"),
             &pts,
@@ -61,7 +61,7 @@ pub fn hayBale() -> Vec<Obj> {
             M.hay_dark,
             verts = 4,
             scale = [0.7, 1.0, 1.0, 1.1]
-        );
+        ));
         sphere!(
             format!("core{s}"),
             0.07,

@@ -43,7 +43,7 @@ pub fn street_lamp() -> Vec<Obj> {
             .map(|&(r, y)| fluted(r, y, 12, 0.07, 3, 0.0))
             .collect();
         loft!("bell", &secs, material = iron);
-        revolve!(
+        crate::eased(revolve!(
             "collar",
             &[
                 (0.0, 0.495),
@@ -57,7 +57,7 @@ pub fn street_lamp() -> Vec<Obj> {
             ],
             material = iron,
             segments = 16
-        );
+        ));
         // the post: fluted, a collar part way, a moulded capital under the lantern's bracket
         loft!(
             "post",
@@ -144,7 +144,7 @@ pub fn street_lamp() -> Vec<Obj> {
             rot = (0, 0, 45),
             smooth = false
         );
-        loft!(
+        crate::eased(loft!(
             "lantern_floor",
             &[
                 square(0.12, 3.43),
@@ -153,7 +153,7 @@ pub fn street_lamp() -> Vec<Obj> {
             ],
             material = iron,
             smooth = false
-        );
+        ));
         loft!(
             "lantern_top",
             &[
@@ -180,20 +180,24 @@ pub fn street_lamp() -> Vec<Obj> {
             );
         }
         // the roof: a hipped canopy, its sides curving in, a vented crown and a finial
-        loft!(
-            "roof",
-            &[
-                square(0.233, 3.905),
-                square(0.233, 3.925),
-                square(0.2, 3.95),
-                square(0.14, 3.99),
-                square(0.085, 4.04),
-                square(0.06, 4.08)
-            ],
-            material = iron,
-            smooth = false
+        crate::ease(
+            loft!(
+                "roof",
+                &[
+                    square(0.233, 3.905),
+                    square(0.233, 3.925),
+                    square(0.2, 3.95),
+                    square(0.14, 3.99),
+                    square(0.085, 4.04),
+                    square(0.06, 4.08)
+                ],
+                material = iron,
+                smooth = false
+            ),
+            30.0,
+            1,
         );
-        revolve!(
+        crate::eased(revolve!(
             "vent",
             &[
                 (0.0, 4.07),
@@ -208,7 +212,7 @@ pub fn street_lamp() -> Vec<Obj> {
             ],
             material = iron,
             segments = 12
-        );
+        ));
         revolve!(
             "finial",
             &[
@@ -348,14 +352,14 @@ pub fn traffic_light() -> Vec<Obj> {
             bevel_segments = 2
         );
         let board = (0, 2.52, 0.085);
-        fextrude!(
+        crate::eased(fextrude!(
             f,
             "rim",
             &rounded_rect(0.52, 1.1, 0.06, low(4, 1)),
             0.012,
             board,
             m.paper
-        );
+        ));
         fextrude!(
             f,
             "board",

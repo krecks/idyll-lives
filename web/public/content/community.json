@@ -851,6 +851,19 @@
         2,
         1
       ],
+      "surface": {
+        "height": 0.825,
+        "kind": "table",
+        "size": [
+          1.84,
+          0.8
+        ],
+        "at": [
+          0,
+          0.02
+        ],
+        "dressed": true
+      },
       "price": 700,
       "category": "community",
       "group": "food",

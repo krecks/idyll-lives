@@ -25,6 +25,7 @@ palette! { SF:
     brass = ("#B08D4A", metal),       // crests and plaques
     wood = ("#9A6B45", wood),         // slats
     glass = ("#C9DDE3", glass),       // the shelter's and the phone box's glazing (see-through)
+    pane = ("#6F8791", gloss),        // the phone box door's panes: opaque, so the moving door is one draw
     blue = ("#2E6FA8", gloss),        // the town map's routes
     // the taxi rank (the shelter): the taxi's yellow, its chequers and lettering, and the sign's light box, lit at
     // night (E8) as the taxi's roof sign looks lit

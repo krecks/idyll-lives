@@ -45,23 +45,27 @@ pub fn town_statue() -> Vec<Obj> {
             bevel = 0.02
         );
         let sq = [(0.6, 0.6), (-0.6, 0.6), (-0.6, -0.6), (0.6, -0.6)];
-        kit_moulding!(
-            f,
-            "base_moulding",
-            &sq,
-            &[
-                (-0.07, 0.0),
-                (-0.07, 0.04),
-                (-0.04, 0.06),
-                (-0.02, 0.1),
-                (0.02, 0.1),
-                (0.02, 0.0)
-            ],
-            m.granite,
-            at = 0.2,
-            plane = Facing::Top
+        crate::ease(
+            kit_moulding!(
+                f,
+                "base_moulding",
+                &sq,
+                &[
+                    (-0.07, 0.0),
+                    (-0.07, 0.04),
+                    (-0.04, 0.06),
+                    (-0.02, 0.1),
+                    (0.02, 0.1),
+                    (0.02, 0.0)
+                ],
+                m.granite,
+                at = 0.2,
+                plane = Facing::Top
+            ),
+            30.0,
+            1,
         );
-        kit_moulding!(
+        crate::eased(kit_moulding!(
             f,
             "cornice",
             &sq,
@@ -76,7 +80,7 @@ pub fn town_statue() -> Vec<Obj> {
             m.granite,
             at = 1.31,
             plane = Facing::Top
-        );
+        ));
         for s in [-1, 1] {
             let sf = s as f64;
             for axis in ['x', 'z'] {

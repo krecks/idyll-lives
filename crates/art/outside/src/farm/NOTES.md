@@ -108,20 +108,20 @@ The table says Paint, Roof. The barn, silo and coop take those with their real m
 
 | Model | Size (w × h × d) | Triangles | Far | Draws |
 |---|---|---|---|---|
-| `model.farm.barn` | 6.04 × 6.00 × 5.94 m | 8,406 | 908 | 1 |
-| `model.farm.silo` | 2.80 × 6.90 × 2.72 m | 9,396 | 632 | 1 |
-| `model.farm.tractor` | 1.62 × 2.51 × 3.30 m | 9,688 | 1,556 | 1 |
-| `model.farm.hayBale` | 1.23 × 1.23 × 1.23 m | 3,168 | 396 | 2 (hay fabric + plain) |
-| `model.farm.hayStack` | 1.91 × 0.93 × 0.88 m | 3,588 | 396 | 2 |
-| `model.farm.scarecrow` | 1.00 × 2.12 × 0.55 m | 4,034 | 999 | 3 (post wood, clothes fabric, plain) |
-| `model.farm.trough` | 1.88 × 0.66 × 0.75 m | 2,700 | 288 | 1 |
-| `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 2,624 | 264 | 3 (walls wood + plain, the hatch) |
+| `model.farm.barn` | 6.04 × 6.00 × 5.94 m | 11,876 | 620 | 1 |
+| `model.farm.silo` | 2.80 × 6.90 × 2.72 m | 10,644 | 568 | 1 |
+| `model.farm.tractor` | 1.62 × 2.51 × 3.30 m | 11,760 | 1,364 | 1 |
+| `model.farm.hayBale` | 1.23 × 1.23 × 1.23 m | 4,544 | 396 | 2 (hay fabric + plain) |
+| `model.farm.hayStack` | 1.91 × 0.93 × 0.88 m | 3,588 | 108 | 2 |
+| `model.farm.scarecrow` | 1.00 × 2.12 × 0.55 m | 4,542 | 1,134 | 3 (post wood, clothes fabric, plain) |
+| `model.farm.trough` | 1.88 × 0.66 × 0.75 m | 3,376 | 256 | 1 |
+| `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 7,696 | 264 | 3 (walls wood + plain, the hatch) |
 
 Before the detail pass (2026-10-22): barn 2,842, silo 4,348, tractor 5,680, round bale 2,144, hay stack 468,
 scarecrow 2,290, trough 1,012, coop 760. Each is inside its size class's target (objects.md: over 2.5 m 12,000,
 1-2.5 m 8,000); the bales, placed two to six a farm, at under half of it.
 
-`check-glb`: 8 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings for every file (the
+`check-glb`: 8 models, 0 failed, no warnings (again since 2026-11-25, below). Khronos validator: 0 errors, 0 warnings for every file (the
 models and their far versions; 2026-10-22, the 12 the detail pass changed).
 
 ## Rebuild
@@ -142,3 +142,22 @@ A file a model (`barn.rs` and `barn_doors.rs`, `silo.rs`, `tractor.rs`, `hay.rs`
 `coop.rs`; the slabs, shells and bars of `prism`, `shell`, `strut`, `_frame` in `common.rs`), proved against the
 last Blender build (`ref/blender`); the scarecrow's far version is the kernel's decimation, held to the decimated far
 versions' rule.
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 1,149 hard edges (barn 476, tractor 360, coop 267, silo 36, scarecrow 7, round bale 2,
+trough 1); none now, each a real bevel, none accepted:
+
+- `common.rs`'s slabs, shells and stadium sweeps take `eased`: a 4 mm chamfer on edges turning over 50°, none on a
+  part under 12 mm one way or 10 cm every way, nor in a far version (each built in the kernel's `far_of`, so its
+  boxes go unchamfered too: the far coop 680 → 264 triangles, the far hay stack 396 → 108).
+- `bar_on`: a bar on a surface, its four top edges cut, 20 triangles where a bevelled box takes 44: the barn's
+  battens and the tractor's tread lugs. The lugs are 3.5 cm deep (a real R1 bar's; the rear ones were 5) and end
+  where the shoulder starts rounding (each end under 5 cm tall); the rims sit in the tyres' bores, their faces a
+  millimetre in from the sidewalls (they were 2 cm in, leaving the bore's corner bare).
+- The barn's standing seams are a centimetre across at the top (they were 2: too narrow now for a bevel to show);
+  its ridge cap and vane head, the silo cap's seams, the bale's spirals, the scarecrow's plaid and crown, the
+  tractor's hood and tyres take `eased`; the grille frame, dish, pre-cleaner bowl and feeder pan a bevel; the
+  steering wheel's rim and spokes are eight-sided (six and four turned 60° and more).
+
+Triangles above: each under its size class's aim (the barn, tractor and coop were over it with plain bevels).

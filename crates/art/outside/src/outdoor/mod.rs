@@ -36,7 +36,7 @@ pub fn family() -> Family {
             Model::new("patioSet", seats::patio_set, (0.6, 0.933, 1.423))
                 .key("model.patioSet")
                 .paint(&[("iron", "Frame"), ("bistro", "Slats")]),
-            Model::new("picnicTable", seats::picnic_table, (2.5, 1.058, 1.62))
+            Model::new("picnicTable", seats::picnic_table, (2.5, 0.834, 1.62))
                 .key("model.picnicTable")
                 .paint(&[("pine_dark", "Frame"), ("pine", "Planks"), ("cloth", "Cloth")]),
             Model::new("gardenChair", seats::garden_chair, (0.84, 1.041, 0.757))

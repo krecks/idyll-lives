@@ -2,12 +2,13 @@
 //! each side and a louvred cupola, and its far version.
 
 use super::barn_doors::{barn_doors, barn_window};
-use super::common::{F, M, P2, offset, prism, pts, shell, strut};
+use super::common::{F, M, P2, bar_on, eased, offset, prism, pts, shell, strut};
 use artkit::parts::{join_all, settle};
 use artkit::place::Coord;
 use artkit::place::N;
 use artkit::py;
 use artkit::scene::Obj;
+use artkit::shapes::AUTO_WIDTH;
 use artkit::{cube, fbox, fcone, fsphere, fsweep, points, rod, sweep};
 
 // --- the barn --------------------------------------------------------------------------------------------
@@ -87,7 +88,7 @@ fn barn_shell(detail: bool) {
         return;
     }
     // a rolled ridge cap, the metal roof's standing seams from eave to ridge, and the plinth's dressed stones
-    sweep!(
+    eased(sweep!(
         "ridge",
         &[
             F.at(0, RIDGE + ROOF_T + 0.01, -ROOF_D - 0.02),
@@ -104,7 +105,7 @@ fn barn_shell(detail: bool) {
         ],
         up = (0, 0, 1),
         smooth = false
-    );
+    ));
     let mut seam = offset(&barn_roof_line(), ROOF_T - 0.005);
     for (end, nxt) in [(0, 1), (-1, -2)] {
         // stopped short of the eaves' edge
@@ -127,13 +128,14 @@ fn barn_shell(detail: bool) {
     for i in 0..n {
         let w = -ROOF_D + 0.18 + (2.0 * ROOF_D - 0.36) * i as f64 / (n - 1) as f64;
         let points: Vec<(f64, f64, f64)> = seam.iter().map(|&(u, v)| (u.f(), v.f(), w)).collect();
+        // a seam's fold a centimetre across, under the width a bevel would show on
         fsweep!(
             F,
             format!("seam{i}"),
             &points,
             0.0,
             M.barn_roof,
-            profile = [(0.04, -0.01), (0.04, 0.01), (0.0, 0.018), (0.0, -0.018)],
+            profile = [(0.04, -0.005), (0.04, 0.005), (0.0, 0.012), (0.0, -0.012)],
             up = (1, 0, 0),
             smooth = false
         );
@@ -232,13 +234,16 @@ fn barn_battens() {
                 .into_iter()
                 .enumerate()
             {
-                prism(
+                bar_on(
                     &format!("batten_{face}{i}_{k}"),
-                    &pts(&[(u - 0.03, a), (u + 0.03, a), (u + 0.03, b), (u - 0.03, b)]),
-                    s * BD,
-                    s * (BD + 0.03),
+                    [u, a, s * BD],
+                    [u, b, s * BD],
+                    [0.0, 0.0, s],
+                    0.06,
+                    0.06,
+                    0.03,
+                    AUTO_WIDTH,
                     M.barn,
-                    'z',
                 );
             }
         }
@@ -250,13 +255,16 @@ fn barn_battens() {
                 .into_iter()
                 .enumerate()
             {
-                prism(
+                bar_on(
                     &format!("batten_side{s}{i}_{k}"),
-                    &pts(&[(u - 0.03, a), (u + 0.03, a), (u + 0.03, b), (u - 0.03, b)]),
-                    s as f64 * BW,
-                    s as f64 * (BW + 0.03),
+                    [s as f64 * BW, a, u],
+                    [s as f64 * BW, b, u],
+                    [s as f64, 0.0, 0.0],
+                    0.06,
+                    0.06,
+                    0.03,
+                    AUTO_WIDTH,
                     M.barn,
-                    'x',
                 );
             }
         }
@@ -401,7 +409,7 @@ fn cupola(detail: bool) {
             at = F.at(0, 5.9, 0),
             material = M.iron
         );
-        fcone!(
+        eased(fcone!(
             F,
             "vane_head",
             0.06,
@@ -412,7 +420,7 @@ fn cupola(detail: bool) {
             verts = 4,
             rot = (0, 90, 0),
             smooth = false
-        );
+        ));
         cube!(
             "vane_tail",
             (0.14, 0.01, 0.12),

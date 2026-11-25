@@ -134,14 +134,14 @@ pub fn vending_drink() -> Vec<Obj> {
                 M.label,
                 verts = 16
             );
-            fextrude!(
+            crate::eased(fextrude!(
                 f,
                 format!("button{i}"),
                 &rounded_rect(0.1, 0.05, 0.012, 2),
                 0.016,
                 (x, 0.95, FRONT + 0.006),
                 M.button
-            );
+            ));
             fbox!(
                 f,
                 format!("button_light{i}"),

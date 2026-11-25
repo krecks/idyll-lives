@@ -200,3 +200,19 @@ The game draws the cook's food on the grate and what they carried out beside it 
 ## The soft forms pass (2026-11-13)
 
 The hammock's pillow is sewn flat and stuffed (its sides drawn in 1.2 cm between corners that stand out, `waist`); the sun lounger's pad and pillow are left unpinched and the pillow whole, their top edge being the lounger's highest point. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `hammock`, `patioChair`, `porchSwing`, `sunLounger`; 8,608 to 9,374 triangles.
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 58 (patio set 45, swing set 4, picnic table, grill station and fire pit 2, the round table,
+bar and grill 1); none now, none accepted. The bistro chairs' seat slats take the 4 mm chamfer the table's have and
+their back slats the crate's `eased` (a 4 mm chamfer on turns over 50°); the grills' and fire pit's revolves, sweeps,
+lofts and extrusions that named no bevel are eased, as are the hood's slabs (`across`), every `slab` top, the round
+table's top, the picnic basket and the swing seats. The jug's lip rounds over in two more rings (no bevel builds on
+its spout) and the kettle's ash catcher's rim is 11 mm (15 mm read as a cut edge).
+
+Sizes (`cargo review sizes`): the patio chair's seat pan and cushion sit 3 cm lower, the cushion's top at 0.48 (a
+dining chair's 0.42-0.48; content `seat` 0.49 → 0.47); the picnic table's basket is carried (`aside`), so the table
+measures 0.834 m, not the basket's 1.058 (`finish` joins all but what is aside).
+
+Draw calls: the hot tub stays at 4 (the tub, its water bubbling, and the cover's two halves folding: four parts
+that move apart), reported to the owner.

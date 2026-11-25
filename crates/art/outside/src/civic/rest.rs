@@ -59,7 +59,7 @@ pub fn wall_bars() -> Vec<Obj> {
         }
         for i in 0..16 {
             let y = 0.15 + i as f64 * 0.152;
-            fcyl!(
+            crate::eased(fcyl!(
                 F,
                 format!("rung{i}"),
                 0.018,
@@ -68,7 +68,7 @@ pub fn wall_bars() -> Vec<Obj> {
                 M.oak,
                 rot = (0, 90, 0),
                 verts = 12
-            );
+            ));
         }
     });
     join(&parts, "bars", Some((0, 0, 0).into()));
@@ -78,7 +78,7 @@ pub fn wall_bars() -> Vec<Obj> {
 
 // --- the altar: 2x1, stone under a white linen and a frontal, two candlesticks and a cross ------------------------
 pub fn candlestick(name: &str, x: f64, y: f64, z: f64) {
-    revolve!(
+    crate::eased(revolve!(
         name,
         &[
             (0.0, 0.0),
@@ -98,8 +98,8 @@ pub fn candlestick(name: &str, x: f64, y: f64, z: f64) {
         at = F.at(x, y, z),
         material = M.brass,
         segments = 16
-    );
-    fcyl!(
+    ));
+    crate::eased(fcyl!(
         F,
         format!("{name}_candle"),
         0.022,
@@ -107,7 +107,7 @@ pub fn candlestick(name: &str, x: f64, y: f64, z: f64) {
         (x, y + 0.35 + 0.12, z),
         M.candle,
         verts = 12
-    );
+    ));
     fsphere!(
         F,
         format!("{name}_flame"),
@@ -208,7 +208,7 @@ pub fn altar() -> Vec<Obj> {
         for s in [-1, 1] {
             candlestick(&format!("candlestick{s}"), s as f64 * 0.62, t, -0.12);
         }
-        revolve!(
+        crate::eased(revolve!(
             "cross_base",
             &[
                 (0.0, 0.0),
@@ -221,7 +221,7 @@ pub fn altar() -> Vec<Obj> {
             at = F.at(0, t, -0.2),
             material = M.brass,
             segments = 16
-        );
+        ));
         fbox!(
             F,
             "cross_v",
@@ -311,7 +311,7 @@ pub fn locker_row() -> Vec<Obj> {
                         );
                     }
                 }
-                fcyl!(
+                crate::eased(fcyl!(
                     F,
                     format!("lock{c}{t}"),
                     0.014,
@@ -320,7 +320,7 @@ pub fn locker_row() -> Vec<Obj> {
                     M.bell,
                     rot = (90, 0, 0),
                     verts = 10
-                );
+                ));
                 fbox!(
                     F,
                     format!("tag_frame{c}{t}"),
@@ -359,7 +359,7 @@ pub fn locker_row() -> Vec<Obj> {
 // --- the mannequin: 1x1, a shop dummy in a jacket and trousers on a chrome stand ---------------------------------
 pub fn mannequin() -> Vec<Obj> {
     let parts = new_parts(|| {
-        revolve!(
+        crate::eased(revolve!(
             "base",
             &[
                 (0.0, 0.0),
@@ -370,12 +370,20 @@ pub fn mannequin() -> Vec<Obj> {
             ],
             material = M.bell,
             segments = 32
-        );
-        fcyl!(F, "rod", 0.012, 0.6, (0, 0.31, -0.12), M.bell, verts = 10);
+        ));
+        crate::eased(fcyl!(
+            F,
+            "rod",
+            0.012,
+            0.6,
+            (0, 0.31, -0.12),
+            M.bell,
+            verts = 10
+        ));
         // the legs, in trousers, and shoes
         for s in [-1, 1] {
             let sf = s as f64;
-            fsweep!(
+            crate::eased(fsweep!(
                 F,
                 format!("leg{s}"),
                 &[
@@ -388,7 +396,7 @@ pub fn mannequin() -> Vec<Obj> {
                 verts = 12,
                 resolution = 2,
                 scale = [1.0, 0.72, 0.62]
-            );
+            ));
             soft!(
                 F,
                 format!("shoe{s}"),
@@ -415,9 +423,9 @@ pub fn mannequin() -> Vec<Obj> {
         .iter()
         .map(|&(y, rx, rz)| ring!(rx, rz, z = y, verts = 20, square = 2.2, at = (bx, by)))
         .collect();
-        loft!("torso", &sections, material = M.cloth1);
+        crate::eased(loft!("torso", &sections, material = M.cloth1));
         // the shirt in the jacket's open neck, its buttons
-        fextrude!(
+        crate::eased(fextrude!(
             F,
             "shirt",
             &[(-0.06, 1.455), (0.06, 1.455), (0.0, 1.27)],
@@ -425,7 +433,7 @@ pub fn mannequin() -> Vec<Obj> {
             (0, 0, 0.088),
             M.cloth4,
             plane = Facing::Front
-        );
+        ));
         for k in 0..3 {
             let kf = k as f64;
             fsphere!(
@@ -440,7 +448,7 @@ pub fn mannequin() -> Vec<Obj> {
         }
         for s in [-1, 1] {
             let sf = s as f64;
-            fsweep!(
+            crate::eased(fsweep!(
                 F,
                 format!("arm{s}"),
                 &[
@@ -453,7 +461,7 @@ pub fn mannequin() -> Vec<Obj> {
                 verts = 10,
                 resolution = 2,
                 scale = [1.0, 0.85, 0.75]
-            );
+            ));
             fsphere!(
                 F,
                 format!("hand{s}"),
@@ -465,7 +473,15 @@ pub fn mannequin() -> Vec<Obj> {
                 rings = 8
             );
         }
-        fcyl!(F, "neck", 0.045, 0.12, (0, 1.5, -0.01), M.dummy, verts = 12);
+        crate::eased(fcyl!(
+            F,
+            "neck",
+            0.045,
+            0.12,
+            (0, 1.5, -0.01),
+            M.dummy,
+            verts = 12
+        ));
         fsphere!(
             F,
             "head",
@@ -519,7 +535,7 @@ pub fn luggage_trolley() -> Vec<Obj> {
                     (x, deck - 0.09, z),
                     M.brass
                 );
-                fcyl!(
+                crate::eased(fcyl!(
                     F,
                     format!("wheel{xs}{zs}"),
                     0.045,
@@ -528,13 +544,13 @@ pub fn luggage_trolley() -> Vec<Obj> {
                     M.rubber,
                     rot = (0, 90, 0),
                     verts = 14
-                );
+                ));
             }
         }
         // the uprights and the arch, a hanging rail across
         for s in [-1, 1] {
             let sf = s as f64;
-            fcyl!(
+            crate::eased(fcyl!(
                 F,
                 format!("upright{s}"),
                 0.016,
@@ -542,7 +558,7 @@ pub fn luggage_trolley() -> Vec<Obj> {
                 (sf * 0.42, deck + 0.725, 0),
                 M.brass,
                 verts = 10
-            );
+            ));
             fsphere!(
                 F,
                 format!("knob{s}"),
@@ -566,7 +582,7 @@ pub fn luggage_trolley() -> Vec<Obj> {
             .map(|d| radians(d as f64))
             .map(|a| (0.42 * cos(a), deck + 1.45 + 0.2 * sin(a), 0))
             .collect();
-        fsweep!(F, "arch", &arch, 0.016, M.brass, verts = 10);
+        crate::eased(fsweep!(F, "arch", &arch, 0.016, M.brass, verts = 10));
         rod(
             "hanging_rail",
             (-0.42, deck + 1.3, 0),
@@ -677,7 +693,7 @@ pub fn vault_door() -> Vec<Obj> {
             M.vault_dark,
             bevel = 0.01
         );
-        revolve!(
+        crate::eased(revolve!(
             "door",
             &[
                 (0.0, 0.0),
@@ -692,8 +708,8 @@ pub fn vault_door() -> Vec<Obj> {
             material = M.vault,
             segments = 48,
             rot = (90, 0, 0)
-        );
-        revolve!(
+        ));
+        crate::eased(revolve!(
             "door_rim",
             &[
                 (r + 0.06, 0.0),
@@ -706,10 +722,10 @@ pub fn vault_door() -> Vec<Obj> {
             material = M.vault_dark,
             segments = 48,
             rot = (90, 0, 0)
-        );
+        ));
         for k in 0..16 {
             let a = TAU * k as f64 / 16.0;
-            fcyl!(
+            crate::eased(fcyl!(
                 F,
                 format!("bolt{k}"),
                 0.022,
@@ -718,11 +734,11 @@ pub fn vault_door() -> Vec<Obj> {
                 M.bell,
                 rot = (90, 0, 0),
                 verts = 10
-            );
+            ));
         }
         // the wheel: a hub, six spokes ending in knobs, a ring
         let wz = WALL + 0.29;
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "hub",
             0.08,
@@ -731,7 +747,7 @@ pub fn vault_door() -> Vec<Obj> {
             M.bell,
             rot = (90, 0, 0),
             verts = 20
-        );
+        ));
         for k in 0..6 {
             let a = TAU * k as f64 / 6.0 + 0.26;
             rod(
@@ -763,7 +779,7 @@ pub fn vault_door() -> Vec<Obj> {
             minor_segments = 8
         );
         // the dial over it
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "dial",
             0.075,
@@ -772,8 +788,8 @@ pub fn vault_door() -> Vec<Obj> {
             M.iron,
             rot = (90, 0, 0),
             verts = 24
-        );
-        fcyl!(
+        ));
+        crate::eased(fcyl!(
             F,
             "dial_face",
             0.06,
@@ -782,7 +798,7 @@ pub fn vault_door() -> Vec<Obj> {
             M.bell,
             rot = (90, 0, 0),
             verts = 24
-        );
+        ));
         fbox!(
             F,
             "dial_mark",
@@ -793,7 +809,7 @@ pub fn vault_door() -> Vec<Obj> {
             M.leaflet4
         );
         // the hinge on the right
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             "hinge",
             0.06,
@@ -801,7 +817,7 @@ pub fn vault_door() -> Vec<Obj> {
             (-0.86, c, WALL + 0.13),
             M.vault_dark,
             verts = 16
-        );
+        ));
         for y in [c - 0.3, c + 0.3] {
             fbox!(
                 F,

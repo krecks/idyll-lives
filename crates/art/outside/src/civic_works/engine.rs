@@ -45,7 +45,7 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
         w,
         m.rubber,
         None,
-        Some(if inner { low(20, 12) } else { low(40, 16) }),
+        Some(if inner { low(16, 12) } else { low(24, 16) }),
         Axis::X,
     );
     if inner {
@@ -65,7 +65,7 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
         at = F.at(x, FE_R, z),
         material = m.steel,
         rot = (0, -90 * s, 0),
-        segments = low(24, 12)
+        segments = low(16, 12)
     );
     if is_low() {
         return;
@@ -88,7 +88,7 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
             verts = 6
         );
     }
-    fcyl!(
+    crate::eased(fcyl!(
         F,
         format!("{name}_cap"),
         0.055,
@@ -96,8 +96,8 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
         (x + sf * (w / 2.0 - 0.02), FE_R, z),
         m.chrome,
         rot = (0, 90, 0),
-        verts = 16
-    );
+        verts = 12
+    ));
 }
 
 pub fn fire_engine() -> Vec<Obj> {
@@ -349,11 +349,11 @@ pub fn fire_engine() -> Vec<Obj> {
         );
         // the arches' black trims
         for (zc, r) in [(FE_FA, 0.57), (FE_RA, 0.58)] {
-            let pts: Vec<(f64, f64, f64)> = arc(zc, FE_R, r + 0.02, FE_SILL + 0.02, low(14, 6))
+            let pts: Vec<(f64, f64, f64)> = arc(zc, FE_R, r + 0.02, FE_SILL + 0.02, low(10, 6))
                 .into_iter()
                 .map(|(z, y)| (sf * (if zc > 0.0 { hx } else { FE_HALF }), y, z))
                 .collect();
-            fsweep!(
+            crate::eased(fsweep!(
                 F,
                 format!("arch{s}{}", float_repr(zc)),
                 &pts,
@@ -361,7 +361,7 @@ pub fn fire_engine() -> Vec<Obj> {
                 m.plastic,
                 profile = rounded_rect(0.06, 0.05, 0.0, 1),
                 up = (0, 0, 1)
-            );
+            ));
         }
         // the side guard between the wheels: two rails on brackets
         for y in [0.4, 0.62] {
@@ -514,14 +514,14 @@ pub fn fire_engine() -> Vec<Obj> {
     }
     for s in [-1, 1] {
         let sf = s as f64;
-        fextrude!(
+        crate::eased(fextrude!(
             F,
             format!("head_bezel{s}"),
             &rounded_rect(0.36, 0.2, 0.04, low(3, 1)),
             0.03,
             (sf * 0.88, 0.93, FE_FRONT + 0.01),
             m.chrome
-        );
+        ));
         fextrude!(
             F,
             format!("head_lens{s}"),
@@ -699,7 +699,7 @@ pub fn fire_engine() -> Vec<Obj> {
         }
     }
     for s in [-1, 1] {
-        fcyl!(
+        crate::eased(fcyl!(
             F,
             format!("beacon{s}"),
             0.07,
@@ -707,7 +707,7 @@ pub fn fire_engine() -> Vec<Obj> {
             (s as f64 * 1.0, FE_ROOF + 0.06, FE_BACK + 0.12),
             m.blue_lens,
             verts = low(14, 8)
-        );
+        ));
     }
     join_all(if is_low() {
         "fireEngine_far"
