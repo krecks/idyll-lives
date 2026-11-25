@@ -117,6 +117,13 @@ impl World {
                         .map(|(i, n)| (n.id.clone(), finite(s.needs[i], 0.75)))
                         .collect(),
                     feelings,
+                    accidents: content
+                        .accidents
+                        .iter()
+                        .enumerate()
+                        .filter(|&(a, _)| s.accident_at[a] > self.tick)
+                        .map(|(a, d)| (d.id.clone(), minutes_left(s.accident_at[a])))
+                        .collect(),
                     skills: content
                         .skills
                         .iter()

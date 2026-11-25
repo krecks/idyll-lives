@@ -313,6 +313,11 @@ impl World {
                     sim.feelings.push(social::ActiveFeeling { def, expires });
                 }
             }
+            for (a, def) in content.accidents.iter().enumerate() {
+                if let Some(&m) = s.accidents.get(&def.id) {
+                    sim.accident_at[a] = after(m).min(tick.saturating_add(def.cooldown_ticks));
+                }
+            }
             for (i, skill) in content.skills.iter().enumerate() {
                 if let Some(&v) = s.skills.get(&skill.id) {
                     sim.skills[i] = v.clamp(0.0, content.skill_rules.max_level);

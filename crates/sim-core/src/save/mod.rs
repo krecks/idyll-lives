@@ -156,6 +156,8 @@
 //! (`meta.roads[].ends`: `merge`). A town without them saves as it did. No file older than this
 //! opens (`OLDEST_SAVE_VERSION`: the game says it is too old and removes it); none is migrated.
 //! A town holds up to 256 servers (`staff::MAX_STAFF`, 128 before); nothing of them is saved.
+//! Still 43: how long until each accident can happen to a resident again (`sims[].accidents`, game
+//! minutes by accident id), left out when none is waiting, so a file without it has none waiting.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -525,6 +527,10 @@ pub struct SimSave {
     pub needs: BTreeMap<String, f32>,
     #[serde(default)]
     pub feelings: Vec<FeelingSave>,
+    /// Game minutes until each accident can happen again, by accident id (`Sim::accident_at`;
+    /// absent: any time).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub accidents: BTreeMap<String, f32>,
     /// Skill levels by id (sorted). Missing in old saves: traits decide.
     #[serde(default)]
     pub skills: BTreeMap<String, f32>,
