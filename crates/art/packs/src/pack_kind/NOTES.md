@@ -122,4 +122,4 @@ The hearth settee's pillows are sewn flat and stuffed (`waist`), its seat and ba
 Every hard edge the play camera showed is eased (18 to 0): the settee's arms' and the rocker's crest's ends eased,
 the throw folded round the crest, the jar's pedestal, cork and pot and the ferns' pots rounded, the rug's outer braid
 chamfered. The counter's wall shelf, bakes and stock pot, the jar's pot plant and the tea table's rug, poufs and ferns
-are drawn `aside`, not the pieces' sizes; the tea table is a small coffee table (docs/review/reference.json).
+are drawn `aside`, not the pieces' sizes; the tea table between its poufs is a side table (docs/review/reference.json: 0.40 × 0.50 × 0.56 m).

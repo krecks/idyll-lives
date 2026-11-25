@@ -3279,7 +3279,7 @@
     "coffeeTable": {
       "label": "Coffee table",
       "w": [
-        0.4,
+        0.6,
         1.4
       ],
       "h": [
@@ -15100,7 +15100,7 @@
     "romantic.candlelitTable": "diningSet",
     "picnicTable": "picnicTable",
     "tableBarHigh": "barTable",
-    "kind.welcomeTeaTable": "coffeeTable",
+    "kind.welcomeTeaTable": "sideTable",
     "lazy.quiltTable": "lowTable",
     "diningChair": "diningChair",
     "chairWood": "diningChair",
