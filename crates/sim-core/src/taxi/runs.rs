@@ -452,7 +452,7 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
             // (Not one that waits for it, which won't pass.)
             let waits = w
                 .cars
-                .get((o.first & !(1 << 63)) as usize)
+                .get(crate::cars::car_index(o.first))
                 .is_some_and(|x| x.waits_for == Some(key))
                 || w.traffic.waits_for(o.first).contains(&key);
             !waits

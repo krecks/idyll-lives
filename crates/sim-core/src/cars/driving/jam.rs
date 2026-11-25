@@ -11,7 +11,7 @@ pub(crate) const JAM_BACK: u32 = drive_secs(3.0) as u32;
 /// for it, should back up (`back_off`): of two cars, the one not holding a claim (holding one,
 /// the other was let through where it waits: it's that one that's in the way); else the later.
 pub(crate) fn waits_back(w: &World, k: u64, me: u64) -> bool {
-    let o = (k & !(1 << 63)) as usize;
+    let o = car_index(k);
     let (mine, theirs) = (w.traffic.holding(me), w.traffic.holding(k));
     // (Turning out of its driveway, it has its way: the other backs up to give it room to finish
     // its turn.)
@@ -35,12 +35,8 @@ pub(crate) fn waits_back(w: &World, k: u64, me: u64) -> bool {
     // (One backing up out of the other's way already goes on: not the other in turn as their
     // claims change, the one going on by letting go of its claim behind it, say; nor one, then the
     // other, a tick each.)
-    let backing = |x: u64| {
-        w.cars
-            .get((x & !(1 << 63)) as usize)
-            .is_some_and(|c| c.jam.1 > 0)
-            && !stuck_back(w, x)
-    };
+    let backing =
+        |x: u64| w.cars.get(car_index(x)).is_some_and(|c| c.jam.1 > 0) && !stuck_back(w, x);
     let mine_to_go = match (backing(me), backing(k)) {
         (true, false) => true,
         (false, true) => false,
@@ -59,7 +55,7 @@ pub(crate) fn waits_back(w: &World, k: u64, me: u64) -> bool {
 /// Whether car `k` (its `Driving::first`) is a household's car still turning out of its driveway
 /// onto the road: in its route's first mouth (`Route::mouths`).
 pub(crate) fn turning_out(w: &World, k: u64) -> bool {
-    w.cars.get((k & !(1 << 63)) as usize).is_some_and(|c| {
+    w.cars.get(car_index(k)).is_some_and(|c| {
         !c.taxi
             && c.state == CarState::Leaving
             && c.route.as_ref().is_some_and(|(_, r)| {
@@ -73,9 +69,7 @@ pub(crate) fn turning_out(w: &World, k: u64) -> bool {
 /// Whether car `k` (its `Driving::first`) can back up no further out of the way of one it holds
 /// up as that one holds it up (`back_off`, `waits_back`).
 pub(crate) fn stuck_back(w: &World, k: u64) -> bool {
-    w.cars
-        .get((k & !(1 << 63)) as usize)
-        .is_some_and(|c| c.jam.2)
+    w.cars.get(car_index(k)).is_some_and(|c| c.jam.2)
 }
 
 /// Car `c` a tick back along its route, out of the way of one it holds up as that one holds it
