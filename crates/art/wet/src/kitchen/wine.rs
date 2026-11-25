@@ -117,7 +117,7 @@ pub fn wine_fridge() -> Vec<Obj> {
                 out = 0.026,
                 w = 0.014,
                 r = None,
-                verts = 8
+                verts = 6
             );
         }
     });
@@ -163,7 +163,7 @@ pub fn wine_fridge() -> Vec<Obj> {
             out = 0.03,
             w = 0.016,
             r = None,
-            verts = 8
+            verts = 6
         );
         gasket(
             &fw,

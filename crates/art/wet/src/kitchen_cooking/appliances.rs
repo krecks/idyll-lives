@@ -3,7 +3,7 @@
 
 use super::common::{hollow, knob};
 use super::{M, SECONDS};
-use crate::common::{shaker, stream};
+use crate::common::{eased, shaker, stream};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::kit::fillet;
@@ -209,14 +209,17 @@ pub fn microwave() -> Vec<Obj> {
         );
         revolve!(
             "soup_bowl",
-            &[
-                (0.0, 0.0),
-                (0.035, 0.0),
-                (0.055, 0.04),
-                (0.05, 0.04),
-                (0.032, 0.008),
-                (0.0, 0.008)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.035, 0.0),
+                    (0.055, 0.04),
+                    (0.05, 0.04),
+                    (0.032, 0.008),
+                    (0.0, 0.008)
+                ],
+                0.002
+            ),
             at = f.at(-0.12, 0.978, -0.26),
             material = M.cup,
             segments = 14
@@ -550,14 +553,17 @@ pub fn coffee_machine() -> Vec<Obj> {
         loft!("hopper", &secs, material = M.bean);
         revolve!(
             "hopper_lid",
-            &[
-                (0.0, 0.0),
-                (0.056, 0.0),
-                (0.05, 0.016),
-                (0.012, 0.02),
-                (0.012, 0.024),
-                (0.0, 0.024)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.056, 0.0),
+                    (0.05, 0.016),
+                    (0.012, 0.02),
+                    (0.012, 0.024),
+                    (0.0, 0.024)
+                ],
+                0.002
+            ),
             at = (hx, hy, hz + 0.114),
             material = M.charcoal,
             segments = 12
@@ -601,13 +607,16 @@ fn cup(f: &GameFrame, name: &str, x: f64, y: f64, z: f64) {
     let (bx, by, bz) = (b.x, b.y, b.z);
     revolve!(
         format!("{name}_saucer"),
-        &[
-            (0.0, 0.0),
-            (0.03, 0.0),
-            (0.05, 0.008),
-            (0.047, 0.01),
-            (0.0, 0.004)
-        ],
+        &eased(
+            &[
+                (0.0, 0.0),
+                (0.03, 0.0),
+                (0.05, 0.008),
+                (0.047, 0.01),
+                (0.0, 0.004)
+            ],
+            0.002
+        ),
         at = (bx, by, bz),
         material = M.cup,
         segments = 14
@@ -682,15 +691,18 @@ fn canister(
     );
     revolve!(
         format!("{name}_lid"),
-        &[
-            (0.0, 0.0),
-            (r * 1.03, 0.0),
-            (r * 1.03, h * 0.1),
-            (r * 0.6, h * 0.14),
-            (r * 0.25, h * 0.14),
-            (r * 0.25, h * 0.16),
-            (0.0, h * 0.16)
-        ],
+        &eased(
+            &[
+                (0.0, 0.0),
+                (r * 1.03, 0.0),
+                (r * 1.03, h * 0.1),
+                (r * 0.6, h * 0.14),
+                (r * 0.25, h * 0.14),
+                (r * 0.25, h * 0.16),
+                (0.0, h * 0.16)
+            ],
+            0.002
+        ),
         at = (bx, by, bz + h * 0.84),
         material = lid,
         segments = 14
@@ -831,16 +843,19 @@ pub fn breakfast_counter() -> Vec<Obj> {
         let b = f.at(-0.28, 0.95, 0.05);
         revolve!(
             "bowl",
-            &[
-                (0.0, 0.0),
-                (0.06, 0.0),
-                (0.12, 0.045),
-                (0.13, 0.06),
-                (0.122, 0.06),
-                (0.11, 0.048),
-                (0.055, 0.008),
-                (0.0, 0.008)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.06, 0.0),
+                    (0.12, 0.045),
+                    (0.13, 0.06),
+                    (0.122, 0.06),
+                    (0.11, 0.048),
+                    (0.055, 0.008),
+                    (0.0, 0.008)
+                ],
+                0.002
+            ),
             at = (b.x, b.y, b.z),
             material = M.jug,
             segments = 18
