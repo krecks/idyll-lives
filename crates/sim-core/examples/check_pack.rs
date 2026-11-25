@@ -89,7 +89,12 @@ fn run() -> Result<bool, String> {
     for id in &ids {
         ok &= check_object(&merged, &content, id);
     }
-    ok &= live_three_days(&merged, &content, &ids, &read("lots/starter.json")?)?;
+    ok &= live_three_days(
+        &merged,
+        &content,
+        &ids,
+        include_str!("../tests/starter_lot.json"),
+    )?;
     Ok(ok)
 }
 

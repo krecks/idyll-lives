@@ -7,7 +7,7 @@ in `models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no V
   one hand or both, content `hold`, level and facing the way the resident faces, base 2 cm under the palms), and set
   down on tops, tables and the floor (items.ts, one thin-instanced template per model, turned by the item's `yaw`).
 - **Tools** (actions.ts `STATION_PROPS`): the chopping board (`chop`), the stew pot (`stir`: `item.mealPot` itself, the
-  pot they then carry away; it was the frying pan, `tool.pan`, still built but no longer drawn), the mixing bowl (`mix`,
+  pot they then carry away; it was the frying pan, `tool.pan`, removed 2026-11-25), the mixing bowl (`mix`,
   2026-10-21) and the food on the grill (`flip`), on the station's top while a resident works there (at its
   `STATION_SPOTS`, else 15 cm towards the cook), turned to face the way they face.
 - **The cook's tool in hand** (2026-11-03; actions.ts `PROPS.knife`, `woodenSpoon`, `spatula`, `whisk`, `ACTIONS[tag].prop`):
@@ -37,7 +37,7 @@ in `models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no V
 
 So each keeps the old part's frame: origin at the middle of its base, front +depth (away from the one holding it).
 Each is built in place in the game's axes (`F`, as its parts were), stood on the floor without moving it
-sideways; the pan and the grill food, which stand off their middle, take their measured `centre`.
+sideways; the grill food, which stands off its middle, takes its measured `centre`.
 
 | Key | What it shows | Draws | Tris |
 |---|---|---|---|
@@ -64,7 +64,6 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.freshPlate` | something fresh from the garden: a salad on the plate, torn leaves in three greens heaped, tomato wedges on their skins, cucumber and radish slices; eaten with a fork | 708 | 708 |
 | `item.plateStackDirty` | three dirty plates stacked, each a little askew, its foot in the well below (the lower two their wells flat, unseen): the top one's leftovers and fork, a drip of gravy down the middle one's rim, a scrap of lettuce over its edge. The sim shows it when two or more dirty plates are carried at once (both hands; content radius 0.156). Over the 750: three plates | 876 | 876 |
 | `tool.board` | the chopping board: rounded, a juice groove, a hanging slot; a tapering carrot, carrot coins, parsley (the knife is in the hand: `tool.knife`) | 600 | 600 |
-| `tool.pan` | the frying pan, its handle to the back: a heavy rim, a riveted bracket, a tapering grip; stir-fry of beef strips, broccoli, peppers and carrot (no longer drawn: the stew is stirred in its pot) | 1,288 | 1,288 |
 | `tool.grillFood` | two bent sausages 2.8 cm thick with grill marks and a rough-edged marked burger | 628 | 628 |
 | `tool.mixingBowl` | a deep glazed bowl, its rim rolled, flat batter with the whisk's swirl on it, a tapering wooden spoon, its bowl in the batter, its handle resting on the far rim (plain satin, one draw) | 616 | 616 |
 | `item.iceCream` | a dessert bowl, rim rolled, three scoops with ragged lips, chocolate sauce trickled over two of them, a fan wafer (no spoon: the hand's) ; empties to `item.bowlDirty` | 644 | 644 |
@@ -157,18 +156,17 @@ sideways; the pan and the grill food, which stand off their middle, take their m
   0.23 and the tasting boards 0.227 by their corners, the dirty bowl 0.099 by its spoon).
 - **Servings** (2026-11-03): the barbecue and the tasting menu served a plate of stew (`mealPlate`); each now serves
   its own plate, `bbqPlate` and `tastingPlate` (content `items`, empty to `plateDirty`, eaten with a fork).
-- **Finishes.** Dishes glazed `gloss`, pans and trays `metal` (the pan's handle `satin`), food `satin` or `matte`.
+- **Finishes.** Dishes glazed `gloss`, pans and trays `metal`, food `satin` or `matte`.
   The wooden boards (chopping, tasting, pizza) take `wood` as the old parts did: their second draw call.
 - **The plate** (`plate()`) is shared: a foot, a rim up to 1.7 cm and a paler well at 0.9 cm (`WELL`), where the food
   stands. The platter is the same, oval.
 - **Shapes.** Round things are `lathe`s (a profile turned about the up axis, one pole at each end, a material per
   band, edges over 40° kept sharp; `wave` flutes a dish, pleats a case, lobes a tomato; `deform` bends a sausage):
-  the plate, bowls, pots, pan, pizza, rolls, scoops, cookies, corn and the sausages (laid down, their grill marks as
+  the plate, bowls, pots, pizza, rolls, scoops, cookies, corn and the sausages (laid down, their grill marks as
   bands). Wedges and the sandwich halves are `prism`s over their outline. Crusts and pastry edges are `crust` sweeps
   (crimped by a wave in their thickness), icing and cream `swirl`s, smears `blob`s, leaves `leaf` outlines. Small
   lumpy food takes `lump!`'s `rough`: the boulder's own noise is too broad to show on a thing a few centimetres across.
-- **Sizes** within 10 % of the old part on every axis (as the gate checked while the old parts were there). The
-  pan's handle runs to the back as the old part's (whose crossbar was across, likely by mistake), 2 cm longer.
+- **Sizes** within 10 % of the old part on every axis (as the gate checked while the old parts were there).
 - **The old `item.pizzaSlice`** was a three-sided cone stood on its edge, through the plate; it is now a flat wedge
   on the plate.
 

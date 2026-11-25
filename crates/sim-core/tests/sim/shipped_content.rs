@@ -3,7 +3,7 @@
 use sim_core::world::TaskKind;
 use sim_core::{Content, World};
 
-const STARTER_LOT: &str = include_str!("../../../../web/public/content/lots/starter.json");
+const STARTER_LOT: &str = include_str!("../starter_lot.json");
 
 /// base.json plus every file in its `"include"` list (careers, content packs), merged the
 /// way the web loader does.
