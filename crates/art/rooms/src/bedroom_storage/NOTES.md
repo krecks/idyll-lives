@@ -91,7 +91,7 @@ the side: it came up through the carcass's top (and the single one's side).
 | `model.dresser` | 1.44 × 1.35 × 0.54 m | 4,688 | 4 | Body, Handles (bracket feet, a shaped apron, bar pulls, a moulded top; a framed picture on an easel, a turned vase, a lidded box with a clasp) |
 | `model.wardrobe` | 1.84 × 2.41 × 0.63 m | 5,036 | 3 | Body (the doors), Handles (frame-and-panel doors, hinge knuckles; clothes on wire hangers, lidded boxes with labels) |
 | `model.chestOfDrawers` | 0.88 × 1.16 × 0.51 m | 3,012 | 2 | Body, Handles (frame-and-panel drawer fronts, bar pulls, a rounded top) |
-| `model.dresserLow` | 1.82 × 0.80 × 0.64 m | 3,796 | 4 | Body, Handles (rounded case, splayed tapered legs, a shadow line under the top, black bar pulls) |
+| `model.dresserLow` | 1.82 × 0.80 × 0.64 m | 3,860 | 3 | Body, Handles (rounded case, splayed tapered legs, a shadow line under the top, black-stained wooden bar pulls) |
 | `model.wardrobeSingle` | 0.60 × 2.28 × 0.62 m | 2,012 | 2 | Body, Handles (a frame-and-panel door, hinge knuckles, clothes on hangers, a lidded box on top) |
 | `model.armoire` | 1.86 × 2.11 × 0.63 m | 6,680 | 3 | Body, Handles (a swept crown moulding and base moulding, turned bun feet, beaded stiles, doors with two raised panels each, turned knobs, an escutcheon) |
 
@@ -113,8 +113,9 @@ For the gate's `edges` and sizes: the armoire's crown and base mouldings (`crown
 and their ends on the wall's face chamfered (swept about the profile's middle, the end rings shrunk 4 mm), and the
 base moulding's cove is the crown's scaled to its 3 cm (it folded back on itself); the hamper's braided cords (four
 sides) shade round. The drum nightstand's knob is 2.5 cm (was 3.7): its depth, knob and all, 0.549 m, inside a
-nightstand's (0.30–0.50 m, ±10 %). The dresser and the low dresser stay at 4 draw calls (each moving drawer's
-oak and its metal pull and clothes, as the body's).
+nightstand's (0.30–0.50 m, ±10 %). The low dresser's black pulls are black-stained wood (`pull_black`, the iron's
+colour), drawn with its oak: 3 draw calls. The dresser stays at 4 (its drawer's oak, and its brass pull and
+clothes, as the body's oak and brass).
 
 ## Rebuild
 
