@@ -32,7 +32,8 @@ fn balance(nodes: &mut [Node], axis: usize, ofs: u32) -> u32 {
         loop {
             loop {
                 i = i.wrapping_add(1);
-                if nodes[i].co[axis] >= co {
+                // (a NaN pivot stops at itself, as polyfill's does)
+                if nodes[i].co[axis] >= co || nodes[i].co[axis].is_nan() {
                     break;
                 }
             }
@@ -49,10 +50,7 @@ fn balance(nodes: &mut [Node], axis: usize, ofs: u32) -> u32 {
         }
         swap_heads(nodes, i, right);
         if i >= median {
-            right = i.wrapping_sub(1);
-            if i == 0 {
-                break;
-            }
+            right = i - 1;
         }
         if i <= median {
             left = i + 1;

@@ -34,3 +34,9 @@ fn the_same_point_of_each_cluster_survives_as_in_blender() {
     assert_eq!(bad, 0);
     assert!(cases >= 10);
 }
+
+#[test]
+fn a_nan_point_does_not_run_the_sort_off_the_end() {
+    let got = artkit::weld::doubles(&[V3::new(0.0, 0.0, 0.0), V3::new(f32::NAN, 0.0, 0.0)], 1e-6);
+    assert_eq!(got.len(), 2);
+}
