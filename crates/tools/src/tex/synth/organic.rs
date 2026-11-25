@@ -14,14 +14,15 @@
 //! Everything wraps: sprites are drawn with wrapping pixel indices and every noise is periodic, so the
 //! maps tile exactly. A fixed-seed generator per set keeps the output deterministic.
 
-use super::{HeightMap, Noise, Set, lerp, seed, smoothstep};
+use super::built::worley;
+use super::{HeightMap, Noise, Set, lerp, mix, mul, pack_arm, rgb, seed, smoothstep, to_u8};
 use crate::tex::grey_detail;
 use crate::tex::pil::Img;
 use std::f64::consts::{PI, TAU};
 
 /// The organic sets' names (the ones [`generate`] makes).
 #[cfg(test)]
-const NAMES: [&str; 9] = [
+pub(super) const NAMES: [&str; 9] = [
     "bark",
     "carpet",
     "fabric_linen",
@@ -55,12 +56,8 @@ impl Organic {
         };
         let normal = self.height.normal(set.relief);
         let (w, h) = (self.height.w, self.height.h);
-        let mut px = vec![0u8; w * h * 3];
-        for i in 0..w * h {
-            px[i * 3] = to_u8(self.ao[i]);
-            px[i * 3 + 1] = to_u8(self.rough[i]);
-        }
-        (albedo, normal, Img { w, h, ch: 3, px })
+        let arm = pack_arm(w, h, &self.ao, &self.rough, set.ao_base);
+        (albedo, normal, arm)
     }
 }
 
@@ -83,10 +80,6 @@ pub fn generate(name: &str, size: usize) -> Option<Organic> {
 }
 
 // --- organic sets: helpers -------------------------------------------------------------------------
-
-fn to_u8(v: f64) -> u8 {
-    (v.clamp(0.0, 1.0) * 255.0).round() as u8
-}
 
 /// SplitMix64: the sprites' placements, sizes and tones.
 struct Rng(u64);
@@ -254,41 +247,6 @@ fn line_noise(n: &Noise, t: f64, period: i64, line: f64, oct: u32) -> f64 {
         p *= 2;
     }
     sum / norm * 1.6
-}
-
-/// Nearest and second-nearest jittered points of a wrapping grid (`cols` x `rows` cells over the
-/// tile), with the nearest cell's index, in units of a cell's width.
-fn worley(
-    n: &Noise,
-    u: f64,
-    v: f64,
-    cols: i64,
-    rows: i64,
-    jitter: f64,
-    salt: u32,
-) -> (f64, f64, i64, i64) {
-    let x = u * cols as f64;
-    let y = v * rows as f64;
-    let (cx, cy) = (x.floor() as i64, y.floor() as i64);
-    let (mut d1, mut d2, mut id) = (f64::INFINITY, f64::INFINITY, (0, 0));
-    let aspect = rows as f64 / cols as f64;
-    for dj in -1..=1 {
-        for di in -1..=1 {
-            let (i, j) = (cx + di, cy + dj);
-            let (wi, wj) = (i.rem_euclid(cols), j.rem_euclid(rows));
-            let px = i as f64 + 0.5 + (n.rand(wi, wj, salt) - 0.5) * jitter;
-            let py = j as f64 + 0.5 + (n.rand(wi, wj, salt + 1) - 0.5) * jitter;
-            let d = ((x - px).powi(2) + ((y - py) / aspect).powi(2)).sqrt();
-            if d < d1 {
-                d2 = d1;
-                d1 = d;
-                id = (wi, wj);
-            } else if d < d2 {
-                d2 = d;
-            }
-        }
-    }
-    (d1, d2, id.0, id.1)
 }
 
 // --- grass blades and leaves --------------------------------------------------------------------------

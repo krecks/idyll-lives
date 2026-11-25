@@ -45,7 +45,7 @@ pub(super) fn leather(n: &Noise, size: usize) -> Surface {
     let nw = n.layer(2);
     let nm = n.layer(3);
     let crease = creases(&n.layer(4), size, size, 28, 0.12 * px, 0.005 * px);
-    paint(size, size, t, &[(0.006, 0.25)], true, |u, v| {
+    paint(size, size, t, &[(0.006, 0.25)], |u, v| {
         let at = |c: f64| ((c.rem_euclid(1.0) * size as f64) as usize).min(size - 1);
         let valley = crease[at(v) * size + at(u)];
         let cells = (t / 0.0025).round() as i64;

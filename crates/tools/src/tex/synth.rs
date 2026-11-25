@@ -2,14 +2,13 @@
 //!
 //! Every map is made from a tileable height field: a periodic gradient-noise lattice (both axes wrap),
 //! brick, stone, plank and shingle courses, a hex lattice, a woven grid and a field of grass blades or
-//! leaves. The height becomes the normal map (Sobel, wrapping) and the packed arm map (AO from a
-//! blurred height, roughness from height and edges); the albedo is either the colour the pattern gives
-//! or, for the greyscale "detail" sets, the height run through [`super::grey_detail`], so the game's
-//! tint sets the hue and the mean lands where the old maps did.
+//! leaves. The height becomes the normal map (Sobel, wrapping); the albedo is either the colour the
+//! pattern gives or, for the greyscale "detail" sets, its luminance run through [`super::grey_detail`],
+//! so the game's tint sets the hue and the mean lands where the old maps did.
 //!
 //! The built surfaces (masonry, paving, boards, shingles, plaster, asphalt and the floor coverings) are in
 //! [`built`]: drawn in metres at the manifest's tile size, with their own roughness and multi-scale cavity
-//! AO ([`Surface`], [`HeightMap::cavity_ao`]) instead of the ones [`HeightMap::arm`] derives.
+//! AO ([`Surface`], [`HeightMap::cavity_ao`]), packed into the arm map ([`pack_arm`]).
 //!
 //! The organic sets (lawn and field earth, foliage, bark, carpet, linen, wallpaper, painted wood and
 //! oak) are made in [`organic`] instead: sprites (blades, leaves, fibres) drawn into a z-buffered
@@ -23,7 +22,7 @@ mod organic;
 
 use super::grey_detail;
 use super::jpeg::{self, Chroma};
-use super::pil::{Filter, Img};
+use super::pil::Img;
 use crate::content;
 use std::f64::consts::FRAC_1_SQRT_2;
 use std::path::Path;
@@ -226,34 +225,6 @@ impl HeightMap {
         }
     }
 
-    /// The packed arm map: R = AO from a blurred height, G = roughness from height and edges, B = 0.
-    pub fn arm(&self, rough: f64, rough_var: f64, ao_gain: f64, ao_base: f64) -> Img {
-        let radius = (self.w / 16).max(2);
-        let low = self.blur(radius);
-        let mut px = vec![0u8; self.w * self.h * 3];
-        for y in 0..self.h {
-            for x in 0..self.w {
-                let (xi, yi) = (x as isize, y as isize);
-                let h = self.v[y * self.w + x];
-                let edge = (self.at(xi + 1, yi) - self.at(xi - 1, yi)).abs()
-                    + (self.at(xi, yi + 1) - self.at(xi, yi - 1)).abs();
-                let ao = (ao_base - ((low.v[y * self.w + x] - h).max(0.0) + edge * 0.12) * ao_gain)
-                    .clamp(0.05, 1.0);
-                let g = (rough + (0.5 - h) * rough_var + edge * 0.12).clamp(0.04, 0.99);
-                let i = (y * self.w + x) * 3;
-                px[i] = to_u8(ao);
-                px[i + 1] = to_u8(g);
-                px[i + 2] = 0;
-            }
-        }
-        Img {
-            w: self.w,
-            h: self.h,
-            ch: 3,
-            px,
-        }
-    }
-
     /// Ambient occlusion from cavities at several scales: each `(radius px, gain)` term darkens a
     /// pixel by how far it sits below the (twice box-blurred, so tent-weighted) height around it.
     /// 1 on open ground; the generator chooses the scales, so a mortar joint and a tile's whole
@@ -298,16 +269,6 @@ impl HeightMap {
         }
         HeightMap { w, h, v: out }
     }
-
-    /// The height as an 8-bit greyscale image (the detail sets then pass it through `grey_detail`).
-    pub fn grey(&self) -> Img {
-        Img {
-            w: self.w,
-            h: self.h,
-            ch: 1,
-            px: self.v.iter().map(|&v| to_u8(v)).collect(),
-        }
-    }
 }
 
 fn to_u8(v: f64) -> u8 {
@@ -339,34 +300,20 @@ pub fn par_map<T: Send + Clone + Default>(
     out
 }
 
-/// What a generator makes: the height, the colour (or, with `grey_from_albedo`, the luminance the
-/// grey detail map is made from instead of the height) and optionally its own roughness and ambient
-/// occlusion (else [`HeightMap::arm`] derives both from the height with the set's numbers).
+/// What a built generator makes: the height, the colour (for a grey detail set, the luminance its detail
+/// map is made from) and its own roughness and ambient occlusion.
 pub struct Surface {
     pub height: HeightMap,
     pub albedo: Img,
-    pub rough: Option<Vec<f64>>,
-    pub ao: Option<Vec<f64>>,
-    pub grey_from_albedo: bool,
+    pub rough: Vec<f64>,
+    pub ao: Vec<f64>,
 }
 
-impl Surface {
-    pub fn plain((height, albedo): (HeightMap, Img)) -> Self {
-        Self {
-            height,
-            albedo,
-            rough: None,
-            ao: None,
-            grey_from_albedo: false,
-        }
-    }
-}
-
-/// The packed arm map from explicit fields: R = AO, G = roughness, B = 0 (not metal).
-pub fn pack_arm(w: usize, h: usize, ao: &[f64], rough: &[f64]) -> Img {
+/// The packed arm map: R = AO times the set's `ao_base`, G = roughness (at least 0.04), B = 0 (not metal).
+pub fn pack_arm(w: usize, h: usize, ao: &[f64], rough: &[f64], ao_base: f64) -> Img {
     let mut px = vec![0u8; w * h * 3];
     for i in 0..w * h {
-        px[i * 3] = to_u8(ao[i]);
+        px[i * 3] = to_u8(ao[i] * ao_base);
         px[i * 3 + 1] = to_u8(rough[i].clamp(0.04, 1.0));
     }
     Img { w, h, ch: 3, px }
@@ -406,9 +353,6 @@ pub struct Set {
     pub grey: Option<(f64, f64, f32)>,
     /// Height of a full 0..1 swing, in UV units (metres, for the manifest's tile sizes).
     pub relief: f64,
-    /// (base roughness, height variation, AO gain), for a generator that leaves roughness and AO to
-    /// [`HeightMap::arm`].
-    pub rough: (f64, f64, f64),
     /// Ambient-occlusion base: 1 for most sets, lower where the surface sits in shade (it scales a
     /// generator's own AO too).
     pub ao_base: f64,
@@ -438,9 +382,8 @@ const fn set(
     normal: usize,
     grey: Option<(f64, f64, f32)>,
     relief: f64,
-    rough: (f64, f64, f64),
 ) -> Set {
-    set_ao(name, albedo, normal, grey, relief, rough, 1.0)
+    set_ao(name, albedo, normal, grey, relief, 1.0)
 }
 
 const fn set_ao(
@@ -449,7 +392,6 @@ const fn set_ao(
     normal: usize,
     grey: Option<(f64, f64, f32)>,
     relief: f64,
-    rough: (f64, f64, f64),
     ao_base: f64,
 ) -> Set {
     Set {
@@ -459,183 +401,53 @@ const fn set_ao(
         arm: 512,
         grey,
         relief,
-        rough,
         ao_base,
     }
 }
 
 pub const SETS: [Set; 35] = [
-    set("bark", 512, 512, None, 0.010, (0.84, 0.20, 2.3)),
-    set_ao("brick", 1024, 1024, None, 0.0041, (0.81, 0.12, 4.5), 0.945),
-    set(
-        "carpet",
-        512,
-        512,
-        Some((0.58, 0.85, 48.0)),
-        0.0052,
-        (0.87, 0.30, 5.0),
-    ),
-    set(
-        "fabric_linen",
-        512,
-        512,
-        Some((0.80, 0.45, 0.0)),
-        0.0006,
-        (0.60, 0.10, 1.5),
-    ),
-    set(
-        "leather",
-        512,
-        512,
-        Some((0.97, 0.6, 0.0)),
-        0.0026,
-        (0.44, 0.0, 0.0),
-    ),
-    set(
-        "floor_laminate",
-        1024,
-        1024,
-        None,
-        0.0012,
-        (0.40, 0.05, 0.1),
-    ),
-    set("floor_tile", 1024, 1024, None, 0.0006, (0.57, 0.15, 0.05)),
-    set("floor_wood", 1024, 1024, None, 0.0014, (0.62, 0.05, 0.1)),
-    set(
-        "foliage",
-        512,
-        512,
-        Some((0.58, 1.10, 0.0)),
-        0.012,
-        (0.74, 0.20, 4.0),
-    ),
-    set(
-        "grass",
-        1024,
-        1024,
-        Some((0.75, 0.55, 0.0)),
-        0.0040,
-        (0.45, 0.15, 1.6),
-    ),
-    set(
-        "grass_lush",
-        1024,
-        1024,
-        Some((0.70, 0.70, 24.0)),
-        0.005,
-        (0.74, 0.10, 1.7),
-    ),
-    set(
-        "painted_wood",
-        512,
-        512,
-        Some((0.75, 1.0, 0.0)),
-        0.0007,
-        (0.39, 0.05, 0.4),
-    ),
-    set(
-        "path_hexpaving",
-        1024,
-        1024,
-        None,
-        0.0014,
-        (0.90, 0.12, 0.2),
-    ),
-    set("path_concrete", 1024, 1024, None, 0.0012, (0.88, 0.06, 0.2)),
-    set("path_flagstone", 1024, 1024, None, 0.006, (0.84, 0.10, 0.3)),
-    set("path_gravel", 1024, 1024, None, 0.003, (0.82, 0.12, 0.4)),
-    set_ao(
-        "road_asphalt",
-        1024,
-        1024,
-        None,
-        0.0026,
-        (0.76, 0.15, 4.0),
-        0.8,
-    ),
+    set("bark", 512, 512, None, 0.010),
+    set_ao("brick", 1024, 1024, None, 0.0041, 0.945),
+    set("carpet", 512, 512, Some((0.58, 0.85, 48.0)), 0.0052),
+    set("fabric_linen", 512, 512, Some((0.80, 0.45, 0.0)), 0.0006),
+    set("leather", 512, 512, Some((0.97, 0.6, 0.0)), 0.0026),
+    set("floor_laminate", 1024, 1024, None, 0.0012),
+    set("floor_tile", 1024, 1024, None, 0.0006),
+    set("floor_wood", 1024, 1024, None, 0.0014),
+    set("foliage", 512, 512, Some((0.58, 1.10, 0.0)), 0.012),
+    set("grass", 1024, 1024, Some((0.75, 0.55, 0.0)), 0.0040),
+    set("grass_lush", 1024, 1024, Some((0.70, 0.70, 24.0)), 0.005),
+    set("painted_wood", 512, 512, Some((0.75, 1.0, 0.0)), 0.0007),
+    set("path_hexpaving", 1024, 1024, None, 0.0014),
+    set("path_concrete", 1024, 1024, None, 0.0012),
+    set("path_flagstone", 1024, 1024, None, 0.006),
+    set("path_gravel", 1024, 1024, None, 0.003),
+    set_ao("road_asphalt", 1024, 1024, None, 0.0026, 0.8),
     set_ao(
         "roof_shingles",
         1024,
         1024,
         Some((0.60, 1.0, 0.0)),
         0.008,
-        (0.61, 0.20, 20.0),
         0.845,
     ),
-    set(
-        "siding_wood",
-        1024,
-        1024,
-        Some((0.68, 1.0, 0.0)),
-        0.016,
-        (0.76, 0.10, 0.3),
-    ),
-    set(
-        "stone_foundation",
-        1024,
-        1024,
-        None,
-        0.0104,
-        (0.75, 0.15, 2.8),
-    ),
-    set(
-        "wall_plaster",
-        1024,
-        512,
-        Some((0.80, 1.0, 0.0)),
-        0.0034,
-        (0.91, 0.03, 0.6),
-    ),
-    set(
-        "wallpaper",
-        1024,
-        512,
-        Some((0.75, 1.0, 0.0)),
-        0.0015,
-        (0.78, 0.05, 0.05),
-    ),
-    set(
-        "wood_oak",
-        512,
-        512,
-        Some((0.80, 0.60, 0.0)),
-        0.0003,
-        (0.52, 0.20, 0.2),
-    ),
-    set("floor_parquet", 1024, 1024, None, 0.0005, (0.42, 0.05, 0.1)),
-    set("floor_checker", 1024, 1024, None, 0.0008, (0.30, 0.05, 0.1)),
-    set("floor_hex", 1024, 512, None, 0.001, (0.25, 0.05, 0.1)),
-    set("floor_terrazzo", 1024, 512, None, 0.0005, (0.28, 0.05, 0.1)),
-    set("floor_marble", 1024, 1024, None, 0.0004, (0.14, 0.05, 0.1)),
-    set("floor_cork", 512, 512, None, 0.0008, (0.48, 0.05, 0.1)),
-    set("floor_lino", 1024, 512, None, 0.0002, (0.48, 0.05, 0.1)),
-    set(
-        "floor_concrete",
-        1024,
-        1024,
-        None,
-        0.0008,
-        (0.36, 0.05, 0.1),
-    ),
-    set("floor_pavers", 1024, 512, None, 0.0028, (0.82, 0.10, 0.2)),
-    set(
-        "floor_encaustic",
-        1024,
-        512,
-        None,
-        0.0008,
-        (0.55, 0.05, 0.1),
-    ),
-    set("floor_sisal", 512, 512, None, 0.0018, (0.86, 0.10, 0.3)),
-    set_ao(
-        "sidewalk",
-        512,
-        512,
-        Some((0.73, 1.0, 0.0)),
-        0.003,
-        (0.86, 0.03, 0.3),
-        0.82,
-    ),
+    set("siding_wood", 1024, 1024, Some((0.68, 1.0, 0.0)), 0.016),
+    set("stone_foundation", 1024, 1024, None, 0.0104),
+    set("wall_plaster", 1024, 512, Some((0.80, 1.0, 0.0)), 0.0034),
+    set("wallpaper", 1024, 512, Some((0.75, 1.0, 0.0)), 0.0015),
+    set("wood_oak", 512, 512, Some((0.80, 0.60, 0.0)), 0.0003),
+    set("floor_parquet", 1024, 1024, None, 0.0005),
+    set("floor_checker", 1024, 1024, None, 0.0008),
+    set("floor_hex", 1024, 512, None, 0.001),
+    set("floor_terrazzo", 1024, 512, None, 0.0005),
+    set("floor_marble", 1024, 1024, None, 0.0004),
+    set("floor_cork", 512, 512, None, 0.0008),
+    set("floor_lino", 1024, 512, None, 0.0002),
+    set("floor_concrete", 1024, 1024, None, 0.0008),
+    set("floor_pavers", 1024, 512, None, 0.0028),
+    set("floor_encaustic", 1024, 512, None, 0.0008),
+    set("floor_sisal", 512, 512, None, 0.0018),
+    set_ao("sidewalk", 512, 512, Some((0.73, 1.0, 0.0)), 0.003, 0.82),
 ];
 
 /// `cargo tex synth [set...]`.
@@ -683,34 +495,25 @@ pub fn maps(set: &Set) -> (Img, Img, Img) {
             let mut height = surface.height;
             height.stretch();
             let albedo = match set.grey {
-                Some((target, contrast, flatten)) if surface.grey_from_albedo => {
-                    grey_detail(&surface.albedo, target, contrast, flatten)
-                }
                 Some((target, contrast, flatten)) => {
-                    grey_detail(&height.grey(), target, contrast, flatten)
+                    grey_detail(&surface.albedo, target, contrast, flatten)
                 }
                 None => surface.albedo,
             };
             let normal = height.normal(set.relief);
-            let arm = match (&surface.ao, &surface.rough) {
-                (Some(ao), Some(rough)) => {
-                    let ao: Vec<f64> = ao.iter().map(|a| a * set.ao_base).collect();
-                    pack_arm(height.w, height.h, &ao, rough)
-                }
-                _ => height.arm(set.rough.0, set.rough.1, set.rough.2, set.ao_base),
-            };
+            let arm = pack_arm(height.w, height.h, &surface.ao, &surface.rough, set.ao_base);
             (albedo, normal, arm)
         }
     };
     let normal = if set.normal == set.albedo {
         normal
     } else {
-        normal.resize(set.normal, set.normal, Filter::Lanczos)
+        normal.resize(set.normal, set.normal)
     };
     let arm = if set.arm == set.albedo {
         arm
     } else {
-        arm.resize(set.arm, set.arm, Filter::Lanczos)
+        arm.resize(set.arm, set.arm)
     };
     (albedo, normal, arm)
 }
@@ -718,29 +521,41 @@ pub fn maps(set: &Set) -> (Img, Img, Img) {
 /// The qualities a normal map is stored at, the lowest that keeps it ([`normal_jpeg`]) taken.
 const NORMAL_QUALITY: [u8; 8] = [88, 90, 92, 94, 95, 96, 97, 98];
 
+/// 8-bit storage keeps a unit normal within 1 % of its length; past 10 % the storage bent its direction too.
+/// At least this share of a stored normal map's texels must keep within it.
+const UNIT: (f64, f64) = (0.10, 0.95);
+/// A tiling height's slopes sum to nothing, so its normals average flat; a mean slope over 0.02 (1.1°) tilts
+/// the whole surface's light by about 2 % where it falls at 45°, as much as the eye tells apart.
+const LEVEL: f64 = 0.02;
+
+/// A stored normal map's (RGB texels, the renderer's `2 c - 1`) share of texels within [`UNIT`] of unit
+/// length, and its mean slope (x / z, y / z over the texels that face out).
+fn normal_stats(px: &[u8]) -> (f64, [f64; 2]) {
+    let (mut unit, mut n) = (0usize, 0usize);
+    let (mut sx, mut sy) = (0f64, 0f64);
+    for t in px.as_chunks::<3>().0 {
+        let [x, y, z] = t.map(|c| c as f64 / 255.0 * 2.0 - 1.0);
+        if ((x * x + y * y + z * z).sqrt() - 1.0).abs() <= UNIT.0 {
+            unit += 1;
+        }
+        if z > 0.05 {
+            sx += x / z;
+            sy += y / z;
+            n += 1;
+        }
+    }
+    let n = n.max(1) as f64;
+    (unit as f64 / (px.len() / 3) as f64, [sx / n, sy / n])
+}
+
 /// A normal map as a JPEG: 4:4:4 (its channels are a direction's components, each a quantity of its own,
 /// which 4:2:0 would average two of, bending every normal), at the lowest of [`NORMAL_QUALITY`] whose decoded
-/// map keeps what `standard.rs` holds a stored normal map to: 95 % of texels within 10 % of unit length, the
-/// mean slope within 0.02 on both axes. (The highest when none does: the standard's test then says which.)
+/// map keeps what `standard.rs` holds a stored normal map to: [`UNIT`] and [`LEVEL`]. (The highest when none
+/// does: the standard's test then says which.)
 fn normal_jpeg(normal: &Img) -> (Vec<u8>, u8) {
     let keeps = |px: &[u8]| {
-        let (mut unit, mut n) = (0usize, 0usize);
-        let (mut sx, mut sy) = (0f64, 0f64);
-        for t in px.as_chunks::<3>().0 {
-            let [x, y, z] = t.map(|c| c as f64 / 255.0 * 2.0 - 1.0);
-            if ((x * x + y * y + z * z).sqrt() - 1.0).abs() <= 0.10 {
-                unit += 1;
-            }
-            if z > 0.05 {
-                sx += x / z;
-                sy += y / z;
-                n += 1;
-            }
-        }
-        let n = n.max(1) as f64;
-        unit as f64 >= 0.95 * (px.len() / 3) as f64
-            && (sx / n).abs() <= 0.02
-            && (sy / n).abs() <= 0.02
+        let (unit, [sx, sy]) = normal_stats(px);
+        unit >= UNIT.1 && sx.abs() <= LEVEL && sy.abs() <= LEVEL
     };
     let mut stored = (Vec::new(), 0);
     for q in NORMAL_QUALITY {
@@ -791,10 +606,8 @@ fn seed(name: &str) -> u64 {
     h
 }
 
+/// A built set's surface ([`built`]; the organic sets are [`organic`]'s).
 fn generate(name: &str, size: usize) -> Surface {
-    if let Some(o) = organic::generate(name, size) {
-        return Surface::plain((o.height, o.albedo.rgb()));
-    }
     // (A variant has its set's seed: its boards lie where the set's do.)
     let n = Noise::new(seed(name.split('.').next().unwrap_or(name)));
     built::generate(name, &n, size).unwrap_or_else(|| unreachable!("unknown set {name}"))
@@ -870,7 +683,8 @@ mod tests {
 
     #[test]
     fn every_set_tiles() {
-        for set in SETS {
+        // (The organic sets' maps: `organic_maps_tile`.)
+        for set in SETS.iter().filter(|s| !organic::NAMES.contains(&s.name)) {
             let Surface { height, albedo, .. } = generate(set.name, 128);
             let hs = seam_f64(&height.v, 128, 128);
             let hm = max_step_f64(&height.v, 128, 128);
@@ -931,23 +745,8 @@ mod tests {
     }
 
     #[test]
-    fn arm_of_flat_height_is_flat() {
-        let mut h = HeightMap::new(16, 16);
-        h.v.fill(0.5);
-        let a = h.arm(0.8, 0.1, 2.0, 1.0);
-        assert!(
-            a.px.as_chunks::<3>()
-                .0
-                .iter()
-                .all(|p| p[0] == 255 && p[2] == 0)
-        );
-        assert!(a.px.as_chunks::<3>().0.iter().all(|p| p[1] == to_u8(0.8)));
-    }
-
-    #[test]
     fn leather_has_creases_and_an_uneven_sheen() {
         let Surface { height, rough, .. } = generate("leather", 256);
-        let rough = rough.expect("leather makes its own roughness");
         let (lo, hi) = rough.iter().fold((f64::INFINITY, 0.0f64), |(lo, hi), &r| {
             (lo.min(r), hi.max(r))
         });
