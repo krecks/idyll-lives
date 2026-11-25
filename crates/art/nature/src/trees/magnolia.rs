@@ -8,9 +8,9 @@ use artkit::botany::species::{
 };
 use artkit::bvh::Rays;
 use artkit::far::{is_low, low};
+use artkit::materials::{Mat, Palette};
 use artkit::math::{atan2, cos, degrees, sin, v3};
 use artkit::perch::Find;
-use artkit::materials::{Mat, Palette};
 use artkit::scene::Obj;
 use artkit::{cupped, leaves};
 

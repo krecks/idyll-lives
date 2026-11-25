@@ -6,9 +6,9 @@ use artkit::botany::skeleton::{_along, Branches, ClumpAims, Heart, LimbPoints, M
 use artkit::botany::species::{Aims, Crown, Hearts, Perches, Seeds, Species, Stage, Tree, grow};
 use artkit::far::{is_low, low};
 use artkit::math::{TAU, cos, sin};
+use artkit::mesh::UvWay;
 use artkit::noise::noise_at;
 use artkit::perch::Find;
-use artkit::mesh::UvWay;
 use artkit::scene::Obj;
 use artkit::{jitter, sweep};
 

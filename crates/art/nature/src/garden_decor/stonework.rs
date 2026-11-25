@@ -413,15 +413,13 @@ pub fn lantern() -> Vec<Obj> {
     // the petals' rim rolled over into their top (out and up, then in), no turn of 60° in it: carved stone
     let mut petals = _petals(0.09, 0.17, 0.48, 0.535, 12, 0.12);
     for (k, dz) in [(1.0041, 0.004), (0.9906, 0.0073)] {
-        let rim: Vec<_> = petals[1].iter().map(|p| p3(p.x * k, p.y * k, p.z + dz)).collect();
+        let rim: Vec<_> = petals[1]
+            .iter()
+            .map(|p| p3(p.x * k, p.y * k, p.z + dz))
+            .collect();
         petals.push(rim);
     }
-    loft!(
-        "platform_petals",
-        &petals,
-        material = M.stone,
-        angle = 60
-    );
+    loft!("platform_petals", &petals, material = M.stone, angle = 60);
     loft!(
         "platform",
         &[

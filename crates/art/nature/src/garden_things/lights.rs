@@ -30,8 +30,13 @@ pub fn lampPost() -> Vec<Obj> {
             .enumerate()
             .flat_map(|(k, &(x, z))| {
                 // (first on the side from the corner before)
-                let (along_z, along_x) = (F.at(r * x, y, r * z - e * z), F.at(r * x - e * x, y, r * z));
-                if k % 2 == 0 { [along_z, along_x] } else { [along_x, along_z] }
+                let (along_z, along_x) =
+                    (F.at(r * x, y, r * z - e * z), F.at(r * x - e * x, y, r * z));
+                if k % 2 == 0 {
+                    [along_z, along_x]
+                } else {
+                    [along_x, along_z]
+                }
             })
             .collect()
     };

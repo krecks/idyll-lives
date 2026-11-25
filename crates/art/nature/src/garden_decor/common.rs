@@ -128,6 +128,9 @@ mod tests {
             let d = ((p.x - 0.2).powi(2) + p.y.powi(2)).sqrt();
             assert!((d - 0.005).abs() < 1e-12);
         }
-        assert_eq!(_eased(&_hex(0.2, 0.0, 12, Some(0.17), 0.0, 0.0), 2, 0.005).len(), 18);
+        assert_eq!(
+            _eased(&_hex(0.2, 0.0, 12, Some(0.17), 0.0, 0.0), 2, 0.005).len(),
+            18
+        );
     }
 }

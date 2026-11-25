@@ -2,13 +2,13 @@
 //! with lemons, two metres tall in all (the ones picked at the front 1.62 m up for a grown-up, 1.42 for a teen and
 //! 1.1 for a child), all picked at once (they shrink away, `ripen`); picked bare, no lemons until it fruits again.
 
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Branches, ClumpAims, Heart, Mass};
 use artkit::botany::species::{Aims, Crown, Hearts, Perches, Seeds, Species, Stage, Tree, grow};
 use artkit::far::low;
 use artkit::math::{TAU, cos, sin};
 use artkit::perch::Find;
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::scene::{self, Obj};
 use artkit::shapes::SHARP;
 use artkit::{fruiting, hang, lump, pot, sweep, trunk};
