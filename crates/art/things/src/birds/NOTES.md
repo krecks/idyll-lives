@@ -91,7 +91,8 @@ across from the game's camera, and the gate doesn't ask for one.
   feathers, `outer` and `undertail` the tail). They are all plain finishes (matte feathers, satin bill and legs, a
   gloss eye), which the game merges into one draw call for the whole bird. A bird uses 14–19 of them.
 - **Sizes.** Each species has its field-guide length and wingspan and a few numbers that shape it (`BLUE_TIT` …). The
-  tail is as long as makes the bird its length, bill tip to tail tip (`_reach`). Each tail comes out near the real one:
+  tail is as long as makes the bird its length, bill tip to tail tip (`_reach`; a species too short for any tail
+  fails its build). Each tail comes out near the real one:
   tit 4.4 cm (real about 5), chaffinch 5.8 (6.5), warbler 4.1 (4.8), blackbird 9.5 (10), dove 14.3 (14). Spread wings
   are rounded for the songbirds, longer and pointed for the dove (`ROUNDED`, `POINTED`).
 

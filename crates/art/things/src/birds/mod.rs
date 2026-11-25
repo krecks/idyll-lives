@@ -167,3 +167,65 @@ pub fn family() -> Option<Family> {
              (`perchHeight`) and the perched torso's rise from level (`pitch`, degrees), in metres.",
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use artkit::py;
+
+    /// What the renderer (`render/shared/birds.ts`) reads of each bird: its five parts by name (`BIRD_PARTS`), its
+    /// length bill tip to tail tip and the body's middle over the feet (`perchHeight`), and every zone coloured.
+    #[test]
+    fn every_bird_is_its_length_on_its_perch_height_in_five_named_parts() {
+        let birds = [
+            (&BLUE_TIT, BLUE_TIT_COLOURS, blue_tit as fn() -> Vec<Obj>),
+            (&CHAFFINCH, CHAFFINCH_COLOURS, chaffinch),
+            (&WARBLER, WARBLER_COLOURS, willow_warbler),
+            (&BLACKBIRD, BLACKBIRD_COLOURS, blackbird),
+            (&COLLARED_DOVE, COLLARED_DOVE_COLOURS, collared_dove),
+        ];
+        for (s, colours, build) in birds {
+            let p = palette(colours);
+            for (zone, like) in SAME {
+                let own = colours.iter().find(|(z, _)| *z == zone);
+                assert!(
+                    own.is_some() || p.get(zone).colour == p.get(like).colour,
+                    "{} {zone}",
+                    s.name
+                );
+            }
+            artkit::scene::reset();
+            let parts = build();
+            let names: Vec<String> = parts.iter().map(|o| o.name()).collect();
+            assert_eq!(
+                names,
+                ["body", "head", "tail", "wing.L", "wing.R"],
+                "{}",
+                s.name
+            );
+            // the bill's tip is the head's foremost point (forward is Blender -y), the tail's tip its farthest from it
+            let head = parts[1].world_points();
+            let bill = *head.iter().min_by(|a, b| a.y.total_cmp(&b.y)).unwrap();
+            let tail = parts[2].world_points();
+            let long = tail
+                .iter()
+                .map(|&q| (q - bill).length())
+                .fold(0.0, f64::max);
+            assert!((long - s.length).abs() < 0.002, "{}: {long} m long", s.name);
+            // the torso's middle (the body over the legs: the folded wings lie on top of it)
+            let torso: Vec<f64> = parts[0]
+                .world_points()
+                .iter()
+                .map(|q| q.z as f64)
+                .filter(|&z| z > s.leg + 0.002)
+                .collect();
+            let (lo, hi) = (py::min_of(&torso), py::max_of(&torso));
+            let mid = (lo + hi) / 2.0;
+            assert!(
+                (mid - bird::perch_height(s)).abs() < 0.005,
+                "{}: middle {mid} m up",
+                s.name
+            );
+        }
+    }
+}
