@@ -9,7 +9,7 @@
 //! fewer faces. Small, separate parts (flowers, leaves, a bale's twine) are better built low: decimating shrinks
 //! thin parts and takes their detail first.
 
-use crate::decimate;
+use crate::decimate::{self, cross, dot, sub};
 use crate::math::{M4, V3};
 use crate::mesh::Mesh;
 use crate::scene::{self, Obj};
@@ -48,15 +48,10 @@ pub const EDGE: f64 = 0.003;
 ///   model's, laid on its faces (a fluted shaft brought down to a few sides is neither smooth nor round any
 ///   more: shaded by its own faces it is crumpled, and dark in its folds).
 ///
-/// The model stands on the floor (`decimated_on` for one that does not). Returns `obj`.
+/// The model stands on the floor. Returns `obj`.
 pub fn decimated(obj: Obj, ratio: f64, feet: f64, edge: f64) -> Obj {
-    decimated_on(obj, ratio, feet, edge, true)
-}
-
-/// `decimated` for a model the floor shades the foot of (`ground`) or not.
-pub fn decimated_on(obj: Obj, ratio: f64, feet: f64, edge: f64, ground: bool) -> Obj {
     // the model's shading, baked on it whole: what its far version keeps
-    crate::shade::bake_ao(&[obj], None, ground);
+    crate::shade::bake_ao(&[obj], None, true);
     let (name, faces, turned) = obj.edit(|o| {
         let turned = decimate(&mut o.mesh, ratio, feet, edge);
         (o.name.clone(), o.mesh.faces.len(), turned)
@@ -223,22 +218,6 @@ fn turn_back(mesh: &mut Mesh, was: &[[f64; 3]], reference: &Surface) -> usize {
 
 /// Reference faces this much further (m) than the nearest are as near.
 const SAME_PLACE: f64 = 1e-5;
-
-fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
 
 /// The point of the triangle `t` nearest `p`.
 fn nearest_on(p: [f64; 3], t: &[[f64; 3]; 3]) -> [f64; 3] {

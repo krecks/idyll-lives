@@ -251,13 +251,7 @@ impl Mesh {
             for &n in &corners[f.start as usize..(f.start + f.len) as usize] {
                 sum += n;
             }
-            let d = dot_v3(sum, sum);
-            if d > 1.0e-35 {
-                let length = d.sqrt();
-                V3::new(sum.x / length, sum.y / length, sum.z / length)
-            } else {
-                V3::ZERO
-            }
+            crate::normals::unit(sum)
         };
         Some(self.faces.iter().map(unit).collect())
     }
@@ -307,7 +301,7 @@ impl Mesh {
 
     /// The mesh's triangles as Blender draws and casts rays at them: (face, its three corners' places among the
     /// face's corners). A quad is cut from its first corner to its third, unless that folds it; a polygon of
-    /// more by clipping ears as Blender clips them (`tri::polygon`), from its normal by Newell's sum: the same
+    /// more by clipping ears as Blender clips them (`polyfill::ngon`), from its normal by Newell's sum: the same
     /// triangles in the same order, each from the same corner.
     pub fn triangles(&self) -> Vec<(u32, [u32; 3])> {
         let mut out = Vec::with_capacity(self.loops.len());
@@ -326,7 +320,7 @@ impl Mesh {
                     }
                 }
                 _ => out.extend(
-                    crate::tri::polygon(&p, normal_of(&p))
+                    crate::polyfill::ngon(&p, normal_of(&p))
                         .into_iter()
                         .map(|t| (f as u32, t)),
                 ),
@@ -632,7 +626,7 @@ pub fn normal_newell(p: &[V3]) -> V3 {
     if len == 0.0 { V3::Z } else { unit }
 }
 
-fn newell(p: &[V3]) -> V3 {
+pub(crate) fn newell(p: &[V3]) -> V3 {
     let mut n = V3::ZERO;
     let mut prev = p[p.len() - 1];
     for &cur in p {
