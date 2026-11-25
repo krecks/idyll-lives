@@ -113,6 +113,8 @@ export async function fetchCached(cache: Cache | null, url: string, progress: (b
     bytes.set(c, at);
     at += c.byteLength;
   }
+  // The chunks are copied: let them go before unpacking, not with the file and its unpacked copy.
+  chunks.length = 0;
   const file = unpack ? await gunzip(bytes.buffer) : bytes.buffer;
   if (sha256 && (await sha256Hex(file)) !== sha256) throw new Error(`${url}: not the file expected (SHA-256 differs)`);
   await cache?.put(url, new Response(bytes, { headers: { 'Content-Type': res.headers.get('Content-Type') ?? 'application/octet-stream' } })).catch(() => {});
