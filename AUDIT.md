@@ -103,12 +103,15 @@ Filled in as each branch lands; see the git log of each branch for the exact com
 
 | Branch | Commits | Findings |
 | --- | --- | --- |
-| `audit/report` | 1 | this report |
-| `audit/bugs` | see log | B1, B2, B3, B4, B5, B7 |
+| `audit/report` | `d4d4db99f` | this report; no code change on this branch |
+| `audit/bugs` | `e2156b99e` B2 · `842cdb0b0` B3 · `30cad03bb` B5 · `23dcc0595` B4 · `fd4e0a6b8` B7 · `8ed7cb2f2` B1 · `c97edcc18` B1's test | B1, B2, B3, B4, B5, B7 |
 | `audit/performance` | — | none applied: every performance finding is low severity and needs a new field or an index (P4, P5) |
-| `audit/maintainability` | see log | M3 |
-| `audit/simplification` | see log | S1, S2 |
-| `audit/split` | see log | SP1 (M5) |
+| `audit/maintainability` | `b8b46ec9f` | M3 |
+| `audit/simplification` | `e07708f7c` S1 · `8cd3676bc` S2 | S1, S2 |
+| `audit/split` | `ae27d079d` | SP1 (M5) |
+
+Every branch was cut from `audit/report` and leaves the suite green; the status column above names the
+branch a finding is applied on, so a finding marked `applied` is on that branch, not on this one.
 
 ## Proposals
 
