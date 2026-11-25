@@ -316,3 +316,41 @@ fn looks_survive_saving_by_content_id() {
         assert_eq!((look.sill, look.head), (None, None), "{sill:?} {head:?}");
     }
 }
+
+/// A saved size Build would refuse loses only the part that's wrong: a door's sill (a door starts
+/// at the floor) but not its top; a window's sill out of range but not its top; a window's top
+/// too close over its sill but not the sill.
+#[test]
+fn a_wrong_sill_or_top_is_dropped_on_its_own() {
+    let mut w = world();
+    w.build(0, &[wall(2, 2), wall(3, 2)]).unwrap();
+    let opening = |x, kind| EdgeEdit {
+        style: Some(1),
+        ..EdgeEdit::new(EdgeAxis::H, x, 2, kind)
+    };
+    w.build(
+        0,
+        &[opening(2, EdgeKind::Door), opening(3, EdgeKind::Window)],
+    )
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    for (x, saved, kept) in [
+        (2, (Some(10), Some(210)), (None, Some(210))),
+        (3, (Some(u16::MAX), Some(200)), (None, Some(200))),
+        (3, (Some(100), Some(110)), (Some(100), None)),
+        (3, (Some(100), Some(200)), (Some(100), Some(200))),
+    ] {
+        let mut json = json.clone();
+        let look = json["lot"]["looks"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|l| l["x"] == x)
+            .unwrap();
+        look["sill"] = serde_json::json!(saved.0);
+        look["head"] = serde_json::json!(saved.1);
+        let loaded = World::from_save_json(CONTENT, &json.to_string()).unwrap();
+        let look = loaded.lot.look(EdgeRef::H(x as u16, 2));
+        assert_eq!((look.sill, look.head), kept, "{x}: {saved:?}");
+    }
+}

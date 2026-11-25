@@ -229,9 +229,16 @@ pub(super) fn decode_looks(lot: &mut Lot, content: &Content, looks: &[LookSave])
             _ => &[],
         };
         let side = |id: &str| index(&b.coverings, id).map_or(0, |i| i as u8 + 1);
-        // A size no door or window may have (as Build checks it) is dropped.
-        let sized = matches!(edge, Edge::Door | Edge::Window)
-            && crate::home::check_opening(edge == Edge::Window, l.sill, l.head).is_ok();
+        // A size no door or window may have (as Build checks it) is dropped: the sill (a door's
+        // always), then the top with the sill kept, each on its own.
+        let window = edge == Edge::Window;
+        let opening = matches!(edge, Edge::Door | Edge::Window);
+        let sill = l
+            .sill
+            .filter(|_| opening && crate::home::check_opening(window, l.sill, None).is_ok());
+        let head = l
+            .head
+            .filter(|_| opening && crate::home::check_opening(window, sill, l.head).is_ok());
         lot.set_look(
             at,
             EdgeLook {
@@ -242,8 +249,8 @@ pub(super) fn decode_looks(lot: &mut Lot, content: &Content, looks: &[LookSave])
                     0
                 },
                 style: index(styles, &l.style).map_or(0, |i| i as u8),
-                sill: l.sill.filter(|_| sized),
-                head: l.head.filter(|_| sized),
+                sill,
+                head,
             },
         );
     }
