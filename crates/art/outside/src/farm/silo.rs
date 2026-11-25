@@ -1,7 +1,7 @@
 //! The grain silo: a galvanised drum on a concrete pad under a red domed cap, its ladder, walkway, door and chute,
 //! and its far version.
 
-use super::common::{F, M};
+use super::common::{F, M, eased};
 use artkit::json::float_repr;
 use artkit::math::{TAU, cos, cosd, degrees, radians, sin, sind};
 use artkit::parts::{join_all, settle};
@@ -114,14 +114,14 @@ pub fn silo() -> Vec<Obj> {
                 SILO_TOP + 0.05 + 0.62 * sin(e) + 0.005,
             ));
         }
-        sweep!(
+        eased(sweep!(
             format!("cap_seam{i}"),
             &pts,
             0.014,
             material = M.silo_cap,
             verts = 4,
             resolution = 2
-        );
+        ));
     }
     torus!(
         "cap_eave",

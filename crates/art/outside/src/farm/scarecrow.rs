@@ -1,7 +1,7 @@
 //! The scarecrow: a crooked post and cross-bar in a plaid shirt and patched trousers, straw at its ends, a sack
 //! head under a floppy hat, swaying in the wind.
 
-use super::common::{F, M};
+use super::common::{F, M, eased};
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, TAU, atan2, cos, cosd, pow, radians, sin, sind, sqrt};
 use artkit::parts::{join, settle_all};
@@ -158,7 +158,7 @@ pub fn scarecrow() -> Vec<Obj> {
             .iter()
             .map(|&y| (x, y, torso_depth(x, y) + 0.004))
             .collect();
-        fsweep!(
+        eased(fsweep!(
             F,
             format!("check_v{i}"),
             &line,
@@ -166,14 +166,14 @@ pub fn scarecrow() -> Vec<Obj> {
             M.shirt_check,
             verts = 4,
             resolution = 2
-        );
+        ));
     }
     for (i, y) in [1.08, 1.22, 1.36].into_iter().enumerate() {
         let line: Vec<(f64, f64, f64)> = [-0.19, -0.1, 0.0, 0.1, 0.19]
             .iter()
             .map(|&x| (x, y, torso_depth(x, y) + 0.004))
             .collect();
-        fsweep!(
+        eased(fsweep!(
             F,
             format!("check_h{i}"),
             &line,
@@ -181,7 +181,7 @@ pub fn scarecrow() -> Vec<Obj> {
             M.shirt_check,
             verts = 4,
             resolution = 2
-        );
+        ));
     }
     for (i, y) in [1.12, 1.25, 1.38, 1.5].into_iter().enumerate() {
         fsphere!(
@@ -434,7 +434,7 @@ pub fn scarecrow() -> Vec<Obj> {
             }
         }
     });
-    revolve!(
+    eased(revolve!(
         "crown",
         &[
             (0.0, 0.17),
@@ -449,7 +449,7 @@ pub fn scarecrow() -> Vec<Obj> {
         material = M.hat,
         segments = 14,
         rot = (4, -6, 0)
-    );
+    ));
     revolve!(
         "hatband",
         &[(0.146, 0.008), (0.149, 0.01), (0.146, 0.05), (0.141, 0.052)],

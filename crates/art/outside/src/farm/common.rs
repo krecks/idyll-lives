@@ -1,6 +1,8 @@
 //! What the farm is built from: the palette, the frame, and the slabs, shells and bars the buildings are made of,
 //! each drawn as an outline on a plane and thickened across it.
 
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::far::is_low;
 use artkit::forms;
 use artkit::materials::Mat;
 use artkit::math::{V3, cosd, sind};
@@ -8,7 +10,7 @@ use artkit::palette;
 use artkit::place::{Coord, GameFrame, N};
 use artkit::py;
 use artkit::scene::Obj;
-use artkit::shapes::SHARP;
+use artkit::shapes::{AUTO_WIDTH, SHARP};
 
 /// Built in the game's axes (x, height, depth; front +depth).
 pub const F: GameFrame = GameFrame::new(0.0);
@@ -87,6 +89,88 @@ pub fn mesh(name: &str, verts: &[(N, N, N)], faces: &[Vec<u32>], material: Mat) 
     forms::object(name, vs, faces, Some(material), false, SHARP, false)
 }
 
+/// `obj` with its edges turning over 50° chamfered by a pixel at the play camera (what `cube!` gives a box), none
+/// in a far version (each far version is built in `far_of`) nor on a part the gate's `edges` can't find hard: under
+/// 12 mm one way (its edges' faces too narrow) or 10 cm every way (a detail, not a piece).
+pub fn eased(obj: Obj) -> Obj {
+    let points = obj.world_points();
+    let side = |k: fn(&V3) -> f32| {
+        let (lo, hi) = points
+            .iter()
+            .map(k)
+            .fold((f32::MAX, f32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)));
+        f64::from(hi - lo)
+    };
+    let sides = [side(|p| p.x), side(|p| p.y), side(|p| p.z)];
+    if is_low() || sides.iter().any(|&s| s < 0.0119) || sides.iter().all(|&s| s < 0.1) {
+        return obj;
+    }
+    // (the gate's `edges` finds turns of 60° or more: a rounded corner's 45° steps are left as they are)
+    bevel_edges(obj, AUTO_WIDTH, 1, 50.0, &EdgeOrder::Corners)
+}
+
+/// A bar lying on a surface from game point `a` to `b`, standing `height` off it towards `up` (a game direction
+/// square to it), `base` wide on the surface and `top` at its face, the face's four edges cut across `c` (a batten
+/// on its wall, a tyre's lug): 20 triangles where a bevelled box takes 44, its edges on the surface covered and
+/// those up its ends short.
+#[allow(clippy::too_many_arguments)] // (a bar's every measure)
+pub fn bar_on(
+    name: &str,
+    a: [f64; 3],
+    b: [f64; 3],
+    up: [f64; 3],
+    base: f64,
+    top: f64,
+    height: f64,
+    c: f64,
+    material: Mat,
+) -> Obj {
+    let unit = |v: [f64; 3]| {
+        let k = py::hypot(py::hypot(v[0], v[1]), v[2]);
+        v.map(|x| x / k)
+    };
+    let cross = |p: [f64; 3], q: [f64; 3]| {
+        [
+            p[1] * q[2] - p[2] * q[1],
+            p[2] * q[0] - p[0] * q[2],
+            p[0] * q[1] - p[1] * q[0],
+        ]
+    };
+    let along = unit([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+    let across = unit(cross(along, up));
+    let up = cross(across, along);
+    let at = |e: [f64; 3], fwd: f64, out: f64, side: f64| {
+        let p: [f64; 3] =
+            std::array::from_fn(|i| e[i] + along[i] * fwd + up[i] * out + across[i] * side);
+        (N::F(p[0]), N::F(p[1]), N::F(p[2]))
+    };
+    let mut verts = Vec::with_capacity(12);
+    for (e, inward) in [(a, c), (b, -c)] {
+        verts.extend([
+            at(e, 0.0, 0.0, -base / 2.0),
+            at(e, 0.0, 0.0, base / 2.0),
+            at(e, 0.0, height - c, -top / 2.0),
+            at(e, 0.0, height - c, top / 2.0),
+            at(e, inward, height, c - top / 2.0),
+            at(e, inward, height, top / 2.0 - c),
+        ]);
+    }
+    let faces = [
+        [0, 1, 7, 6],
+        [1, 7, 9, 3],
+        [0, 6, 8, 2],
+        [3, 9, 11, 5],
+        [2, 8, 10, 4],
+        [4, 5, 11, 10],
+        [0, 1, 3, 2],
+        [2, 3, 5, 4],
+        [6, 7, 9, 8],
+        [8, 9, 11, 10],
+    ]
+    .map(|f| f.to_vec());
+    mesh(name, &verts, &faces, material)
+}
+
 /// A convex outline `pts` on a plane (see `lift`), extruded from `w0` to `w1` across it.
 pub fn prism(name: &str, pts: &[P2], w0: f64, w1: f64, material: Mat, axis: char) -> Obj {
     let n = pts.len();
@@ -100,7 +184,7 @@ pub fn prism(name: &str, pts: &[P2], w0: f64, w1: f64, material: Mat, axis: char
     for i in 0..n32 {
         faces.push(vec![i, (i + 1) % n32, n32 + (i + 1) % n32, n32 + i]);
     }
-    mesh(name, &verts, &faces, material)
+    eased(mesh(name, &verts, &faces, material))
 }
 
 /// `line` (a polyline on a plane, u rising left to right) moved `t` to its left (up, for a roof), mitred.
@@ -152,7 +236,7 @@ pub fn shell(name: &str, line: &[P2], t: f64, w0: f64, w1: f64, material: Mat, a
     }
     faces.push(vec![i0, o0, o1, i1]);
     faces.push(vec![i0 + n - 1, i1 + n - 1, o1 + n - 1, o0 + n - 1]);
-    mesh(name, &verts, &faces, material)
+    eased(mesh(name, &verts, &faces, material))
 }
 
 /// A flat bar from `a` to `b` on a plane (a door's brace), `width` wide, from `w0` to `w1` across.
@@ -216,7 +300,7 @@ pub fn stadium_sweep(
             );
         }
     }
-    mesh(name, &verts, &faces, material)
+    eased(mesh(name, &verts, &faces, material))
 }
 
 pub fn stadium_slab(
