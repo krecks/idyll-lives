@@ -328,7 +328,7 @@ pub fn on_masses(
     let mut out = Vec::with_capacity(n);
     for i in 0..n {
         let (at, s, sq) = if i < masses.len() {
-            masses[i % masses.len()]
+            masses[i]
         } else {
             masses[rng.randrange(masses.len() as i64) as usize]
         };

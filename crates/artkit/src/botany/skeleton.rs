@@ -7,7 +7,6 @@
 use crate::botany::{CARD_OF, Clad, Tiles, clad};
 use crate::bvh::Rays;
 use crate::far::{is_low, low};
-use crate::forms::by;
 use crate::materials::{Mat, Palette, hex_of, rgb_of};
 use crate::math::{self, P3, PI, TAU, V3, atan2, cos, sin, sqrt, v3};
 use crate::motion::{Squash, Stages, squash, stages};
@@ -148,7 +147,7 @@ options! {
     Bough { verts: usize = 6, res: usize = 3, material: Option<Mat> = None }
 }
 
-/// A tapering, curving bark tube (`sweep`) through Blender `pts`, `r0` across at its start, `r1` at its end.
+/// A tapering, curving bark `twig` through Blender `pts`, `r0` across at its start, `r1` at its end.
 pub fn _bough<Q: Into<V3> + Copy>(
     name: impl AsRef<str>,
     pts: &[Q],
@@ -157,16 +156,12 @@ pub fn _bough<Q: Into<V3> + Copy>(
     p: &Palette,
     o: Bough,
 ) -> Obj {
-    let k = r1 / r0;
-    crate::sweep!(
-        name,
-        pts,
-        r0,
-        material = o.material.unwrap_or_else(|| p.get("bark")),
-        verts = low(o.verts, 3),
-        resolution = low(o.res, 1),
-        scale = by(move |w| 1.0 + (k - 1.0) * w)
-    )
+    let material = o.material.unwrap_or_else(|| p.get("bark"));
+    let twig = crate::botany::Twig {
+        verts: o.verts,
+        res: o.res,
+    };
+    crate::botany::twig(name, pts, r0, r1, material, twig)
 }
 
 /// `_bough` with its options by name: `bough!(name, pts, r0, r1, p, key = value, ...)`.

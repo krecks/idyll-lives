@@ -45,13 +45,3 @@ pub use crate::{
     kit_scroll as scroll, kit_shaker as shaker, kit_songbird as songbird,
     kit_taxi_word as taxi_word, kit_tube as tube, kit_turned as turned,
 };
-
-/// Python's `min` of floats: the first of the least.
-pub(crate) fn least(xs: &[f64]) -> f64 {
-    crate::py::min_of(xs)
-}
-
-/// Python's `max` of two floats: the first unless the second is greater.
-pub(crate) fn most(a: f64, b: f64) -> f64 {
-    crate::py::max(a, b)
-}
