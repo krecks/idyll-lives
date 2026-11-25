@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(ring.len(), 12);
         // the corner at (0.2, 0) becomes two points 5 mm from it, along its two sides
         for p in &ring[..2] {
-            let d = ((p.x - 0.2).powi(2) + p.y.powi(2)).sqrt();
+            let d = artkit::py::hypot(p.x - 0.2, p.y);
             assert!((d - 0.005).abs() < 1e-12);
         }
         assert_eq!(
