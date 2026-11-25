@@ -98,12 +98,12 @@ stones' own random numbers are seeded from a float as Python's `random.seed` see
 Every edge the gate found is eased: the pond's flags have a weathered round top edge (four loft rows, no turn of 60°,
 6,440 triangles) and its water a 4 mm meniscus; the lamp post's flutes are a wave (40 points), its lantern's corner
 bars rounded (`rounded_rect`), its square rings' corners eased 6 mm and its floor's rim rolled; the birdhouse's braces
-rounded, its gabled box chamfered (`crate::chamfer`) and its front bevelled 3 mm; the feeders' trays have a round lip
+rounded, its gabled box chamfered (`bevel::ease`) and its front bevelled 3 mm; the feeders' trays have a round lip
 and an eased hub, the seed a 4 mm round top; the planter box's cap rail is eased on its inside too; the dog house's
 door trim is rounded, its bowl's lip rolled and its ridge cap's ends chamfered; the string lights' pots' inner rims
 rolled. One-strip chamfers on a wood finish (the birdhouse's post, the planter box's legs and battens, the string
-lights' posts and collars) are applied before the join (`crate::bevel_first`), so their UVs are made on the chamfered
-mesh: carried from the faces they cut, the strips had none (the texture smeared). The dog house's shingles are 11 mm
+lights' posts and collars) take their UVs on the chamfered mesh, as the kernel lays them: carried from the faces they
+cut, the strips had none (the texture smeared). The dog house's shingles are 11 mm
 at the butt (a cedar shingle's, too thin to show an edge, so no chamfer): 2,644 triangles, was 4,052, under the 4,000
 aim. The pond's reeds and reedmace are dwarf ones (Typha minima, under 0.75 m), so the pond is 0.62 m tall, within
 a garden pond's 0-0.6 m (±10 %).

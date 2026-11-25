@@ -65,7 +65,7 @@ pub fn workbench() -> Vec<Obj> {
         let (post, rail_y) = (0.07, BENCH_TOP - 0.09);
         for sx in [-1, 1] {
             let x = sx as f64 * 0.73;
-            let made = fbox!(
+            fbox!(
                 f,
                 format!("post_front{sx}"),
                 post,
@@ -76,9 +76,7 @@ pub fn workbench() -> Vec<Obj> {
                 bevel = 0.004,
                 bevel_segments = 1
             );
-            // (chamfered before its UVs are made, so the chamfers get their own)
-            artkit::bevel::apply(made);
-            let made = fbox!(
+            fbox!(
                 f,
                 format!("post_back{sx}"),
                 post,
@@ -89,8 +87,6 @@ pub fn workbench() -> Vec<Obj> {
                 bevel = 0.004,
                 bevel_segments = 1
             );
-            // (chamfered before its UVs are made, so the chamfers get their own)
-            artkit::bevel::apply(made);
             fbox!(
                 f,
                 format!("rail_side{sx}"),

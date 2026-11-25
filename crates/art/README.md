@@ -455,6 +455,17 @@ Playwright headless with full Chrome for Testing, at 1 % volume (`page.addInitSc
 - **Boxes come chamfered.** A `cube!` or `fbox!` that names no `bevel` takes a 4 mm chamfer (`shapes::AUTO_BEVEL`)
   where the gate's `edges` would find its edges hard (every side 12 mm or more, the longest 5 cm or more), none in a
   far version. `bevel = 0` keeps one sharp: a plate set in a frame, a liner whose edges hide inside something.
+- **Easing what isn't a box.** The kernel's helpers, one for every family (a family keeps no copy of its own):
+  `bevel::eased(obj)` (a part's turns over 50° chamfered 4 mm, none on a part too small for the gate to find or in a
+  far version; `bevel::ease(obj, angle, segments)` at another angle), `forms::eased(profile, r)` and
+  `forms::eased_loop` (a lathe's or a moulding's corners of 60° or more rounded on an arc), `forms::round_at` (one
+  corner rolled in four steps), `forms::inset` (an outline moved in) and `place::eased_prism` (a body with chamfered
+  ends). Botany's pots, saucers and raised beds come chamfered; a `boulder!` is scaled in its mesh. A bevel that
+  would end where no other bevelled edge goes (a mitre, a loft's end) is left off those edges, and the gate says
+  where; a profile closed on its first point turns into a welded ring.
+- **UVs on the bevel.** A textured part's box or round UVs are made on its bevelled mesh, so a one-strip chamfer
+  takes the texture as a face of its own (carried, its strip had no area: `texels` found it smeared); UVs made
+  already (a sweep's) are carried. `uv::box_named` lays some parts a box a face where their own UVs stretch.
 - **`up` is the kernel's.** `fsweep!` maps the points to game axes but passes `up` (which way a profile's first
   side faces) as it is, in the kernel's axes: `up = (0, 1, 0)` on a path along game x flips a profile down.
 - **The bevel is lazy.** `bevel = ..` only asks: the part is rounded when it is joined or written. Until then its

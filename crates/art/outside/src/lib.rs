@@ -2,7 +2,6 @@
 //! fittings. One folder a family, each listed in `families()`.
 
 use artkit::family::Family;
-use artkit::scene::Obj;
 
 pub mod civic;
 pub mod civic_works;
@@ -31,18 +30,6 @@ pub fn families() -> Vec<(&'static str, Family)> {
         ("civic_works", civic_works::family()),
         ("water_edge", water_edge::family()),
     ]
-}
-
-/// `obj` given its bevel now and its box UVs laid on the bevelled mesh, a face at a time, so a chamfer's strip
-/// takes the texture as its faces do (carried, as Blender carries them, the strip reads its edge's line smeared
-/// across it: the gate's `texels` finds a rail's chamfers "smeared").
-pub fn boxed(obj: Obj) -> Obj {
-    artkit::bevel::apply(obj);
-    obj.edit(|o| {
-        artkit::uv::box_(&mut o.mesh);
-        o.mesh.uv_metres = true;
-    });
-    obj
 }
 
 /// A content object by its id, from `file` under web/public/content: for the families' content-facts tests.

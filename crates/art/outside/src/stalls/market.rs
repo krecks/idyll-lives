@@ -171,7 +171,7 @@ pub fn market_stall() -> Vec<Obj> {
             );
         }
         for z in [-0.38, 0.38] {
-            crate::boxed(fbox!(
+            fbox!(
                 f,
                 format!("shelf_rail{}", float_repr(z)),
                 1.76,
@@ -179,11 +179,11 @@ pub fn market_stall() -> Vec<Obj> {
                 0.04,
                 (0, 0.17, z),
                 M.timber
-            ));
+            );
         }
         for x in [-0.88, 0.88] {
             for (z, h) in [(-0.4, 2.1), (0.4, 1.9)] {
-                crate::boxed(fbox!(
+                fbox!(
                     f,
                     format!("post{}{}", float_repr(x), float_repr(z)),
                     0.06,
@@ -193,12 +193,12 @@ pub fn market_stall() -> Vec<Obj> {
                     M.timber,
                     bevel = 0.006,
                     bevel_segments = 1
-                ));
+                );
             }
             // knee braces under the beams
             let sign = if x > 0.0 { 1 } else { -1 };
             for (z, y) in [(0.4, 1.84), (-0.4, 2.04)] {
-                crate::boxed(fbox!(
+                fbox!(
                     f,
                     format!("brace{}{}", float_repr(x), float_repr(z)),
                     0.04,
@@ -207,7 +207,7 @@ pub fn market_stall() -> Vec<Obj> {
                     (x - 0.08 * sign as f64, y - 0.07, z),
                     M.timber,
                     rot = (0, 45 * sign, 0)
-                ));
+                );
             }
         }
         fbox!(

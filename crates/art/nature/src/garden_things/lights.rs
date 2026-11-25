@@ -385,8 +385,6 @@ pub fn stringLights() -> Vec<Obj> {
             fsweep!(F, format!("hook{i}"), &hook, 0.004, m.wire, verts = 5);
         }
     });
-    // (the chamfers laid with their own grain)
-    crate::bevel_first(&["post", "collar"]);
     join(&still, "posts", Some(p3(0, 0, 0)));
     let string = new_parts(|| {
         let x0 = POST_X - 0.04;

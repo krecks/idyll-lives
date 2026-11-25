@@ -109,7 +109,7 @@ Every hard edge the gate found (37) is gone, and the smash bin's posts no longer
   from the middle of the back face so the hole's rim is eased too); the rubber floor mat set aside (`aside`) and the
   long foot 1 cm shorter, so the stand measures 0.72 × 2.00 × 0.77 m, a heavy bag stand's footprint.
 - **Smash bin:** the plates' rims a 4 mm band (too narrow to show hard: a lathe rim at no extra triangles); the
-  posts' bevel 4 mm in two segments (one segment carried its wood's UVs as lines: 2.8 % of `crate_dark` smeared).
+  posts' bevel 4 mm in one segment (its wood's UVs laid on the bevel; carried, they smeared 2.8 % of `crate_dark`).
 - **Cool-down cushion:** the singing bowl stand's, the candle dish's, the candle's and the pot's rims cut once more
   where they turned over 70°; the round mat 0.86 m across (was 0.90; a floor cushion's mat), 40 sides.
 - **Grudge journal:** the cactus fluted in 48 points (32 made its ribs 71° ridges), the pot's rim chamfered, the chair

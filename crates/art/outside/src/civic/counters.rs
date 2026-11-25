@@ -170,7 +170,7 @@ pub fn teacher_desk() -> Vec<Obj> {
         }
         let (gx, gz) = (-0.5, -0.12);
         // (box UVs on the turned base: round about its axis, the grain stretched over its slopes near the middle)
-        crate::boxed(artkit::bevel::eased(revolve!(
+        let base = artkit::bevel::eased(revolve!(
             "globe_base",
             &[
                 (0.0, 0.0),
@@ -184,7 +184,8 @@ pub fn teacher_desk() -> Vec<Obj> {
             at = F.at(gx, t, gz),
             material = M.walnut,
             segments = 16
-        )));
+        ));
+        base.edit(|p| p.uv = artkit::mesh::UvWay::Box);
         let arc: Vec<(f64, f64, f64)> = (150..371)
             .step_by(20)
             .map(|d| radians(d as f64))

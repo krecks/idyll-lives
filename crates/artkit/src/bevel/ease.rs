@@ -15,7 +15,7 @@ pub fn eased(obj: Obj) -> Obj {
 /// corner (a moulding's mitre, which a bevel can't stop at); two segments on a lip turning past 120° (one would
 /// leave two turns of 60° and more). Its points are welded first, so a seam (a closed sweep's, a profile closed
 /// on its first point) doesn't stop the bevel. A bevel the kernel can't build at `angle` is tried on the turns
-/// over 30° (a mitre's), else left off (the gate's `edges` then says where).
+/// over 30° (a mitre's), else on the edges it can be built on (`bevel_edges`).
 pub fn ease(obj: Obj, angle: f64, segments: usize) -> Obj {
     if crate::far::is_low() {
         return obj;
@@ -36,8 +36,9 @@ pub fn ease(obj: Obj, angle: f64, segments: usize) -> Obj {
     let builds = |angle: f64| {
         obj.read(|o| bevelled(&o.mesh, AUTO_WIDTH, segments, angle, &EdgeOrder::Corners).is_ok())
     };
-    let Some(angle) = [angle, 30.0].into_iter().find(|&a| builds(a)) else {
-        return obj;
-    };
+    let angle = [angle, 30.0]
+        .into_iter()
+        .find(|&a| builds(a))
+        .unwrap_or(angle);
     bevel_edges(obj, AUTO_WIDTH, segments, angle, &EdgeOrder::Corners)
 }

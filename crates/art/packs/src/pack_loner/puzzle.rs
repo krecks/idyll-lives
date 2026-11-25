@@ -4,7 +4,7 @@ use super::common::{_chair, _desk, _mug, BANDS, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{Axis, M4, P3, TAU, V3, acos, cos, cosd, degrees, radians, sin, sind};
+use artkit::math::{Axis, P3, TAU, acos, cos, cosd, degrees, radians, sin, sind};
 use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
@@ -276,15 +276,6 @@ const TWIG: (f64, f64, f64) = (0.19, 1.16, -0.2); // where the leggy twig leaves
 
 /// A cloud of foliage: a few jittered, flattened clumps around (x, y, z), the top one the fullest.
 #[allow(clippy::too_many_arguments)]
-/// Bakes a part's scale into its mesh, so its leaves' texture is laid on it at its own size (made on the unscaled
-/// boulder, a pad 0.2 m across took the texture of one 1 m across, squashed flat).
-fn flat_scale(o: Obj) {
-    o.edit(|p| {
-        p.mesh.transform(&M4::diagonal(p.scale));
-        p.scale = V3::new(1.0, 1.0, 1.0);
-    });
-}
-
 fn _pad(f: &GameFrame, x: f64, y: f64, z: f64, w: f64, d: f64, seed: i32) {
     let mut rnd = Random::new(seed as i128);
     let s = seed as f64;
@@ -299,7 +290,6 @@ fn _pad(f: &GameFrame, x: f64, y: f64, z: f64, w: f64, d: f64, seed: i32) {
         subdivisions = 2
     );
     jitter!(o, 0.006, size = 0.04, seed = s);
-    flat_scale(o);
     for k in 0..3 {
         let px = x + rnd.uniform(-w, w) * 0.3;
         let pz = z + rnd.uniform(-d, d) * 0.25;
@@ -314,7 +304,6 @@ fn _pad(f: &GameFrame, x: f64, y: f64, z: f64, w: f64, d: f64, seed: i32) {
             subdivisions = 1
         );
         jitter!(o, 0.005, size = 0.03, seed = (seed + k) as f64);
-        flat_scale(o);
     }
 }
 

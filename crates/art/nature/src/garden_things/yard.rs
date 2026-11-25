@@ -344,7 +344,7 @@ pub fn dogHouse() -> Vec<Obj> {
         }
     }
     // the ridge cap's sawn ends eased
-    crate::chamfer(&["ridge"]);
+    artkit::bevel::ease(artkit::scene::obj("ridge"), artkit::shapes::SHARP, 1);
     join_all("dogHouse");
     settle_with(
         &meshes(),

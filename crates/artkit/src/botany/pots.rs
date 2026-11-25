@@ -1,11 +1,22 @@
 //! What is turned from a profile: a pot with its soil, a cupped bloom leaning on its stem.
 
+use crate::bevel::{EdgeOrder, bevel_edges};
 use crate::far::{is_low, low};
 use crate::forms::{Jitter, jitter};
 use crate::materials::{Mat, Palette};
 use crate::math::{Axis, M4, V3, p3, radians, v3};
+use crate::mesh::UvWay;
 use crate::scene::Obj;
-use crate::shapes::{Revolve, Round, cylinder, options, revolve};
+use crate::shapes::{AUTO_WIDTH, Revolve, Round, SHARP, cylinder, options, revolve};
+
+/// A turned pot's or saucer's square-cut rims and foot chamfered `AUTO_WIDTH` (the gate's `edges` finds them hard),
+/// none in a far version.
+fn chamfered(obj: Obj) -> Obj {
+    if is_low() {
+        return obj;
+    }
+    bevel_edges(obj, AUTO_WIDTH, 1, SHARP, &EdgeOrder::Corners)
+}
 
 options! {
     /// `pot`'s options (`r_bottom` None: 0.72 of `r_top`; `rim` 0: none).
@@ -13,7 +24,7 @@ options! {
 }
 
 /// A pot standing at height `z0`, `h` tall, its top `r_top` across the rim's inside, in the palette `p`'s `body`
-/// (its soil in `soil`): returns its soil height.
+/// (its soil in `soil`), its rims chamfered: returns its soil height.
 pub fn pot(p: &Palette, r_top: f64, h: f64, o: Pot) -> f64 {
     let (z0, rim, rim_h) = (o.z0, o.rim, o.rim_h);
     let segments = low(o.segments, 8.max(o.segments / 2));
@@ -36,7 +47,7 @@ pub fn pot(p: &Palette, r_top: f64, h: f64, o: Pot) -> f64 {
         (inner - 0.006, top - 0.035),
         (0.0, top - 0.035),
     ]);
-    revolve(
+    chamfered(revolve(
         "pot",
         &profile,
         Revolve {
@@ -44,7 +55,7 @@ pub fn pot(p: &Palette, r_top: f64, h: f64, o: Pot) -> f64 {
             segments: Some(segments),
             ..Revolve::default()
         },
-    );
+    ));
     if o.soil {
         cylinder(
             "soil",
@@ -81,7 +92,9 @@ options! {
     Cupped { yaw: f64 = 0.0, tilt: f64 = 0.0, segments: usize = 6 }
 }
 
-/// A bloom turned from `profile` [(r, z)] (a tulip, a poppy, a lily's trumpet), leaning `tilt` towards `yaw`.
+/// A bloom turned from `profile` [(r, z)] (a tulip, a poppy, a lily's trumpet), leaning `tilt` towards `yaw`. Its
+/// texture is laid a box a face (`UvWay::Box`): round its axis, a cup's turned UVs stretch it over 2x, the more so
+/// tilted.
 pub fn cupped(
     name: impl AsRef<str>,
     profile: &[(f64, f64)],
@@ -89,16 +102,18 @@ pub fn cupped(
     material: Mat,
     o: Cupped,
 ) -> Obj {
+    let bloom = revolve(
+        name,
+        profile,
+        Revolve {
+            material: Some(material),
+            segments: Some(low(o.segments, 3)),
+            ..Revolve::default()
+        },
+    );
+    bloom.edit(|p| p.uv = UvWay::Box);
     _put(
-        revolve(
-            name,
-            profile,
-            Revolve {
-                material: Some(material),
-                segments: Some(low(o.segments, 3)),
-                ..Revolve::default()
-            },
-        ),
+        bloom,
         at,
         Put {
             yaw: o.yaw,
@@ -115,8 +130,8 @@ options! {
 
 /// A pot standing at height `z0`, `h` tall, its rim `r_top` across the inside: a rolled lip `lip` thick round the top
 /// (0: a plain, square-cut rim), a foot band `foot` high at the bottom, a body swelling by `belly`, a hollow top and
-/// its soil (`soil_top`) a little below the rim, and a `saucer` under it (its overhang). Returns the soil's
-/// height. Turned in the palette `p`'s `body` (or `material`), so the player colours it.
+/// its soil (`soil_top`) a little below the rim, and a `saucer` under it (its overhang), their rims chamfered. Returns
+/// the soil's height. Turned in the palette `p`'s `body` (or `material`), so the player colours it.
 pub fn vessel(p: &Palette, r_top: f64, h: f64, o: Vessel) -> f64 {
     let (z0, lip, foot, saucer) = (o.z0, o.lip, o.foot, o.saucer);
     let segments = low(o.segments, 8.max(o.segments / 2));
@@ -144,7 +159,7 @@ pub fn vessel(p: &Palette, r_top: f64, h: f64, o: Vessel) -> f64 {
     }
     let inner = r_top - 0.008;
     prof.extend([(inner - 0.004, top - 0.04), (0.0, top - 0.04)]);
-    revolve(
+    chamfered(revolve(
         "pot",
         &prof,
         Revolve {
@@ -152,10 +167,10 @@ pub fn vessel(p: &Palette, r_top: f64, h: f64, o: Vessel) -> f64 {
             segments: Some(segments),
             ..Revolve::default()
         },
-    );
+    ));
     if saucer != 0.0 {
         let rs = rb + saucer;
-        revolve(
+        chamfered(revolve(
             "saucer",
             &[
                 (0.0, z0 - 0.002),
@@ -171,7 +186,7 @@ pub fn vessel(p: &Palette, r_top: f64, h: f64, o: Vessel) -> f64 {
                 segments: Some(segments),
                 ..Revolve::default()
             },
-        );
+        ));
     }
     if o.soil {
         soil_top(

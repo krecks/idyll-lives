@@ -98,7 +98,7 @@ pub fn herb_garden() -> Vec<Obj> {
                     (px, y0 + h / 2.0, pz),
                     M.cedar_dark,
                     bevel = 0.006,
-                    bevel_segments = 2 // (one carried its grain as lines: smeared)
+                    bevel_segments = 1
                 );
             }
         }

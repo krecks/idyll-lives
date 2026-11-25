@@ -237,11 +237,18 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, hold: Hold, off: &mut Off) {
         );
     }
     let (of, corner) = its_order(&mesh, &g.faces);
+    // (botany eases what the scripts left sharp, a pot's and a saucer's rims and a raised bed's boards: their bevel,
+    // asked for, shades them smooth with their sharp edges kept; their points and faces are still Blender's)
+    let eased = !g.lines.contains_key("bevel")
+        && obj.read(|o| o.bevel.is_some())
+        && ["pot", "saucer", "board"]
+            .iter()
+            .any(|n| g.name.starts_with(n));
     let smooth: String = of
         .iter()
         .map(|&f| if mesh.faces[f].smooth { '1' } else { '0' })
         .collect();
-    assert_eq!(smooth, g.lines["s"], "{what}: smooth faces");
+    assert!(eased || smooth == g.lines["s"], "{what}: smooth faces");
     let mats = words(&g.lines["mats"]);
     let wears: Vec<&str> = of
         .iter()
@@ -265,9 +272,8 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, hold: Hold, off: &mut Off) {
         })
         .collect();
     sharp.sort_unstable();
-    assert_eq!(
-        mesh.sharp.iter().copied().collect::<Vec<_>>(),
-        sharp,
+    assert!(
+        eased || mesh.sharp.iter().copied().collect::<Vec<_>>() == sharp,
         "{what}: sharp edges"
     );
     if let Some(uv) = g.lines.get("uv") {
@@ -291,14 +297,14 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, hold: Hold, off: &mut Off) {
     }
     let bevel = obj.read(|o| o.bevel.is_some());
     assert_eq!(
-        bevel,
+        bevel && !eased,
         g.lines.contains_key("bevel"),
         "{what}: a bevel asked for"
     );
     // The normals: Blender's to the bit with the faces round each vertex summed in its order (which for its own
     // primitives isn't the same from one run of it to the next); in the kernel's own order they are measured.
     let cn = g.f32s("cn");
-    if !cn.is_empty() {
+    if !cn.is_empty() && !eased {
         let mine = normals::corner_normals(&mesh);
         let mut in_its_order = artkit::mesh::Mesh::from_pydata(mesh.verts.clone(), &g.faces);
         for (face, &f) in in_its_order.faces.iter_mut().zip(&of) {
@@ -2635,6 +2641,16 @@ fn veg_patch() {
     ]);
     let mut rng = Random::new(81);
     let top = raised_bed(&p, 0.92, 0.92, 0.18);
+    // (the script's boards were sharp and flat: botany's are eased now, the gate's `edges`)
+    for part in scene::meshes() {
+        if part.name().starts_with("board") {
+            part.edit(|o| {
+                o.bevel = None;
+                o.mesh.shade_flat();
+                o.mesh.sharp.clear();
+            });
+        }
+    }
     let still = join_all("vegPatch");
     let mut spots: Vec<Vec<(f64, f64)>> = Vec::new();
     for x in [-0.28, 0.0, 0.28] {

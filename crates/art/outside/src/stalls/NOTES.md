@@ -95,5 +95,5 @@ The gate's `edges` found 60 (ice cream cart 30, hot dog stand 11, market stall 7
 accepted. Eased (the crate's 4 mm chamfer on turns over 50°): the wheels' rims, the parasol's canopy, the hot dog
 sign's frame, the machines' keypad, window bezel and drink buttons, the chalk board's frame; the ice cream tubs and
 the scale's pan in two segments (their lips turn past 120°). The market stall's posts, shelf rails and braces lay
-their wood UVs on the chamfered box (`boxed`): carried, their chamfers smeared the grain (`texels`). The machines'
+their wood UVs on the chamfered box (as the kernel lays any box's: carried, their chamfers smeared the grain, `texels`). The machines'
 levelling feet are gone: they stood inside the plinth, 112 triangles nobody saw (the snack machine is under 8,000).

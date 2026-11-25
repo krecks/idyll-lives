@@ -55,5 +55,5 @@ platform's rims and the roof's eave rounded over (rows added, no turn of 60°), 
 posts bevelled boxes (were square cones) and the panels bevelled 4 mm: 52 edges to none, 3,992 triangles (was
 2,076; the aim for its 1.03 m is 8,000). The fountain's stem has its collar and top rounded and both basins' water,
 like the birdbath's, a 4 mm meniscus. The gnome's beard is 14 round with its top rounded in. The boulder's moss,
-lichen and grass tufts have their scale baked into their meshes before the join (`crate::bake_scale`), so the foliage
-is laid on them as they are drawn (squashed after, it stretched over 2×).
+lichen and grass tufts have their scale in their meshes (a `boulder!` is scaled so), so the foliage is laid on them as
+they are drawn (squashed after, it stretched over 2×).

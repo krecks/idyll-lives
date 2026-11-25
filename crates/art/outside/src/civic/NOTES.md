@@ -118,5 +118,5 @@ candles, the vault's rims. Not the bar's tumblers, the pen pot or the hotel lamp
 made edges of its own. The plant table's pots have their rim's top edge cut across in the profile instead, ten
 round (a chamfer all round took it past 8,000 triangles), its legs a one-step chamfer; the teller's speaking
 grille's back rim is cut across the same way; a book's boards take a 2 mm chamfer (3 mm met in a 6 mm board's
-middle, a ridge). The teacher's globe's turned base lays box UVs on its chamfered mesh (`boxed`): round about its
-axis, the walnut's grain stretched over its slopes.
+middle, a ridge). The teacher's globe's turned base lays box UVs (`UvWay::Box`, on its chamfered mesh): round about
+its axis, the walnut's grain stretched over its slopes.

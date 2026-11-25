@@ -470,7 +470,7 @@ pub fn smash_bin() -> Vec<Obj> {
                     (px, h / 2.0, pz),
                     M.crate_dark,
                     bevel = 0.004,
-                    bevel_segments = 2
+                    bevel_segments = 1
                 );
             }
         }
