@@ -6,7 +6,8 @@ use super::desk_things::{cactus, keyboard, laptop_open, monitor, mouse, mug, not
 use super::{DT, F, M};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
-use artkit::parts::{join, join_all, new_parts};
+use artkit::math::P3;
+use artkit::parts::{aside, join, join_all, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, join, kit, settle, slide, soft};
@@ -124,7 +125,7 @@ pub(super) const CORNER_SEAT: (f64, f64) = (0.11, 0.11); // the chair's seat (ga
 pub fn desk_corner() -> Vec<Obj> {
     let e = 0.93;
     let i = -e + CORNER_WING; // the wings' inner edges
-    new_parts(|| {
+    let desk = new_parts(|| {
         // an L of white laminate, its edges rounded
         let cut = [(CORNER_CUT - i, i), (i, CORNER_CUT - i)];
         let outline = [(-e, -e), (e, -e), (e, i), cut[0], cut[1], (i, e), (-e, e)];
@@ -296,7 +297,10 @@ pub fn desk_corner() -> Vec<Obj> {
                 }
             }
         }
-        // on the top: an open laptop on the back wing turned to the chair, a mug, a tray of papers, a cactus and a notebook
+    });
+    // on the top: an open laptop on the back wing turned to the chair, a mug, a tray of papers, a cactus and a
+    // notebook; the chair at the corner: drawn, not the desk's size
+    let carried = new_parts(|| {
         laptop_open(0.05, -0.62, DT, -20.0);
         mug(0.42, -0.45, DT);
         fbox!(
@@ -325,14 +329,15 @@ pub fn desk_corner() -> Vec<Obj> {
             "notebook", -0.58, DT, 0.35, 0.18, 0.24, 0.014, M.notebook, 20.0,
         );
         pen("pen", -0.5, DT + 0.014, 0.32, 40.0);
+        let chair = new_parts(|| desk_chair(M.chair, 0.0, 0.5, false, None));
+        let seat = turned(&chair, "chair", (0, 0, 0), 0.0, 135.0);
+        seat.edit(|o| {
+            o.loc.x = (f64::from(o.loc.x) - CORNER_SEAT.0) as f32;
+            o.loc.y = (f64::from(o.loc.y) - CORNER_SEAT.1) as f32;
+        });
     });
-    let chair = new_parts(|| desk_chair(M.chair, 0.0, 0.5, false, None));
-    let seat = turned(&chair, "chair", (0, 0, 0), 0.0, 135.0);
-    seat.edit(|o| {
-        o.loc.x = (f64::from(o.loc.x) - CORNER_SEAT.0) as f32;
-        o.loc.y = (f64::from(o.loc.y) - CORNER_SEAT.1) as f32;
-    });
-    join_all("deskCorner");
+    aside(&carried, "carried");
+    join(&desk, "deskCorner", Some(P3::ZERO));
     settle!(centre = false);
     meshes()
 }
@@ -486,7 +491,10 @@ pub fn desk_standing() -> Vec<Obj> {
                 verts = 8
             );
         }
-        // the monitor on its stand at the back, facing the resident, its cable down the left leg
+    });
+    // the monitor on its stand at the back, facing the resident, its cable down the left leg, a mug and a cactus:
+    // drawn, not the desk's size
+    let carried = new_parts(|| {
         monitor(
             "monitor",
             0,
@@ -521,6 +529,7 @@ pub fn desk_standing() -> Vec<Obj> {
         mug(0.32, -0.3, 1.05);
         cactus(-0.36, -0.36, 1.05, 0.04, 0.07);
     });
+    aside(&carried, "carried");
     join!(&still, "deskStanding", origin = (0, 0, 0));
     // the keyboard shelf under the front, sliding 20 cm out to the resident
     let parts = new_parts(|| {
