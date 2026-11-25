@@ -413,7 +413,8 @@ Playwright headless with full Chrome for Testing, at 1 % volume (`page.addInitSc
 ## Traps
 
 - **Wall face.** A model built on the tile's back edge sits inside the house wall; wall faces are 7 cm in. The gate
-  fails a model whose back reaches over 1 cm past the face.
+  fails a model whose back reaches over 1 cm past the face, at rest (`wall`) or opened (`opened`: any key of a
+  use's, `open`'s or `night`'s clip; a door swung back past 90°, a lid tipped past upright).
 - **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall and off
   its content `surface`. Give its `Model` a `centre` (the back of a counter or a fridge is 0.43 m in from the
   middle of its tile); a failed size or centre check prints the measured centre to copy. No content fact says a

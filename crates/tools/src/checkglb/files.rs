@@ -125,6 +125,16 @@ pub(super) fn check(
         furniture,
         counting.file,
     )?;
+    // `opened` came in after the models it finds: counted against the baseline.
+    let mut opened = Found::default();
+    warnings.retain(|w| match untag(w) {
+        Some(("opened", text)) => {
+            opened.count += 1;
+            opened.text.push(text.to_string());
+            false
+        }
+        _ => true,
+    });
     let mut summary = format!(
         "{:>6} KB {:>6} tris {} draws {:>2} materials  {} m",
         fixed(info.size as f64 / 1024.0, 1),
@@ -212,6 +222,13 @@ pub(super) fn check(
     }
     // The counted checks: what they found in the file and its far version's (`far: …`), and the batch checks'.
     let mut found: BTreeMap<&'static str, Found> = BTreeMap::new();
+    // (Counted where it finds any, or the baseline or the entry names it: none found is then stale, or unused.)
+    if opened.count > 0
+        || counting.baseline.get("opened", entry_key) > 0
+        || entry.get("accept").and_then(|a| a.get("opened")).is_some()
+    {
+        found.insert("opened", opened);
+    }
     let far_found = far_counted.into_iter().map(|(c, f)| {
         let text = f.text.into_iter().map(|t| format!("far: {t}")).collect();
         (
