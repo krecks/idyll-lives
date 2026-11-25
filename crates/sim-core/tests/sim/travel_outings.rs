@@ -359,55 +359,59 @@ fn a_visit_to_a_place_shutting_before_they_could_get_there_is_refused() {
 fn nobody_sets_out_for_a_closed_place_and_those_there_go_home_as_it_shuts() {
     // The hamlets with cars and parking (`an_outing_by_car_in_reach_...`), the other's park open
     // 9:00 to 16:00: those who go on an outing there get there while it's open, and are gone by
-    // last orders after it shuts.
+    // last orders after it shuts. (Over a few seeds: whether anyone picks the park in three days
+    // is chance, about four seeds in five, the way there accurately weighed.)
     let content = common::content();
     let h = two_hamlets_with_parking(&content, 31);
-    let mut w = World::from_json(&content, &with_cars(&h), 31).expect("the hamlets load");
-    let park = far_park(&w, &h);
     let (open, close) = (9 * 60, 16 * 60);
-    w.plots[park as usize].hours = Some(sim_core::world::PlotHours {
-        open,
-        close,
-        days: 0b1111111,
-    });
     let late = f32::from(close) + sim_core::staff::LAST_ORDERS * 60.0 + 15.0;
-    let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
-    let mut there = std::collections::BTreeSet::new();
     let (mut arrivals, mut shut_arrivals, mut stayed_late) = (Vec::new(), Vec::new(), Vec::new());
-    while w.tick < end {
-        w.tick_once();
-        let minute = clock::minute_of_day(w.tick);
-        for (i, s) in w.sims.iter().enumerate() {
-            let (x, z) = s.tile();
-            let at = s.here()
-                && s.visiting.is_some_and(|v| v.plot == park)
-                && w.plot_at(x, z) == Some(park);
-            if at && !there.contains(&i) {
-                arrivals.push((clock::day(w.tick), minute as u32, i));
-                if !w.plots[park as usize].open_at_tick(w.tick) {
-                    shut_arrivals.push((clock::day(w.tick), minute as u32, i));
+    for seed in 31..35 {
+        let mut w = World::from_json(&content, &with_cars(&h), seed).expect("the hamlets load");
+        let park = far_park(&w, &h);
+        w.plots[park as usize].hours = Some(sim_core::world::PlotHours {
+            open,
+            close,
+            days: 0b1111111,
+        });
+        let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
+        let mut there = std::collections::BTreeSet::new();
+        while w.tick < end {
+            w.tick_once();
+            let minute = clock::minute_of_day(w.tick);
+            for (i, s) in w.sims.iter().enumerate() {
+                let (x, z) = s.tile();
+                let at = s.here()
+                    && s.visiting.is_some_and(|v| v.plot == park)
+                    && w.plot_at(x, z) == Some(park);
+                let when = (seed, clock::day(w.tick), minute as u32, i);
+                if at && !there.contains(&i) {
+                    arrivals.push(when);
+                    if !w.plots[park as usize].open_at_tick(w.tick) {
+                        shut_arrivals.push(when);
+                    }
                 }
-            }
-            if at && minute >= late {
-                stayed_late.push((clock::day(w.tick), minute as u32, i));
-            }
-            if at {
-                there.insert(i);
-            } else {
-                there.remove(&i);
+                if at && minute >= late {
+                    stayed_late.push(when);
+                }
+                if at {
+                    there.insert(i);
+                } else {
+                    there.remove(&i);
+                }
             }
         }
     }
-    eprintln!("got to the park (day, minute, resident): {arrivals:?}");
+    eprintln!("got to the park (seed, day, minute, resident): {arrivals:?}");
     assert!(!arrivals.is_empty(), "nobody went to the park");
     assert!(
         shut_arrivals.is_empty(),
-        "got there while it was shut (day, minute, resident): {shut_arrivals:?}"
+        "got there while it was shut (seed, day, minute, resident): {shut_arrivals:?}"
     );
-    stayed_late.dedup_by_key(|k| (k.0, k.2));
+    stayed_late.dedup_by_key(|k| (k.0, k.1, k.3));
     assert!(
         stayed_late.is_empty(),
-        "still there well after it shut (day, minute, resident): {stayed_late:?}"
+        "still there well after it shut (seed, day, minute, resident): {stayed_late:?}"
     );
 }
 
