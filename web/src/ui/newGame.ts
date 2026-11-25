@@ -186,20 +186,20 @@ const roadSig = (r: RoadPlan) => `${r.kind ?? 'street'}|${r.width}|${r.points.ma
 /**
  * Step 3's streets put into the layout too, so they don't make the town be built again: the roads `after` (the
  * built town's plan after an edit) has that `before` hadn't, added to `layout`'s roads (each once), and those
- * `before` had that `after` hasn't (a road split or bent by the new one's junction) taken out where the layout has
- * them. The layout itself when no road changed.
+ * `before` had that `after` hasn't (a road split or bent by the new one's junction, a street undone or removed)
+ * taken out where the layout has them. The layout itself when that changes none of its roads.
  */
 export function addedStreets(layout: NeighbourhoodDraft, before: NeighbourhoodDraft, after: NeighbourhoodDraft): NeighbourhoodDraft {
   if (before.roads === after.roads) return layout;
   const was = new Set(before.roads.map(roadSig));
   const now = new Set(after.roads.map(roadSig));
   const fresh = after.roads.filter((r) => !was.has(roadSig(r)));
-  // (Only an edit that drew a road changes the layout: one that only took roads away leaves it.)
-  if (!fresh.length) return layout;
   const goneRoads = before.roads.filter((r) => !now.has(roadSig(r)));
   const had = new Set(layout.roads.map(roadSig));
   // (A piece of a road split by the new one's junction goes in only where the layout had that road, in its place.)
   const inLayout = goneRoads.filter((g) => had.has(roadSig(g)));
+  // (Nothing the layout has went, and nothing drawn: the layout as it was.)
+  if (!fresh.length && !inLayout.length) return layout;
   const pieceOf = (r: RoadPlan) => goneRoads.find((g) => r.points.every((p) => onLine(p, g.points)));
   const added = fresh.filter((r) => {
     const whole = pieceOf(r);

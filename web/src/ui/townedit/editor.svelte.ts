@@ -209,6 +209,8 @@ export class TownEditorState implements TownEditor {
     this.letWorkerGo?.();
     this.letWorkerGo = null;
     this.session = null;
+    // (A street half drawn on the town let go is of that town.)
+    for (const st of this.stages.values()) st.cancel();
     this.editGhostsOf = null;
     this.pickedKey = null;
     this.hovered = null;
@@ -304,13 +306,21 @@ export class TownEditorState implements TownEditor {
   }
 
   undo(): void {
-    this.session?.undo();
+    this.told((s) => s.undo());
   }
   redo(): void {
-    this.session?.redo();
+    this.told((s) => s.redo());
   }
   reset(): void {
-    this.session?.reset();
+    this.told((s) => s.reset());
+  }
+  /** Undo, redo and reset are edits too: told as `apply`'s are (step 3's streets go into the layout, and out again). */
+  private told(go: (s: EditSession) => unknown): void {
+    const s = this.session;
+    if (!s) return;
+    const before = s.plan;
+    go(s);
+    if (s.plan !== before) this.hooks.edited?.(before, s.plan);
   }
 
   /** The town settled and on screen, and its problems checked, as the plan stands (the way on waits for it). */
