@@ -311,7 +311,10 @@ fn a_setup_whose_sim_isnt_in_town_is_dropped_without_a_refund() {
     let (mut w, content) = garden_home();
     let object = something_new(&w);
     yes(&mut w, 0, object);
-    assert!(until(&mut w, 60, |w| w.sims[0].held.is_some()), "carrying it");
+    assert!(
+        until(&mut w, 60, |w| w.sims[0].held.is_some()),
+        "carrying it"
+    );
     assert_eq!(w.setups.len(), 1);
     let funds = w.households[0].funds;
     // A hand-edited save: the setup names a sim who isn't in town. The object is still there, so
