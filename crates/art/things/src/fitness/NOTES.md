@@ -155,3 +155,7 @@ Built in Rust since 2026-11-18 (`cargo art fitness`), proved against the last Bl
 nodes come out `roll` before `mat` (the order they are made).
 
 - **No hard edges (2026-11-25, gate zero).** The bike's beam, stabilisers and posts' ends chamfered and its saddle's top rolled over (two more rings), the treadmill's rails and uprights, the bench's beam and the bar's sleeves. The sauna keeps four draws (glass in the cabin and in the swinging door); the treadmill's belt loop moves its slats one on, as it should; the massage table's standing place (slot 1, the masseur) has nothing under it, as it should.
+
+## Measured as the piece (2026-11-25)
+
+`dumbbells`: the rubber floor mat in front of the rack is set aside (`parts::aside`, `mat_aside`): drawn as before, not the rack's size; `cargo review sizes` measures the rack 0.44 m deep (was 0.93 with the mat).

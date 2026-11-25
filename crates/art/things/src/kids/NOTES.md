@@ -124,3 +124,9 @@ cargo art kids --preview  # previews/kids/<id>.png, <id>@<clip>.png
 The beds' duvets are rumpled by the form as the bedroom's are (2.5 cm folds 24 cm apart, a 5 cm roll over the mattress's edge, a square hem; the family's own `rumple` is the bean bag's only now), their pillows a third box and two thirds puff with pinched corners, their mattresses unpinched and `resting`. Besides, its soft boxes take the shared form's new shape (the soft form: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 6 models changed shape: `crib`, `highChair`, `kidsBed`, `kidsBedCar`, `playTent`, `rockingHorse`; 29,104 to 29,770 triangles.
 
 - **No hard edges (2026-11-25, gate zero).** The changing table's guard, the car bed's spoiler (its leading edge rounded) and the toy box's hand holds chamfered; the bean bag's, the tent's and the horse's mane's and tail's fabric is laid on from the sides (`UvWay::Box`), as a turned layout stretched it over 2×. The high chair's seat is 6 mm lower (its shell's top 0.599 m, under the kind's 0.6).
+
+## Measured as the piece (2026-11-25)
+
+`trainTable`: the layout on the board (track, tunnel, station, the little town) is set aside (`parts::aside`, `layout_aside`): drawn as before, not the table's size; `cargo review sizes` measures the table with its train, 0.54 m high (was 0.68).
+
+`crib`: the changing chest 1 cm taller, its pad at 0.85 m (its top 0.853 m, in the crib kind's 0.85–0.95 for the changing top; it was 0.844).
