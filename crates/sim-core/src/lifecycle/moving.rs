@@ -102,12 +102,22 @@ pub(super) fn beds(w: &World, plot: u32) -> Beds {
         places: Vec::new(),
         couples: Vec::new(),
     };
-    for (o, _) in w
-        .objects
-        .iter()
-        .zip(&w.object_plot)
-        .filter(|(_, p)| **p == Some(plot))
-    {
+    // (The plot's own objects from the index while it's current, in the same id order.)
+    let on: Vec<&crate::world::ObjectInstance> = if w.object_index.version == w.objects_version {
+        w.object_index
+            .on(plot)
+            .iter()
+            .map(|&o| &w.objects[o as usize])
+            .collect()
+    } else {
+        w.objects
+            .iter()
+            .zip(&w.object_plot)
+            .filter(|(_, p)| **p == Some(plot))
+            .map(|(o, _)| o)
+            .collect()
+    };
+    for o in on {
         let def = &w.content.objects[o.def];
         let Some(stages) = bed_stages(&w.content, def, true) else {
             continue;
