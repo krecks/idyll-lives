@@ -5,14 +5,17 @@
 //! a three-octave keyboard on an X-stand). Still.
 
 use super::M;
-use super::common::{P, flat_quads, sheet_music, turn_round};
-use artkit::forms::smooth_outline;
+use super::common::{P, flat_quads, sheet_music};
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
+use artkit::kit::turn_round;
 use artkit::kit::{self, fillet};
 use artkit::math::{PI, cos, sin};
 use artkit::parts::{Settle, join_all, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
+use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsweep, soft};
 
 /// A white key's width.
@@ -111,7 +114,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
         M.ball_red
     );
     // the case behind the keys: a rounded top with its control strip, buttons, a screen, two speaker grilles
-    fsweep!(
+    let case_top = fsweep!(
         f,
         "case_top",
         &[
@@ -130,6 +133,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
             (0.008, -0.068)
         ]
     );
+    bevel_edges(case_top, 0.003, 1, SHARP, &EdgeOrder::Corners); // its ends' edges
     fbox!(
         f,
         "strip",
@@ -217,7 +221,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
         bevel = 0.003,
         bevel_segments = 1
     );
-    fsweep!(
+    let ledge = fsweep!(
         f,
         "rest_ledge",
         &[
@@ -234,6 +238,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
             (-0.006, 0.015)
         ]
     );
+    bevel_edges(ledge, 0.002, 1, SHARP, &EdgeOrder::Corners);
     sheet_music(
         &f,
         "music",
@@ -365,7 +370,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
             ],
             0,
             M.brass,
-            profile = super::common::rr(0.008, 0.024, 0.003, 1),
+            profile = rounded_rect(0.008, 0.024, 0.003, 1),
             resolution = 2,
             scale = [0.8, 0.9, 1.15, 1.1]
         );

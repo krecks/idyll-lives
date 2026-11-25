@@ -7,7 +7,7 @@
 #
 # The key is a hash of everything the package is built from: the git trees of its crates and of the workspace's
 # Cargo.toml, Cargo.lock, .cargo/ and rust-toolchain.toml, the uncommitted changes to them and the untracked files
-# among them, and the versions of rustc and wasm-bindgen. A package already made with that key (by this checkout or
+# among them, the versions of rustc and wasm-bindgen, and this script. A package already made with that key (by this checkout or
 # by any other worktree of the repo) is copied from ~/.cache/idyll-lives/wasm-pkg/<pkg>/<key>/; otherwise it is
 # built here (cargo in this checkout's target/, then wasm-bindgen), kept there and copied. A build holds the key's
 # lock, so two worktrees asking for the same package at once build it once. LL_WASM_CACHE=0 builds without the
@@ -49,6 +49,8 @@ key=$(
     git ls-files --others --exclude-standard -- $inputs | while read -r f; do echo "$f $(git hash-object "$f")"; done
     rustc -V
     wasm-bindgen -V
+    # (This script too: its build commands.)
+    cat tools/wasm-cache.sh
   } | sha256 | cut -c1-24
 )
 if [ "$mode" = key ]; then

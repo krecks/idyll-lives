@@ -1,7 +1,8 @@
 //! The gnome, the wheelbarrow planter and the boulders.
 
 use super::M;
-use super::common::{_on_top, _stone};
+use super::common::_on_top;
+use crate::ground::rock::_stone;
 use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
 use artkit::math::{P3, TAU, cos, degrees, sin};
@@ -180,6 +181,9 @@ pub fn gnome() -> Vec<Obj> {
     );
     // the beard: a long wedge from the cheeks to a point on his chest, a little wavy; a moustache over it
     let rows = [
+        // (its top rounded in under the moustache: no turn of 60°)
+        (0.35, 0.046, 0.026, -0.024),
+        (0.348, 0.052, 0.03, -0.025),
         (0.345, 0.055, 0.032, -0.026),
         (0.315, 0.062, 0.04, -0.04),
         (0.28, 0.056, 0.038, -0.055),
@@ -189,7 +193,8 @@ pub fn gnome() -> Vec<Obj> {
     ];
     let sections: Vec<Vec<P3>> = rows
         .iter()
-        .map(|&(z, rx, ry, y)| ring!(rx, ry, z = z, verts = 10, at = (0.0, y)))
+        // (14 round: at 10 its flattened sides turned 60° at the cheeks)
+        .map(|&(z, rx, ry, y)| ring!(rx, ry, z = z, verts = 14, at = (0.0, y)))
         .collect();
     let beard = loft!("beard", &sections, material = M.beard);
     jitter!(beard, 0.004, size = 0.03, seed = 2.0);
@@ -578,11 +583,12 @@ pub fn boulder() -> Vec<Obj> {
     _stone(
         "boulder_main",
         0.34,
-        (-0.06, 0.02),
+        (-0.06, 0.02, 0.0),
         M.rock,
         (1.12, 0.94, 0.86),
         0.4,
         0.43,
+        3,
         &[
             ((0.1, -0.05, 1.0), 0.07),
             ((0.35, -0.2, 1.0), 0.05),
@@ -591,29 +597,37 @@ pub fn boulder() -> Vec<Obj> {
             ((0.6, -0.8, 0.25), 0.05),
             ((-0.5, -0.9, 0.1), 0.04),
         ],
-        3,
+        0.0,
+        (0.3, 0.1),
+        0.0,
     );
     _stone(
         "boulder_side",
         0.21,
-        (0.3, 0.17),
+        (0.3, 0.17, 0.0),
         M.rock_dark,
         (1.0, 0.92, 0.8),
         2.1,
         0.24,
-        &[((0.5, -0.6, 1.0), 0.03), ((1.0, 0.2, 0.3), 0.04)],
         3,
+        &[((0.5, -0.6, 1.0), 0.03), ((1.0, 0.2, 0.3), 0.04)],
+        0.0,
+        (0.3, 0.1),
+        0.0,
     );
     _stone(
         "boulder_small",
         0.13,
-        (0.26, -0.27),
+        (0.26, -0.27, 0.0),
         M.rock_warm,
         (1.05, 0.85, 0.75),
         4.2,
         0.12,
-        &[((0.3, -0.4, 1.0), 0.02)],
         2,
+        &[((0.3, -0.4, 1.0), 0.02)],
+        0.0,
+        (0.3, 0.1),
+        0.0,
     );
     let moss = _on_top(&[(-0.14, 0.12), (0.02, 0.18), (0.32, 0.24)], 0.03);
     let lichen = _on_top(&[(0.08, -0.08), (-0.28, -0.1), (0.26, -0.27)], 0.012);

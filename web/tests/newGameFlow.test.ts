@@ -145,6 +145,8 @@ describe('step 2 and step 3: the layout, the built town and what each one remake
     // (Nothing drawn: the layout as it was.)
     expect(addedStreets(proposed, built, { ...built })).toBe(proposed);
     expect(addedStreets(proposed, after, built)).toBe(proposed);
+    // (The new street undone or removed in step 3: out of the layout again.)
+    expect(addedStreets(added, after, built).roads.map((r) => r.name)).toEqual(['High Street']);
     // (The high street split where the new street meets it.)
     const west = road(0, 100, 200, 100);
     const east = road(200, 100, 400, 100);

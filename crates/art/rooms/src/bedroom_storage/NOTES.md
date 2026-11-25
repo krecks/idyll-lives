@@ -61,8 +61,9 @@ The three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, 
 chocolate bars and a paperback in it) slides out 30 cm (`drawer_open`, as the dressers') for the content's "Grab a
 snack from the drawer" (`snack`, `snack_drawer`), held 2.5 s: a second draw call. It was keyed to "Pick an outfit"
 with clothes in it until 2026-10-21, when the content gave the drawer the snack (I-bedroom-05). The hamper's lid
-(`lid`, hinged at its back; the basket is hollow with washing in it) lifts 70° (`lid_open`, 0.7 s; any further and
-it goes into the wall the hamper stands at) for the whole of the content's "Sort the washing" (`sortWashing`,
+(`lid`, hinged 4 cm in from its back, near the loop's height, so its back lifts off the rim and comes forward; about
+the rim's bottom edge it went 7.7 cm into the wall; the basket is hollow with washing in it) lifts 80° (`lid_open`,
+0.7 s) for the whole of the content's "Sort the washing" (`sortWashing`,
 `clean`, 5 minutes, comfort, chores; not autonomous): a third draw call. (Washing that goes from the hamper to the
 washer would need a laundry loop in the sim.)
 
@@ -81,7 +82,7 @@ the side: it came up through the carcass's top (and the single one's side).
 |---|---|---|---|---|
 | `model.nightstand` | 0.54 × 0.66 × 0.46 m | 1,884 | 2 | Body, Handles (a shaped apron, a turned knob; a book with pages and a mug of coffee on top, books in the niche) |
 | `model.nightstandModern` | 0.58 × 0.56 × 0.47 m | 1,416 | 2 | Body, Handles (rounded oak top, splayed oak legs, a black bar pull, a lidded box in the niche) |
-| `model.nightstandRound` | 0.54 × 0.57 × 0.56 m | 2,468 | 2 | Body, Handles (a swelling drum, the drawer front between two seams, a turned knob, a moulded top) |
+| `model.nightstandRound` | 0.54 × 0.57 × 0.55 m | 2,468 | 2 | Body, Handles (a swelling drum, the drawer front between two seams, a turned knob, a moulded top) |
 | `model.nightstandDrawers` | 0.58 × 0.60 × 0.47 m | 1,968 | 2 | Body, Handles (rounded case and top, bar pulls; a lidded biscuit tin and a paperback in the drawer) |
 | `model.nightstandLamp` | 0.54 × 1.09 × 0.46 m | 3,284 | 3 | Body, Shade (glows `#FFD9A0` at night; brass foot and collar, trimmed shade on a harp, a finial) |
 | `model.cedarChest` | 0.96 × 0.505 × 0.52 m | 3,212 | 3 | Body, Handles (bracket-cut plinth, two raised panels in frames, iron corner brackets and drop handles, a brass lock; a framed raised field on the lid) |
@@ -92,7 +93,7 @@ the side: it came up through the carcass's top (and the single one's side).
 | `model.chestOfDrawers` | 0.88 × 1.16 × 0.51 m | 3,012 | 2 | Body, Handles (frame-and-panel drawer fronts, bar pulls, a rounded top) |
 | `model.dresserLow` | 1.82 × 0.80 × 0.64 m | 3,796 | 4 | Body, Handles (rounded case, splayed tapered legs, a shadow line under the top, black bar pulls) |
 | `model.wardrobeSingle` | 0.60 × 2.28 × 0.62 m | 2,012 | 2 | Body, Handles (a frame-and-panel door, hinge knuckles, clothes on hangers, a lidded box on top) |
-| `model.armoire` | 1.86 × 2.11 × 0.63 m | 6,296 | 3 | Body, Handles (a swept crown moulding and base moulding, turned bun feet, beaded stiles, doors with two raised panels each, turned knobs, an escutcheon) |
+| `model.armoire` | 1.86 × 2.11 × 0.63 m | 6,680 | 3 | Body, Handles (a swept crown moulding and base moulding, turned bun feet, beaded stiles, doors with two raised panels each, turned knobs, an escutcheon) |
 
 ### Detail (2026-10-22)
 
@@ -105,6 +106,15 @@ side did, in the lit preview).
 
 `check-glb`: 0 failed; warnings: 4 draw calls on the dresser and the low dresser (their drawers carry metal pulls,
 as before). Khronos validator: 0 errors, 0 warnings each.
+
+## Edges eased (2026-11-25)
+
+For the gate's `edges` and sizes: the armoire's crown and base mouldings (`crown`) have their top corners eased 4 mm
+and their ends on the wall's face chamfered (swept about the profile's middle, the end rings shrunk 4 mm), and the
+base moulding's cove is the crown's scaled to its 3 cm (it folded back on itself); the hamper's braided cords (four
+sides) shade round. The drum nightstand's knob is 2.5 cm (was 3.7): its depth, knob and all, 0.549 m, inside a
+nightstand's (0.30–0.50 m, ±10 %). The dresser and the low dresser stay at 4 draw calls (each moving drawer's
+oak and its metal pull and clothes, as the body's).
 
 ## Rebuild
 

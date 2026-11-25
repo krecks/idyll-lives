@@ -63,21 +63,6 @@ macro_rules! sprigs {
     };
 }
 
-/// `botany::_with_part` with its options by name, as the family scripts wrote them: `_with_part!(name, still, build, origin, clip, key = value, ...)`.
-#[macro_export]
-macro_rules! _with_part {
-    ($name:expr, $still:expr, $build:expr, $origin:expr, $clip:expr $(, $k:ident = $v:expr)* $(,)?) => {
-        match ($name, $still, $build, $origin, $clip) {
-            (name, still, build, origin, clip) => {
-                #[allow(unused_mut)]
-                let mut o = $crate::botany::WithPart::default();
-                $(o.$k = $crate::Arg::arg($v);)*
-                $crate::botany::_with_part(name, still, build, origin, clip, o)
-            }
-        }
-    };
-}
-
 /// `botany::pot` with its options by name, as the family scripts wrote them: `pot!(palette, r_top, h, key = value, ...)`.
 #[macro_export]
 macro_rules! pot {
@@ -433,21 +418,6 @@ macro_rules! tulip_head {
     };
 }
 
-/// `botany::lupin_spike` with its options by name, as the family scripts wrote them: `lupin_spike!(name, at, h, r, material, key = value, ...)`.
-#[macro_export]
-macro_rules! lupin_spike {
-    ($name:expr, $at:expr, $h:expr, $r:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {
-        match ($name, $at, $h, $r, $material) {
-            (name, at, h, r, material) => {
-                #[allow(unused_mut)]
-                let mut o = $crate::botany::LupinSpike::default();
-                $(o.$k = $crate::Arg::arg($v);)*
-                $crate::botany::lupin_spike(name, at, h, r, material, o)
-            }
-        }
-    };
-}
-
 /// `botany::florets` with its options by name, as the family scripts wrote them: `florets!(name, r, at, material, key = value, ...)`.
 #[macro_export]
 macro_rules! florets {
@@ -519,7 +489,7 @@ macro_rules! soil_top {
     };
 }
 
-/// `botany::leafy_shrub` with its options by name, as the family scripts wrote them: `leafy_shrub!(palette, seed, w, h, cols, wood, key = value, ..., blooms = |masses, rng| ...)`.
+/// `botany::leafy_shrub` with its options by name, as the family scripts wrote them: `leafy_shrub!(seed, w, h, cols, wood, key = value, ..., blooms = |masses, rng| ...)`.
 #[macro_export]
 macro_rules! leafy_shrub {
     (@set $o:ident, blooms, $v:expr) => {
@@ -528,13 +498,13 @@ macro_rules! leafy_shrub {
     (@set $o:ident, $k:ident, $v:expr) => {
         $o.$k = $crate::Arg::arg($v);
     };
-    ($palette:expr, $seed:expr, $w:expr, $h:expr, $cols:expr, $wood:expr $(, $k:ident = $v:expr)* $(,)?) => {
-        match ($palette, $seed, $w, $h, $cols, $wood) {
-            (palette, seed, w, h, cols, wood) => {
+    ($seed:expr, $w:expr, $h:expr, $cols:expr, $wood:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($seed, $w, $h, $cols, $wood) {
+            (seed, w, h, cols, wood) => {
                 #[allow(unused_mut)]
                 let mut o = $crate::botany::LeafyShrub::default();
                 $($crate::leafy_shrub!(@set o, $k, $v);)*
-                $crate::botany::leafy_shrub(palette, seed, w, h, cols, wood, o)
+                $crate::botany::leafy_shrub(seed, w, h, cols, wood, o)
             }
         }
     };
@@ -630,16 +600,16 @@ macro_rules! mound {
     };
 }
 
-/// `botany::rosettes` with its options by name, as the family scripts wrote them: `rosettes!(palette, rng, n, radius, z, cols, key = value, ...)`.
+/// `botany::rosettes` with its options by name, as the family scripts wrote them: `rosettes!(rng, n, radius, z, cols, key = value, ...)`.
 #[macro_export]
 macro_rules! rosettes {
-    ($palette:expr, $rng:expr, $n:expr, $radius:expr, $z:expr, $cols:expr $(, $k:ident = $v:expr)* $(,)?) => {
-        match ($palette, $n, $radius, $z, $cols) {
-            (palette, n, radius, z, cols) => {
+    ($rng:expr, $n:expr, $radius:expr, $z:expr, $cols:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($n, $radius, $z, $cols) {
+            (n, radius, z, cols) => {
                 #[allow(unused_mut)]
                 let mut o = $crate::botany::Rosettes::default();
                 $(o.$k = $crate::Arg::arg($v);)*
-                $crate::botany::rosettes(palette, $rng, n, radius, z, cols, o)
+                $crate::botany::rosettes($rng, n, radius, z, cols, o)
             }
         }
     };

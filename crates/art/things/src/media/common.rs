@@ -2,6 +2,7 @@
 
 use super::{F, M};
 pub use crate::common::P;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, atan2, cosd, degrees, sind};
@@ -11,7 +12,7 @@ use artkit::shapes::Cube;
 use artkit::{fbox, fsweep, revolve, soft};
 
 /// The wall's face (game depth).
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// `_axle`: the rot for a cylinder whose axis runs along the game direction (gx, 0, gz).
 pub fn axle(gx: f64, gz: f64) -> P3 {
@@ -72,7 +73,7 @@ pub fn capsule(
         Some(r) if r != 0.0 => r,
         _ => (if d < h { d } else { h }) * 0.45,
     };
-    fsweep!(
+    let bar = fsweep!(
         F,
         name,
         &[(x0, y, z), (x1, y, z)],
@@ -81,7 +82,9 @@ pub fn capsule(
         profile = rounded_rect(h, d, r, 3),
         up = (0, 0, 1),
         angle = 50.0
-    )
+    );
+    // its ends' edges eased (only theirs: round its section each turn is under 50 degrees)
+    bevel_edges(bar, 0.003_f64.min(r * 0.5), 1, 50.0, &EdgeOrder::Corners)
 }
 
 /// `_grille`: a speaker's cloth face: a thin panel on the front at depth `z`, with fine horizontal ribs.

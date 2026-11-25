@@ -26,9 +26,9 @@ const DOOR_HOLD: f64 = 1.4; // and shuts again this long after it opened
 const FAR: f64 = 0.25; // placed on town lots, seen from afar: a quarter of the triangles (E7)
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let door = format!(r#"{{"clip": "door", "delay": {DOOR_DELAY:?}, "hold": {DOOR_HOLD:?}}}"#);
-    Some(Family::new(
+    Family::new(
         "shops",
         M.palette(),
         vec![
@@ -67,21 +67,13 @@ pub fn family() -> Option<Family> {
          Listed in the base manifest's packs. Each has a far version for the town overview. The till's cash drawer \
          slides out (`till`) while a resident buys a treat; the bakery case's back glass door slides aside (`door`) \
          for a pastry.",
-    ))
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::cafe::{SEAT, SEAT_FORWARD, TABLE_TOP};
     use artkit::json::{Json, loads};
-
-    fn num(j: Option<&Json>) -> Option<f64> {
-        match j {
-            Some(Json::Num(x)) => Some(*x),
-            Some(Json::Int(i)) => Some(*i as f64),
-            _ => None,
-        }
-    }
 
     /// The heights the content names are the ones the models are built to.
     #[test]
@@ -105,14 +97,18 @@ mod tests {
             .get("surface")
             .and_then(|s| s.get("height"));
         assert_eq!(
-            num(surface),
+            surface.and_then(Json::num),
             Some(TABLE_TOP),
             "cafeTable: surface height moved"
         );
         let seat = find("cafeChair").get("seat").expect("cafeChair seat");
-        assert_eq!(num(seat.get("height")), Some(SEAT), "cafeChair: seat moved");
         assert_eq!(
-            num(seat.get("forward")),
+            seat.get("height").and_then(Json::num),
+            Some(SEAT),
+            "cafeChair: seat moved"
+        );
+        assert_eq!(
+            seat.get("forward").and_then(Json::num),
             Some(SEAT_FORWARD),
             "cafeChair: seat moved"
         );

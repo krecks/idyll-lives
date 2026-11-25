@@ -1,7 +1,9 @@
 //! The exercise bike: an upright bike, the flywheel at the front, the cranks under the saddle.
 
 use super::M;
-use super::common::{on, rr};
+use super::common::on;
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, pow, sin, sind};
@@ -22,26 +24,38 @@ fn console(x: impl Into<N>, y: f64, z: f64) -> (N, f64, f64) {
 
 pub fn exercise_bike() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    let frame = rr(0.06, 0.05, 0.016, 2);
+    let frame = rounded_rect(0.06, 0.05, 0.016, 2);
     let still = new_parts(|| {
         // the base: a beam on two stabilisers with rubber end caps and levelling feet, transport wheels at the front
-        fsweep!(
-            f,
-            "beam",
-            &[(0, 0.05, -0.43), (0, 0.05, 0.43)],
-            0,
-            M.body,
-            profile = rr(0.06, 0.12, 0.014, 2)
-        );
-        for z in [-0.38, 0.38] {
+        bevel_edges(
             fsweep!(
                 f,
-                format!("stabiliser{}", float_repr(z)),
-                &[(-0.22, 0.03, z), (0.22, 0.03, z)],
+                "beam",
+                &[(0, 0.05, -0.43), (0, 0.05, 0.43)],
                 0,
                 M.body,
-                profile = rr(0.05, 0.08, 0.016, 2)
-            );
+                profile = rounded_rect(0.06, 0.12, 0.014, 2)
+            ),
+            0.003,
+            1,
+            50.0,
+            &EdgeOrder::Corners,
+        ); // its ends' edges
+        for z in [-0.38, 0.38] {
+            bevel_edges(
+                fsweep!(
+                    f,
+                    format!("stabiliser{}", float_repr(z)),
+                    &[(-0.22, 0.03, z), (0.22, 0.03, z)],
+                    0,
+                    M.body,
+                    profile = rounded_rect(0.05, 0.08, 0.016, 2)
+                ),
+                0.003,
+                1,
+                50.0,
+                &EdgeOrder::Corners,
+            ); // its ends' edges
             for s in [-1, 1] {
                 soft!(
                     f,
@@ -67,15 +81,21 @@ pub fn exercise_bike() -> Vec<Obj> {
             verts = 10,
             round = 1
         );
-        fsweep!(
-            f,
-            "seat_tube",
-            &[(0, 0.06, -0.14), (0, 0.6, -0.105)],
-            0,
-            M.body,
-            profile = &frame,
-            up = (1, 0, 0)
-        );
+        bevel_edges(
+            fsweep!(
+                f,
+                "seat_tube",
+                &[(0, 0.06, -0.14), (0, 0.6, -0.105)],
+                0,
+                M.body,
+                profile = &frame,
+                up = (1, 0, 0)
+            ),
+            0.003,
+            1,
+            50.0,
+            &EdgeOrder::Corners,
+        ); // its ends' edges
         kit::tube!(
             f,
             "seat_post",
@@ -120,16 +140,22 @@ pub fn exercise_bike() -> Vec<Obj> {
             segments = 10,
             rot = (90, 0, 0)
         );
-        fsweep!(
-            f,
-            "handle_post",
-            &[(0, 0.06, 0.22), (0, 0.5, 0.27), (0, 0.95, 0.32)],
-            0,
-            M.body,
-            profile = &frame,
-            up = (1, 0, 0),
-            resolution = 2
-        );
+        bevel_edges(
+            fsweep!(
+                f,
+                "handle_post",
+                &[(0, 0.06, 0.22), (0, 0.5, 0.27), (0, 0.95, 0.32)],
+                0,
+                M.body,
+                profile = &frame,
+                up = (1, 0, 0),
+                resolution = 2
+            ),
+            0.003,
+            1,
+            50.0,
+            &EdgeOrder::Corners,
+        ); // its ends' edges
         fcyl!(
             f,
             "bracket",
@@ -194,7 +220,10 @@ pub fn exercise_bike() -> Vec<Obj> {
             (0.7, 0.1, -0.2, 0.03),
             (0.72, 0.19, -0.215, 0.05),
             (0.745, 0.2, -0.22, 0.06),
+            (0.752, 0.19, -0.214, 0.056),
             (0.758, 0.17, -0.205, 0.05),
+            (0.762, 0.14, -0.195, 0.042), // its top's edge rolled over
+            (0.764, 0.1, -0.185, 0.034),
         ]
         .iter()
         .map(|&(y, w, back, nose)| {
@@ -304,7 +333,7 @@ pub fn exercise_bike() -> Vec<Obj> {
                 &[(sf * 0.075, CRANK.1, CRANK.2), end],
                 0,
                 M.steel,
-                profile = rr(0.014, 0.034, 0.006, 1),
+                profile = rounded_rect(0.014, 0.034, 0.006, 1),
                 up = (1, 0, 0),
                 scale = [1.0, 0.8]
             );

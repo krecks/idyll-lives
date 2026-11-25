@@ -16,9 +16,6 @@ fn every_family_of_the_registry_builds_and_is_named_once() {
     let registry = registry();
     let mut seen: Vec<&str> = registry.iter().map(|(n, _)| *n).collect();
     for (name, family) in &registry {
-        let family = family
-            .as_ref()
-            .unwrap_or_else(|| panic!("{name}: its module builds nothing"));
         assert!(!family.models.is_empty(), "{name}: no models");
     }
     seen.sort_unstable();
@@ -47,10 +44,6 @@ fn a_name_the_registry_does_not_have_is_no_family() {
     );
     let err = pick(&[], &registry, false).unwrap_err();
     assert!(err.starts_with("name a family (trees, plants, "), "{err}");
-    // a family whose module builds nothing is refused by name
-    let empty = [("trees", None)];
-    let err = pick(&names(&["trees"]), &empty, false).unwrap_err();
-    assert!(err.starts_with("trees: its module builds nothing"), "{err}");
 }
 
 /// `--centres` writes the file anew from the families' models: a key no family builds goes.

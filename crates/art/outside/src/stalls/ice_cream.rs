@@ -43,14 +43,13 @@ fn parasol(name: &str, r: f64, h: f64, gores: usize, a: Mat, b: Mat) -> Vec<Obj>
         rings.push(ring);
     }
     let canopy = striped(
-        loft!(
+        artkit::bevel::eased(loft!(
             format!("{name}_canopy"),
             &rings,
             material = a,
             smooth = false
-        ),
+        )),
         gores,
-        a,
         b,
     );
     // the valance: a band of scallops round the rim, a tongue a gore
@@ -82,7 +81,7 @@ fn parasol(name: &str, r: f64, h: f64, gores: usize, a: Mat, b: Mat) -> Vec<Obj>
         })
         .collect();
     let val = forms_band(&format!("{name}_valance"), &top_o, &out, &inn, &top_i, a);
-    striped(val, gores, a, b);
+    striped(val, gores, b);
     let mut made = vec![canopy, val];
     for i in (0..n).step_by(2) {
         // the ribs under the canopy
@@ -325,19 +324,23 @@ pub fn ice_cream_cart() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            revolve!(
-                format!("tub{k}"),
-                &[
-                    (0.0, 0.88),
-                    (0.08, 0.88),
-                    (0.088, 0.952),
-                    (0.09, 0.958),
-                    (0.077, 0.958),
-                    (0.0, 0.93)
-                ],
-                at = f.at(x, 0, 0.08),
-                material = M.steel,
-                segments = 10
+            artkit::bevel::ease(
+                revolve!(
+                    format!("tub{k}"),
+                    &[
+                        (0.0, 0.88),
+                        (0.08, 0.88),
+                        (0.088, 0.952),
+                        (0.09, 0.958),
+                        (0.077, 0.958),
+                        (0.0, 0.93)
+                    ],
+                    at = f.at(x, 0, 0.08),
+                    material = M.steel,
+                    segments = 10
+                ),
+                50.0,
+                2,
             );
             let cream = sphere!(
                 format!("cream{k}"),

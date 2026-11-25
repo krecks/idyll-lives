@@ -196,3 +196,10 @@ fn a_part_is_cut_across_and_closed() {
     assert_eq!(world.len(), 6);
     assert!(world.iter().all(|p| p.x <= 3.0 + 1e-6));
 }
+
+#[test]
+fn a_rounded_rect_with_no_corner_segments_is_still_a_rectangle() {
+    let outline = rounded_rect(1.0, 0.5, 0.1, 0);
+    assert_eq!(outline.len(), 8);
+    assert!(outline.iter().all(|p| p.0.is_finite() && p.1.is_finite()));
+}

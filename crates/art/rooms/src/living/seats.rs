@@ -1,15 +1,19 @@
 //! L2, the small seats: the recliner (it reclines), the rocking chair (it rocks), the pouf, the ottoman and the
 //! floor cushion (their tops sink in) and the bean bag (it flattens).
 
-use super::common::{Cushion, cushion, leg, panel, plain, press, round_rings, seat, settled};
+use super::common::{
+    Cushion, cushion, leg, panel, plain, press, round_rings, seat, settled, swept,
+};
 use super::{F, M};
-use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::forms::{catmull, rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, V3, cos, exp, pow, radians, sin, sqrt};
+use artkit::mesh::UvWay;
 use artkit::motion::{Rock, Squash, path, rock, squash};
 use artkit::parts::{hinged, join, measure, new_parts, turn};
 use artkit::place::Facing;
 use artkit::scene::Obj;
+use artkit::shapes::SHARP;
 use artkit::{fbox, fextrude, fsweep, jitter, loft, ring, settle, soft, sphere, sweep, swing};
 
 // The recliner: its seat and back tip back 25° about the sitter's hips and glide 8 cm forward as they do
@@ -361,21 +365,24 @@ pub fn rocking_chair() -> Vec<Obj> {
                 scale = [1.0, 0.85, 1.0]
             );
         }
-        fsweep!(
-            F,
+        let crest = [
+            (-0.245, 0.985, -0.3),
+            (-0.12, 0.996, -0.285),
+            (0.0, 1.0, -0.28),
+            (0.12, 0.996, -0.285),
+            (0.245, 0.985, -0.3),
+        ]
+        .map(|(x, y, z)| V3::from(F.at(x, y, z)));
+        let (crest, _) = catmull(&crest, 2, false);
+        swept(
             "crest",
-            &[
-                (-0.245, 0.985, -0.3),
-                (-0.12, 0.996, -0.285),
-                (0.0, 1.0, -0.28),
-                (0.12, 0.996, -0.285),
-                (0.245, 0.985, -0.3)
-            ],
-            0.0,
+            &crest,
+            &rounded_rect(0.07, 0.035, 0.014, 2),
+            &vec![1.0; crest.len()],
+            V3::Z,
+            SHARP,
+            0.004, // its ends chamfered
             M.rocker,
-            profile = rounded_rect(0.07, 0.035, 0.014, 2),
-            up = (0, 0, 1),
-            resolution = 2
         );
         fsweep!(
             F,
@@ -624,6 +631,8 @@ pub fn bean_bag() -> Vec<Obj> {
             material = M.bag
         );
         bag.edit(|o| {
+            // laid face by face (a slumped blob: laid round its upright, its dome and dent would stretch)
+            o.uv = UvWay::Box;
             // the dent the sitter has left, in front of the back
             for v in &mut o.mesh.verts {
                 let (x, y, z) = (v.x as f64, v.y as f64, v.z as f64);

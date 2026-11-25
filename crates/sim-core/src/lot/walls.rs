@@ -27,7 +27,7 @@ impl Lot {
 
     /// The walls, doors, windows, fences, gates and diagonals stored on tiles `[x0, z0, x1, z1)`
     /// (a tile holds the edges on its `-z` and `-x` sides; far edges are on the tiles one past the
-    /// lot), chunk by chunk and row by row in each: what `structure_rect` sends.
+    /// lot), chunk by chunk and row by row in each.
     pub fn walls_in(&self, [x0, z0, x1, z1]: [i32; 4]) -> Vec<(EdgeRef, Edge)> {
         let (x0, z0) = (x0.max(0) as usize, z0.max(0) as usize);
         let (x1, z1) = (

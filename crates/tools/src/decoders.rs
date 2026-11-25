@@ -24,7 +24,7 @@ pub fn main_with(_args: &[String]) -> i32 {
 }
 
 fn run() -> Result<(), String> {
-    let web = crate::characters::repo_root().join("web");
+    let web = crate::repo_root().join("web");
     let out = web.join("public").join("decoders");
     let pkg: serde_json::Value = serde_json::from_slice(
         &std::fs::read(web.join("package.json")).map_err(|e| format!("web/package.json: {e}"))?,

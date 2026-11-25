@@ -80,11 +80,12 @@ jobs:
           echo "Version $version"
 
       # Compressed asset copies (cargo assets, run by the build), cached by content
-      # hash so only changed files are encoded again.
+      # hash so only changed files are encoded again. The key lists what the copies'
+      # own keys hold (the JPEG decoder too), so a new set of copies is saved.
       - uses: actions/cache@v6
         with:
           path: web/.assets/cache
-          key: assets-rs-${{ hashFiles('crates/tools/src/assets.rs', 'crates/tools/src/assets/**', 'Cargo.lock', 'web/public/assets/**') }}
+          key: assets-rs-${{ hashFiles('crates/tools/src/assets.rs', 'crates/tools/src/assets/**', 'crates/tools/src/tex/jpeg.rs', 'crates/tools/src/tex/jpeg/**', 'Cargo.lock', 'web/public/assets/**') }}
           restore-keys: assets-rs-
 
       # wasm-opt's results (each entry keyed by its input's SHA-256, binaryen's version and the

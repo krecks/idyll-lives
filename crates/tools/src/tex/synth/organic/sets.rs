@@ -102,7 +102,8 @@ pub(super) fn earth(n: &Noise, r: &mut Rng, size: usize) -> Organic {
     c.fill(|u, v| {
         let (wu, wv) = n.warp(u, v, 0.03, 12);
         // Clods: cells of a warped Voronoi, cracked apart, each heaped unevenly.
-        let (d1, d2, ci, cj) = worley(n, wu, wv, 36, 36, 0.95, 3);
+        let w = worley(n, wu, wv, 36, 36, 0.95, 3);
+        let (d1, d2, (ci, cj)) = (w.f1, w.f2, w.cell);
         let open = smoothstep(0.45, 0.65, n.fbm(u, v, 6, 3));
         let crack = 1.0 - (1.0 - smoothstep(0.0, 0.12, d2 - d1)) * open;
         let heap = 0.5 + 0.5 * n.rand(ci, cj, 5);
@@ -355,24 +356,24 @@ pub(super) fn bark(n: &Noise, r: &mut Rng, size: usize) -> Organic {
             // Colour: grey on the weathered tops, warm brown down the walls, near black deep in.
             let drift = nk.fbm2(u, v, 3, 2, 3);
             let warm = nk.fbm2(u + 0.3, v, 5, 2, 3);
-            let mut top = mix3(
+            let mut top = mix(
                 rgb(122, 112, 96),
                 rgb(158, 154, 141),
                 smoothstep(0.35, 0.65, drift),
             );
-            top = mix3(top, rgb(120, 94, 68), 0.45 * smoothstep(0.55, 0.70, warm));
-            top = mix3(
+            top = mix(top, rgb(120, 94, 68), 0.45 * smoothstep(0.55, 0.70, warm));
+            top = mix(
                 top,
                 rgb(160, 156, 144),
                 0.35 * crown * smoothstep(0.45, 0.65, drift),
             );
-            top = scale3(top, 0.86 + 0.24 * tone);
-            let wall = mix3(rgb(22, 17, 13), rgb(84, 64, 46), smoothstep(-fw, 0.2, e));
-            let wall2 = mix3(rgb(40, 31, 24), rgb(90, 72, 54), smoothstep(-0.4, 0.15, e2));
-            let mut col = mix3(wall2, top, open2 * (0.6 + 0.4 * crown));
-            col = mix3(wall, col, open);
-            col = mix3(col, scale3(top, 0.45), 0.7 * flake * crown);
-            col = scale3(
+            top = mul(top, 0.86 + 0.24 * tone);
+            let wall = mix(rgb(22, 17, 13), rgb(84, 64, 46), smoothstep(-fw, 0.2, e));
+            let wall2 = mix(rgb(40, 31, 24), rgb(90, 72, 54), smoothstep(-0.4, 0.15, e2));
+            let mut col = mix(wall2, top, open2 * (0.6 + 0.4 * crown));
+            col = mix(wall, col, open);
+            col = mix(col, mul(top, 0.45), 0.7 * flake * crown);
+            col = mul(
                 col,
                 0.94 + 0.35 * fibre * open + 0.2 * grit + 0.3 * lump
                     - 0.25 * smoothstep(0.12, 0.0, scale) * crown,
@@ -385,17 +386,17 @@ pub(super) fn bark(n: &Noise, r: &mut Rng, size: usize) -> Organic {
                 let curl = (kr * 16.0 + 1.5 * jag).sin() * 0.5 + 0.5;
                 let kh = 0.40 - 0.22 * eye + 0.04 * curl * (1.0 - eye) + 0.04 * grit;
                 h = lerp(h, kh, inner) + 0.12 * lip * open;
-                let kc = mix3(scale3(top, 0.8), rgb(84, 66, 50), 0.3 + 0.3 * curl);
-                let kc = mix3(kc, rgb(28, 20, 15), eye);
-                col = mix3(col, scale3(kc, 0.9 + 0.4 * grit + 0.3 * fibre), inner);
+                let kc = mix(mul(top, 0.8), rgb(84, 66, 50), 0.3 + 0.3 * curl);
+                let kc = mix(kc, rgb(28, 20, 15), eye);
+                col = mix(col, mul(kc, 0.9 + 0.4 * grit + 0.3 * fibre), inner);
             }
             // Moss: streaks running down the trunk, thickest beside the fissures.
             let mp = smoothstep(0.50, 0.68, nk.fbm2(u0, v0, 4, 1, 4));
             let moss = mp * (0.35 + 0.65 * (1.0 - crown)) * (0.6 + 0.8 * fibre).clamp(0.0, 1.0);
-            col = mix3(col, scale3(rgb(80, 92, 42), 0.8 + 0.5 * grit), moss * 0.7);
+            col = mix(col, mul(rgb(80, 92, 42), 0.8 + 0.5 * grit), moss * 0.7);
             // Lichen: pale grey-green spots on the crowns.
             let lichen = smoothstep(0.62, 0.74, nk.fbm(u0, v0, 9, 4)) * crown;
-            col = mix3(col, rgb(160, 164, 146), lichen * 0.45);
+            col = mix(col, rgb(160, 164, 146), lichen * 0.45);
             let i = y * size + x;
             z[i] = h;
             cols[i] = col;
@@ -408,7 +409,7 @@ pub(super) fn bark(n: &Noise, r: &mut Rng, size: usize) -> Organic {
     let mut ao = vec![0.0; size * size];
     for i in 0..size * size {
         let o = occ[i].min(1.0);
-        let c = scale3(cols[i], 1.14 * (1.0 - 0.3 * o));
+        let c = mul(cols[i], 1.31 * (1.0 - 0.3 * o));
         img[i * 3] = to_u8(c[0]);
         img[i * 3 + 1] = to_u8(c[1]);
         img[i * 3 + 2] = to_u8(c[2]);
@@ -430,23 +431,6 @@ pub(super) fn bark(n: &Noise, r: &mut Rng, size: usize) -> Organic {
         ao,
         rough,
     }
-}
-
-pub(super) fn rgb(r: u8, g: u8, b: u8) -> [f64; 3] {
-    [r as f64 / 255.0, g as f64 / 255.0, b as f64 / 255.0]
-}
-
-pub(super) fn mix3(a: [f64; 3], b: [f64; 3], t: f64) -> [f64; 3] {
-    let t = t.clamp(0.0, 1.0);
-    [
-        lerp(a[0], b[0], t),
-        lerp(a[1], b[1], t),
-        lerp(a[2], b[2], t),
-    ]
-}
-
-pub(super) fn scale3(c: [f64; 3], k: f64) -> [f64; 3] {
-    [c[0] * k, c[1] * k, c[2] * k]
 }
 
 /// Frieze carpet (1 m a tile): twisted yarn ends, each tuft's strands splayed about a lean that

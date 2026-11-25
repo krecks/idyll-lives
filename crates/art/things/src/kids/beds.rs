@@ -1,9 +1,10 @@
 //! KD1: the kids' bed and the race car bed.
 
-use super::common::{P, mattress, moon, soft_pillow, star, teddy, turn_down, turned};
+use super::common::{P, mattress, moon, soft_pillow, star, teddy, turn_down};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{PI, TAU, cos, radians, sin};
@@ -11,15 +12,17 @@ use artkit::place::Facing;
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsweep, revolve, sphere};
 
-/// The mattress top (characters.ts BEDS.kidsBed).
+/// The mattress top (furniture.json beds.kidsBed).
 const KIDS_TOP: f64 = 0.44;
 
 /// A turned bun foot `h` tall, `r` round.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn bun(name: &str, x: f64, z: f64, h: f64, r: f64, material: Mat, segments: usize) -> Obj {
-    turned(
+    kit::turned!(
+        F,
         name,
         x,
+        0.0,
         z,
         &[
             (0.0, 0.0),
@@ -32,8 +35,7 @@ pub fn bun(name: &str, x: f64, z: f64, h: f64, r: f64, material: Mat, segments: 
             (0.0, h),
         ],
         material,
-        segments,
-        0.0,
+        segments = segments
     )
 }
 
@@ -448,6 +450,7 @@ pub fn kids_bed_car() -> Vec<Obj> {
     // an aerofoil, thick at its leading edge (u up, v back from it)
     let wing = vec![
         (0.0, 0.0),
+        (0.0016, 0.0001), // (its leading edge round)
         (0.012, 0.004),
         (0.018, 0.02),
         (0.016, 0.045),
@@ -456,6 +459,7 @@ pub fn kids_bed_car() -> Vec<Obj> {
         (-0.004, 0.05),
         (-0.006, 0.02),
         (-0.004, 0.004),
+        (-0.0012, 0.0006),
     ];
     fsweep!(
         F,

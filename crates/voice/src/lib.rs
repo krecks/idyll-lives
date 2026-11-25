@@ -88,17 +88,8 @@ impl LineInputs {
     }
 }
 
-/// The phonemizer: `line` turns a line of English into what the model and the mouth need.
-pub struct Engine {
-    g2p: G2p,
-}
-
-impl Engine {
-    pub fn new(g2p: G2p) -> Self {
-        Engine { g2p }
-    }
-
-    /// A line in a voice (clamped to what sounds right). The phonemes come from the marked-up
+impl G2p {
+    /// A line of English as the model and the mouth need it: a line in a voice (clamped to what sounds right). The phonemes come from the marked-up
     /// text, so a pronunciation fixed there shapes the mouth.
     pub fn line(&self, text: &str, voice: VoiceParams) -> LineInputs {
         let plain = plain_text(text);
@@ -111,7 +102,7 @@ impl Engine {
         }
         LineInputs {
             text: plain,
-            phonemes: self.g2p.phonemize(text),
+            phonemes: self.phonemize(text),
             voice: voice.clamped(),
         }
     }

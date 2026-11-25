@@ -1316,6 +1316,84 @@ fn a_visit_out_of_walking_reach_goes_by_taxi_there_and_back() {
     assert!(home, "A never got home");
 }
 
+/// As `a_visit_out_of_walking_reach_goes_by_taxi_there_and_back`, B's house now a place with
+/// hours, shut soon after the taxi would get A there and hours before a walk would: the order is
+/// taken, by the taxi's time. `shut_aboard`: it shuts as A rides there. Whether A rode the taxi
+/// there, and back, and got home.
+fn by_taxi_to_a_place_shutting(shut_aboard: bool) -> (bool, bool, bool) {
+    let mut w = town(
+        7,
+        &[
+            house(20, &[r#"{"name":"A","age":40,"traits":["cheerful"]}"#]),
+            house(560, &[r#"{"name":"B","age":40,"traits":["cheerful"]}"#]),
+        ],
+    );
+    run_to(&mut w, 1, 9.0);
+    let now = sim_core::clock::minute_of_day(w.tick) as u16;
+    let hours = |close| {
+        Some(sim_core::world::PlotHours {
+            open: 0,
+            close,
+            days: 0b1111111,
+        })
+    };
+    let close = (now + 1..now + 12 * 60)
+        .find(|&close| {
+            w.plots[1].hours = hours(close);
+            w.apply(sim_core::Command::Visit { sim: 0, plot: 1 })
+                .is_ok()
+        })
+        .expect("the visit is taken");
+    assert!(
+        close < now + 4 * 60,
+        "it shuts {} minutes on: a walk there could be in time",
+        close - now
+    );
+    let end = sim_core::clock::tick_at(2, 12.0 * 60.0).unwrap();
+    let (mut out, mut back, mut home) = (false, false, false);
+    while w.tick < end && !home {
+        w.tick_once();
+        let aboard = |home: bool| {
+            w.taxis.runs.iter().any(|r| {
+                r.place == Some(1)
+                    && r.home == home
+                    && r.stops
+                        .iter()
+                        .any(|s| s.sim == 0 && s.state == StopState::Aboard)
+            })
+        };
+        if shut_aboard && !out && aboard(false) {
+            w.plots[1].hours = hours(sim_core::clock::minute_of_day(w.tick) as u16);
+        }
+        out |= aboard(false);
+        back |= aboard(true);
+        let a = &w.sims[0];
+        home |= out && a.visiting.is_none() && a.pos[0] < 45.0 && w.taxi_booking(0).is_none();
+    }
+    (out, back, home)
+}
+
+#[test]
+fn a_visit_by_taxi_to_a_place_shut_before_a_walk_would_get_there_still_goes_by_it() {
+    // When the taxi's time comes A goes out to it and rides it there, not dropped for the walk
+    // (booked, no second taxi is offered, `Taxis::takes`: dropped, A was again and again as it
+    // came, and the taxi left), and A is home again by it.
+    let (out, _, home) = by_taxi_to_a_place_shutting(false);
+    assert!(out, "A never rode the taxi there");
+    assert!(home, "A never got home");
+}
+
+#[test]
+fn put_down_by_the_taxi_at_a_place_shut_meanwhile_one_goes_home_by_taxi() {
+    // The place shut as A rode there: put down at its kerb, on the way there still
+    // (`Sim::visiting`), A isn't left there with the visit dropped (no taxi back, a walk home of
+    // hours) but turns back, home by the taxi.
+    let (out, back, home) = by_taxi_to_a_place_shutting(true);
+    assert!(out, "A never rode the taxi there");
+    assert!(back, "A never rode a taxi home");
+    assert!(home, "A never got home");
+}
+
 #[test]
 fn a_guest_leaving_a_visit_early_has_the_taxi_back_brought_forward() {
     // A goes by taxi to visit B's house 540 m along the street, nobody home there: A gives the

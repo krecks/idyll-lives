@@ -105,16 +105,11 @@
  * Testing, not `chrome-headless-shell`, which draws in software). See tools/bench/README.md.
  */
 
-import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { createConnection } from 'node:net';
 import { basename, join, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { launchArgs, newWindow, playwright, ROOT, serve, SITE_STORAGE, WEB } from './lib/browser.mjs';
 import { quiet } from './quiet.mjs';
-
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 
 const [what, ...args] = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -137,7 +132,6 @@ const url = flag('url', null);
 const port = Number(flag('port', null));
 if (served && !url && !port) fail('give your own port (--port <n>, a free one) or --url of a server you started from this checkout');
 if (port === 5199) fail('5199 is the main checkout\'s server: pick a port of your own');
-const base = url ?? `http://localhost:${port}`;
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const out = flag('out', what === 'sheet' ? join(resolve(need('dir')), 'sheets') : join(ROOT, 'bench-results', `check-${stamp}`));
 mkdirSync(out, { recursive: true });
@@ -161,13 +155,9 @@ const portTaken = (p) =>
 let vite = null;
 if (served && !url) {
   if (await portTaken(port)) fail(`port ${port} is in use (someone else's server?): pick a free one`);
-  vite = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => vite.kill());
-  await new Promise((resolve, reject) => {
-    vite.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    vite.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-  });
+  vite = await serve({ port });
 }
+const base = url ?? vite?.url ?? `http://localhost:${port}`;
 
 // Fail loudly when the server can't give what the pages need: a wasm package that is missing, or
 // linked from outside the server's allowed folders (403), leaves pictures of an empty scene.
@@ -183,19 +173,11 @@ for (const [name, path, needed] of served
   if (answer !== 200) console.warn(`check: ${base}${path} answered ${answer}`);
 }
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  try {
-    return await import(createRequire(WEB + 'package.json').resolve('playwright'));
-  } catch {
-    throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
-  }
-}
 const { chromium } = await playwright();
 const launchOptions = {
   headless: !has('headed'),
   ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-  args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
+  args: launchArgs(),
 };
 /**
  * The browser keeps a profile under `bench-results/.browser/` (one per kind and port, as
@@ -359,15 +341,6 @@ function pageHelpers() {
   };
 }
 
-/** A new page in a window of its own (a kept browser's `newPage` opens a tab in its first window instead). */
-async function newWindow(context) {
-  const cdp = await context.newCDPSession(context.pages()[0]);
-  const page = context.waitForEvent('page');
-  await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
-  await cdp.detach();
-  return page;
-}
-
 /** The scripts every page of a context runs before the game's: quiet, the run's settings, the helpers. */
 async function setUp(context) {
   await context.addInitScript(quiet);
@@ -399,7 +372,7 @@ async function newPage() {
   // (A kept browser's site storage: cleared, so each page starts as a new player's would.)
   if (kept && served) {
     const cdp = await context.newCDPSession(page);
-    await cdp.send('Storage.clearDataForOrigin', { origin: new URL(base).origin, storageTypes: 'cookies,file_systems,indexeddb,local_storage,service_workers,cache_storage' });
+    await cdp.send('Storage.clearDataForOrigin', { origin: new URL(base).origin, storageTypes: SITE_STORAGE });
     await cdp.detach();
   }
   page.on('pageerror', (err) => noteError(`page error: ${err.message}`));
@@ -1483,4 +1456,4 @@ if (what === 'sheet') {
 writeFileSync(join(out, `${what}-${run}.json`), JSON.stringify(log, null, 2));
 console.log(`check: ${join(out, `${what}-${run}.json`)}`);
 await (kept ?? browser).close();
-vite?.kill();
+vite?.stop();

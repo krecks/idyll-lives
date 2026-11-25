@@ -44,7 +44,7 @@ function files(dir) {
 }
 
 /** The key of `tree`'s web/ built with `assets`. */
-export function buildKey({ tree = ROOT, assets = 'source' } = {}) {
+function buildKey({ tree = ROOT, assets = 'source' } = {}) {
   const h = createHash('sha256');
   h.update(`${RECIPE} assets=${assets}\n`);
   h.update(git(tree, ['rev-parse', 'HEAD:web']));

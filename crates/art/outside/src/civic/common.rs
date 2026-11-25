@@ -4,7 +4,7 @@
 use artkit::materials::Mat;
 use artkit::math::radians;
 use artkit::parts::{join, new_parts, set_origin};
-use artkit::place::{Coord, GameFrame, Spot};
+use artkit::place::{Coord, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fsphere, fsweep, jitter, kit_fillet, kit_tube, loft, palette, revolve};
 
@@ -97,23 +97,13 @@ palette! { M:
     vault_dark = ("#5C6168", metal),
 }
 
+pub use crate::outdoor::common::rod;
+
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, game depth (one tile deep)
+pub use artkit::kit::WALL;
 
 // Heights the content names (civic.json): kept here and checked against it.
 pub const SEAT: f64 = 0.45; // pew and waitingBench seat.height (forward 0)
-
-/// A round bar between two game points.
-pub fn rod(name: &str, a: impl Spot, b: impl Spot, r: f64, m: Mat, verts: usize) -> Obj {
-    artkit::rod!(
-        name,
-        a.through(&F),
-        b.through(&F),
-        r,
-        material = m,
-        verts = verts
-    )
-}
 
 /// A bent tube through game points, its corners rounded without overshooting.
 pub fn tube(name: &str, pts: &[(f64, f64, f64)], r: f64, m: Mat, corner: f64, verts: usize) -> Obj {
@@ -290,7 +280,8 @@ pub fn book(
             d,
             (0, 0, 0),
             cover,
-            bevel = 0.003,
+            // (2 mm: 3 met in the middle of a 6 mm board's edge, a ridge)
+            bevel = 0.002,
             bevel_segments = 1
         );
         fbox!(
@@ -347,7 +338,11 @@ pub fn open_book<X: Coord, Y: Coord, Z: Coord>(
                     .collect()
                 })
                 .collect();
-            loft!(format!("{name}_pages{s}"), &sections, material = M.page);
+            artkit::bevel::eased(loft!(
+                format!("{name}_pages{s}"),
+                &sections,
+                material = M.page
+            ));
             // the top page curving up from the spine
             fsweep!(
                 F,
@@ -379,7 +374,7 @@ pub fn open_book<X: Coord, Y: Coord, Z: Coord>(
 
 /// A small potted plant standing at game (x, y, z).
 pub fn plant(name: &str, x: f64, y: f64, z: f64, r: f64) {
-    revolve!(
+    artkit::bevel::eased(revolve!(
         format!("{name}_pot"),
         &[
             (0.0, 0.0),
@@ -392,7 +387,7 @@ pub fn plant(name: &str, x: f64, y: f64, z: f64, r: f64) {
         at = F.at(x, y, z),
         material = M.pot,
         segments = 16
-    );
+    ));
     for (k, (dx, dy, dz, s)) in [
         (0.0, 1.9, 0.0, 0.9),
         (-0.45, 1.6, 0.2, 0.7),

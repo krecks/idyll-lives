@@ -1,7 +1,7 @@
 use super::*;
 
 fn committed(file: &str) -> std::path::PathBuf {
-    crate::content::root()
+    crate::repo_root()
         .join("web/public/assets/textures/leafcards")
         .join(file)
 }

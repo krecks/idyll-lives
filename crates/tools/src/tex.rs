@@ -5,8 +5,8 @@
 //! - `materials`: writes `materials.json` in the current directory (`materials.py`), its finishes held to the
 //!   ranges real surfaces fall in (`pbr.rs`).
 //!
-//! The numbers follow numpy and Pillow step by step (float64 as numpy evaluates it, numpy's pairwise sums and
-//! Python's compensated `sum()`, Pillow's fixed-point resampling and box blur, libjpeg-turbo's decoder and
+//! The numbers follow numpy and Pillow step by step (float64 as numpy evaluates it, numpy's pairwise sums,
+//! Pillow's fixed-point resampling and box blur, libjpeg-turbo's decoder and
 //! encoder), so the outputs are the scripts' to the byte; see `pil` and `jpeg`.
 
 pub(crate) mod jpeg;
@@ -35,7 +35,7 @@ pub fn main_with(args: &[String]) -> i32 {
         ["leafcards"] => leafcards::run(None),
         ["leafcards", out] => leafcards::run(Some(out)),
         ["materials"] => {
-            finish_faults(&crate::content::root().join("web/public/assets")).and_then(|faults| {
+            finish_faults(&crate::repo_root().join("web/public/assets")).and_then(|faults| {
                 if faults.is_empty() {
                     std::fs::write("materials.json", materials_json())
                         .map_err(|e| format!("materials.json: {e}"))
@@ -101,26 +101,6 @@ pub fn np_sum(a: &[f64]) -> f64 {
 
 pub fn np_mean(a: &[f64]) -> f64 {
     np_sum(a) / a.len() as f64
-}
-
-/// Python's built-in `sum()` of floats (3.12+: Neumaier's compensated summation).
-pub fn py_fsum(items: impl IntoIterator<Item = f64>) -> f64 {
-    let mut it = items.into_iter();
-    let Some(mut f) = it.next() else { return 0.0 };
-    let mut c = 0.0f64;
-    for x in it {
-        let t = f + x;
-        if f.abs() >= x.abs() {
-            c += (f - t) + x;
-        } else {
-            c += (x - t) + f;
-        }
-        f = t;
-    }
-    if c != 0.0 && c.is_finite() {
-        f += c;
-    }
-    f
 }
 
 // --- clouds.py ------------------------------------------------------------------------------------
@@ -225,41 +205,8 @@ fn clouds(out: &Path) -> Result<(), String> {
 
 // --- detail maps ----------------------------------------------------------------------------------
 
-/// `lin`/`srgb` for the detail maps, in Python floats.
-pub fn lin(v: f64) -> f64 {
-    let c = v / 255.0;
-    if c <= 0.04045 {
-        c / 12.92
-    } else {
-        ((c + 0.055) / 1.055).powf(2.4)
-    }
-}
-
-pub fn srgb(c: f64) -> f64 {
-    if c <= 0.0031308 {
-        12.92 * c
-    } else {
-        1.055 * c.powf(1.0 / 2.4) - 0.055
-    }
-}
-
-/// The point LUT that maps greyscale to a detail map with linear mean `target`, given the histogram.
-pub fn detail_lut(hist: &[u64; 256], target: f64) -> [u8; 256] {
-    let total: u64 = hist.iter().sum();
-    let mean_lin = py_fsum(
-        hist.iter()
-            .enumerate()
-            .map(|(v, &n)| lin(v as f64) * n as f64),
-    ) / total as f64;
-    let k = target / mean_lin;
-    std::array::from_fn(|v| {
-        (srgb((lin(v as f64) * k).min(1.0)) * 255.0)
-            .round_ties_even()
-            .clamp(0.0, 255.0) as u8
-    })
-}
-
-fn to_lin(a: f64) -> f64 {
+/// sRGB (0..1) as linear light, and back.
+pub fn to_lin(a: f64) -> f64 {
     if a <= 0.04045 {
         a / 12.92
     } else {
@@ -267,7 +214,7 @@ fn to_lin(a: f64) -> f64 {
     }
 }
 
-fn to_srgb(a: f64) -> f64 {
+pub fn to_srgb(a: f64) -> f64 {
     if a <= 0.0031308 {
         12.92 * a
     } else {
@@ -369,26 +316,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lut_hits_the_target_mean() {
-        // A flat mid-grey: the LUT maps it to the sRGB value whose linear value is the target.
-        let mut hist = [0u64; 256];
-        hist[128] = 100;
-        let lut = detail_lut(&hist, 0.8);
-        assert_eq!(lut[128], (srgb(0.8) * 255.0).round() as u8);
-        assert_eq!(lut[0], 0);
-        assert_eq!(lut[255], 255);
-        assert!(lut.windows(2).all(|w| w[0] <= w[1]));
-    }
-
-    #[test]
-    fn srgb_round_trip() {
-        for v in [0.0, 10.0, 128.0, 255.0] {
-            assert!((srgb(lin(v)) * 255.0 - v).abs() < 1e-9);
-        }
-    }
-
-    #[test]
-    fn sums_like_numpy_and_python() {
+    fn sums_like_numpy() {
         let a: Vec<f64> = (0..1000)
             .map(|i| (i as f64 * 0.37).sin() * 10f64.powi(i % 9))
             .collect();
@@ -397,8 +325,6 @@ mod tests {
             let r: Vec<f64> = (0..8).map(|j| a[j] + a[j + 8]).collect();
             ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]))
         });
-        // Python's sum() is compensated: 0.1 ten times is exactly 1.0 there.
-        assert_eq!(py_fsum(std::iter::repeat_n(0.1, 10)), 1.0);
     }
 
     /// `tests/fixtures/tex/materials.json` is what materials.py wrote (but for the sky's URL, since `cargo envconv`'s `.pcenv`,
@@ -418,7 +344,7 @@ mod tests {
     /// their names say.
     #[test]
     fn finishes_are_plausible() {
-        let faults = finish_faults(&crate::content::root().join("web/public/assets")).unwrap();
+        let faults = finish_faults(&crate::repo_root().join("web/public/assets")).unwrap();
         assert!(faults.is_empty(), "{}", faults.join("\n"));
         let entries: serde_json::Value = serde_json::from_str(&materials_json()).unwrap();
         for (finish, metal, class) in [
@@ -468,10 +394,8 @@ mod tests {
         let read = |text: &str| -> serde_json::Value { serde_json::from_str(text).unwrap() };
         let ours = read(&materials_json());
         let manifest = read(
-            &std::fs::read_to_string(
-                crate::content::root().join("web/public/assets/manifest.json"),
-            )
-            .unwrap(),
+            &std::fs::read_to_string(crate::repo_root().join("web/public/assets/manifest.json"))
+                .unwrap(),
         );
         let finishes = |entries: &serde_json::Value| -> Vec<(String, serde_json::Value)> {
             entries
@@ -488,7 +412,7 @@ mod tests {
     /// clouds.py made the committed cloud layer; the port makes the same pixels.
     #[test]
     fn clouds_match_the_committed_layer() {
-        let path = crate::content::root().join("web/public/assets/textures/sky/clouds.png");
+        let path = crate::repo_root().join("web/public/assets/textures/sky/clouds.png");
         let committed = image::open(path).unwrap().to_rgba8();
         assert_eq!(committed.dimensions(), (CW as u32, CH as u32));
         assert!(committed.into_raw() == clouds_rgba());

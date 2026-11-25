@@ -2,12 +2,11 @@
 //! its stream of water (`water_on`).
 
 use super::M;
-use super::common::{
-    LATHE, Lathe, Ring, bends, bowl_shell, drain, gooseneck, lathe, pull, shaker, tube,
-};
+use super::common::{LATHE, Lathe, Ring, bends, bowl_shell, drain, gooseneck, lathe, pull, shaker};
 use crate::common::water;
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
@@ -216,15 +215,15 @@ pub fn sink_vessel() -> Vec<Obj> {
         // the stand: four tapered legs from the floor up to the vanity, a slatted shelf between them
         for x in [-0.38, 0.38] {
             for z in [-0.43, 0.01] {
-                tube(
-                    &f,
+                kit::tube!(
+                    f,
                     format!("leg{}{}", float_repr(x), float_repr(z)),
                     &[(x, 0.0, z), (x, 0.305, z)],
                     0.016,
                     M.wood,
-                    8,
-                    1,
-                    [0.7, 1.0],
+                    verts = 8,
+                    round = 1,
+                    scale = [0.7, 1.0]
                 );
             }
             fbox!(
@@ -325,7 +324,8 @@ pub fn sink_console() -> Vec<Obj> {
                 Ring::from((0.765, 0.29, 0.22, 7.0)),
                 Ring::from((0.77, 0.297, 0.227, 7.0)),
                 Ring::from((0.87, 0.3, 0.23, 7.0)),
-                Ring::from((0.88, 0.296, 0.226, 7.0)),
+                Ring::from((0.877, 0.2985, 0.2285, 7.0)), // its top edge eased
+                Ring::from((0.88, 0.2945, 0.2245, 7.0)),
                 Ring::from((0.88, 0.25, 0.168, 5.0, 0.168, bz - z)),
                 Ring::from((0.875, 0.245, 0.163, 5.0, 0.163, bz - z)),
                 Ring::from((0.83, 0.225, 0.145, 4.0, 0.145, bz - z)),
@@ -343,8 +343,8 @@ pub fn sink_console() -> Vec<Obj> {
         // the frame: each side a leg from a foot up and back under the basin to the wall, and a towel bar
         for s in [-1, 1] {
             let x = s as f64 * 0.27;
-            tube(
-                &f,
+            kit::tube!(
+                f,
                 format!("leg{s}"),
                 &bends(
                     &[(x, 0.012, 0.0), (x, 0.752, 0.0), (x, 0.752, -0.41)],
@@ -353,9 +353,8 @@ pub fn sink_console() -> Vec<Obj> {
                 ),
                 0.016,
                 M.brass,
-                10,
-                1,
-                1.0,
+                verts = 10,
+                round = 1
             );
             lathe(
                 &f,
@@ -418,7 +417,7 @@ pub fn sink_console() -> Vec<Obj> {
             M.fabric,
             profile = rounded_rect(0.4, 0.012, 0.005, 2),
             up = (1, 0, 0),
-            resolution = 2
+            resolution = 4
         );
         spout = gooseneck(
             &f,

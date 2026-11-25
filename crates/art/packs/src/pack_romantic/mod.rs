@@ -25,8 +25,8 @@ mod vanity;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_romantic",
         M.palette(),
         vec![
@@ -37,15 +37,15 @@ pub fn family() -> Option<Family> {
                 .paint(&[("body", "Body"), ("fabric", "Fabric"), ("cloth", "Tablecloth")]),
             Model::new("heartTub", dining::heart_tub, (1.865, 0.784, 1.817))
                 .key("model.romantic.heartTub")
-                .centre(-0.017, 0.004)
+                .centre(-0.0174, -0.004)
                 .motions(json!({"uses": {"petalBath": "fill"}}))
                 .paint(&[("tub", "Body"), ("cloth", "Fabric")]),
-            Model::new("vanity", vanity::vanity, (0.8, 1.64, 0.822))
+            Model::new("vanity", vanity::vanity, (0.8, 1.623, 0.369))
                 .key("model.romantic.vanity")
                 .centre(0.0, -0.019)
                 .motions(json!({"uses": {"primp": "drawer_open"}, "hold": 2.0}))
                 .paint(&[("ivory", "Body"), ("velvet", "Fabric"), ("rosegold", "Rose gold")]),
-            Model::new("gramophone", vanity::gramophone, (0.742, 1.581, 0.702))
+            Model::new("gramophone", vanity::gramophone, (0.66, 1.498, 0.546))
                 .key("model.romantic.gramophone")
                 .centre(0.041, -0.079)
                 .motions(json!({"uses": {"listen": "needle", "waltz": "needle"}, "loops": {"listen": "platter", "waltz": "platter"}}))
@@ -66,5 +66,5 @@ pub fn family() -> Option<Family> {
          moves while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the \
          gramophone's arm drops onto the turning record, the bureau's flap drops and the arbour swing sways while a \
          bloom is cut.",
-    ))
+    )
 }

@@ -3,27 +3,12 @@
 // from that file has it (its roads and pads on the land stored), unshaped (`edited` false) and kept by
 // `applyLand` while unshaped; a town laid again on it is graded into it again, not flattened. Classic worlds
 // and drafts from older code get none (they stay flat). `SLOW_TESTS=1 bun test tests/landFollow.slow.test.ts`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('a land the town follows', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { previewWorld } = await import('../src/game/townPreview');
@@ -34,12 +19,10 @@ describe('a land the town follows', async () => {
   const { generateFromSpec } = await import('../src/game/macro');
   const { CLASSIC } = await import('../src/game/world');
   const { builtSurfaceOf, ENTRY_MAX } = await import('../src/render/shared/builtSurface');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   test('a new place carries its land, graded under its town, to its town file', () => {
     const made = runTownJob(content, t, { kind: 'world', world: 'heath', seed: 4242, options: { town: 'village', villages: 'few', hills: 'hilly' } });

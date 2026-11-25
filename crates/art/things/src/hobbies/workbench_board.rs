@@ -1,9 +1,10 @@
 //! H3: the workbench's tool board and the tools hung on it.
 
 use super::M;
-use super::common::{link, rr, up_quad};
+use super::common::{link, up_quad};
 use super::workbench::BOARD_Z;
-use artkit::forms::smooth_outline;
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::math::{V3, cos, radians, sin};
@@ -303,18 +304,19 @@ pub fn tool_board(fr: &GameFrame) {
         &[(0.3, 1.08, z + 0.013), (0.3, 1.33, z + 0.013)],
         0,
         M.plank,
-        profile = rr(0.024, 0.02, 0.008, 1),
+        profile = rounded_rect(0.024, 0.02, 0.008, 1),
         up = (1, 0, 0),
         scale = [1.0, 0.85]
     );
-    fsweep!(
+    let head = fsweep!(
         fr,
         "mallet_head",
         &[(0.235, 1.36, z + 0.032), (0.365, 1.36, z + 0.032)],
         0,
         M.plank,
-        profile = rr(0.06, 0.06, 0.012, 2)
+        profile = rounded_rect(0.06, 0.06, 0.012, 2)
     );
+    bevel_edges(head, 0.004, 1, 50.0, &EdgeOrder::Corners); // its faces' edges
     revolve!(
         "tape",
         &[

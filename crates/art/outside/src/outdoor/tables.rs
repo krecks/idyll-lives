@@ -98,7 +98,7 @@ pub fn patio_table_round() -> Vec<Obj> {
         M.mosaic
     };
     // the top: a slab under the mosaic, the tiles, an iron band round its edge
-    revolve!(
+    artkit::bevel::eased(revolve!(
         "top",
         &[
             (0.0, 0.676),
@@ -111,7 +111,7 @@ pub fn patio_table_round() -> Vec<Obj> {
         material = M.mosaic,
         segments = 24,
         smooth = false
-    );
+    ));
     mosaic(
         "tiles",
         0.72,
@@ -312,10 +312,10 @@ pub fn patio_table4() -> Vec<Obj> {
 // --- the patio chair: a bent-iron frame, slatted back and a seat cushion ---------------------------------------
 pub fn patio_chair() -> Vec<Obj> {
     let (sz, r) = (0.05, 0.0125);
-    // the seat: a pan on a tube frame, a piped cushion tied on
+    // the seat: a pan on a tube frame, a piped cushion tied on, its top at 0.48 (a dining chair's 0.42-0.48)
     let ring: Vec<(f64, f64, f64)> = rounded_rect(0.44, 0.4, 0.04, 2)
         .iter()
-        .map(|&(u, v)| (u, 0.442, sz + v))
+        .map(|&(u, v)| (u, 0.412, sz + v))
         .collect();
     fsweep!(
         F,
@@ -332,7 +332,7 @@ pub fn patio_chair() -> Vec<Obj> {
         0.42,
         0.012,
         0.38,
-        (0, 0.45, sz),
+        (0, 0.42, sz),
         M.patio_green,
         bevel = 0.004,
         bevel_segments = 1
@@ -343,7 +343,7 @@ pub fn patio_chair() -> Vec<Obj> {
         0.42,
         0.05,
         0.38,
-        (0, 0.476, sz + 0.01),
+        (0, 0.446, sz + 0.01),
         M.cushion,
         round = 0.02,
         puff = 0.008,

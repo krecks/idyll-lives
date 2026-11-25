@@ -15,7 +15,7 @@ palette! { M:
     amber = ("#F6A609", gloss, glow("#FFB733")), // the arch band and the bubble tubes: lit at night
     sunny = ("#FFE29A", gloss, glow("#FFE7A8")), // the inner arch band, lit
     window = ("#5B3A8C", gloss), // the record window's back
-    grille = ("#E9D8B0", fabric), // the speaker cloth
+    grille = ("#E9D8B0", matte), // the speaker cloth (plain: the spinning label is the fourth draw it would cost)
     cards = ("#FFF2C8", gloss), // the song cards
     vinyl = ("#2B2433", gloss),
     label = ("#F6C744", gloss),
@@ -103,7 +103,7 @@ pub const STRIPES: [Mat; 6] = [
     M.stripe_violet,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
 /// The mocktail cart's top shelf's top.
@@ -194,13 +194,14 @@ pub fn bulb(f: &GameFrame, x: f64, y: f64, z: f64, k: usize, r: f64) {
         (x, y, z),
         BULBS[k % BULBS.len()],
         segments = 6,
-        rings = 4
+        rings = 3 // (a bead 3 cm across: 7 px at the play camera)
     );
 }
 
 /// A pleated curtain hanging from `y1` (its heading) down to `y0` (its hem), along `z0`..`z1` in the plane at
-/// `x` (or along x, `z0`..`z1` being x, in the plane at depth `x`: `along_x`). Its folds are shallow under the
-/// heading tape, deepen as it falls and drift a little; a turned-up hem thickens its foot.
+/// `x`, `per_fold` points across each fold (enough that no crest turns 60°, the gate's hard edge). Its folds are
+/// shallow under the heading tape, deepen as it falls and drift a little; a turned-up hem thickens its foot (to
+/// 11.5 mm, as the heading: thinner than a hard edge's 12 mm faces).
 #[allow(clippy::too_many_arguments)]
 pub fn pleats(
     f: &GameFrame,
@@ -214,52 +215,44 @@ pub fn pleats(
     amp: f64,
     mat: Mat,
     t: f64,
-    along_x: bool,
+    per_fold: usize,
 ) -> Obj {
-    let n = folds * 4;
     let h = y1 - y0;
     let rows = [
-        (y0, 1.0, 1.5, 0.0),
-        (y0 + 0.012, 1.0, 1.5, 0.02),
+        (y0, 1.0, 1.15, 0.0),
+        (y0 + 0.012, 1.0, 1.15, 0.02),
         (y0 + 0.04, 1.0, 1.0, 0.05),
         (y0 + h * 0.4, 0.92, 1.0, 0.25),
         (y1 - 0.07, 0.72, 1.0, 0.4),
-        (y1 - 0.06, 0.4, 1.3, 0.42),
-        (y1, 0.36, 1.3, 0.42),
+        (y1 - 0.06, 0.4, 1.15, 0.42),
+        (y1, 0.36, 1.15, 0.42),
     ];
-    let (mut verts, mut m) = (Vec::new(), 0);
-    for &(y, af, tf, phase) in &rows {
-        let front: Vec<(f64, f64)> = (0..=n)
-            .map(|k| {
-                (
-                    z0 + (z1 - z0) * k as f64 / n as f64,
-                    amp * af * sin(2.0 * PI * folds as f64 * k as f64 / n as f64 + phase)
-                        + t * tf / 2.0,
-                )
-            })
+    let (verts, faces) = kit::pleats!(
+        f,
+        &rows,
+        z0,
+        z1,
+        x,
+        folds,
+        amp,
+        t,
+        per_fold = per_fold,
+        along_x = false
+    );
+    // its side hems: a cord down each end, where the cloth's end is (the folds end where they start)
+    for z in [z0, z1] {
+        let down: Vec<(f64, f64, f64)> = rows
+            .iter()
+            .map(|&(y, af, _, phase)| (x + amp * af * sin(phase), y, z))
             .collect();
-        let mut ring = front.clone();
-        ring.extend(front.iter().rev().map(|&(u, o)| (u, o - t * tf)));
-        m = ring.len();
-        verts.extend(ring.iter().map(|&(u, o)| {
-            if along_x {
-                f.at(u, y, x + o)
-            } else {
-                f.at(x + o, y, u)
-            }
-        }));
-    }
-    let m = m as u32;
-    let mut faces: Vec<Vec<u32>> = Vec::new();
-    for r in 0..rows.len() as u32 - 1 {
-        let (a, b) = (r * m, (r + 1) * m);
-        faces.extend((0..m).map(|i| vec![a + i, a + (i + 1) % m, b + (i + 1) % m, b + i]));
-    }
-    let n = n as u32;
-    for base in [0, (rows.len() as u32 - 1) * m] {
-        // the top and bottom edges across the cloth's thickness
-        faces.extend(
-            (0..n).map(|k| vec![base + k, base + k + 1, base + m - 2 - k, base + m - 1 - k]),
+        kit::tube!(
+            f,
+            numbered("side_hem"),
+            &down,
+            0.0065,
+            mat,
+            verts = 6,
+            round = 1
         );
     }
     object_of!(name, &verts, &faces, &[mat], sharp = 70)

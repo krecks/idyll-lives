@@ -7,7 +7,7 @@
  *
  *   bun tools/bench/profile.mjs [options]
  *     --state family-check     a state in debug-states/ (dev server; `--url` for one already running)
- *     --speed 3                game speed (0 paused, 1..3, 4 super speed in quiet hours only)
+ *     --speed 3                game speed (0 paused, 1..3, 4 super speed: 30×, 60× in quiet hours)
  *     --secs 60 --warmup 5     measured after the warm-up
  *     --preset medium          graphics preset (low, medium, high)
  *     --renderer webgl         WebGL2 instead of WebGPU
@@ -27,6 +27,7 @@ const has = (name) => args.includes(`--${name}`);
 
 const state = flag('state', 'family-check');
 const speed = Number(flag('speed', '3'));
+if (![0, 1, 2, 3, 4].includes(speed)) throw new Error(`--speed ${flag('speed')}: the game's speeds are 0 to 4`);
 const secs = Number(flag('secs', '60'));
 const warmup = Number(flag('warmup', '5'));
 const preset = flag('preset', 'medium');
@@ -61,11 +62,12 @@ console.log(`opening ${base}/?${query} …`);
 await page.goto(`${base}/?${query}`);
 
 // The game screen is up once the interface is there and the loading screen is gone.
-await page.waitForFunction(() => document.querySelector('.hud-root') && !document.querySelector('.loading'), { timeout: 180_000, polling: 250 });
+await page.waitForFunction(() => document.querySelector('.hud-root') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 250 });
 console.log('game up; warm-up');
 await page.waitForTimeout(warmup * 1000);
 await page.keyboard.press(String(speed));
-await page.evaluate(() => window.__perfReport && (window.__profileStart = performance.now()));
+// (The report's times count from page load: what came before this is the load and the warm-up.)
+const t0 = await page.evaluate(() => performance.now());
 
 // Its own frame-gap recorder: every gap, so hitches under the game's 50 ms threshold are kept too.
 const gaps = await page.evaluate(async (ms) => {
@@ -92,10 +94,10 @@ writeFileSync(join(out, 'perf.json'), JSON.stringify({ query, state, speed, pres
 const sorted = gaps.map((g) => g.gap).sort((a, b) => a - b);
 const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
 const over = (ms) => gaps.filter((g) => g.gap >= ms).length;
-const drops = report.droppedFrames.filter((d) => d.at >= 0);
+const drops = report.droppedFrames.filter((d) => d.at >= t0);
 const phases = {};
 for (const d of drops) phases[d.phase] = (phases[d.phase] ?? 0) + 1;
-const tasks = report.longTasks;
+const tasks = report.longTasks.filter((t) => t.start >= t0);
 const taskPhases = {};
 for (const t of tasks) taskPhases[t.phase] = (taskPhases[t.phase] ?? 0) + 1;
 const worst = [...gaps].sort((a, b) => b.gap - a.gap).slice(0, 15);
@@ -122,10 +124,10 @@ const md = [
   ...report.slowest.slice(0, 20).map((e) => `- ${e.name}: ${e.ms.toFixed(0)} ms at ${(e.start / 1000).toFixed(2)} s${e.detail ? ` (${e.detail})` : ''}`),
   '',
   '## Every dropped frame',
-  ...report.droppedFrames.map((d) => `- ${d.gap.toFixed(0)} ms at ${(d.at / 1000).toFixed(2)} s (${d.phase})`),
+  ...drops.map((d) => `- ${d.gap.toFixed(0)} ms at ${(d.at / 1000).toFixed(2)} s (${d.phase})`),
   '',
   '## Every long task',
-  ...report.longTasks.map((t) => `- ${t.ms.toFixed(0)} ms at ${(t.start / 1000).toFixed(2)} s (${t.phase})`),
+  ...tasks.map((t) => `- ${t.ms.toFixed(0)} ms at ${(t.start / 1000).toFixed(2)} s (${t.phase})`),
   '',
 ];
 writeFileSync(join(out, 'report.md'), md.join('\n'));

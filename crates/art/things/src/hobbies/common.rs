@@ -1,16 +1,16 @@
 //! What the hobbies are built from: the helpers hobbies.py shared between its models.
 
 use super::M;
-pub use crate::common::{P, rr};
+pub use crate::common::P;
+use artkit::forms::rounded_rect;
 use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
-use artkit::math::{Axis, M4, P3, V3, cos, cosd, degrees, pow, radians, sin, sind};
+use artkit::math::{M4, V3, cos, cosd, degrees, pow, radians, sin, sind};
 use artkit::mesh::{Mesh, normal_newell};
 use artkit::motion::{Squash, squash};
-use artkit::parts::{join, turn};
-use artkit::place::{Coord, GameFrame};
+use artkit::place::GameFrame;
 use artkit::scene::{self, Obj};
-use artkit::{fbox, fcyl, fsweep, revolve, rod, soft, torus};
+use artkit::{fbox, fcyl, fsweep, rod, soft, torus};
 
 /// The game direction of an old part's long axis (its local y) under its `rotate`: Euler degrees (yaw y, pitch x,
 /// roll z), read as the game reads them (`quatFromEuler` in render/shared/math.ts).
@@ -66,29 +66,6 @@ pub fn link(name: &str, verts: Vec<V3>, faces: &[(Vec<u32>, u16)], materials: &[
         mesh.push_face(corners, *mat, false);
     }
     scene::add(name, mesh)
-}
-
-/// A turned piece standing at game (x, y, z): `profile` [(radius, height up), ...] from its foot, revolved.
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn turned(
-    fr: &GameFrame,
-    name: &str,
-    x: impl Coord,
-    y: f64,
-    z: impl Coord,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-    scale: P3,
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = fr.at(x, y, z),
-        material = material,
-        segments = segments,
-        scale = scale
-    )
 }
 
 /// Flat quads lying level, one mesh of two triangles each (the lines between keys, a board's squares):
@@ -150,7 +127,7 @@ pub fn sheet_music(fr: &GameFrame, name: &str, w: f64, h: f64, at: P, rot: P, de
 /// and a curved top rail and mid rail with three slats between.
 pub fn chair(fr: &GameFrame, z: f64, frame: Mat, pad: Mat, w: f64, d: f64) {
     let back = z - d / 2.0 + 0.02;
-    let post = rr(0.032, 0.032, 0.008, 1);
+    let post = rounded_rect(0.032, 0.032, 0.008, 1);
     fbox!(
         fr,
         "chair_seat",
@@ -232,7 +209,7 @@ pub fn chair(fr: &GameFrame, z: f64, frame: Mat, pad: Mat, w: f64, d: f64) {
         &top,
         0,
         frame,
-        profile = rr(0.09, 0.022, 0.01, 1)
+        profile = rounded_rect(0.09, 0.022, 0.01, 1)
     );
     let mid: Vec<P> = xs.iter().map(|&x| (x, 0.62, bow(x))).collect();
     fsweep!(
@@ -241,7 +218,7 @@ pub fn chair(fr: &GameFrame, z: f64, frame: Mat, pad: Mat, w: f64, d: f64) {
         &mid,
         0,
         frame,
-        profile = rr(0.035, 0.02, 0.006, 1)
+        profile = rounded_rect(0.035, 0.02, 0.006, 1)
     );
     for k in [-1, 0, 1] {
         let x = k as f64 * 0.1;
@@ -261,7 +238,7 @@ pub fn chair(fr: &GameFrame, z: f64, frame: Mat, pad: Mat, w: f64, d: f64) {
 /// legs joined by a foot ring.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn stool(fr: &GameFrame, z: f64, top: f64, r: f64, legs: Mat, seat: Mat, x: f64) {
-    turned(
+    kit::turned!(
         fr,
         "stool_seat",
         x,
@@ -276,8 +253,7 @@ pub fn stool(fr: &GameFrame, z: f64, top: f64, r: f64, legs: Mat, seat: Mat, x: 
             (0.0, 0.04),
         ],
         seat,
-        20,
-        P3::ONE,
+        segments = 20
     );
     for k in 0..4 {
         let a = (45 + 90 * k) as f64;
@@ -304,22 +280,6 @@ pub fn stool(fr: &GameFrame, z: f64, top: f64, r: f64, legs: Mat, seat: Mat, x: 
         major_segments = 20,
         minor_segments = 4
     );
-}
-
-/// Turns a model built in place half a turn about the footprint's middle (each part about its own origin, which
-/// moves round with it), then moves it `forward` m to the front. A part's clips then open the other way.
-pub fn turn_round(objs: &[Obj], forward: f64) {
-    for &o in objs {
-        turn(o, 180.0, Axis::Z);
-        o.edit(|p| {
-            p.loc = V3::new(-p.loc.x, (-(p.loc.y as f64) - forward) as f32, p.loc.z);
-        });
-    }
-}
-
-/// Joins an instrument built upright (its foot at the origin) into one part, its origin at its foot.
-pub fn upright(parts: &[Obj], name: &str) -> Obj {
-    join(parts, name, Some(P3::ZERO))
 }
 
 /// Leans an upright instrument back by `degrees` and stands its foot at game `foot`. The lean is the node's turn,

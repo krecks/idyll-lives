@@ -5,7 +5,7 @@
 //! The parts are placed in game axes (`F`, no shift), where the game places it; a desk's top is the content's
 //! `surface` height (`DT`, 0.75 for the plain desks, 1.05 standing). Backs against the wall stop at its face (game
 //! depth -0.43, -0.93 two tiles deep). The computer, writing, laptop and gaming desks keep the old part's chair in
-//! the back half (`characters.ts` SEATS: seat 0.44, 17 cm back), facing the desk, as residents sit there. Moving
+//! the back half (furniture.json `seats`: seat 0.44, 17 cm back), facing the desk, as residents sit there. Moving
 //! parts:
 //! - the standing and computer desks' keyboard shelf slides out to the resident while they type (`tray_out`);
 //! - the writing desk's drawer slides out as they sit down to write (`drawer_open`, shut after 2.5 s);
@@ -104,17 +104,17 @@ palette! { M:
 }
 
 const F: GameFrame = GameFrame::new(0.0);
-const WALL: f64 = -0.43; // the wall's face, game depth (one tile deep)
+use artkit::kit::WALL;
 const DT: f64 = 0.74; // the second catalogue's desk top
 const FT: f64 = 0.7525; // the plain desks' top (content surface 0.75)
-const CHAIR_Z: f64 = -0.17; // where a desk's own chair stands (characters.ts SEATS fwd)
+const CHAIR_Z: f64 = -0.17; // where a desk's own chair stands (furniture.json `seats` fwd)
 
 const DESK: [(&str, &str); 2] = [("frame", "Frame"), ("drawers", "Drawers")];
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let swivel = json!({"uses": {"sit": "swivel", "write": "swivel", "homework": "swivel"}, "hold": 0.6, "ride": "swivel"});
-    Some(Family::new(
+    Family::new(
         "office",
         M.palette(),
         vec![
@@ -122,7 +122,7 @@ pub fn family() -> Option<Family> {
                 .key("model.deskSimple")
                 .centre(0.0, -0.085)
                 .paint(&[("oak", "Top"), DESK[0], DESK[1]]),
-            Model::new("deskCorner", catalog_desks::desk_corner, (1.86, 1.009, 1.86))
+            Model::new("deskCorner", catalog_desks::desk_corner, (1.86, 0.742, 1.86))
                 .key("model.deskCorner")
                 .paint(&[
                     ("laminate", "Top"),
@@ -130,7 +130,7 @@ pub fn family() -> Option<Family> {
                     ("drawers", "Drawers"),
                     ("chair", "Chair"),
                 ]),
-            Model::new("deskStanding", catalog_desks::desk_standing, (0.96, 1.54, 0.63))
+            Model::new("deskStanding", catalog_desks::desk_standing, (0.96, 1.05, 0.63))
                 .key("model.deskStanding")
                 .centre(0.0, -0.115)
                 .motions(json!({"uses": {"browse": "tray_out", "code": "tray_out"}}))
@@ -146,7 +146,7 @@ pub fn family() -> Option<Family> {
                     ("inlay", "Desk pad"),
                 ]),
             // its own size: the monitor, the things on it and the chair at it are not measured
-            Model::new("computerDesk", desks::computer_desk, (1.54, 0.752, 0.391))
+            Model::new("computerDesk", desks::computer_desk, (1.54, 0.752, 0.5))
                 .key("model.computerDesk")
                 .centre(0.0, 0.0142)
                 .motions(json!({"uses": {"code": "tray_out", "write": "tray_out", "markets": "tray_out", "browse": "tray_out", "homework": "tray_out"}}))
@@ -158,7 +158,7 @@ pub fn family() -> Option<Family> {
                     ("chair", "Chair"),
                 ]),
             // its own size: the chair drawn at it and what lies on it are not measured (a desk is 0.75 m tall)
-            Model::new("deskWriting", desks::desk_writing, (1.54, 0.752, 0.433))
+            Model::new("deskWriting", desks::desk_writing, (1.54, 0.752, 0.5))
                 .key("model.deskWriting")
                 .centre(0.0, 0.0142)
                 .motions(json!({"uses": {"write": "drawer_open", "homework": "drawer_open"}, "hold": 2.5}))
@@ -222,5 +222,5 @@ pub fn family() -> Option<Family> {
          costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's \
          drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the \
          chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
-    ))
+    )
 }

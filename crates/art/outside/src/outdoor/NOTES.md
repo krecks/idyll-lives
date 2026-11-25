@@ -8,8 +8,8 @@ stay where the game has them; models that stand off the middle of their footprin
 ends and bent tubes in one piece, shaped and rounded boards, soft piped cushions, lofted cups, jugs, bottles and a
 basket, a parasol canopy sagging between its ribs, a mosaic of proud tiles, extruded stones and wedges. The common
 pieces (chairs, benches, tables, the parasol) keep to about half their size class's target: the town overview draws
-every lot's outdoor objects whole, and these have no far version. Helpers (`common.rs`): `bent` (`kit::fillet!` + `kit::tube!`), `bar` (a
-rounded-rect section swept), `plank` (an outline placed like a board), `side_slab`, `slab`, `cup`, `jug`,
+every lot's outdoor objects whole, and these have no far version. Helpers (`common.rs`, `rod` and `bent` the yard's and the civic family's too): `bent` (`kit::fillet!` +
+`kit::tube!`), `bar` (a rounded-rect section swept), `plank` (an outline placed like a `kit::board`), `side_slab`, `slab`, `cup`, `jug`,
 `bottle`, and `jitter`, which wobbles with `noise()` so a jittered model is the same on every run (in Blender the
 shared jitter was not: the fire pit's centre moved 2 mm and failed the size check); `mosaic` (`tables.rs`),
 `cast_end` (`seats.rs`), `flame` and `log` (`fire.rs`).
@@ -107,7 +107,7 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
   on the pillow and the feet inside the spreader bar. A changed sling needs those numbers changed too; the two pack
   hammocks have theirs.
 - **Porch swing** (`porchSwing`): an A-frame; the slatted seat with arms, cushion (its top 0.52 m, the content's
-  `seat`; 5 cm lower than it was) and chains swings from the beam,
+  `seat`, `PORCH_SEAT`, a test holds them together; 5 cm lower than it was; until 2026-11-25 the top was 0.505) and chains swings from the beam,
   `swing` ±10° in 2 s while sat in, ridden. Chains are plain satin, so the seat stays one draw call.
 - **Swing set** (`swingSet`): a round-timber A-frame, its legs splayed ±0.72 m at the foot (2 × 2 tiles; it was
   ±0.42 on 2 × 1, too upright for seats swinging 20°); both seats and their chains are one part, `swing` ±20° in
@@ -200,3 +200,19 @@ The game draws the cook's food on the grate and what they carried out beside it 
 ## The soft forms pass (2026-11-13)
 
 The hammock's pillow is sewn flat and stuffed (its sides drawn in 1.2 cm between corners that stand out, `waist`); the sun lounger's pad and pillow are left unpinched and the pillow whole, their top edge being the lounger's highest point. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `hammock`, `patioChair`, `porchSwing`, `sunLounger`; 8,608 to 9,374 triangles.
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 58 (patio set 45, swing set 4, picnic table, grill station and fire pit 2, the round table,
+bar and grill 1); none now, none accepted. The bistro chairs' seat slats take the 4 mm chamfer the table's have and
+their back slats `artkit::bevel::eased` (a 4 mm chamfer on turns over 50°); the grills' and fire pit's revolves, sweeps,
+lofts and extrusions that named no bevel are eased, as are the hood's slabs (`across`), every `slab` top, the round
+table's top, the picnic basket and the swing seats. The jug's lip rounds over in two more rings (no bevel builds on
+its spout) and the kettle's ash catcher's rim is 11 mm (15 mm read as a cut edge).
+
+Sizes (`cargo review sizes`): the patio chair's seat pan and cushion sit 3 cm lower, the cushion's top at 0.48 (a
+dining chair's 0.42-0.48; content `seat` 0.49 → 0.47); the picnic table's basket is carried (`aside`), so the table
+measures 0.834 m, not the basket's 1.058 (`finish` joins all but what is aside).
+
+Draw calls: the hot tub stays at 4 (the tub, its water bubbling, and the cover's two halves folding: four parts
+that move apart), reported to the owner.

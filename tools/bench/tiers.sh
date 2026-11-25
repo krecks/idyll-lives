@@ -58,8 +58,8 @@ for l in "${labels[@]}"; do
   else
     bin=$out/bins/$name
     echo "building the benchmark as $name"
-    built=$(cargo test --release --locked -p sim-core --test big_world ${FEATURES:+--features $FEATURES} --no-run --message-format=json 2>/dev/null |
-      grep -o '"executable":"[^"]*big_world[^"]*"' | tail -1 | cut -d'"' -f4)
+    built=$(cargo test --release --locked -p sim-core --test big_world ${FEATURES:+--features $FEATURES} --no-run --message-format=json |
+      grep -o '"executable":"[^"]*big_world[^"]*"' | tail -1 | cut -d'"' -f4 || true)
     [ -n "$built" ] || { echo "the benchmark didn't build" >&2; exit 1; }
     cp "$built" "$bin"
   fi

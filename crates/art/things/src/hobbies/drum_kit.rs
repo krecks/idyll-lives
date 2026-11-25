@@ -37,7 +37,7 @@ pub fn drum_kit() -> Vec<Obj> {
             (0, ky, kz),
             M.shell,
             rot = (90, 0, 0),
-            verts = 32
+            verts = 24
         );
         for (k, z) in [kz - 0.2, kz + 0.2].into_iter().enumerate() {
             fcyl!(
@@ -48,7 +48,7 @@ pub fn drum_kit() -> Vec<Obj> {
                 (0, ky, z),
                 M.head,
                 rot = (90, 0, 0),
-                verts = 28,
+                verts = 24,
                 smooth = false
             );
             torus!(
@@ -70,7 +70,7 @@ pub fn drum_kit() -> Vec<Obj> {
             (0, ky, kz + 0.2045),
             M.shell,
             rot = (90, 0, 0),
-            verts = 24,
+            verts = 16,
             smooth = false
         );
         fbox!(
@@ -90,7 +90,7 @@ pub fn drum_kit() -> Vec<Obj> {
             (0.13, ky - 0.1, kz + 0.2045),
             M.seat,
             rot = (90, 0, 0),
-            verts = 16,
+            verts = 12,
             smooth = false
         );
         for k in 0..8 {
@@ -399,7 +399,6 @@ pub fn drum_kit() -> Vec<Obj> {
             (0.2, 0.5),
             (0.185, 0.513),
             (0.13, 0.52),
-            (0.0, 0.521),
         ];
         let sections: Vec<Vec<P3>> = rings
             .iter()
@@ -419,7 +418,7 @@ pub fn drum_kit() -> Vec<Obj> {
     });
     join(&still, "body", Some(P3::ZERO));
     let c = new_parts(|| {
-        cymbal(&f, "crash", 0.2, CRASH, (-14.0, 10.0, 0.0), 22);
+        cymbal(&f, "crash", 0.2, CRASH, (-14.0, 10.0, 0.0), 20);
         fcyl!(
             f,
             "crash_felt",
@@ -441,7 +440,7 @@ pub fn drum_kit() -> Vec<Obj> {
     });
     let crash = hinged(join(&c, "crash", None), f.at(CRASH.0, CRASH.1, CRASH.2));
     let r = new_parts(|| {
-        cymbal(&f, "ride", 0.25, RIDE, (-10.0, -8.0, 0.0), 32);
+        cymbal(&f, "ride", 0.25, RIDE, (-10.0, -8.0, 0.0), 26);
         fcyl!(
             f,
             "ride_felt",

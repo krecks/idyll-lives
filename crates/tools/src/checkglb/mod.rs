@@ -45,8 +45,6 @@ use py::{
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::f64::consts::PI;
 
-pub use py::repr_str as py_repr_str;
-
 /// Triangles at full detail by the model's largest side (m): (up to, target, most). About the
 /// primitive parts' median and 90th percentile in each class, so a model costs what the
 /// primitive models cost today (docs/design/objects.md, "Budgets").
@@ -56,7 +54,8 @@ const TRIANGLES: [(f64, i64, i64); 4] = [
     (2.5, 8000, 16000),
     (f64::INFINITY, 12000, 24000),
 ];
-/// Draw calls per model (each its own in the sun's shadow map too): aim for 1-3.
+/// Draw calls per model (each its own in the sun's shadow map too): aim for 1-3 for the still model, one more for
+/// each moving part, glass and lone metal hardware (`draws_aimed`), at most 4 (a pack entry's `draws` more).
 const DRAWS: (usize, usize) = (3, 4);
 /// Extensions the game's loader can read (no Draco: its decoder isn't shipped).
 const EXTENSIONS: [&str; 7] = [

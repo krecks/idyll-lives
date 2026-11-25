@@ -17,7 +17,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { PRESETS, SAMPLE_RATE, STYLE_IDS, engine, medianPitch, phonemizer, synthesizeLine } from './engine.mjs';
+import { PRESETS, SAMPLE_RATE, STYLE_IDS, engine, medianPitch, phonemizer, say } from './engine.mjs';
 
 const LINES = [
   'Hello there!',
@@ -74,7 +74,6 @@ function centroid(x) {
 
 const first = await engine();
 const second = await engine();
-const say = async (e, text, voice) => (await synthesizeLine(e, text, voice)).samples;
 
 /** Same samples twice in one engine and once in a fresh one; prints the time. */
 async function steady(label, line, voice) {
@@ -125,7 +124,7 @@ const ada = await say(first, line, { ...plain, style: 'F1' });
 const large = await say(first, line, { ...plain, style: 'F1', depth: 0.88 });
 if (!(centroid(large) < centroid(ada) * 0.95)) fail(`a larger voice should sound darker (${centroid(ada).toFixed(0)} Hz to ${centroid(large).toFixed(0)} Hz)`);
 if (Math.abs(large.length - ada.length) > 0.05 * ada.length) fail('depth should not change the timing');
-if (phonemizer.line('…', 1, 1, 1).text !== '') fail('text without words should give nothing to say (the worker then skips the model)');
+if (phonemizer.line('…', 1, 1).text !== '') fail('text without words should give nothing to say (the worker then skips the model)');
 if ((await say(first, '', ARLO)).length !== 0) fail('empty text should give no samples');
 // Trimmed: speech starts within 0.1 s.
 const peak = base.reduce((m, x) => Math.max(m, Math.abs(x)), 0);

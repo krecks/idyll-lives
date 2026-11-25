@@ -385,14 +385,15 @@ fn build(name: &str) -> Obj {
             10,
             6,
         ),
+        // (Blender's scale is the object's, the kernel's in its mesh: the noise is laid before either)
         "boulder" => boulder!(
             "rock",
             0.4,
             at = (0.1, 0.1, 0),
             material = M.body,
-            seed = 3.0,
-            scale = (1.2, 1.0, 0.7)
-        ),
+            seed = 3.0
+        )
+        .set_scale((1.2, 1.0, 0.7)),
         "joined" => joined(),
         "joined_settled" => {
             let o = joined();

@@ -13,7 +13,8 @@ things, seen from far: every model has a far version (`.far_ratio(0.25)`; the ch
 ## The moving ones
 
 - **Seesaw** (3 × 1 tiles): a 2.5 m plank on a blue A-frame stand, rubber bumpers under its ends. The content's two
-  slots fall at x = ±0.75 m (3 m wide, 2 slots) at 0.56 m: the seats are there, level at rest. The plank, its seats
+  places are at x = ±0.78 m (`SEAT_X`; a test holds them to it) at 0.56 m: the seats are there, level at rest, the
+  handles 0.28 m in from them (2026-11-25; they were at ±0.75, the slots' spread). The plank, its seats
   and handles are one part (`plank`) turning about the axle (0.46 m up). `seesaw` rocks it ±12° in 1.4 s (`rock`
   about the build axes' y), so the low end just meets its bumper. `motions`: `{"loops": {"seesaw": "seesaw"}, "ride":
   "seesaw"}`.
@@ -122,3 +123,11 @@ cargo art playground --preview  # previews/playground/<id>.png, <id>@<clip>.png,
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `basketballHoop`, `seesaw`, `springRider`; the same triangles.
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 44 (climbing frame 24, slide 11, hoop 6, spring rider 2, merry-go-round 1); none now, none
+accepted. `mesh` eases what it builds flat (`artkit::bevel::eased`: a 4 mm chamfer on turns over 50°), so the slide's
+chute; the frames' boards (`board`) are eased and lay their wood's UVs a box a face (along the sweep, the chamfers had
+none: `texels`), as the climbing frame's posts do (the kernel lays a box's UVs on its chamfered mesh); the hoop's board frame, the slide's porthole
+panels, the spring rider's plates and the roundabout's centre disc are eased.

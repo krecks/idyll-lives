@@ -9,11 +9,10 @@
 //! fewer faces. Small, separate parts (flowers, leaves, a bale's twine) are better built low: decimating shrinks
 //! thin parts and takes their detail first.
 
-use crate::decimate;
+use crate::decimate::{self, cross, dot, sub};
 use crate::math::{M4, V3};
-use crate::mesh::{Mesh, edge as mesh_edge};
+use crate::mesh::Mesh;
 use crate::scene::{self, Obj};
-use std::collections::BTreeSet;
 
 /// `full` detail, or `reduced` while a far version is being built.
 pub fn low<T>(full: T, reduced: T) -> T {
@@ -49,15 +48,10 @@ pub const EDGE: f64 = 0.003;
 ///   model's, laid on its faces (a fluted shaft brought down to a few sides is neither smooth nor round any
 ///   more: shaded by its own faces it is crumpled, and dark in its folds).
 ///
-/// The model stands on the floor (`decimated_on` for one that does not). Returns `obj`.
+/// The model stands on the floor. Returns `obj`.
 pub fn decimated(obj: Obj, ratio: f64, feet: f64, edge: f64) -> Obj {
-    decimated_on(obj, ratio, feet, edge, true)
-}
-
-/// `decimated` for a model the floor shades the foot of (`ground`) or not.
-pub fn decimated_on(obj: Obj, ratio: f64, feet: f64, edge: f64, ground: bool) -> Obj {
     // the model's shading, baked on it whole: what its far version keeps
-    crate::shade::bake_ao(&[obj], None, ground);
+    crate::shade::bake_ao(&[obj], None, true);
     let (name, faces, turned) = obj.edit(|o| {
         let turned = decimate(&mut o.mesh, ratio, feet, edge);
         (o.name.clone(), o.mesh.faces.len(), turned)
@@ -74,7 +68,7 @@ pub fn decimate(mesh: &mut Mesh, ratio: f64, feet: f64, edge: f64) -> usize {
     // corners' frames): what the collapses carry
     mesh.normals = Some(crate::normals::corner_normals(mesh));
     mesh.stored = None;
-    merge_doubles(mesh, 1e-5);
+    mesh.remove_doubles(1e-5);
     let faces = mesh.triangle_verts();
     let reference = Surface::new(
         faces
@@ -173,97 +167,6 @@ pub fn locks(mesh: &Mesh, feet: f64, edge: f64) -> Vec<bool> {
         .collect()
 }
 
-/// `bmesh.ops.remove_doubles` on a mesh that has what a joined one has: the points within `dist` of one another
-/// become one, a face that loses a side by it loses a corner (or goes, under three, or as another face's double),
-/// and the corners left keep their UVs and normals, the edges left their sharpness, the points their shading.
-fn merge_doubles(mesh: &mut Mesh, dist: f32) {
-    let target = crate::weld::doubles(&mesh.verts, dist);
-    let to = |v: u32| match target[v as usize] {
-        t if t >= 0 => t as u32,
-        _ => v,
-    };
-    if (0..mesh.verts.len() as u32).all(|v| to(v) == v) {
-        return;
-    }
-    let mut index = vec![u32::MAX; mesh.verts.len()];
-    let mut out = Mesh {
-        mats: mesh.mats.clone(),
-        uv_metres: mesh.uv_metres,
-        ..Mesh::default()
-    };
-    let mut kept_points = Vec::new();
-    for v in 0..mesh.verts.len() {
-        if to(v as u32) == v as u32 {
-            index[v] = out.verts.len() as u32;
-            out.verts.push(mesh.verts[v]);
-            kept_points.push(v);
-        }
-    }
-    let per_point = |have: &Option<Vec<f32>>| {
-        have.as_ref()
-            .map(|h| kept_points.iter().map(|&v| h[v]).collect::<Vec<f32>>())
-    };
-    out.card_shade = per_point(&mesh.card_shade);
-    out.ao = per_point(&mesh.ao);
-    let sorted = |c: &[u32]| {
-        let mut key = c.to_vec();
-        key.sort_unstable();
-        key
-    };
-    // the faces no merge touches are there first: one that becomes the double of any of them goes
-    let mut seen: BTreeSet<Vec<u32>> = BTreeSet::new();
-    for f in 0..mesh.faces.len() {
-        let c = mesh.corners(f);
-        if c.iter().all(|&v| to(v) == v) {
-            seen.insert(sorted(
-                &c.iter().map(|&v| index[v as usize]).collect::<Vec<_>>(),
-            ));
-        }
-    }
-    let mut corners: Vec<usize> = Vec::new();
-    for f in 0..mesh.faces.len() {
-        let face = mesh.faces[f];
-        let c: Vec<u32> = mesh.corners(f).iter().map(|&v| to(v)).collect();
-        let changed = mesh.corners(f).iter().zip(&c).any(|(a, b)| a != b);
-        // a corner whose side has closed up goes: the one before the side
-        let kept: Vec<usize> = (0..c.len())
-            .filter(|&i| c[i] != c[(i + 1) % c.len()])
-            .collect();
-        let verts: Vec<u32> = kept.iter().map(|&i| index[c[i] as usize]).collect();
-        let distinct: BTreeSet<u32> = verts.iter().copied().collect();
-        if verts.len() < 3 || distinct.len() != verts.len() {
-            continue;
-        }
-        if changed && !seen.insert(sorted(&verts)) {
-            continue;
-        }
-        out.push_face(&verts, face.mat, face.smooth);
-        corners.extend(kept.iter().map(|&i| face.start as usize + i));
-    }
-    out.uvs = mesh
-        .uvs
-        .as_ref()
-        .map(|uv| corners.iter().map(|&l| uv[l]).collect());
-    out.normals = mesh
-        .normals
-        .as_ref()
-        .map(|n| corners.iter().map(|&l| n[l]).collect());
-    let mut left: BTreeSet<(u32, u32)> = BTreeSet::new();
-    for f in 0..out.faces.len() {
-        let c = out.corners(f);
-        for i in 0..c.len() {
-            left.insert(mesh_edge(c[i], c[(i + 1) % c.len()]));
-        }
-    }
-    for &(a, b) in &mesh.sharp {
-        let e = mesh_edge(index[to(a) as usize], index[to(b) as usize]);
-        if e.0 != e.1 && left.contains(&e) {
-            out.sharp.insert(e);
-        }
-    }
-    *mesh = out;
-}
-
 /// Turns each of `mesh`'s triangles that the collapses turned round: one that faces against the `reference`
 /// surface nearest its middle, and against the way it faced itself before (`was`: a triangle on a slat or a pane
 /// thinner than its vertices moved is nearer the other side's faces, and is as it should be). How many. One of
@@ -315,22 +218,6 @@ fn turn_back(mesh: &mut Mesh, was: &[[f64; 3]], reference: &Surface) -> usize {
 
 /// Reference faces this much further (m) than the nearest are as near.
 const SAME_PLACE: f64 = 1e-5;
-
-fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
 
 /// The point of the triangle `t` nearest `p`.
 fn nearest_on(p: [f64; 3], t: &[[f64; 3]; 3]) -> [f64; 3] {

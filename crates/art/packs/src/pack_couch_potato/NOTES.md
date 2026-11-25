@@ -12,7 +12,7 @@ The screens the residents watch (the cinema's, the console's) stand on the wall 
 seats in front of them, the sitters facing the object's back (content `"seat": {"height": 0.45, "forward": 0.05,
 "facing": "back"}` for the cinema, `"forward": 0.12` for the console, as the piano and the writer's bureau). Each is
 built as the old part first stood (the seats at the back, the screen at the front edge facing them, its oak back to
-the room) and turned round (`turn_round`), so its oak back is on the wall and the console's tray slides out the other
+the room) and turned round (`kit::turn_round`), so its oak back is on the wall and the console's tray slides out the other
 way (+Z game, towards the players); the old parts were turned the same way. The cinema's hips stay where they were on its seats (0.05 is the old 0 turned round);
 the console's sit 8 cm further back than before, against the loveseat's back, so the knees stay under the shelf.
 
@@ -100,3 +100,22 @@ cargo art pack_couchPotato --preview  # previews/pack_couchPotato/<id>.png, <id>
 ## The soft forms pass (2026-11-13)
 
 The recliner's head pillow and the game console's pillow are sewn flat and stuffed (`waist`), `resting`; the lava lamp's pouf top and lean, turned on the tile, are left unpinched (their corners are the model's outermost points). Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 6 models changed shape: `cinemaWall`, `fitnessGame`, `gameConsole`, `lavaLamp`, `recliner`, `snackFridge`; 25,832 to 26,548 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate found (41) is gone:
+- **Cinema wall:** the seats' plinths bevelled; the curtains' hem and heading 11.5 mm thick (thinner than a hard
+  edge's faces) with a corded side hem down each end; the speaker drivers' surround rolled over in two turns; the
+  front cushions, back rolls, arm pads and console lid `resting` (7,976 triangles).
+- **Pixel Arcade console:** the swept arms' ends eased.
+- **Recliner:** the arm's roll ends tangent to the panel's inside face (it tucked under into a lip), the swept ends
+  eased, the throw's thin edges rounded in two steps, the cup's rim eased; the folded footrest 1 cm further forward,
+  so the chair is 0.77 m deep (a recliner's 0.85 less 10 %).
+- **Snack fridge:** the crisp bowl's rim rolled over.
+- **Lava lamp:** the pouf and its rug set aside (`aside`, as a desk's chair): it measures as the lamp on its table,
+  0.26 × 1.16 × 0.26 m. It keeps 4 draw calls: the rising wax (played by a use) and the drifting wax (always) are
+  parts of their own, besides the glass vessel on the still body.
+
+The workout game's step mat and kettlebell on the floor before it are `aside` (`floor`), and so is the balance board
+that rocks on the mat, a moving part (`board_aside`, still tilted by `board`): it measures 0.80 × 1.16 × 0.30 m, the
+stand (`tvOnStand`, 0.30–0.55 deep). No draw call more (2026-11-25).

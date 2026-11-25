@@ -55,12 +55,11 @@ palette! { M:
     towel = ("#F4EFE2", satin),
     amp = ("#E4E1DA", satin),
     speaker = ("#3A3D41", satin),
-    soil = ("#4A3A2E", matte),       // the cushion's plant pot and the cactus's
     ash = ("#8E8A84", matte),        // the incense's ash
 }
 
 /// A ring of Blender points of radius `r` at height `y`, in and out `depth` (a fraction) `flutes` times round: the
-/// pleats of a zafu, the ribs of a cactus.
+/// pleats of a zafu, the ribs of a cactus, the kind pack's wicker basket and planter.
 pub fn fluted(r: f64, y: f64, verts: usize, at: (f64, f64), flutes: i32, depth: f64) -> Vec<P3> {
     (0..verts)
         .map(|k| {

@@ -91,4 +91,6 @@ fn crown(tree: &mut Tree) {
         material = p.get("leaf4"),
         verts = low(8, 5)
     );
+    // (the sprays a box a face: along their path, a bent spray stretched the needles over 2x)
+    artkit::uv::box_named(&["spray"]);
 }

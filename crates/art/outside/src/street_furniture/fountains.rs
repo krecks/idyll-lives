@@ -48,7 +48,7 @@ pub fn drinking_fountain() -> Vec<Obj> {
             .map(|&(r, y)| fluted(r, y, 16, 0.06, 3, 0.0))
             .collect();
         loft!("pillar", &secs, material = m.body);
-        revolve!(
+        artkit::bevel::eased(revolve!(
             "capital",
             &[
                 (0.0, 0.775),
@@ -62,7 +62,7 @@ pub fn drinking_fountain() -> Vec<Obj> {
             ],
             material = m.body,
             segments = 24
-        );
+        ));
         // the bowl: a dish with a rolled lip, falling to the drain
         revolve!(
             "bowl",
@@ -355,7 +355,7 @@ pub fn fountain_town() -> Vec<Obj> {
         );
         // the fountain: a moulded foot, a fluted column, the wide lower bowl gadrooned underneath with a rolled lip, a
         // stem, the small top bowl and a knob
-        revolve!(
+        artkit::bevel::eased(revolve!(
             "foot",
             &[
                 (0.0, 0.3),
@@ -370,7 +370,7 @@ pub fn fountain_town() -> Vec<Obj> {
             ],
             material = stone,
             segments = 24
-        );
+        ));
         revolve!(
             "column_base",
             &[
@@ -451,7 +451,7 @@ pub fn fountain_town() -> Vec<Obj> {
             material = stone,
             segments = 14
         );
-        revolve!(
+        artkit::bevel::eased(revolve!(
             "top_bowl",
             &[
                 (0.0, 1.84),
@@ -464,7 +464,7 @@ pub fn fountain_town() -> Vec<Obj> {
             ],
             material = stone,
             segments = 24
-        );
+        ));
         let secs: Vec<_> = [(0.085, 1.852), (0.16, 1.895), (0.225, 1.945)]
             .iter()
             .map(|&(r, y)| lobed(r, y, 12, 0.14, 2))
@@ -551,7 +551,7 @@ pub fn fountain_town() -> Vec<Obj> {
             let a = 22.5 + (45 * k) as f64;
             let (x, z) = (0.73 * cosd(a), 0.73 * sind(a));
             // a crown of spray: a low ring flaring up round where the stream lands
-            revolve!(
+            artkit::bevel::eased(revolve!(
                 format!("splash{k}"),
                 &[
                     (0.0, -0.02),
@@ -563,7 +563,7 @@ pub fn fountain_town() -> Vec<Obj> {
                 at = f.at(x, WATER_Y, z),
                 material = m.spray,
                 segments = 8
-            );
+            ));
         }
     });
     let splash = hinged(join(&splashes, "splash", None), f.at(0, WATER_Y, 0));

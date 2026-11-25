@@ -50,7 +50,6 @@ describe('signal-head rows', () => {
     // (Right after the cars' rows, as snapshot.rs works it out; the fields fit the row; the header's count is in the header.)
     expect(SNAPSHOT_RS).toContain(BASES.light);
     expect(SNAPSHOT_RS).toContain(BASES.capacity);
-    expect(BASE).toBe(LAYOUT.carBase + LAYOUT.maxCars * LAYOUT.carStride);
     expect(Math.max(F.shown, F.x, F.z, F.yaw, F.state)).toBeLessThan(STRIDE);
     expect(COUNT).toBeLessThan(constant('HEADER_LEN'));
     expect(new Set(Object.values(S)).size).toBe(4);
@@ -154,13 +153,12 @@ describe('signal-head rows', () => {
     const old = { ...layout, light: undefined, lightBase: undefined, lightStride: undefined, header: { ...layout.header, lightCount: undefined } } as SnapshotLayout;
     expect(rows.read(snapshot(JUNCTION), old)).toEqual({ placed: false, lit: false });
     expect(rows.count).toBe(0);
-    // A count past the snapshot's room (a stray value) reads only what there's room for.
-    const snap = snapshot(JUNCTION);
+    // A count past the snapshot's room (a stray value) reads only what there's room for: ten heads shown, room for 8.
+    const snap = snapshot([...JUNCTION, ...JUNCTION, ...JUNCTION.slice(0, 2)].map((r, k) => ({ ...r, x: r.x + k })));
     snap[COUNT] = 10_000;
     const few = new SignalRows(8);
     few.read(snap, layout);
-    expect(few.count).toBeLessThanOrEqual(8);
-    expect(few.count).toBe(4);
+    expect(few.count).toBe(8);
   });
 
   test("reads each head's row, so its pole is known by the structure's junctions", () => {

@@ -146,7 +146,9 @@ pub fn fridge_french_door() -> Vec<Obj> {
                 0.012,
                 (sf * 0.205, 0.80, 0.186),
                 M.carton,
-                holes = [grip]
+                holes = [grip],
+                bevel = 0.003,
+                bevel_segments = 1
             );
         }
         // food

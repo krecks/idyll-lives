@@ -6,45 +6,30 @@
 // smallest homes when the cap is near; a smaller tier is the same people in fewer homes; each
 // neighbour knows about 35 others, likelier those living near; the town file says the most
 // residents the town grows to; and the houses furnished ahead are the ones Move in finds made.
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
 
 describe('seeded people', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
+  usePublicFetch();
   const realRandom = Math.random;
   afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
     Math.random = realRandom;
   });
-  const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, useTownContent, vacantSlots } = await import('../src/game/town');
   const { defaultResidentsMost, FILL_CAP, fillPlan, fillTown, homesOf, keepForSale, neighbourBonds, offered, peopleStreams, populate, residentsMost, SIM_RESIDENTS, tierFor } = await import('../src/game/people');
   const { mulberry32 } = await import('../src/game/noise');
   const { runTownJob } = await import('../src/game/townJobs');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type PlotSlot = import('../src/game/town').PlotSlot;
   type TownJob = import('../src/game/townJobs').TownJob;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /**
    * A town of the shipped fixed houses on a grid, its own and nothing the generator makes, so the
@@ -73,12 +58,11 @@ describe('seeded people', async () => {
   /** A small generated world (a hamlet, no villages), for the town file. */
   const hamlet = generateWorld(content, t, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'none' });
 
-  // From here on nothing may roll Creation's dice.
-  beforeAll(() => {
-    Math.random = () => {
-      throw new Error('Math.random was called');
-    };
-  });
+  // From here on nothing may roll Creation's dice: set now, not in a beforeAll, so the towns built while the
+  // tests are collected (the big one below) are held to it too.
+  Math.random = () => {
+    throw new Error('Math.random was called');
+  };
 
   /** Both waves of a town's people from `seed`, the player moving into the first home left, and whom step 3 offers. */
   const people = (town: NeighbourhoodDraft, seed: number, cap = FILL_CAP) => {

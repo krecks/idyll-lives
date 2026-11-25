@@ -6,7 +6,7 @@ use artkit::place::{Coord, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, jitter, revolve, sphere};
 
-pub const WALL: f64 = -0.43; // the wall's face, game depth
+pub use artkit::kit::WALL;
 pub const DOOR_Z: f64 = 0.152; // the door ring's middle, game depth
 pub const DOOR_Y: f64 = 0.4; // the door's middle, height
 pub const DOOR_R: f64 = 0.21; // the ring's radius

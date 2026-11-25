@@ -6,9 +6,10 @@ use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, radians, sin, sind};
 use artkit::motion::{Path, keys};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, RotationMode};
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{
     fbox, fcone, fcyl, fextrude, fsphere, fsweep, grow, jitter, revolve, settle, soft, swing,
 };
@@ -22,12 +23,14 @@ fn _cup(f: &GameFrame, x: f64, y: f64, z: f64, m: Option<Mat>) {
     revolve!(
         numbered("saucer"),
         &[
-            (0.0, 0.0),
-            (0.026, 0.0),
-            (0.042, 0.007),
-            (0.04, 0.009),
-            (0.0, 0.004)
-        ],
+            &[(0.0, 0.0)][..],
+            // (its rim rolled over)
+            &eased(
+                &[(0.026, 0.0), (0.042, 0.007), (0.04, 0.009), (0.0, 0.004)],
+                AUTO_WIDTH
+            ),
+        ]
+        .concat(),
         at = f.at(x, y, z),
         material = M.cup,
         segments = 12
@@ -163,7 +166,7 @@ pub fn espresso_bar() -> Vec<Obj> {
                     (0.16, 0.66, 0.074)
                 ],
                 0.008,
-                steps = 2
+                steps = 5
             ),
             0.0,
             M.chalk,
@@ -285,7 +288,9 @@ pub fn espresso_bar() -> Vec<Obj> {
             (-0.06, 0.915, -0.05),
             M.chrome,
             plane = Facing::Top,
-            holes = vec![rounded_rect(0.36, 0.1, 0.01, 2)]
+            holes = vec![rounded_rect(0.36, 0.1, 0.01, 2)],
+            bevel = 0.004,
+            bevel_segments = 1
         );
         fbox!(
             f,
@@ -658,7 +663,8 @@ pub fn cookbook_lectern() -> Vec<Obj> {
                 (0.026, 0.72),
                 (0.04, 0.78),
                 (0.06, 0.86),
-                (0.06, 0.88),
+                (0.06, 0.876),
+                (0.056, 0.88), // (its top edge chamfered)
                 (0.0, 0.88)
             ],
             at = f.at(0, 0.05, -0.05),
@@ -770,8 +776,12 @@ pub fn cookbook_lectern() -> Vec<Obj> {
                 (sf * 0.012, 0.012),
             ];
             let pts = [_on_desk(0.0, 0.032, -0.155), _on_desk(0.0, 0.032, 0.155)];
-            let swapped: Vec<(f64, f64)> = prof.iter().map(|&(u, v)| (v, u)).collect();
-            fsweep!(
+            // (the block's fore-edge rounded, its ends eased)
+            let swapped: Vec<(f64, f64)> = eased(&prof, AUTO_WIDTH)
+                .iter()
+                .map(|&(u, v)| (v, u))
+                .collect();
+            let pages = fsweep!(
                 f,
                 numbered("pages"),
                 &pts,
@@ -780,6 +790,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
                 profile = swapped,
                 up = (0, 0, 1)
             );
+            ease(pages, 60.0, 1);
         }
         fbox!(
             f,
@@ -818,7 +829,11 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             up = (0, 0, 1),
             resolution = 2
         );
-        // a turned stool with a pile of cookbooks, and a jar of wooden spoons on the floor
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // a turned stool with a pile of cookbooks, a recipe-card box and a jar of wooden spoons on the floor by it:
+    // drawn, not the lectern's size
+    let beside = new_parts(|| {
         revolve!(
             "stool",
             &[
@@ -830,7 +845,8 @@ pub fn cookbook_lectern() -> Vec<Obj> {
                 (0.11, 0.36),
                 (0.13, 0.38),
                 (0.15, 0.4),
-                (0.15, 0.42),
+                (0.15, 0.416),
+                (0.146, 0.42), // (its seat's edge chamfered)
                 (0.0, 0.42)
             ],
             at = f.at(0.29, 0, -0.27),
@@ -930,7 +946,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&beside, "beside");
     // The page on the right-hand block (game -x), curling gently up from the spine, its origin on the spine, then
     // tilted onto the desk; `page` turns it over about the spine (its own Y, after the tilt).
     let (hx, hy, hz) = _on_desk(0.0, 0.0625, 0.0);

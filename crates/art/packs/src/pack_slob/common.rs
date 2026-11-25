@@ -12,7 +12,6 @@ use artkit::{boulder, fbox, loft, palette, revolve, ring, soft};
 palette! { M:
     body = ("#D9533F", metal),       // the microwave cart's frame; see the per-model notes for each body
     bag = ("#E07A2E", satin),        // the beanbag's wipe-clean vinyl
-    bag_light = ("#EB8C40", satin),
     bag_seam = ("#C8642A", satin),
     stand = ("#6E9FC0", satin),      // the nightstand
     stand_front = ("#5A8BAE", satin),
@@ -55,23 +54,20 @@ palette! { M:
     bag_purple = ("#9B59B6", satin),
 }
 
-/// The pop colours, by name.
-pub const POP: [&str; 6] = [
-    "pop_red",
-    "pop_orange",
-    "pop_blue",
-    "pop_green",
-    "pop_purple",
-    "pop_yellow",
+/// The pop colours.
+pub const POP: [Mat; 6] = [
+    M.pop_red,
+    M.pop_orange,
+    M.pop_blue,
+    M.pop_green,
+    M.pop_purple,
+    M.pop_yellow,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
-pub fn _m(name: &str) -> Mat {
-    M.palette().get(name)
-}
-
-/// A rounded-cornered box lofted upright (a case, a cabinet), its top and bottom edges eased by `ease`.
+/// A rounded-cornered box lofted upright (a case, a cabinet, the neat pack's appliances and dock), its top and
+/// bottom edges eased by `ease`.
 #[allow(clippy::too_many_arguments)]
 pub fn _box<X: Coord, Z: Coord>(
     f: &GameFrame,

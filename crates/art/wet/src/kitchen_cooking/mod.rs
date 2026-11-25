@@ -48,8 +48,8 @@ palette! { M:
 }
 
 const SECONDS: f64 = 1.4; // a door drops, a drawer slides or a knob turns in this long
-// catalog2's 0.79-deep counter numbers drawn 0.66 deep against the wall (the counters' COUNTER66)
-const COUNTER66: [(f64, f64); 4] = [(-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23)];
+// catalog2's 0.79-deep counter numbers drawn 0.66 deep against the wall: the counters'
+use crate::kitchen_counters::COUNTER66;
 const HOLD: f64 = 3.0; // seconds a door stays open once a use starts
 
 /// The microwave's plate turns once its door has shut (`door_open` opens in 1.0 s and plays back from its hold,
@@ -64,10 +64,10 @@ fn bake() -> Json {
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
     // its top under its content `surface`.
-    Some(Family::new(
+    Family::new(
         "kitchen_cooking",
         M.palette(),
         vec![
@@ -83,7 +83,7 @@ pub fn family() -> Option<Family> {
             // started at the fridge (snapshot.rs: no interaction at a station that isn't the recipe's origin).
             .motions(json!({"uses": {"cook": "burner_on", "stir": "burner_on", "bake": (bake())}}))
             .paint(&[("enamel", "Body"), ("chrome", "Knobs"), ("hob", "Hob")]),
-            Model::new("stoveGas", cookers::stove_gas, (0.92, 1.111, 0.694))
+            Model::new("stoveGas", cookers::stove_gas, (0.92, 1.091, 0.694))
                 .key("model.stoveGas")
                 .centre(0.0, -0.089)
                 // cook and gourmet (and any `stir` step) light the front left burner; bake drops the oven door
@@ -179,5 +179,5 @@ pub fn family() -> Option<Family> {
          below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a knob \
          turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave \
          swings its door (`door_open`) and turns its turntable (`turntable`).",
-    ))
+    )
 }

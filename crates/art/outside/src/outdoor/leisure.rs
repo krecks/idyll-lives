@@ -1,7 +1,7 @@
 //! OU2: the sun lounger, the hammock, the porch swing, the swing set and the cedar hot tub; each moves while it
 //! is used.
 
-use super::common::{F, M, board, end_round, mesh_of, plank, side_slab, tapered_leg};
+use super::common::{F, M, end_round, mesh_of, plank, side_slab, tapered_leg};
 use super::seats::arm_board;
 use artkit::forms::{bisect, rounded_rect};
 use artkit::json::float_repr;
@@ -319,7 +319,8 @@ pub fn hammock() -> Vec<Obj> {
                 M.hammock_frame,
                 0.006,
             );
-            board(
+            kit::board(
+                &F,
                 &format!("brace{s}"),
                 (0, 0.06, sf * 1.0),
                 (0, 0.5, sf * 1.34),
@@ -506,7 +507,8 @@ fn a_frame(prefix: &str, beam_y: f64, material: Mat, round_legs: bool, spread: f
                 );
             }
         }
-        board(
+        kit::board(
+            &F,
             &format!("{prefix}tie{s}"),
             (x, 0.7, -tie - 0.03),
             (x, 0.7, tie + 0.03),
@@ -575,8 +577,9 @@ fn a_frame(prefix: &str, beam_y: f64, material: Mat, round_legs: bool, spread: f
     }
 }
 
-// The seat hung 5 cm lower than it was: the cushion's top at 0.515 m (content `seat` 0.50, sunk in it).
+// The seat hung 5 cm lower than it was; the cushion's top is the content's `seat` height.
 const PORCH_DROP: f64 = 0.05;
+pub(super) const PORCH_SEAT: f64 = 0.52;
 
 pub fn porch_swing() -> Vec<Obj> {
     let frame = new_parts(|| a_frame("", 2.0, M.porch_frame, false, 0.42));
@@ -735,9 +738,9 @@ pub fn porch_swing() -> Vec<Obj> {
             F,
             "cushion",
             1.28,
-            0.065,
+            0.08,
             0.42,
-            (0, 0.5225 - d, 0.05),
+            (0, PORCH_SEAT - 0.04, 0.05),
             M.porch_cushion,
             round = 0.03,
             puff = 0.01,
@@ -771,7 +774,7 @@ pub fn swing_set() -> Vec<Obj> {
                 .iter()
                 .map(|&u| (x + u, 0.48 + 0.035 * pow(u / 0.2, 2.0), 0))
                 .collect();
-            fsweep!(
+            artkit::bevel::eased(fsweep!(
                 F,
                 format!("seat{}", float_repr(x)),
                 &belt,
@@ -780,7 +783,7 @@ pub fn swing_set() -> Vec<Obj> {
                 profile = rounded_rect(0.012, 0.2, 0.005, 1),
                 up = (0, 0, 1),
                 resolution = 2
-            );
+            ));
             for dx in [-0.2, 0.2] {
                 fsweep!(
                     F,

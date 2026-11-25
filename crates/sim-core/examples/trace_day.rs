@@ -12,10 +12,8 @@ fn main() {
     let parts: Vec<String> = includes.iter().map(|n| read(n)).collect();
     let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
     let content = sim_core::merge_content(&base, &parts).unwrap();
-    let mut lot: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../web/public/content/lots/starter.json"
-    ))
-    .unwrap();
+    let mut lot: serde_json::Value =
+        serde_json::from_str(include_str!("../tests/starter_lot.json")).unwrap();
     let sp = lot["spawns"].clone();
     lot["sims"] = serde_json::json!([
         { "name": "Ada", "traits": ["foodie", "lazy"], "perks": ["ironBladder"], "x": sp[0][0], "z": sp[0][1] },

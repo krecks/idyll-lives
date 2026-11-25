@@ -31,8 +31,8 @@ mod terrarium;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_natureLover",
         M.palette(),
         vec![
@@ -44,7 +44,7 @@ pub fn family() -> Option<Family> {
                     "growth": "grow"
                 }))
                 .paint(&[("cedar", "Wood"), ("cedar_dark", "Posts & rails")]),
-            Model::new("pottingBench", bench::potting_bench, (1.76, 1.785, 0.6))
+            Model::new("pottingBench", bench::potting_bench, (1.76, 1.74, 0.6))
                 .key("model.natureLover.pottingBench")
                 .centre(0.0, -0.13)
                 .motions(json!({"uses": {"potSeedlings": "seedling", "tieBouquet": "bouquet"}}))
@@ -63,7 +63,7 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, 0.011)
                 .motions(json!({"uses": {"rinse": "water_on"}}))
                 .paint(&[("cedar_wood", "Wood"), ("copper", "Copper")]),
-            Model::new("mossTerrarium", terrarium::moss_terrarium, (0.48, 1.174, 0.698))
+            Model::new("mossTerrarium", terrarium::moss_terrarium, (0.4, 1.174, 0.4))
                 .key("model.natureLover.mossTerrarium")
                 .centre(0.03, 0.049)
                 .motions(json!({"uses": {"mist": "lid_open"}}))
@@ -83,5 +83,5 @@ pub fn family() -> Option<Family> {
          costs one draw call per finish group. Each moves while it is used: a lettuce is picked from \
          the veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the \
          hammock sways, the shower runs, the cloche lifts and the glasshouse's door and vent open.",
-    ))
+    )
 }

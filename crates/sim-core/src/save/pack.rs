@@ -87,12 +87,22 @@ pub(super) fn base64(bytes: &[u8]) -> String {
 
 pub(super) fn unbase64(s: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(s.len() / 4 * 3);
-    let digit = |c: u8| BASE64.iter().position(|&d| d == c).map(|v| v as u32);
+    let digit = |c: u8| {
+        Some(u32::from(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        }))
+    };
     for chunk in s.as_bytes().chunks(4) {
-        if chunk.len() != 4 {
+        let pad = chunk.iter().rev().take_while(|&&c| c == b'=').count();
+        // (Three or four `=` stand for no byte at all: corrupt, not a chunk to read.)
+        if chunk.len() != 4 || pad > 2 {
             return None;
         }
-        let pad = chunk.iter().rev().take_while(|&&c| c == b'=').count();
         let mut n = 0u32;
         for &c in &chunk[..4 - pad] {
             n = n << 6 | digit(c)?;
@@ -219,6 +229,16 @@ pub(super) fn decode_looks(lot: &mut Lot, content: &Content, looks: &[LookSave])
             _ => &[],
         };
         let side = |id: &str| index(&b.coverings, id).map_or(0, |i| i as u8 + 1);
+        // A size no door or window may have (as Build checks it) is dropped: the sill (a door's
+        // always), then the top with the sill kept, each on its own.
+        let window = edge == Edge::Window;
+        let opening = matches!(edge, Edge::Door | Edge::Window);
+        let sill = l
+            .sill
+            .filter(|_| opening && crate::home::check_opening(window, l.sill, None).is_ok());
+        let head = l
+            .head
+            .filter(|_| opening && crate::home::check_opening(window, sill, l.head).is_ok());
         lot.set_look(
             at,
             EdgeLook {
@@ -229,14 +249,8 @@ pub(super) fn decode_looks(lot: &mut Lot, content: &Content, looks: &[LookSave])
                     0
                 },
                 style: index(styles, &l.style).map_or(0, |i| i as u8),
-                // A size no door or window may have is dropped.
-                sill: l.sill.filter(|&s| {
-                    edge == Edge::Window
-                        && s + crate::command::MIN_WINDOW <= crate::command::MAX_HEAD
-                }),
-                head: l.head.filter(|&h| {
-                    matches!(edge, Edge::Door | Edge::Window) && h <= crate::command::MAX_HEAD
-                }),
+                sill,
+                head,
             },
         );
     }

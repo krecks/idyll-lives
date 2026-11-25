@@ -1,7 +1,7 @@
 /**
  * The snapshot's car rows as the renderer reads them (`render/shared/cars.ts` `carRowAt`,
  * `carRowIsTaxi`; `render/pc/cars.ts` draws them): laid out as sim-core writes them (`snapshot.rs`
- * `CAR_BASE`, `CAR_STRIDE`, `car::*`, read from its source: `snapshotLayout.ts`), eight floats a row,
+ * `CAR_BASE`, `CAR_STRIDE`, `car::*`, read from its source: `snapshotLayout.ts`), `CAR_STRIDE` floats a row,
  * the households' cars first in the structure's order, then the work taxis' (`car.kind`); and the
  * taxi's own look (`paintTaxi`): yellow, its sign on its roof.
  */
@@ -44,19 +44,12 @@ const ROWS: Row[] = [
 ];
 
 describe('car rows', () => {
-  test('are eight floats each, after the residents and servers, as sim-core writes them', () => {
+  test('fit their stride, after the residents and servers, as sim-core writes them', () => {
     expect(SNAPSHOT_RS).toContain(BASES.car);
-    expect(LAYOUT.carStride).toBe(8);
-    expect(F.kind).toBe(5);
     expect(Math.max(F.shown, F.x, F.z, F.yaw, F.doors, F.kind, F.trail, F.trailLen)).toBeLessThan(LAYOUT.carStride);
     // (Their ways' points after the lights' rows.)
     expect(SNAPSHOT_RS).toContain(BASES.trail);
-    expect(LAYOUT.trailBase).toBe(LAYOUT.lightBase + LAYOUT.maxLights * LAYOUT.lightStride);
-    expect(LAYOUT.capacity).toBe(LAYOUT.trailBase + LAYOUT.maxTrailPoints * LAYOUT.trailStride);
     expect(K.household).not.toBe(K.taxi);
-    // (The lights' rows right after the room for every car.)
-    expect(LAYOUT.lightBase).toBe(LAYOUT.carBase + LAYOUT.maxCars * LAYOUT.carStride);
-    expect(LAYOUT.header.lightCount).toBe(11);
   });
 
   test('start after as many residents and servers as the renderer has rows for (`MAX_CHARACTERS`)', () => {

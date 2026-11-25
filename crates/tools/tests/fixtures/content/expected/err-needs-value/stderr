@@ -1,0 +1,3 @@
+usage: cargo content list|in|out [<id>...] [--group <group>] [--label <label>]
+                     [--to <category>/<group>] [--dry-run] [--content <dir>] [--plan <dir>]
+content: error: --group needs a value

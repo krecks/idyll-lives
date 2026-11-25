@@ -5,6 +5,7 @@
  * at its junctions; the overview's decks and barrier (`townRoadMesh`), on the road hierarchy's fixture.
  */
 import { describe, expect, test } from 'bun:test';
+import { line } from './support/geometry';
 import type { RoadPlan, WorldStructure } from '../src/core/protocol';
 import { lengths, nearest, trimJoins } from '../src/game/roads';
 import { Kerb, KERB_Y, RoadIndex, roadMeshes, roadTiles, SIDEWALK, townRoadMesh, townRoads, WALK_Y } from '../src/render/shared/roads';
@@ -15,7 +16,6 @@ import * as F from '../src/render/roadHierarchyFixture';
 import { JunctionCuts } from '../src/render/shared/junctions';
 import { deriveJunctions, plansOf } from './fixtures/junctions';
 
-const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A road along x at z = 50, and a lane off it to the south (+z) ending in a dead end: beginning at the road's kerb, as the town's lanes do (`trimJoins`). */
 const road: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['out', 'out'] };
 const [, lane] = trimJoins([road, { points: line(50, 50, 50, 90, 40), width: 6, ends: ['join', 'dead'] }]);
@@ -27,6 +27,7 @@ describe('roads as drawn', () => {
     // The lane begins at the road's kerb (its first point past it; they're a metre apart).
     expect(lane.points[0][1]).toBeGreaterThanOrEqual(50 + 3.5 - SIDEWALK);
     expect(lane.points[0][1]).toBeLessThan(50 + 3.5 - SIDEWALK + 1);
+    expect(walk.pos.length).toBeGreaterThan(0);
     for (let i = 0; i < walk.pos.length; i += 3) {
       const [x, y, z] = [walk.pos[i], walk.pos[i + 1], walk.pos[i + 2]];
       if (y < WALK_Y - 0.001) continue;

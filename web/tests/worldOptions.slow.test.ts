@@ -5,41 +5,24 @@
 // file; the land's relief comes with it; a river's bridges and an island's causeways span their
 // water, their decks dry to walk on; and the kinds from before places (small, medium, dense) are
 // the countryside at their town sizes.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('world options', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { defaultsOf, expectations, placeOf, specOf } = await import('../src/game/world');
   const landMasks = await import('../src/game/landMasks');
   const { inside, lengths } = await import('../src/game/roads');
   const lengthOf = (r: { points: [number, number][] }) => lengths(r.points).at(-1)!;
-  type Templates = import('../src/game/town').Templates;
   type WorldOptions = import('../src/game/world').WorldOptions;
   type Draft = import('../src/game/town').NeighbourhoodDraft;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** A heath hamlet with no villages round it (a small world, quick to make), with `options` over that. */
   const SMALL: Partial<WorldOptions> = { town: 'hamlet', villages: 'none' };

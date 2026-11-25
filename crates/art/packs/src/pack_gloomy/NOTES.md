@@ -10,7 +10,7 @@ chair, the window seat's cushion top); the tub keeps `SEATS`/`BEDS` 0.25 (its in
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `recordCabinet` | the lid over the turntable's well, hinged along its back: `lid_open` lifts it 80° (0.9 s) | `listen`, `newAlbum` |
+| `recordCabinet` | the lid over the turntable's well, hinged along its back's top edge (its back edge tips forward, clear of the wall): `lid_open` lifts it 80° (0.9 s) | `listen`, `newAlbum` |
 | `recordCabinet` | the platter and record, origin on the spindle: `platter_spin`, one turn clockwise in 1.8 s (33 rpm), a loop | `listen`, `newAlbum` (loop) |
 | `cello` | the cello, built upright on its stand, origin on the end pin's foot: `off_stand` (0.9 s) moves it across to between the player's knees and leans it back 14° | `practise`, `lament` |
 | `journalDesk` | the tall candle's flame, built full size on its wick and scaled to nothing: `candle` lights it (0.6 s); its material glows at night. Its top is at 0.75 (2026-10-21: 0.78, over a desk's 0.72–0.76: M-packs-08), everything on it 3 cm lower with it | `journal`, `poetry` |
@@ -103,3 +103,14 @@ cargo art pack_gloomy --preview  # previews/pack_gloomy/<id>.png, <id>@<clip>.pn
 ## The soft forms pass (2026-11-13)
 
 The window seat's two pillows are sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `journalDesk`, `soakingTub`, `windowSeat`; 20,098 to 20,610 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the play camera showed is eased (66 to 0): the desk's arched gallery bevelled, the candles' rims
+rounded into their hollows (`candle`), the cello's plates rounded onto its ribs and its neck's flat face chamfered,
+the window's casing rounded, the throw's ends eased, the tub's ledge top a bevelled board. The desk pays for its
+gallery with fewer arch steps, a coarser dish, inkwell and finials and no hidden flame core (7,962 triangles); the
+record cabinet with a 20-sided platter and record, thinner door slats and plainer pods (3,950). The floor vase, the
+cello's music book and candle, the lamp's pebbles, the window wall and the tub's fern are drawn `aside`, so each piece
+measures as its kind; the cello's scroll is 2 mm lower. The record cabinet keeps its fourth draw (the wood lid and
+the platter each a moving part).

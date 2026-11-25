@@ -1,8 +1,7 @@
 //! BR2: the nightstands, the blanket chest, the laundry hamper and the bed-end bench.
 
 use super::common::{
-    DRAWER_SECONDS, F, M, PULL, Style, WALL, book, books, drawer, front, gap, knob, mug, pull,
-    shell, top,
+    DRAWER_SECONDS, F, M, PULL, Style, WALL, book, books, drawer, front, gap, mug, shell, top,
 };
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -88,7 +87,7 @@ fn classic_nightstand(decor: bool) {
         Style::Plain,
         None,
     );
-    knob("knob", 0.018, (0, 0.45, front_z + 0.02), M.brass);
+    kit::knob!(F, "knob", 0, 0.45, front_z + 0.02, 0.018, M.brass);
     top("top", 0.54, 0.025, 0.44, 0.56, WALL + 0.22, M.oak, 0.01);
     books("niche_book", -0.2, 0.16, -0.22, 4, 0.17, 0.15);
     if decor {
@@ -334,16 +333,16 @@ pub fn nightstand_modern() -> Vec<Obj> {
             Style::Plain,
             None,
         );
-        pull(
+        kit::pull!(
+            F,
             "pull",
             0.0,
             0.485,
             front_z + 0.02,
             0.12,
             M.iron,
-            0.005,
-            0.016,
-            false,
+            r = 0.005,
+            out = 0.016
         );
         top("top", 0.58, 0.03, NS_TOP.0, 0.56, NS_TOP.1, M.oak, 0.012);
         books("niche_book", -0.22, 0.14, -0.2, 5, 0.19, 0.16);
@@ -447,7 +446,7 @@ pub fn nightstand_round() -> Vec<Obj> {
                 rot = (0, 0, -a)
             );
         }
-        knob("knob", 0.0185, (0, 0.42, z + 0.255), M.brass);
+        kit::knob!(F, "knob", 0, 0.42, z + 0.255, 0.0125, M.brass); // (2.5 cm: the drum stays a nightstand's depth)
         revolve!(
             "top",
             &[
@@ -509,16 +508,16 @@ pub fn nightstand_drawers() -> Vec<Obj> {
                 Style::Plain,
                 None,
             );
-            pull(
+            kit::pull!(
+                F,
                 &format!("pull{i}"),
                 0.0,
                 y + 0.02,
                 front_z + 0.02,
                 0.11,
                 M.brass,
-                0.005,
-                0.016,
-                false,
+                r = 0.005,
+                out = 0.016
             );
         }
         gap("drawer", 0.52, 0.135, 0, 0.485, front_z, M.plinth);
@@ -535,16 +534,16 @@ pub fn nightstand_drawers() -> Vec<Obj> {
         0.36,
         M.walnut,
         &|| {
-            pull(
+            kit::pull!(
+                F,
                 "pull_top",
                 0.0,
                 0.505,
                 front_z + 0.02,
                 0.11,
                 M.brass,
-                0.005,
-                0.016,
-                false,
+                r = 0.005,
+                out = 0.016
             );
         },
         Some(&drawer_snacks),
@@ -921,7 +920,8 @@ fn braid(
         material,
         verts = 4,
         closed = true,
-        scale = scale
+        scale = scale,
+        angle = 100 // a cord is round: its four sides shade so
     );
 }
 
@@ -1035,9 +1035,11 @@ pub fn laundry_hamper() -> Vec<Obj> {
             resolution = 2
         );
     });
-    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.56, z - 0.236));
+    // hinged 4 cm in from its back edge, near the loop's height: the back lifts off the rim and comes forward as it
+    // opens (turned about the rim's bottom edge, its back went into the wall)
+    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.624, z - 0.197));
     let objs = settle!(centre = false);
-    swing!(lid, "lid_open", -70.0, seconds = 0.7, axis = Axis::X); // not past upright: it stands at the wall
+    swing!(lid, "lid_open", -80.0, seconds = 0.7, axis = Axis::X); // not past upright: it stands at the wall
     objs
 }
 

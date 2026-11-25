@@ -125,6 +125,16 @@ pub(super) fn check(
         furniture,
         counting.file,
     )?;
+    // `opened` came in after the models it finds: counted against the baseline.
+    let mut opened = Found::default();
+    warnings.retain(|w| match untag(w) {
+        Some(("opened", text)) => {
+            opened.count += 1;
+            opened.text.push(text.to_string());
+            false
+        }
+        _ => true,
+    });
     let mut summary = format!(
         "{:>6} KB {:>6} tris {} draws {:>2} materials  {} m",
         fixed(info.size as f64 / 1024.0, 1),
@@ -212,6 +222,13 @@ pub(super) fn check(
     }
     // The counted checks: what they found in the file and its far version's (`far: …`), and the batch checks'.
     let mut found: BTreeMap<&'static str, Found> = BTreeMap::new();
+    // (Counted where it finds any, or the baseline or the entry names it: none found is then stale, or unused.)
+    if opened.count > 0
+        || counting.baseline.get("opened", entry_key) > 0
+        || entry.get("accept").and_then(|a| a.get("opened")).is_some()
+    {
+        found.insert("opened", opened);
+    }
     let far_found = far_counted.into_iter().map(|(c, f)| {
         let text = f.text.into_iter().map(|t| format!("far: {t}")).collect();
         (
@@ -418,6 +435,8 @@ fn check_file(
     let (mut lo, mut hi) = ([inf; 3], [ninf; 3]);
     let mut tris = 0i64;
     let mut groups: BTreeSet<(Option<usize>, String)> = BTreeSet::new();
+    // The finishes in the still body's plain group (`draws_aimed`: metal hardware alone).
+    let mut still_plain: BTreeSet<String> = BTreeSet::new();
     // Per problem, the materials that have it.
     let mut flags: HashMap<&str, BTreeSet<String>> = HashMap::new();
     // Draw calls: one per finish group, the still body's and each moving part's apart.
@@ -516,14 +535,11 @@ fn check_file(
                         repr_str(&name)
                     ));
                 }
-                groups.insert((
-                    p.part,
-                    if fin.plain.get(&f) == Some(&true) {
-                        "plain".into()
-                    } else {
-                        f
-                    },
-                ));
+                let plain = fin.plain.get(&f) == Some(&true);
+                if plain && p.part.is_none() {
+                    still_plain.insert(f.clone());
+                }
+                groups.insert((p.part, if plain { "plain".into() } else { f }));
                 continue;
             }
             groups.insert((p.part, format!("file:{name}")));
@@ -791,12 +807,17 @@ fn check_file(
             groups.len(),
             most_draws
         ));
-    } else if groups.len() > DRAWS.0 {
-        warnings.push(format!(
-            "{} draw calls, aim for {} at most",
-            groups.len(),
-            DRAWS.0
-        ));
+    } else {
+        let declared = entry.get("draws").map(|_| most_draws);
+        let see_through = |f: &str| fin.see_through(Some(&J::Str(f.into())));
+        let aim = draws_aimed(&groups, &see_through, &still_plain, declared);
+        if groups.len() > aim {
+            warnings.push(format!(
+                "{} draw calls, aim for {aim} at most ({} for the still model, one more for each moving part, its glass and metal hardware alone on a still body)",
+                groups.len(),
+                DRAWS.0
+            ));
+        }
     }
     for (i, img) in gltf
         .get("images")

@@ -1,6 +1,7 @@
 //! The stacked laundry centre and the rainfall steam shower.
 
-use super::common::{_bottle, _box, _m, _towels, M, TOWELS, WALL};
+use super::common::{_bottle, _towels, M, TOWELS, WALL};
+use crate::pack_slob::common::_box;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
@@ -48,7 +49,7 @@ fn _porthole(f: &GameFrame, name: &str, cy: f64, zf: f64) {
         ],
         at = f.at(WX, cy, zf),
         material = M.porthole,
-        segments = 24,
+        segments = 20,
         rot = (90, 0, 0)
     );
     soft!(
@@ -77,6 +78,7 @@ fn _appliance(f: &GameFrame, name: &str, y0: f64, hh: f64, zf: f64, door: bool) 
         M.appliance,
         10.0,
         24,
+        0.006,
     );
     soft!(
         f,
@@ -156,7 +158,7 @@ fn _appliance(f: &GameFrame, name: &str, y0: f64, hh: f64, zf: f64, door: bool) 
         ],
         at = f.at(WX, cy, zf - 0.004),
         material = M.drum,
-        segments = 24,
+        segments = 16, // (behind the porthole: seen only with the washer's door open)
         rot = (90, 0, 0)
     );
     if !door {
@@ -207,6 +209,15 @@ fn _basket(
             ring!(
                 w / 2.0 + 0.008,
                 d / 2.0 + 0.008,
+                z = b.z + h + 0.008,
+                verts = 20,
+                square = 5,
+                at = (b.x, b.y)
+            ),
+            // (its top edge chamfered)
+            ring!(
+                w / 2.0 + 0.004,
+                d / 2.0 + 0.004,
                 z = b.z + h + 0.012,
                 verts = 20,
                 square = 5,
@@ -277,7 +288,9 @@ fn _shirt(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, material: Mat) {
         0.022,
         (x, 0, 0),
         material,
-        plane = Facing::Side
+        plane = Facing::Side,
+        bevel = 0.004,
+        bevel_segments = 1
     );
 }
 
@@ -339,7 +352,7 @@ pub fn laundry_center() -> Vec<Obj> {
             M.towel_a,
             profile = rounded_rect(0.008, 0.13, 0.004, 1),
             up = (0, 1, 0),
-            resolution = 2
+            resolution = 4
         );
         // the counter: open cubbies under a top, towels above and baskets below
         fbox!(
@@ -408,7 +421,7 @@ pub fn laundry_center() -> Vec<Obj> {
             3,
             0.26,
             0.2,
-            &["towel_w", "towel_c", "towel_w"],
+            &[M.towel_w, M.towel_c, M.towel_w],
         );
         for (x, m) in [(CX - 0.22, M.wicker), (CX + 0.22, M.wicker_b)] {
             _basket(
@@ -433,7 +446,7 @@ pub fn laundry_center() -> Vec<Obj> {
             3,
             0.3,
             0.22,
-            &["towel_w", "towel_a", "towel_w"],
+            &[M.towel_w, M.towel_a, M.towel_w],
         );
         _bottle(
             f,
@@ -499,7 +512,7 @@ pub fn laundry_center() -> Vec<Obj> {
             bevel_segments = 1
         );
         let b = f.at(CX + 0.12, 0.96, 0.03);
-        let iron: Vec<Vec<P3>> = [(0.0, 1.0), (0.025, 0.98), (0.04, 0.85)]
+        let iron: Vec<Vec<P3>> = [(0.0, 1.0), (0.025, 0.98), (0.036, 0.9), (0.04, 0.8)]
             .iter()
             .map(|&(h, k)| {
                 [
@@ -561,7 +574,7 @@ pub fn laundry_center() -> Vec<Obj> {
                 verts = 12
             );
         }
-        for (i, m) in ["towel_c", "towel_w", "towel_b", "towel_f"]
+        for (i, m) in [M.towel_c, M.towel_w, M.towel_b, M.towel_f]
             .into_iter()
             .enumerate()
         {
@@ -571,7 +584,7 @@ pub fn laundry_center() -> Vec<Obj> {
                 CX - 0.27 + i as f64 * 0.18,
                 1.72,
                 -0.29,
-                _m(m),
+                m,
             );
         }
     });
@@ -611,6 +624,7 @@ pub fn rain_shower_tower() -> Vec<Obj> {
             M.body,
             12.0,
             24,
+            0.006,
         );
         soft!(
             f,
@@ -973,7 +987,7 @@ pub fn rain_shower_tower() -> Vec<Obj> {
             2,
             0.24,
             0.2,
-            &["pad", "pastel_a"],
+            &[M.pad, M.pastel_a],
         ); // satin: no fabric draw
         _bottle(
             f,

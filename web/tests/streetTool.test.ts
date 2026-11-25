@@ -3,15 +3,14 @@
 // lane past the river. The live checks agree with `drawStreet` on the same strokes, reason for reason
 // (a tight bend, a junction too near another, a road alongside, a crossing too wide, a footpath over
 // the water), tell an unfinished street from a refused one, and tint a street up a steep slope; on a
-// generated river world every live verdict is `drawStreet`'s, within the per-move budget. (The slope is
+// generated river world every live verdict is `drawStreet`'s (`streetTool.slow.test.ts`). (The slope is
 // the settle's to judge, through the town worker: `editSettle.slow.test.ts`; here only its forecast.) The tool
 // itself, driven as the town stage drives it: clicks, a freehand drag, Backspace, Esc and Enter, the
 // street drawn picked; the magnet; Enter carrying a street on to a road nearby; a street clearly too
 // steep refused up front, its climb measured as `measureLand` measures it; the hint on bare land. The road hierarchy: an
 // avenue's live checks, a one-way street drawn with arrows along it the way cars go (flipped on the card), the
 // motorway not crossed. `bun test`.
-import { afterAll, describe, expect, mock, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
 import type { Edited } from '../src/game/edit/edited';
@@ -26,8 +25,12 @@ import type { TownGhosts } from '../src/render/types';
 import type { Picked } from '../src/ui/townedit/pick';
 import type { TownEditor } from '../src/ui/townedit/tools';
 
-// (The card and its runes are the page's: the tool reads its choices from a plain object here.)
-const choice = { kind: 'auto' as string, oneway: false, flip: false, clear: true, along: 'homes' as string, shown: 'street' as string, shownArea: -1, drawn: [] as { road: number; name: string }[] };
+// (The card and its runes are the page's: the tool reads its choices from a plain object here. Nothing along the
+// streets drawn: these templates have no houses to fill them with.)
+const CHOICE = { kind: 'auto' as string, oneway: false, flip: false, clear: true, along: 'none' as string, shown: 'street' as string, shownArea: -1, drawn: [] as { road: number; name: string }[] };
+const choice = { ...CHOICE };
+// Every test starts from the card as the page opens it, whichever ran before.
+beforeEach(() => Object.assign(choice, CHOICE, { drawn: [] }));
 mock.module('../src/ui/townedit/StreetCard.svelte', () => ({ default: {} }));
 mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   streetChoice: choice,
@@ -352,7 +355,6 @@ describe('the hint names what the street will be', () => {
 
 describe('the tool', () => {
   test('clicks set points; the one on a road ends the street, which is drawn and picked', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.hover(87, MAIN_Z + 12);
@@ -441,7 +443,6 @@ describe('the tool', () => {
   });
 
   test('Enter ends the street where the pointer rests, as the hint says: the last click over the water, the pointer on the far bank', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.down(87, MAIN_Z + 8);
@@ -555,7 +556,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test('a click 20 m off a road starts the street on it; with the ground ten times nearer (zoomed in), not', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.hover(120, 80);
@@ -575,7 +575,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test('a corner set near a road stays where it is set when the street pulled there would be refused', () => {
-    choice.along = 'none';
     const editor = fakeEditor(town());
     const tool = streetTool.stage(editor);
     tool.down(100, MAIN_Z - 8);
@@ -592,7 +591,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test(`Enter carries a street ended short of a road on to it, within ${AUTO_JOIN} m; past that it ends as a dead end`, async () => {
-    choice.along = 'none';
     const ask = { kind: 'street' as const, asked: false, clear: true };
     // (From Far Lane north towards the high street, ended 20 m short of its middle.)
     const pts: Pt[] = [
@@ -623,7 +621,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
   });
 
   test('a street asked for on the card stays a street out of town, with no area', () => {
-    choice.along = 'none';
     const draft = hillTown();
     draft.open!.land = blankLand(W, D);
     const editor = fakeEditor(draft);
@@ -658,87 +655,6 @@ describe('the magnet, Enter carrying a street on, the kind asked for, bare land'
     tool.up();
     expect(editor.said.refusals).toEqual([]);
     expect(editor.draft.roads.map((r) => r.ends)).toEqual([['out', 'out']]);
-  });
-});
-
-// On a generated river world: random strokes in and round the main town, each judged by the live
-// checks and by drawStreet. Every reason the live checks give (the slope is not one) is
-// drawStreet's own; drawStreet refuses nothing the live checks pass but what they leave to it.
-describe('on a generated world', async () => {
-  const WEB = new URL('../', import.meta.url).pathname;
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content: RealContent } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
-  const { generateWorld, useTownContent } = await import('../src/game/town');
-  const { mulberry32 } = await import('../src/game/noise');
-  const { townIssues } = await import('../src/ui/townedit/problems');
-  const real = await RealContent.load('http://localhost/content/base.json');
-  useTownContent(real);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const templates: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(real), lampTiles: real.lampTiles, windowTiles: real.windowTiles };
-  const world = generateWorld(real, templates, 'river', 4242, undefined, undefined, { town: 'village', villages: 'few' });
-
-  test('every live verdict is drawStreet’s, within the per-move budget', () => {
-    const a0 = world.open!.areas[0];
-    const rand = mulberry32(9);
-    let [agreed, refused, bridged, cut, checked] = [0, 0, 0, 0, 0];
-    const left: string[] = [];
-    const blocking: string[] = [];
-    const base = townIssues(world, templates, real);
-    const times: number[] = [];
-    for (let k = 0; k < 400; k++) {
-      const pts: Pt[] = [];
-      let [x, z] = [a0.x - 60 + rand() * (a0.w + 120), a0.z - 60 + rand() * (a0.d + 120)];
-      let way = rand() * Math.PI * 2;
-      for (let i = 2 + Math.floor(rand() * 3); i > 0; i--) {
-        pts.push([x, z]);
-        way += (rand() - 0.5) * 1.6;
-        const l = 20 + rand() * 80;
-        [x, z] = [x + Math.cos(way) * l, z + Math.sin(way) * l];
-      }
-      const kind = rand() < 0.15 ? 'trail' : 'street';
-      const t0 = performance.now();
-      const live = liveStreet(world, templates, pts, { kind });
-      times.push(performance.now() - t0);
-      const verdict = verdictOf(world, templates, real, pts, { kind, clear: true }, 1);
-      const why = refusal(verdict);
-      const liveWhy = live.why;
-      // (What it makes blocks nothing in the Problems list the town didn't have: every street bridged or cutting a footpath, and one in eight of the rest.)
-      const crossed = 'draft' in verdict && verdict.draft.roads.some((r, i) => r.kind === 'trail' && world.roads[i] !== r);
-      if (crossed) cut++;
-      if ('draft' in verdict && (k % 8 === 0 || crossed || verdict.draft.roads.some((r, i) => r.bridge && world.roads[i] !== r))) {
-        checked++;
-        const fresh = townIssues(verdict.draft, templates, real, base).blocking.map((i) => i.text);
-        if (fresh.length) blocking.push(`${JSON.stringify(pts.map(([x, z]) => [Math.round(x), Math.round(z)]))} ${kind}: ${fresh.join('; ')}`);
-      }
-      if (live.bridges.length) bridged++;
-      if (liveWhy) {
-        refused++;
-        expect(why).toBe(liveWhy);
-        agreed++;
-      } else if (why && !unfinished(why)) left.push(why);
-      else agreed++;
-    }
-    times.sort((a, b) => a - b);
-    const median = times[times.length >> 1];
-    const p95 = times[Math.floor(times.length * 0.95)];
-    console.log(`streetTool: ${agreed} of 400 strokes judged alike (${refused} refused alike, ${bridged} bridged, ${cut} cutting a footpath; ${checked} drawn checked for problems); left to drawStreet: ${left.length ? left.join('; ') : 'none'}; live checks ${median.toFixed(2)} ms median, ${p95.toFixed(2)} ms p95`);
-    // (What the live checks leave to drawStreet: the network.)
-    for (const why of left) expect(why).toMatch(/joins none/);
-    expect(agreed + left.length).toBe(400);
-    expect(blocking).toEqual([]);
-    expect(median).toBeLessThan(5);
   });
 });
 
@@ -786,7 +702,6 @@ describe('avenues, one-way streets and the motorway', () => {
   });
 
   test('a one-way street drawn: open till it ends on a road, arrows along it; drawn one-way the way the card says', () => {
-    choice.along = 'none';
     for (const flip of [false, true]) {
       const editor = fakeEditor(town());
       const tool = streetTool.stage(editor);

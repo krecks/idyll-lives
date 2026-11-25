@@ -3,6 +3,7 @@
 
 use super::M;
 use super::common::{DOOR_R, DOOR_Y, DOOR_Z, folded, front_disc, lump, rbox};
+use artkit::forms::eased;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit::fillet;
 use artkit::materials::Mat;
@@ -246,7 +247,8 @@ fn door(f: &GameFrame, ring: Mat) -> Obj {
             "door_ring",
             &[
                 (DOOR_R - 0.035, DOOR_Z - 0.006),
-                (DOOR_R + 0.012, DOOR_Z - 0.006),
+                (DOOR_R + 0.008, DOOR_Z - 0.006), // its back edge eased
+                (DOOR_R + 0.012, DOOR_Z - 0.002),
                 (DOOR_R + 0.012, DOOR_Z + 0.006),
                 (DOOR_R + 0.004, DOOR_Z + 0.022),
                 (DOOR_R - 0.012, DOOR_Z + 0.03),
@@ -408,14 +410,17 @@ fn machine(dryer: bool) -> Vec<Obj> {
             // a wicker basket of dry washing on the top, its weave in bands, handles at its ends
             revolve!(
                 "basket",
-                &[
-                    (0.0, 0.0),
-                    (0.185, 0.0),
-                    (0.21, 0.18),
-                    (0.195, 0.18),
-                    (0.17, 0.02),
-                    (0.0, 0.02)
-                ],
+                &eased(
+                    &[
+                        (0.0, 0.0),
+                        (0.185, 0.0),
+                        (0.21, 0.18),
+                        (0.195, 0.18),
+                        (0.17, 0.02),
+                        (0.0, 0.02)
+                    ],
+                    0.004
+                ),
                 at = f.at(-0.06, 0.86, -0.14),
                 material = M.wicker_plain,
                 segments = 24,

@@ -31,7 +31,7 @@ import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
 import { BusyShare } from './busyShare';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
-import { playClip, updateVoiceVolume, type Playing } from './player';
+import { playClip, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
 import { hasClip, pauseVoice, resumeVoice, speak, stepDownVoice, voiceReady, voiceStatus, voiceThreadStats, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
@@ -223,7 +223,6 @@ export class VoiceDirector {
       return;
     }
     this.ensureLines();
-    updateVoiceVolume();
 
     const { curr, layout } = frame;
     const k = layout.sim;

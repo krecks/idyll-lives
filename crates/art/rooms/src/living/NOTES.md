@@ -16,7 +16,7 @@ Each is built where the old part stood (`F`, game axes), its back on the wall's 
   them 2 cm in 0.6 s (`squash`), held while the use lasts: `motions: {"uses": {"relax": "sink_in", "doze":
   "sink_in"}}` (the classic sofa has no `doze`). 1 draw.
 
-The seat cushions' tops are the seat heights (`characters.ts` `SEATS`, content `seat`): 0.44–0.45 m, the designer
+The seat cushions' tops are the seat heights (furniture.json `seats`, content `seat`): 0.44–0.45 m, the designer
 sofa's 0.425 m.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -25,12 +25,12 @@ sofa's 0.425 m.
 | `model.loveseat` | 1.84 × 0.83 × 0.84 m | 6,132 | 3 | Upholstery, Cushions, Legs, Pillow |
 | `model.sofaThree` | 2.82 × 0.87 × 0.86 m | 8,108 | 3 | Upholstery, Cushions, Legs, Pillows, Throw |
 | `model.sofaDesign` (brass rail and legs) | 1.87 × 0.72 × 0.82 m | 7,342 | 3 | Upholstery, Cushions, Frame, Legs |
-| `model.sofaThreeSeat` | 2.86 × 0.82 × 0.88 m | 7,108 | 3 | Upholstery, Cushions, Legs, Pillow, Second pillow |
+| `model.sofaThreeSeat` | 2.82 × 0.82 × 0.88 m | 7,092 | 3 | Upholstery, Cushions, Legs, Pillow, Second pillow |
 | `model.sectionalMiddle` | 1.00 × 0.82 × 0.88 m | 2,538 | 3 | Upholstery, Cushions, Legs |
 | `model.sectionalArmLeft` (arm at +x) | 1.00 × 0.82 × 0.88 m | 3,238 | 3 | Upholstery, Cushions, Legs |
 | `model.sectionalArmRight` (arm at −x) | 1.00 × 0.82 × 0.88 m | 3,238 | 3 | Upholstery, Cushions, Legs |
 | `model.sectionalCorner` | 1.00 × 0.82 × 0.89 m | 3,874 | 3 | Upholstery, Cushions, Legs, Pillow |
-| `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.90 m | 3,634 | 3 | Upholstery, Cushions, Legs, Throw |
+| `model.chaise` (1 × 2) | 0.96 × 0.82 × 1.84 m | 3,618 | 3 | Upholstery, Cushions, Legs, Throw |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in play (WebGPU and
 WebGL, day and night, all four facings across the set): residents sit on each, and `sink_in` plays and holds.
@@ -95,14 +95,14 @@ for the side, nesting and console tables). Still, but for two:
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.coffeeTable` | 1.30 × 0.42 × 0.74 m | 2,124 | 3 | Wood, Knob |
-| `model.coffeeTableGlass` | 1.30 × 0.60 × 0.74 m | 2,428 | 2 | Frame, Glass |
-| `model.coffeeTableMarble` | 0.88 × 0.58 × 0.88 m | 2,436 | 1 | Top, Base |
+| `model.coffeeTableGlass` | 1.30 × 0.53 × 0.74 m | 2,660 | 2 | Frame, Glass |
+| `model.coffeeTableMarble` | 0.88 × 0.54 × 0.88 m | 2,436 | 1 | Top, Base |
 | `model.sideTable` | 0.55 × 0.55 × 0.45 m | 720 | 2 | Wood, Knob |
 | `model.coffeeTableRound` | 0.84 × 0.42 × 0.84 m | 2,036 | 2 | Top, Base |
-| `model.coffeeTableLong` | 1.66 × 0.42 × 0.72 m | 1,056 | 2 | Top, Legs |
+| `model.coffeeTableLong` | 1.52 × 0.42 × 0.72 m | 1,120 | 2 | Top, Legs |
 | `model.nestingTables` | 0.57 × 0.51 × 0.55 m | 1,128 | 3 | Top, Small table, Legs |
 | `model.sideTableRound` | 0.52 × 0.56 × 0.52 m | 1,396 | 1 | Top, Base |
-| `model.consoleTable` | 1.80 × 0.80 × 0.56 m | 2,360 | 3 | Top, Legs, Baskets |
+| `model.consoleTable` | 1.60 × 0.80 × 0.44 m | 2,360 | 3 | Top, Legs, Baskets |
 
 `check-glb`: 0 failed. Khronos validator: 0 errors, 0 warnings each. Seen in play on WebGPU (each bought, all four
 facings across the set; the drawer opening while a resident flips through a magazine) and on the WebGL clips bench.
@@ -128,8 +128,8 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
   (it has no back).
 - **Display cabinet**: walnut, solid sides, a pale back, glass-look shelves (plain `gloss`, so the door is its only
   glass), ornaments; a brass-framed glass door with a brass knob, a node of its own (`door`, its origin on the hinge
-  at its left, `DOOR_HINGE`) with no clip yet: the (+use) swing needs only `swing!(door, "door_open", ..)` and a use.
-  Still, it counts 3 draws; with a clip the door's brass and glass draw on their own (4).
+  at its left, `DOOR_HINGE`), swinging +100° to the front (`door_open`); with the clip the door's brass and glass
+  draw on their own; the carcass is plain satin (as its ornaments), so 3 draws.
 - Plants on the shelves are plain satin spheres, not `foliage`, so they cost no draw; the cube shelf's bins are
   `fabric` (its second draw), the ladder shelf's basket too.
 
@@ -138,12 +138,12 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
 | `model.bookshelf` | 0.90 × 1.92 × 0.38 m | 6,836 | 3 | Frame, Back | `book_out` (read, study, homework) |
 | `model.bookcaseLow` | 0.92 × 1.17 × 0.38 m | 2,820 | 3 | Frame, Back | `book_out` (read) |
 | `model.bookcaseWide` (2 × 1) | 1.86 × 2.00 × 0.47 m | 7,244 | 3 | Frame, Back | `book_out` (read, study, homework) |
-| `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.53 m | 6,776 | 2 | Frame, Shelves | — |
+| `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.53 m | 7,540 | 2 | Frame, Shelves | — |
 | `model.bookcaseTall` | 0.90 × 2.00 × 0.34 m | 4,584 | 3 | Frame, Back | `book_out` (read, study) |
 | `model.bookcaseCorner` | 0.90 × 1.90 × 0.34 m | 4,196 | 2 | Frame, Back | `book_out` (read) |
 | `model.cubeShelf` | 0.80 × 0.80 × 0.36 m | 2,676 | 2 | Frame, Back | — |
 | `model.ladderShelf` | 0.64 × 1.80 × 0.36 m | 3,416 | 3 | Frame, Shelves | — |
-| `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 3,536 | 4 | Frame, Back | `door_open` for `openDoor` (and back for `shutDoor`): the glazed door swings 100° on its left hinge, `DOOR_HINGE` (I-living-02, 2026-10-31). 4 draws, one more than the still door's 3 (an animated node exports as its own primitives): the gate's limit, over the 3 it aims for. |
+| `model.displayCabinet` | 0.86 × 1.91 × 0.45 m | 3,760 | 3 | Frame, Back | `door_open` for `openDoor` (and back for `shutDoor`): the glazed door swings 100° on its left hinge, `DOOR_HINGE` (I-living-02, 2026-10-31). 3 draws: the carcass in a plain finish with its ornaments, the door's brass and its glass. |
 
 `check-glb`: 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each. Seen in the gallery beside the
 old parts, on the clips bench (WebGPU), and in play: the bookshelf read at (`book_out` plays, held while reading),
@@ -201,13 +201,13 @@ tables above. The helpers (common.rs):
   more triangles (the table above), the armchair (4,556) and the lounge chair (4,028) a little over their aim of
   4,000. The designer chair's arm pads, crossed in one step, are not pinched (they were, for a day, and the chair
   7 mm narrower).
-- **`leg`** (a turned leg: collar, taper, splay), **`throw`** (a throw swept over a seat's front edge,
-  wobbled), **`rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`press`** (tufts
+- **`leg`** (a turned leg: collar, taper, splay), **`rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`press`** (tufts
   pressed into a top), **`round_rings`**/**`disc`** (turned things lofted from (height, radius) rows: table
   tops with moulded edges, feet, vases, finials), **`shell`** (a dished plywood shell), **`top`** (a table top
-  with rounded corners and eased edges), **`turned_leg`**, **`knob`** (a turned knob), **`fillet`** (a polyline
-  with its corners rounded, for bent tube: a Catmull-Rom sweep through close corner points bulges past them, which
-  stood the console table 1.3 cm taller), **`basket`**, **`plant_bowl`**.
+  with rounded corners and eased edges), **`turned_leg`**, **`knob`** (a turned knob), **`basket`**, **`plant_bowl`**.
+  The throw over a seat's front edge (`kit::throw!`) and the bent tube's rounded corners (`kit::fillet`: a
+  Catmull-Rom sweep through close corner points bulges past them, which stood the console table 1.3 cm taller) are
+  the kit's.
 
 What each has now:
 
@@ -260,8 +260,8 @@ The leather armchair's cushions (`leather`), the designer chair's (`hide`) and t
 ## Built in Rust (2026-11-18)
 
 Built in Rust since 2026-11-18 (`cargo art living`), proved against the last Blender build (`ref/blender`). The cabriole legs are the
-kit's (`kit::cabriole!`). Kept as the Blender script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
-sofa bed's leg, the nesting and console tables' frames); its `_legs4` was never called and is not ported.
+kit's (`kit::cabriole!`). Its own `fillet` is gone for the kit's (the same bytes: the bed's handle, the sofa bed's leg, the nesting and console
+tables' frames); its `_legs4` was never called and is not ported.
 
 ## The bookshelf's hardbacks (2026-11-18)
 
@@ -270,3 +270,31 @@ From a showcase living room judged at the play camera. **The bookshelf's books a
 the boards, a gilt band round some spines; the same books as before (the plain row's random numbers, in order), some
 pushed up to 12 mm back (a generator of their own), one leaning on the last where a row ends short of its shelf, the
 lying ones rounded too. 4,136 → 6,836 triangles, the edges the gate counted 33 → 0.
+
+## Gate to zero (2026-11-25)
+
+Every living model clear of the gate's warnings but three the gate itself gets wrong (below):
+
+- Edges eased: the camel back's and the bergère's channels lofted (`channel`: rolled back no tighter than their
+  thickness, where the inside folded, their ends chamfered 4 mm); rolled arms (`rolled_arm`) and the designer lounge
+  chair's shells (`shell`: section corners cut, ends chamfered) through `swept`/`eased_prism`; the designer sofa's
+  arm caps (straight to the roll, curved over it: one 60 cm span overshot and folded it); the rocking chair's crest;
+  the glass table's posts and vase lip; the display cabinet's plate and cup; the ladder's rails, the corner
+  bookcase's quarter shelves and the staircases' strings (`eased_bar`); the closed flight's top tread's back edge.
+- Legs (`leg`, `cabriole`) are `tube`s: a loft laid with a sweep's UVs at one scale, so the wood isn't sheared where
+  the eased top or the cabriole's ankle changes its thickness fast (a sweep's UVs grow round it with its scale); the
+  cabriole's top eased as `leg`'s. Sofa legs 8 sides, the cabriole 10.
+- The bean bag's fabric laid face by face (`UvWay::Box`): laid round its upright, its dome and seat stretched.
+- Triangles: book page blocks set in between the boards unbevelled, a plain row's page tops a quad, the shelves'
+  oak chamfered in one step, foliage clumps 8 × 5, the box sofas' back cushions crowned in 3 steps, the bergère's seat
+  `resting`.
+- Sizes true to their kinds: the chaise 1.84 deep (its throw and seat cushion with it), the three-seater 2.82; a bud
+  vase and a low bowl of succulents on the coffee tables (under 55 cm). The console (1.80 × 0.56), the long coffee table
+  (1.66) and the industrial shelving (0.53 deep) keep their sizes: made smaller, what towns and saves keep on their
+  tops hangs over the edge and the town won't load (the sim's travel samples, grid_identity), so their kinds are left
+  to decide.
+- Left to the gate: the sofa bed's bedding and frame read stretched and dense at rest, where the grown mattress is
+  scaled to 0.2 of its length, tucked out of sight in the base (out, they are laid 1:1); the three-seaters' mattress
+  probe reads `fwd` −0.42 as a depth, where for a bed lain on `across` the renderer moves the sleeper along the sofa
+  (residents.ts `bedFwd`), so it lands on the deck behind the seat (at the footprint's middle the seat is 0.437 and
+  0.446 m).

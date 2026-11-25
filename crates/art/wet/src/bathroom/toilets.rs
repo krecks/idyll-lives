@@ -1,14 +1,15 @@
 //! The toilets: a bowl, a seat and a cistern; the lid lifts while a resident uses it.
 //!
 //! Built where the game places it, the cistern against the wall face (game depth -0.43), not centred: the game
-//! sits the resident at the footprint's middle (characters.ts SEATS, the content's `seat`), so the bowl must stay
+//! sits the resident at the footprint's middle (furniture.json `seats`, the content's `seat`), so the bowl must stay
 //! where the seat is. The seat's top is the seat height. The lid is the moving part, hinged at its back edge;
 //! `lid_up` lifts it 100° to lean on the cistern (or over the smart seat's housing). The bowl, its seat and lid
 //! are egg-shaped from above (`EGG`: narrower to the front), as an elongated bowl is.
 
 use super::M;
-use super::common::{LATHE, Lathe, WALL, lathe, rose, tube, wall_rose};
+use super::common::{LATHE, Lathe, WALL, lathe, rose, wall_rose};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, TAU, cos, sin};
 use artkit::parts::{hinged, join, new_parts};
@@ -79,6 +80,8 @@ fn foot(f: &GameFrame, z: f64, top: f64, r: f64, ratio: f64, flare: f64) {
     let rings = [
         (0.0, flare),
         (0.012, flare),
+        (0.0135, flare - 0.012), // its shoulder rolled in
+        (0.016, flare - 0.03),
         (0.03, 0.9 + 0.06 * flare),
         (top * 0.45, 0.8),
         (top * 0.8, 0.88),
@@ -242,7 +245,7 @@ fn hinges(f: &GameFrame, z: f64, y: f64, material: Mat, x: f64) {
             material,
             Lathe { verts: 10, ..LATHE },
         );
-        tube(
+        kit::tube!(
             f,
             format!("hinge{s}"),
             &[
@@ -251,9 +254,8 @@ fn hinges(f: &GameFrame, z: f64, y: f64, material: Mat, x: f64) {
             ],
             0.011,
             material,
-            10,
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
     }
 }
@@ -263,7 +265,7 @@ fn hinges(f: &GameFrame, z: f64, y: f64, material: Mat, x: f64) {
 fn roll(f: &GameFrame, x: f64, y: f64, z: f64, side: i32) {
     let ax = x - side as f64 * 0.06;
     wall_rose(f, "roll_rose", ax, y, z, 0.024, M.chrome, 0.01, 14);
-    tube(
+    kit::tube!(
         f,
         "roll_arm",
         &[
@@ -273,9 +275,8 @@ fn roll(f: &GameFrame, x: f64, y: f64, z: f64, side: i32) {
         ],
         0.0055,
         M.chrome,
-        8,
-        2,
-        1.0,
+        verts = 8,
+        round = 2
     );
     fcyl!(
         f,
@@ -285,7 +286,9 @@ fn roll(f: &GameFrame, x: f64, y: f64, z: f64, side: i32) {
         (x, y, z + 0.065),
         M.paper,
         rot = (0, 90, 0),
-        verts = 18
+        verts = 14,
+        bevel = 0.003,
+        bevel_segments = 1
     );
     fcyl!(
         f,
@@ -365,7 +368,7 @@ fn cistern_lid(f: &GameFrame, w: f64, y: f64, d: f64, material: Mat, t: f64, ste
 /// A flush lever on the cistern's front at game depth `z`: a round boss and an arm towards the middle.
 fn lever(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, ball: bool) {
     wall_rose(f, "lever_boss", x, y, z, 0.02, material, 0.012, 12);
-    tube(
+    kit::tube!(
         f,
         "lever",
         &[
@@ -376,9 +379,9 @@ fn lever(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, ball: bool) {
         ],
         0.006,
         material,
-        8,
-        2,
-        [1.0, 1.0, 0.9, 0.8],
+        verts = 8,
+        round = 2,
+        scale = [1.0, 1.0, 0.9, 0.8]
     );
     if ball {
         fsphere!(
@@ -465,7 +468,7 @@ pub fn toilet_compact() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        roll(&f, 0.33, 0.62, WALL, 1);
+        roll(&f, 0.30, 0.62, WALL, 1); // (4.5 cm clear of the cistern)
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let lid = lid(&f, zb, rim + 0.024, r, ratio, M.seat, 0.02, false);
@@ -482,15 +485,14 @@ pub fn toilet_classic() -> Vec<Obj> {
         close_coupled(&f, zb, rim, r, ratio, -0.25, 0.44, 0.4, M.seat_wood, 1.25);
         // a moulded two-step lid, a band round the cistern and a lever with a ball end
         cistern_lid(&f, 0.47, rim + 0.4, 0.185, M.cistern, 0.03, true);
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "cistern_band",
             &[(-0.195, rim + 0.06, -0.253), (0.195, rim + 0.06, -0.253)],
             0.007,
             M.cistern,
-            8,
-            1,
-            1.0,
+            verts = 8,
+            round = 1
         );
         lever(&f, -0.15, 0.76, -0.25, M.chrome, true);
     });

@@ -6,7 +6,9 @@
 //! players' hands (held `tool.cue`, one each), not on the cloth.
 
 use super::M;
-use super::common::{P, rr, turned};
+use super::common::P;
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
 use artkit::math::{P3, TAU, cos, exp, pow, sqrt};
@@ -14,6 +16,7 @@ use artkit::motion::{Grow, Squash, grow, path, squash};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
+use artkit::shapes::SHARP;
 use artkit::{fbox, fextrude, fsweep, sphere};
 
 const BALL: f64 = 0.0285;
@@ -122,7 +125,7 @@ pub fn pool_table() -> Vec<Obj> {
         }
         // the rails: one moulded frame round the bed, rounded over at the top outside edge
         let rails = [(1.25, 0.7), (-1.25, 0.7), (-1.25, -0.7), (1.25, -0.7)];
-        kit::moulding!(
+        let rails = kit::moulding!(
             f,
             "rails",
             &rails,
@@ -138,14 +141,21 @@ pub fn pool_table() -> Vec<Obj> {
             at = RAIL_TOP - 0.15,
             plane = Facing::Top
         );
+        // its mitred corners' edges eased
+        bevel_edges(rails, 0.004, 1, SHARP, &EdgeOrder::Corners);
         // the cushions: cloth noses along the rails' inside, between the pockets
-        let nose = [
-            (0.0, 0.0),
-            (0.04, 0.0),
-            (0.038, 0.012),
-            (0.026, 0.032),
-            (0.012, 0.03),
-        ];
+        // (its rubber nose rounded)
+        let nose = artkit::forms::round_at(
+            &[
+                (0.0, 0.0),
+                (0.04, 0.0),
+                (0.038, 0.012),
+                (0.026, 0.032),
+                (0.012, 0.03),
+            ],
+            3,
+            0.006,
+        );
         for s in [-1, 1] {
             let sf = s as f64;
             for (x0, x1) in [(-1.09, -0.07), (0.07, 1.09)] {
@@ -176,24 +186,28 @@ pub fn pool_table() -> Vec<Obj> {
                 } else {
                     format!("pocket{s}{}", r(x))
                 };
-                turned(
-                    &f,
+                kit::turned!(
+                    f,
                     &name,
                     x,
                     RAIL_TOP - 0.002,
                     z,
-                    &[
-                        (0.0, 0.0),
-                        (0.046, 0.0),
-                        (0.058, 0.0),
-                        (0.064, 0.003),
-                        (0.06, 0.006),
-                        (0.048, 0.005),
-                        (0.0, 0.003),
-                    ],
+                    // (the leather rolled round its lip)
+                    &artkit::forms::round_at(
+                        &[
+                            (0.0, 0.0),
+                            (0.046, 0.0),
+                            (0.058, 0.0),
+                            (0.064, 0.003),
+                            (0.06, 0.006),
+                            (0.048, 0.005),
+                            (0.0, 0.003),
+                        ],
+                        3,
+                        0.0015
+                    ),
                     M.pocket,
-                    14,
-                    P3::ONE,
+                    segments = 12
                 );
             }
             // the sights: mother-of-pearl diamonds on the rails' tops
@@ -229,9 +243,9 @@ pub fn pool_table() -> Vec<Obj> {
             }
             // turned legs, heavy, on square feet
             for sz in [-1, 1] {
-                turned(
-                    &f,
-                    &format!("leg{s}{sz}"),
+                kit::turned!(
+                    f,
+                    format!("leg{s}{sz}"),
                     sf * 1.08,
                     0.02,
                     sz as f64 * 0.5,
@@ -251,8 +265,7 @@ pub fn pool_table() -> Vec<Obj> {
                         (0.0, BED - 0.265),
                     ],
                     M.pool_frame,
-                    10,
-                    P3::ONE,
+                    segments = 10
                 );
                 fbox!(
                     f,
@@ -356,7 +369,7 @@ pub fn pool_table() -> Vec<Obj> {
             &lp,
             0,
             M.rack,
-            profile = rr(0.03, t, 0.004, 1),
+            profile = rounded_rect(0.03, t, 0.004, 1),
             closed = true
         );
     });

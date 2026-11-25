@@ -8,7 +8,8 @@
 
 import { clip, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, bump, hangArms, stand, TAU } from './idle';
-import { armIK, elbow, footIK, hang, len, lerpV, pointOn, ramp, smooth, sub, turned, wrist } from './ik';
+import { armIK, elbow, footIK, hang, len, lerpV, pointOn, ramp, sub, turned, wrist } from './ik';
+import { smooth } from '../../../../game/noise';
 import { SHARES_177, SHARES_181, sizes, type Fit, type Size } from './street';
 
 /**

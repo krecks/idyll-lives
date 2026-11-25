@@ -31,8 +31,8 @@ mod rides;
 use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "yard",
         M.palette(),
         vec![
@@ -52,7 +52,7 @@ pub fn family() -> Option<Family> {
                 .key("model.bicycle")
                 .far_low()
                 .paint(&[("city", "Frame")]),
-            Model::new("mountainBike", rides::mountain_bike, (1.832, 0.998, 0.605))
+            Model::new("mountainBike", rides::mountain_bike, (1.832, 0.998, 0.725))
                 .tolerance(0.02)
                 .key("model.mountainBike")
                 .far_low()
@@ -146,5 +146,5 @@ pub fn family() -> Option<Family> {
          picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts, the \
          washing goes out on the line a line at a time and stays out, the post waits half out of the letterbox's \
          slot and its door swings open to fetch it.",
-    ))
+    )
 }

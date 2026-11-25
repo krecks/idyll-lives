@@ -1,11 +1,11 @@
 //! The label-and-sort organizer desk and the tidy entry console.
 
-use super::common::{_flat, _m, M, PASTELS, WALL};
-use artkit::forms::rounded_rect;
+use super::common::{_flat, M, PASTELS, WALL};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
-use artkit::parts::{join, new_parts, settle};
+use artkit::parts::{aside, join, new_parts, settle};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{
@@ -25,19 +25,26 @@ const BIN: (f64, f64) = (0.0, 0.87); // the bin `drawer_open` pulls out (x, midd
 /// A storage bin: lofted, a little wider at its mouth, a label holder and a grip cut in its front.
 fn _bin(f: &GameFrame, name: &str, x: f64, y: f64, material: Mat) {
     let b = f.at(x, y - 0.095, HZ - 0.005);
-    let sections: Vec<Vec<P3>> = [(0.0, 0.94), (0.005, 0.97), (0.18, 1.0), (0.19, 1.02)]
-        .iter()
-        .map(|&(h, k)| {
-            ring!(
-                0.13 * k,
-                (HD - 0.02) / 2.0 * k,
-                z = b.z + h,
-                verts = 16,
-                square = 6,
-                at = (b.x, b.y)
-            )
-        })
-        .collect();
+    let sections: Vec<Vec<P3>> = [
+        (0.0, 0.94),
+        (0.005, 0.97),
+        (0.18, 1.0),
+        (0.186, 1.02), // (its lip rounded over)
+        (0.19, 1.012),
+        (0.192, 0.995),
+    ]
+    .iter()
+    .map(|&(h, k)| {
+        ring!(
+            0.13 * k,
+            (HD - 0.02) / 2.0 * k,
+            z = b.z + h,
+            verts = 16,
+            square = 6,
+            at = (b.x, b.y)
+        )
+    })
+    .collect();
     loft!(name, &sections, material = material);
     let face = HZ - 0.005 + (HD - 0.02) / 2.0;
     soft!(
@@ -132,7 +139,7 @@ pub fn organizer_desk() -> Vec<Obj> {
             1.6,
             0.035,
             DD,
-            (0, 0.745, DZ),
+            (0, 0.7405, DZ), // (its top at 0.758)
             M.birch,
             bevel = 0.01,
             bevel_segments = 2
@@ -179,7 +186,7 @@ pub fn organizer_desk() -> Vec<Obj> {
             1.6,
             0.02,
             HD,
-            (0, 1.22, HZ),
+            (0, 1.198, HZ), // (the hutch's top at 1.208, within a desk's height)
             M.body,
             bevel = 0.004,
             bevel_segments = 1
@@ -188,9 +195,9 @@ pub fn organizer_desk() -> Vec<Obj> {
             f,
             "hutch_back",
             1.6,
-            0.5,
+            0.456,
             0.012,
-            (0, 1.0, HZ - HD / 2.0 + 0.004),
+            (0, 0.978, HZ - HD / 2.0 + 0.004),
             M.birch
         );
         for i in 0..6 {
@@ -198,15 +205,15 @@ pub fn organizer_desk() -> Vec<Obj> {
                 f,
                 format!("divider{i}"),
                 0.02,
-                0.48,
+                0.44,
                 HD,
-                (-0.79 + i as f64 * 0.316, 1.0, HZ),
+                (-0.79 + i as f64 * 0.316, 0.98, HZ),
                 M.body,
                 bevel = 0.003,
                 bevel_segments = 1
             );
         }
-        for (r, y) in [0.87, 1.105].into_iter().enumerate() {
+        for (r, y) in [0.87, 1.095].into_iter().enumerate() {
             for i in 0..5 {
                 let x = -0.632 + i as f64 * 0.316;
                 if (x, y) != BIN {
@@ -215,7 +222,7 @@ pub fn organizer_desk() -> Vec<Obj> {
                         &format!("bin{r}{i}"),
                         x,
                         y,
-                        _m(PASTELS[(i + r * 2) % PASTELS.len()]),
+                        PASTELS[(i + r * 2) % PASTELS.len()],
                     );
                 }
             }
@@ -353,7 +360,7 @@ pub fn organizer_desk() -> Vec<Obj> {
             material = M.pastel_f,
             segments = 14
         );
-        for (k, m) in ["pastel_d", "ledger", "coral"].into_iter().enumerate() {
+        for (k, m) in [M.pastel_d, M.ledger, M.coral].into_iter().enumerate() {
             let kf = k as f64;
             fsweep!(
                 f,
@@ -363,7 +370,7 @@ pub fn organizer_desk() -> Vec<Obj> {
                     (0.598 + 0.02 * kf, 0.94 - 0.01 * kf, z - 0.08 + 0.016 * kf)
                 ],
                 0.006,
-                _m(m),
+                m,
                 verts = 6,
                 scale = [1.0, 0.9]
             );
@@ -405,22 +412,34 @@ const PANEL_TOP: f64 = 1.78; // the back panel's top, under its cap
 /// A shoe: a lofted upper rising to the heel, its opening dark, on a white sole.
 fn _shoe(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, material: Mat) {
     let b = f.at(x, y + 0.012, z);
-    let upper: Vec<Vec<P3>> = [(0.0, 1.0), (0.035, 1.0), (0.05, 0.85)]
+    let outline = smooth_outline(
+        &[
+            (0.0, -0.11),
+            (0.03, -0.09),
+            (0.038, 0.0),
+            (0.034, 0.09),
+            (0.0, 0.105),
+            (-0.034, 0.09),
+            (-0.038, 0.0),
+            (-0.03, -0.09),
+        ],
+        1,
+        true,
+    );
+    // (h, inset): its top's edge rounded in all round
+    let upper: Vec<Vec<P3>> = [(0.0, 0.0), (0.035, 0.0), (0.044, 0.003), (0.05, 0.008)]
         .iter()
-        .map(|&(h, k)| {
-            [
-                (0.0, -0.11),
-                (0.03, -0.09),
-                (0.038, 0.0),
-                (0.034, 0.09),
-                (0.0, 0.105),
-                (-0.034, 0.09),
-                (-0.038, 0.0),
-                (-0.03, -0.09),
-            ]
-            .iter()
-            .map(|&(px, py)| P3::from((b.x + px * k, b.y + py, b.z + h)))
-            .collect()
+        .map(|&(h, e)| {
+            outline
+                .iter()
+                .map(|&(px, py)| {
+                    P3::from((
+                        b.x + px * (1.0 - e / 0.038),
+                        b.y + py * (1.0 - e / 0.11),
+                        b.z + h,
+                    ))
+                })
+                .collect()
         })
         .collect();
     loft!(name, &upper, material = material);
@@ -544,12 +563,17 @@ pub fn entry_console() -> Vec<Obj> {
             M.body
         );
         // shoes, neatly paired
-        for (i, m) in ["shoe_a", "shoe_b", "shoe_c"].into_iter().enumerate() {
+        for (i, m) in [M.shoe_a, M.shoe_b, M.shoe_c].into_iter().enumerate() {
             let x = -0.27 + i as f64 * 0.27;
             for ddx in [-0.045, 0.045] {
-                _shoe(f, &format!("shoe{i}{ddx}"), x + ddx, 0.231, -0.27, _m(m));
+                _shoe(f, &format!("shoe{i}{ddx}"), x + ddx, 0.231, -0.27, m);
             }
         }
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // on top, a bowl and a vase of tulips; the back panel rising from the top with the mirror, the hooks, a tote and a
+    // scarf (a hall stand's): drawn, not the console's size
+    let over = new_parts(|| {
         // on top: a bowl, a vase of tulips
         revolve!(
             "bowl",
@@ -574,8 +598,10 @@ pub fn entry_console() -> Vec<Obj> {
                 (0.05, 0.0),
                 (0.06, 0.09),
                 (0.03, 0.19),
-                (0.034, 0.22),
-                (0.03, 0.22),
+                (0.034, 0.214),
+                (0.0335, 0.219),
+                (0.031, 0.221),
+                (0.028, 0.218),
                 (0.0, 0.2)
             ],
             at = f.at(0.28, 0.8175, -0.3),
@@ -610,7 +636,7 @@ pub fn entry_console() -> Vec<Obj> {
                     (0.0, 0.04)
                 ],
                 f.at(x, 1.198, z),
-                _m(["coral", "pastel_b", "pad", "coral", "pastel_e"][k]),
+                [M.coral, M.pastel_b, M.pad, M.coral, M.pastel_e][k],
                 yaw = -a + 90.0,
                 tilt = 10.0,
                 segments = 6
@@ -755,7 +781,12 @@ pub fn entry_console() -> Vec<Obj> {
                 (-0.3, 1.04, pz + 0.075),
                 (-0.305, 1.25, pz + 0.07),
                 (-0.33, 1.49, pz + 0.075),
-                (-0.335, 1.5, pz + 0.06),
+                // (folded over the hook in a round, 30° a step)
+                (-0.332, 1.4975, pz + 0.073),
+                (-0.334, 1.503, pz + 0.0675),
+                (-0.335, 1.505, pz + 0.06),
+                (-0.334, 1.503, pz + 0.0525),
+                (-0.332, 1.4975, pz + 0.047),
                 (-0.33, 1.49, pz + 0.045),
                 (-0.31, 1.28, pz + 0.04)
             ],
@@ -767,7 +798,7 @@ pub fn entry_console() -> Vec<Obj> {
         );
         jitter!(scarf, 0.003, size = 0.08, seed = 4.0);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&over, "over");
     // The key tray drawer: front, knob, the tray and keys inside: `tray` slides it out.
     let drawer = new_parts(|| {
         fbox!(

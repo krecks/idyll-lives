@@ -69,6 +69,18 @@ pub fn ensure(objs: &[Obj]) -> bool {
     true
 }
 
+/// Lays the textured finishes on the parts whose names start with one of `names` a box a face (`UvWay::Box`), not
+/// round their axis or along their path: a cone whose round UVs crowd towards its point, a bent spray or a short stem
+/// whose own stretch the texture over 2x. A face's box never stretches it past 1.7x.
+pub fn box_named(names: &[&str]) {
+    for part in scene::meshes() {
+        let name = part.name();
+        if names.iter().any(|n| name.starts_with(n)) {
+            part.edit(|p| p.uv = UvWay::Box);
+        }
+    }
+}
+
 fn extent(co: &[V3], i: usize) -> (f64, f64) {
     let lo = co.iter().map(|c| c[i]).fold(f32::INFINITY, f32::min);
     let hi = co.iter().map(|c| c[i]).fold(f32::NEG_INFINITY, f32::max);

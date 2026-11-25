@@ -8,8 +8,9 @@
 //! teeth; the tall cabinet's upper door onto its towels while one takes a fresh towel.
 
 use super::M;
-use super::common::{LATHE, Lathe, WALL, bends, bottle, lathe, pull, shaker, tube, wall_rose};
-use artkit::forms::rounded_rect;
+use super::common::{LATHE, Lathe, WALL, bends, bottle, lathe, pull, shaker, wall_rose};
+use artkit::forms::{Scale, rounded_rect};
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{TAU, cos, sin};
 use artkit::motion::Ease;
@@ -110,7 +111,7 @@ fn cup(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, r: f64, h: f64, materi
 fn brushes(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, colours: &[Mat]) {
     for (k, &m) in colours.iter().enumerate() {
         let s = if k % 2 == 1 { 1.0 } else { -1.0 };
-        tube(
+        kit::tube!(
             f,
             format!("{name}{k}"),
             &[
@@ -119,9 +120,8 @@ fn brushes(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, colours: &[Mat]) {
             ],
             0.0045,
             m,
-            6,
-            1,
-            1.0,
+            verts = 6,
+            round = 1
         );
         fbox!(
             f,
@@ -252,8 +252,8 @@ pub fn mirror_cabinet() -> Vec<Obj> {
             verts = 8
         );
         // a light bar over the top on an arm from the wall
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "lamp_arm",
             &bends(
                 &[
@@ -266,9 +266,8 @@ pub fn mirror_cabinet() -> Vec<Obj> {
             ),
             0.007,
             M.chrome,
-            8,
-            1,
-            1.0,
+            verts = 8,
+            round = 1
         );
         wall_rose(&f, "lamp_rose", 0, 1.935, z0, 0.02, M.chrome, 0.008, 12);
         soft!(
@@ -357,8 +356,10 @@ pub fn mirror_round() -> Vec<Obj> {
     let still = new_parts(|| {
         // the frame: a moulded section, flat at the back and rounded to the front, swept round the circle
         let moulding = vec![
-            (-0.02, -0.02),
-            (-0.02, 0.02),
+            (-0.016, -0.02), // its back corners (on the wall) eased
+            (-0.02, -0.016),
+            (-0.02, 0.016),
+            (-0.016, 0.02),
             (0.0, 0.02),
             (0.012, 0.016),
             (0.019, 0.007),
@@ -439,8 +440,8 @@ pub fn mirror_round() -> Vec<Obj> {
             0.01,
             14,
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "hook",
             &bends(
                 &[
@@ -453,9 +454,8 @@ pub fn mirror_round() -> Vec<Obj> {
             ),
             0.006,
             M.frame_brass,
-            8,
-            1,
-            1.0,
+            verts = 8,
+            round = 1
         );
     });
     join(&still, "body", Some((0, 0, 0).into()));
@@ -519,15 +519,20 @@ pub fn bath_cabinet_tall() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            tube(
-                &f,
+            kit::tube!(
+                f,
                 format!("towel{k}"),
-                &[(x, niche.0 + 0.07, -0.4), (x, niche.0 + 0.07, -0.13)],
+                // its rolled end eased 4 mm round its rim
+                &[
+                    (x, niche.0 + 0.07, -0.4),
+                    (x, niche.0 + 0.07, -0.134),
+                    (x, niche.0 + 0.07, -0.13)
+                ],
                 0.048,
                 m,
-                12,
-                1,
-                1.0,
+                verts = 12,
+                round = 1,
+                scale = Scale::List(vec![1.0, 1.0, 0.917])
             );
             fcyl!(
                 f,

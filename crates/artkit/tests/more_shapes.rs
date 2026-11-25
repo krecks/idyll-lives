@@ -1,15 +1,13 @@
-//! The torus, the outlines and a mirrored part against gamekit's in Blender 5.2 (tests/golden/more_shapes.txt): torus,
-//! rounded_rect, smooth_outline and circle as the family scripts called them, with what they made; made-up mirrored
-//! parts (no family mirrors one yet), each part then its mirror.
+//! The torus and the outlines against gamekit's in Blender 5.2 (tests/golden/more_shapes.txt): torus,
+//! rounded_rect, smooth_outline and circle as the family scripts called them, with what they made.
 mod common;
 
-use artkit::forms::{circle, mirrored, rounded_rect, smooth_outline};
+use artkit::forms::{circle, rounded_rect, smooth_outline};
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3};
+use artkit::math::P3;
 use artkit::mesh::Mesh;
 use artkit::scene::{self, Obj};
 use artkit::shapes::{Torus, torus};
-use artkit::{cube, cylinder, sphere, sweep};
 use common::*;
 
 #[derive(Clone, Debug)]
@@ -88,7 +86,7 @@ fn mat(name: &str) -> Mat {
 }
 
 /// What differs between a part and a golden mesh dump (its \`place\`, \`v\`, \`f\`, \`s\`, \`e\`, \`mats\` lines).
-fn mesh_off(obj: Obj, lines: &[&str], loose: bool) -> Vec<String> {
+fn mesh_off(obj: Obj, lines: &[&str]) -> Vec<String> {
     let (mesh, loc, rot, scale): (Mesh, _, _, _) =
         obj.read(|o| (o.mesh.clone(), o.loc, o.rot, o.scale));
     let get = |k: &str| {
@@ -126,15 +124,13 @@ fn mesh_off(obj: Obj, lines: &[&str], loose: bool) -> Vec<String> {
         .zip(&want)
         .map(|(g, w)| (0..3).map(|k| (g[k] - w[k]).abs()).fold(0.0, f32::max))
         .fold(0.0, f32::max);
-    if off > 0 && loose && apart <= 2e-7 {
-        said.push("near".to_string());
-    } else if off > 0 {
+    if off > 0 {
         said.push(format!(
             "{off} of {} points off, by up to {far} units ({apart} m)",
             want.len()
         ));
     }
-    let mut faces: Vec<String> = (0..mesh.faces.len())
+    let faces: Vec<String> = (0..mesh.faces.len())
         .map(|f| {
             mesh.corners(f)
                 .iter()
@@ -143,12 +139,7 @@ fn mesh_off(obj: Obj, lines: &[&str], loose: bool) -> Vec<String> {
                 .join(",")
         })
         .collect();
-    let mut want_faces: Vec<String> = get("f").split(' ').map(str::to_string).collect();
-    if loose {
-        // (a cylinder's faces come out of Blender's merge in an order of their own)
-        faces.sort();
-        want_faces.sort();
-    }
+    let want_faces: Vec<String> = get("f").split(' ').map(str::to_string).collect();
     if faces != want_faces {
         said.push("faces differ".to_string());
     }
@@ -203,53 +194,12 @@ fn pts_off(got: &[(f64, f64)], line: &str) -> Vec<String> {
     }
 }
 
-fn mirror_source(label: &str) -> Obj {
-    let (body, metal) = (mat("body"), mat("metal"));
-    match label {
-        "cube" => cube!(
-            "arm",
-            (0.1, 0.4, 0.05),
-            at = (0.3, 0.1, 0.5),
-            material = body,
-            rot = (10, 0, 25),
-            bevel = 0
-        ),
-        "cylinder" => cylinder!(
-            "leg",
-            0.02,
-            0.4,
-            at = (0.25, -0.2, 0.2),
-            material = metal,
-            verts = 8,
-            rot = (0, 12, 0)
-        ),
-        "sweep" => sweep!(
-            "rail",
-            &[(0.2, 0.0, 0.0), (0.25, 0.1, 0.3), (0.2, 0.3, 0.5)],
-            0.01,
-            material = metal,
-            verts = 5
-        ),
-        "scaled" => sphere!(
-            "knob",
-            0.03,
-            at = (0.1, 0.2, 0.3),
-            material = metal,
-            segments = 8,
-            rings = 5,
-            scale = (1, 1.5, 0.7)
-        ),
-        other => panic!("{other}"),
-    }
-}
-
 #[test]
-fn tori_outlines_and_mirrors_are_gamekits_in_blender() {
+fn tori_and_outlines_are_gamekits_in_blender() {
     let text = golden("more_shapes.txt");
     let lines: Vec<&str> = text.lines().collect();
-    // per function: (calls, to the bit, the same to single precision, within a fifth of a micrometre)
-    let mut by: std::collections::BTreeMap<String, (usize, usize, usize, usize)> =
-        Default::default();
+    // per function: (calls, to the bit, the same to single precision)
+    let mut by: std::collections::BTreeMap<String, (usize, usize, usize)> = Default::default();
     let mut bad = Vec::new();
     let mut i = 0;
     while i < lines.len() {
@@ -295,7 +245,7 @@ fn tori_outlines_and_mirrors_are_gamekits_in_blender() {
                     arg("minor_radius").unwrap().num(),
                     o,
                 );
-                mesh_off(obj, body, false)
+                mesh_off(obj, body)
             }
             "rounded_rect" => {
                 let n = |k: &str| arg(k).unwrap().num();
@@ -326,19 +276,6 @@ fn tori_outlines_and_mirrors_are_gamekits_in_blender() {
                     body[0].strip_prefix("pts ").unwrap(),
                 )
             }
-            "mirrored" => {
-                let axis = match arg("axis") {
-                    Some(Val::Str(a)) if a == "Y" => Axis::Y,
-                    Some(Val::Str(a)) if a == "Z" => Axis::Z,
-                    _ => Axis::X,
-                };
-                let obj = mirror_source(head[5]);
-                let copy = mirrored(obj, axis, None);
-                let second = body.iter().rposition(|l| l.starts_with("place ")).unwrap();
-                let mut said = mesh_off(obj, &body[..second], true);
-                said.extend(mesh_off(copy, &body[second..], true));
-                said
-            }
             other => panic!("{other}"),
         };
         let e = by.entry(func.to_string()).or_default();
@@ -349,10 +286,6 @@ fn tori_outlines_and_mirrors_are_gamekits_in_blender() {
             // the same points as singles: the double a unit out, from the C library's cosine or sine (Apple's in
             // Blender, the libm crate's here)
             e.2 += 1;
-        } else if said.iter().all(|s| s == "near") {
-            // a mirror's points through the mirroring matrix taken apart into Euler angles and put back together
-            // (a half turn about an axis, single precision): within a fifth of a micrometre
-            e.3 += 1;
         } else {
             bad.push(format!(
                 "{} {} {func}: {}",
@@ -364,8 +297,8 @@ fn tori_outlines_and_mirrors_are_gamekits_in_blender() {
     }
     let report: Vec<String> = by
         .iter()
-        .map(|(k, (n, ok, single, near))| {
-            format!("{k}: {ok} of {n} Blender's to the bit, {single} to single precision, {near} within 0.2 um")
+        .map(|(k, (n, ok, single))| {
+            format!("{k}: {ok} of {n} Blender's to the bit, {single} to single precision")
         })
         .collect();
     println!("{}", report.join("\n"));

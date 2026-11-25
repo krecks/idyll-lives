@@ -26,12 +26,12 @@ mod oven;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_foodie",
         M.palette(),
         vec![
-            Model::new("herbGarden", garden::herb_garden, (0.86, 1.293, 0.763))
+            Model::new("herbGarden", garden::herb_garden, (0.86, 1.209, 0.4))
                 .key("model.foodie.herbGarden")
                 .centre(0.0, -0.054)
                 .motions(json!({"uses": {"tendHerbs": "sprig"}}))
@@ -46,18 +46,18 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, -0.18)
                 .motions(json!({"uses": {"espresso": "brew", "latteArt": "brew", "pour": "brew"}, "hold": 4.0}))
                 .paint(&[("teal", "Body"), ("oak_top", "Worktop"), ("machine", "Machine")]),
-            Model::new("cookbookLectern", cafe::cookbook_lectern, (0.836, 1.147, 0.588))
+            Model::new("cookbookLectern", cafe::cookbook_lectern, (0.56, 1.149, 0.407))
                 .key("model.foodie.cookbookLectern")
                 .centre(0.022, -0.123)
                 .motions(json!({"uses": {"studyRecipes": "page", "foodMagazines": "page"}}))
                 .paint(&[("walnut", "Body"), ("honey_wood", "Stool & ledge"), ("cover", "Cookbook")]),
-            Model::new("pizzaOven", oven::pizza_oven, (1.89, 1.9, 0.916))
+            Model::new("pizzaOven", oven::pizza_oven, (1.57, 1.9, 0.913))
                 .key("model.foodie.pizzaOven")
                 .centre(0.005, 0.018)
                 // a bake (the pizza, or any `bake` step of a recipe at it) takes the door off and lights the fire
                 .motions(json!({"uses": {"bakePizza": ["door_off", "flames"], "bake": ["door_off", "flames"], "warmUp": "flames"}}))
                 .paint(&[("plaster", "Body"), ("worktop", "Worktop"), ("brick", "Brick")]),
-            Model::new("chefsIsland", island::chefs_island, (1.86, 1.128, 0.889))
+            Model::new("chefsIsland", island::chefs_island, (1.86, 1.075, 0.889))
                 .key("model.foodie.chefsIsland")
                 .centre(0.0, 0.0154)
                 // the drawer opens for the prep step's utensils (chop), the ring under the pan glows while it cooks
@@ -69,5 +69,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sprig \
          grows, the pantry doors swing, the coffee runs, a page turns, the oven door lifts aside for the peel as the \
          fire grows, and the island's drawer pulls out.",
-    ))
+    )
 }

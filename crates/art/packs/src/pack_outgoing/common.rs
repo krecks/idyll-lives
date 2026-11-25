@@ -5,6 +5,7 @@ use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
 use artkit::place::GameFrame;
 use artkit::{fcone, fcyl, fsweep, loft, palette, revolve, ring, soft, torus};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 palette! { M:
     body = ("#E8735A", satin),       // coral: the bar's counter, the desk frame, the stage, the floor's frame
@@ -67,20 +68,16 @@ palette! { M:
     pin_b = ("#3E8EDE", gloss),
 }
 
-// By name: as the palette's own names.
-pub const TILES: [&str; 6] = ["tile_a", "tile_b", "tile_c", "tile_d", "tile_e", "tile_f"];
-pub const BOTTLES: [&str; 8] = [
-    "bottle_a", "bottle_b", "bottle_c", "bottle_d", "bottle_e", "bottle_f", "magenta", "turq",
+// Colours in turn.
+pub const TILES: [Mat; 6] = [M.tile_a, M.tile_b, M.tile_c, M.tile_d, M.tile_e, M.tile_f];
+pub const BOTTLES: [Mat; 8] = [
+    M.bottle_a, M.bottle_b, M.bottle_c, M.bottle_d, M.bottle_e, M.bottle_f, M.magenta, M.turq,
 ];
-pub const PHOTOS: [&str; 8] = [
-    "coral", "turq", "sunny", "magenta", "photo_b", "photo_a", "photo_c", "beer",
+pub const PHOTOS: [Mat; 8] = [
+    M.coral, M.turq, M.sunny, M.magenta, M.photo_b, M.photo_a, M.photo_c, M.beer,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
-
-pub fn _m(name: &str) -> Mat {
-    M.palette().get(name)
-}
+pub use artkit::kit::WALL;
 
 /// A spirit bottle standing on `y`: a body (round, or square as a whisky's), its label, a shoulder, neck and cap.
 #[allow(clippy::too_many_arguments)]
@@ -95,14 +92,15 @@ pub fn _bottle(
     square: bool,
 ) {
     let b = f.at(x, y, z);
-    let sq = if square { 5 } else { 2 };
+    // (a square one no squarer than 2.6: its eight points then turn under 60° at the corners, not edges that show)
+    let sq = if square { 2.6 } else { 2.0 };
     let sections: Vec<Vec<P3>> = [
         (0.0, 0.94, sq),
         (0.02, 1.0, sq),
         (0.6, 1.0, sq),
-        (0.72, 0.7, 2),
-        (0.8, 0.34, 2),
-        (1.0, 0.34, 2),
+        (0.72, 0.7, 2.0),
+        (0.8, 0.34, 2.0),
+        (1.0, 0.34, 2.0),
     ]
     .iter()
     .map(|&(t, k, s)| {
@@ -230,7 +228,7 @@ pub fn _stool(f: &GameFrame, name: &str, x: f64, z: f64, h: f64) {
         at = f.at(x, 0.28, z),
         material = M.brass,
         major_segments = 18,
-        minor_segments = 5
+        minor_segments = 4
     );
     for a in [0, 120, 240] {
         // the foot ring's struts
@@ -294,17 +292,20 @@ pub fn _speaker(
         let r = w * if k == 0 { 0.36 } else { 0.2 };
         revolve!(
             format!("{name}_cone{k}"),
-            &[
-                (0.0, -0.002),
-                (r * 1.08, -0.002),
-                (r * 1.08, 0.004),
-                (r, 0.01),
-                (r * 0.82, 0.004),
-                (r * 0.32, -0.012),
-                (r * 0.3, -0.006),
-                (r * 0.2, 0.0),
-                (0.0, 0.004)
-            ],
+            &eased(
+                &[
+                    (0.0, -0.002),
+                    (r * 1.08, -0.002),
+                    (r * 1.08, 0.004),
+                    (r, 0.01),
+                    (r * 0.82, 0.004),
+                    (r * 0.32, -0.012),
+                    (r * 0.3, -0.006),
+                    (r * 0.2, 0.0),
+                    (0.0, 0.004)
+                ],
+                AUTO_WIDTH
+            ),
             at = f.at(x, cy, zf),
             material = if k != 0 { M.dark } else { M.coral },
             segments = 16,

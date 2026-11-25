@@ -18,8 +18,8 @@ mod pod;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_energetic",
         M.palette(),
         vec![
@@ -37,7 +37,7 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, 0.022)
                 .motions(json!({"loops": {"bounce": "bounce"}}))
                 .paint(&[("tramp_frame", "Frame"), ("tramp_pad", "Pads"), ("tramp_mat", "Mat")]),
-            Model::new("streetballHoop", play::streetball_hoop, (0.86, 2.833, 0.886))
+            Model::new("streetballHoop", play::streetball_hoop, (0.86, 2.918, 0.886))
                 .key("model.energetic.streetballHoop")
                 .centre(0.0, 0.013)
                 .motions(json!({"uses": {"shoot": [{"clip": "swish", "delay": 1.4, "every": 3.2}, "ball_taken"]}}))
@@ -65,5 +65,5 @@ pub fn family() -> Option<Family> {
          manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group. The bike's cranks turn and the trampoline's mat dips while used (loops), the net sways, the \
          blender's lid lifts, the rain grows and the pod's canopy lowers; the bouldering wall is still.",
-    ))
+    )
 }

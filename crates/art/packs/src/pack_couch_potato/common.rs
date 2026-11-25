@@ -1,15 +1,14 @@
 //! What the couch potato pack is built from: its palette, pleated curtains, speaker drivers, screens and snacks.
 
 use artkit::materials::Mat;
-use artkit::math::{PI, V3, atan2, cosd, sind};
-use artkit::parts::{numbered, turn};
+use artkit::math::{PI, atan2, cosd, sin, sind};
+use artkit::parts::numbered;
 use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
 use artkit::scene::Obj;
 use artkit::{fbox, fextrude, fsphere, kit, object_of, palette, revolve};
 
 use artkit::forms::rounded_rect;
-use artkit::math::Axis;
 
 palette! { M:
     // the cinema wall
@@ -98,62 +97,35 @@ pub fn pleats(
     mat: Mat,
     t: f64,
 ) -> Obj {
-    let n = folds * 4;
     let h = y1 - y0;
+    // (the hem and the heading 11.5 mm thick at most: thinner than a hard edge's 12 mm faces)
     let rows = [
-        (y0, 1.0, 1.5, 0.0),
-        (y0 + 0.012, 1.0, 1.5, 0.02),
+        (y0, 1.0, 1.15, 0.0),
+        (y0 + 0.012, 1.0, 1.15, 0.02),
         (y0 + 0.04, 1.0, 1.0, 0.05),
         (y0 + h * 0.45, 0.9, 1.0, 0.25),
         (y1 - 0.06, 0.7, 1.0, 0.4),
-        (y1 - 0.05, 0.4, 1.3, 0.42),
-        (y1, 0.36, 1.3, 0.42),
+        (y1 - 0.05, 0.4, 1.15, 0.42),
+        (y1, 0.36, 1.15, 0.42),
     ];
-    let (mut verts, mut m) = (Vec::new(), 0);
-    for &(y, af, tf, phase) in &rows {
-        let front: Vec<(f64, f64)> = (0..=n)
-            .map(|k| {
-                (
-                    x0 + (x1 - x0) * k as f64 / n as f64,
-                    amp * af
-                        * artkit::math::sin(2.0 * PI * folds as f64 * k as f64 / n as f64 + phase)
-                        + t * tf / 2.0,
-                )
-            })
+    let (verts, faces) = kit::pleats!(f, &rows, x0, x1, z, folds, amp, t);
+    // its side hems: a cord down each end, where the cloth's end is (the folds end where they start)
+    for x in [x0, x1] {
+        let down: Vec<(f64, f64, f64)> = rows
+            .iter()
+            .map(|&(y, af, _, phase)| (x, y, z + amp * af * sin(phase)))
             .collect();
-        let mut ring = front.clone();
-        ring.extend(front.iter().rev().map(|&(u, o)| (u, o - t * tf)));
-        m = ring.len();
-        verts.extend(ring.iter().map(|&(u, o)| f.at(u, y, z + o)));
-    }
-    let m = m as u32;
-    let mut faces: Vec<Vec<u32>> = Vec::new();
-    for r in 0..rows.len() as u32 - 1 {
-        let (a, b) = (r * m, (r + 1) * m);
-        faces.extend((0..m).map(|i| vec![a + i, a + (i + 1) % m, b + (i + 1) % m, b + i]));
-    }
-    let n = n as u32;
-    for base in [0, (rows.len() as u32 - 1) * m] {
-        faces.extend(
-            (0..n).map(|k| vec![base + k, base + k + 1, base + m - 2 - k, base + m - 1 - k]),
+        kit::tube!(
+            f,
+            numbered("side_hem"),
+            &down,
+            0.0065,
+            mat,
+            verts = 5,
+            round = 1
         );
     }
     object_of!(name, &verts, &faces, &[mat], sharp = 70)
-}
-
-/// Turns a model built in place half a turn about the footprint's middle (each part about its own origin,
-/// which moves round with it), as pack_bookworm turned the writer's bureau. A part's slides then go the other way.
-pub fn turn_round(objs: &[Obj]) {
-    for &o in objs {
-        turn(o, 180.0, Axis::Z);
-        o.edit(|p| {
-            p.loc = V3 {
-                x: -p.loc.x,
-                y: -p.loc.y,
-                z: p.loc.z,
-            }
-        });
-    }
 }
 
 /// A speaker driver at (x, y) on a face at depth `z`, facing +z (`facing` 1) or -z: its flange, a rolled
@@ -173,7 +145,9 @@ pub fn driver(
         (r + 0.012, -0.008),
         (r + 0.012, 0.002),
         (r + 0.004, 0.004),
-        (r - 0.002, 0.009),
+        // (the surround's crest rolled over in two turns, not one)
+        (r - 0.0005, 0.0085),
+        (r - 0.0035, 0.0085),
         (r - 0.008, 0.004),
         (r * 0.36, -0.02),
         (r * 0.3, -0.016),

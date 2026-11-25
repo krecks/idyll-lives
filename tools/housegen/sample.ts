@@ -19,13 +19,15 @@
  * with a household in it (or a shell): checked here as homes are, each flat's layout the same
  * whoever lives there, and priced (flats the cheapest homes); a building of flats made in 15 ms
  * or less (the median). The simulation checks each flat is reached from the street door, has a
- * toilet in a bathroom and beds for its household.
+ * toilet in a bathroom and beds for its household. A problem too when fewer than 90 % of the houses
+ * tried are made.
  *
- * Run: bun tools/housegen/sample.ts out.json [houses per lot size] [buildings of flats]
+ * `--no-timing`: the flats' time not checked against its 15 ms (a run beside others, on a slow machine).
+ *
+ * Run: bun tools/housegen/sample.ts out.json [houses per lot size] [buildings of flats] [--no-timing]
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import type { Economy, ObjectDef } from '../../web/src/content/content.ts';
 import type { GardenSize, HouseGenConfig, Residents } from '../../web/src/game/housegen.ts';
 import type { Door, Facing, HouseTemplate, Placement, PlannedRoom } from '../../web/src/game/town.ts';
 
@@ -40,18 +42,16 @@ const ROW_COVER: [number, number] = [0.3, 0.6];
 
 const root = new URL('../../web/public/content/', import.meta.url);
 const cfg = JSON.parse(readFileSync(new URL('housegen.json', root), 'utf8')) as HouseGenConfig;
-type ContentFile = { objects?: ObjectDef[]; include?: string[]; roomRules?: { lampTiles?: number; windowTiles?: number }; economy?: Partial<Economy> };
-const baseFile = JSON.parse(readFileSync(new URL('base.json', root), 'utf8')) as ContentFile;
-// Objects of base.json and the files it includes (the catalogue in furniture.json, the garden, packs).
-const base = {
-  objects: [baseFile, ...(baseFile.include ?? []).map((f) => JSON.parse(readFileSync(new URL(f, root), 'utf8')) as ContentFile)].flatMap((f) => f.objects ?? []),
-};
+// The content as the game loads it (base.json and the files it includes, merged by `mergeContent`).
+Object.assign(globalThis, { location: { href: root.href, search: '' } });
+const { Content } = await import('../../web/src/content/content.ts');
+const content = await Content.load(new URL('base.json', root).href);
 const houses = JSON.parse(readFileSync(new URL('houses.json', root), 'utf8')) as { plot: { width: number; depth: number }; lotSizes: Record<string, { width: number; depth: number }> };
-// The first definition of each object, with `Content.radius`'s default and limits.
-const byId = new Map<string, ObjectDef>();
-for (const o of base.objects) if (!byId.has(o.id)) byId.set(o.id, o);
-const info = objectInfos({ object: (id) => byId.get(id), radius: (d) => Math.max(0.02, Math.min(0.45, d?.radius ?? 0.12)) });
+const info = objectInfos(content);
 
+/** `--no-timing`: the flats' time not checked against its budget (`tools/ci-local.sh generated`). */
+const timing = !process.argv.includes('--no-timing');
+if (!timing) process.argv.splice(process.argv.indexOf('--no-timing'), 1);
 const out = process.argv[2] ?? 'houses.json';
 const perSize = Number(process.argv[3] ?? 60);
 const towns: unknown[] = [];
@@ -65,11 +65,11 @@ const households: [string, Residents | undefined][] = [
 const problems: string[] = [];
 const kidsOnly = cfg.residents?.kidsOnly;
 const forKids = (def: string) => {
-  const o = byId.get(def);
+  const o = content.object(def);
   return !!o && !!(kidsOnly?.categories?.includes(o.category ?? '') || kidsOnly?.groups?.includes(o.group ?? ''));
 };
 const bedIds = new Set(Object.values(cfg.residents?.beds ?? {}).flat());
-const isBed = (def: string) => byId.get(def)?.group === 'beds' || bedIds.has(def);
+const isBed = (def: string) => content.object(def)?.group === 'beds' || bedIds.has(def);
 /** The layout alone (walls, doors, windows, rooms' places), to compare houses furnished for different households. */
 const layout = (h: HouseTemplate) =>
   JSON.stringify([h.walls, h.doors, h.windows, h.upper?.walls, h.upper?.doors, h.basement?.walls, h.basement?.doors, ...[h.rooms, h.upper?.rooms, h.basement?.rooms].map((rs) => rs?.map((r) => [r.x, r.z, r.w, r.d]))]);
@@ -94,9 +94,9 @@ function furnishingProblems(all: Placement[], bedrooms: number, who: Residents |
   if (tooSmall.length) out.push(`a child's bed a child here may not sleep in: ${[...new Set(tooSmall.map((o) => o.def))].join(', ')}`);
   if (who) {
     const beds = all.filter((o) => isBed(o.def));
-    const doubles = beds.filter((o) => (byId.get(o.def)?.slots ?? 1) >= 2).length;
+    const doubles = beds.filter((o) => (content.object(o.def)?.slots ?? 1) >= 2).length;
     // Places to sleep (a bunk bed has two); short of bedrooms two share one, so two a room at most.
-    const places = beds.reduce((n, o) => n + (byId.get(o.def)?.slots ?? 1), 0);
+    const places = beds.reduce((n, o) => n + (content.object(o.def)?.slots ?? 1), 0);
     if (places < sleepers(who, bedrooms)) out.push(`${places} places to sleep for ${2 * who.couples + who.adults + who.children}`);
     if (who.couples && doubles < who.couples) out.push('no bed for two for the couple');
   }
@@ -140,14 +140,14 @@ const CLASSES = Object.values(cfg.classes)
   .filter((c) => c !== 'flat');
 /** Per house class, and per class and garden size: the houses' prices (as `price.ts` prices a home on its lot). */
 const prices = new Map<string, number[]>();
-const objectPrice = (def: string) => byId.get(def)?.price ?? 0;
+const objectPrice = (def: string) => content.object(def)?.price ?? 0;
 // A farm lot's house is a large lot's (town.ts `houseLot`).
 for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => size !== 'farm')) {
   for (let seed = 1; seed <= perSize; seed++) {
     stats.tried++;
     const garden = GARDEN_SIZES[seed % GARDEN_SIZES.length];
     const name = `${size} ${seed * 7919} ${garden}`;
-    const variants = households.map(([name, who]) => [name, who, generateHouse(cfg, info, lot, houses.plot, size, seed * 7919, baseFile.roomRules?.lampTiles, baseFile.roomRules?.windowTiles, who, garden)] as const);
+    const variants = households.map(([name, who]) => [name, who, generateHouse(cfg, info, lot, houses.plot, size, seed * 7919, content.lampTiles, content.windowTiles, who, garden)] as const);
     if (variants.some(([, , v]) => !v !== !variants[0][2])) problems.push(`${name}: made for some households, not others`);
     for (const [household, who, v] of variants) {
       if (!v) continue;
@@ -160,6 +160,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     stats.made++;
     // A garden door: in the back wall, else a side wall (none where the stairs and a room's only window take it).
     const ground = h.rooms ?? [];
+    if (!ground.length) problems.push(`${name}: no rooms planned`);
     const [x0, x1, z0, z1] = [Math.min(...ground.map((r) => r.x)), Math.max(...ground.map((r) => r.x + r.w)), Math.min(...ground.map((r) => r.z)), Math.max(...ground.map((r) => r.z + r.d))];
     // The lot cut to fit it: inside it, and covered no more and no less than its garden size says.
     if (!h.lot) problems.push(`${name}: no lot cut to fit the house`);
@@ -180,7 +181,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     const cls = h.class;
     if (!cls) problems.push(`${name}: no house class`);
     else {
-      const [bare, rates] = [variants[0][2]!, baseFile.economy?.homePrice];
+      const [bare, rates] = [variants[0][2]!, content.economy.homePrice];
       const { width, depth } = bare.lot ?? lot;
       const { total } = priceOf(objectPrice, rates, bare, width, depth);
       for (const k of [cls, `${cls} ${garden}`]) prices.set(k, [...(prices.get(k) ?? []), total]);
@@ -190,11 +191,11 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     if (h.upper) stats.two++;
     if (h.basement) stats.basements++;
     const all = [...h.objects, ...(h.upper?.objects ?? []), ...(h.basement?.objects ?? [])];
-    stats.value += all.reduce((n, o) => n + (byId.get(o.def)?.price ?? 0), 0);
-    const seats = all.filter((o) => byId.get(o.def)?.seatAt).length;
+    stats.value += all.reduce((n, o) => n + (content.object(o.def)?.price ?? 0), 0);
+    const seats = all.filter((o) => content.object(o.def)?.seatAt).length;
     stats.seats += seats;
     if (seats) stats.dining++;
-    stats.tops += all.filter((o) => byId.get(o.def)?.layer === 'surface').length;
+    stats.tops += all.filter((o) => content.object(o.def)?.layer === 'surface').length;
     for (const r of [...(h.rooms ?? []), ...(h.upper?.rooms ?? []), ...(h.basement?.rooms ?? [])]) {
       const k = kinds.get(r.kind) ?? { n: 0, area: 0, most: 0, long: 0 };
       kinds.set(r.kind, { n: k.n + 1, area: k.area + r.w * r.d, most: Math.max(k.most, r.w * r.d), long: Math.max(k.long, r.w, r.d) });
@@ -208,7 +209,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
     const pad = Object.values(cfg.classes).some((c) => c.row && c.label === h.class) ? 1 : 0;
     const turn = turner(pad, pad, width, depth, facing);
     const [W, D] = facing % 2 ? [depth + 2 * pad, width + 2 * pad] : [width + 2 * pad, depth + 2 * pad];
-    const footprint = (def: string): [number, number] => byId.get(def)?.footprint ?? [1, 1];
+    const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
     // The storey above `D` rows down, the basement on the rows after every storey's (as `town.ts` puts them).
     const storeys = h.upper ? 2 : 1;
     const floors = [[h, 0], [h.upper, D], [h.basement, storeys * D]] as const;
@@ -255,7 +256,7 @@ for (const [size, lot] of Object.entries(houses.lotSizes).filter(([size]) => siz
 const { flatsTemplate, flatName, flatsStats, floorsId, overId, placeFloors } = await import('../../web/src/game/flats.ts');
 const { flatPriceOf } = await import('../../web/src/game/price.ts');
 type Furnished = Residents | 'shell' | undefined;
-const templates = { ...houses, houses: [], parks: (houses as unknown as { parks: unknown[] }).parks, gen: cfg, info, lampTiles: baseFile.roomRules?.lampTiles, windowTiles: baseFile.roomRules?.windowTiles } as unknown as import('../../web/src/game/town.ts').Templates;
+const templates = { ...houses, houses: [], parks: (houses as unknown as { parks: unknown[] }).parks, gen: cfg, info, lampTiles: content.lampTiles, windowTiles: content.windowTiles } as unknown as import('../../web/src/game/town.ts').Templates;
 type Storey = { walls: [number, number, number, number][]; doors: Door[]; windows?: Door[]; objects: (Placement & { unit?: number })[]; rooms?: PlannedRoom[] };
 /**
  * A building as a town of its own: `lot` turned `facing`, its `storeys` floors (each a list of
@@ -265,7 +266,7 @@ type Storey = { walls: [number, number, number, number][]; doors: Door[]; window
 function buildingTown(lot: { width: number; depth: number }, facing: Facing, floors: Storey[][], outside: (Placement & { unit?: number })[], ground: { name: string; entry: [number, number]; public: boolean; kind: string }, flats: { rect: { x: number; z: number; w: number; d: number }; storey: number; door: [number, number]; inside: [number, number]; entry: [number, number] }[], who: Furnished[]) {
   const turn = turner(0, 0, lot.width, lot.depth, facing);
   const [W, D] = facing % 2 ? [lot.depth, lot.width] : [lot.width, lot.depth];
-  const footprint = (def: string): [number, number] => byId.get(def)?.footprint ?? [1, 1];
+  const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
   const all = floors.flatMap((list, k) => list.map((f) => [f, k * D] as const));
   const tileOn = ([x, z]: [number, number], lift: number): [number, number] => {
     const [cx, cz] = turn.point([x + 0.5, z + 0.5]);
@@ -305,7 +306,7 @@ const perFlats = Number(process.argv[4] ?? 24);
 function checkFlat(label: string, u: { rect: { x: number; z: number; w: number; d: number }; bedrooms: number; door: [number, number]; inside: [number, number]; layout: { walls: unknown; doors: Door[]; windows: unknown; objects: Placement[]; rooms: PlannedRoom[] } }, bare: typeof u, who: Furnished) {
   if (flatLayout(u.layout) !== flatLayout(bare.layout)) problems.push(`${label}: another layout`);
   if (who === 'shell') {
-    const loose = u.layout.objects.filter((o) => isBed(o.def) || byId.get(o.def)?.group === 'seating' || (byId.get(o.def)?.category === 'living' && o.def !== cfg.stairs));
+    const loose = u.layout.objects.filter((o) => isBed(o.def) || content.object(o.def)?.group === 'seating' || (content.object(o.def)?.category === 'living' && o.def !== cfg.stairs));
     if (loose.length) problems.push(`${label}: a shell with ${[...new Set(loose.map((o) => o.def))].join(', ')}`);
     if (!u.layout.objects.some((o) => o.def === 'toilet' || o.def === 'toiletCompact')) problems.push(`${label}: a shell without a toilet`);
     return;
@@ -317,7 +318,7 @@ function checkFlat(label: string, u: { rect: { x: number; z: number; w: number; 
   if (inFlat(...u.door, u.rect) || !inFlat(ix, iz, u.rect)) problems.push(`${label}: its door at ${u.door} isn't from the hall`);
   for (const p of planProblems(u.layout.rooms, u.layout.doors, (r) => inFlat(ix, iz, r))) problems.push(`${label}: ${p}`);
   for (const o of u.layout.objects) {
-    const [fw, fd] = byId.get(o.def)?.footprint ?? [1, 1];
+    const [fw, fd] = content.object(o.def)?.footprint ?? [1, 1];
     const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
     if (!inFlat(o.x, o.z, u.rect) || !inFlat(o.x + w - 1, o.z + d - 1, u.rect)) problems.push(`${label}: the ${o.def} at ${o.x},${o.z} is out of the flat`);
   }
@@ -340,7 +341,7 @@ for (let seed = 1; seed <= perFlats; seed++) {
   flatStats.shells += who.filter((w) => w === 'shell').length;
   flatStats.bays += b.bays.length;
   b.units.forEach((u, i) => checkFlat(`${id} flat ${i + 1}`, u, bare.units[i], who[i]));
-  for (const i of bare.units.keys()) flatPrices.push(flatPriceOf(objectPrice, baseFile.economy?.homePrice, bare, i).total);
+  for (const i of bare.units.keys()) flatPrices.push(flatPriceOf(objectPrice, content.economy.homePrice, bare, i).total);
   if (b.outside.filter((o) => o.unit !== undefined).length !== b.units.length) problems.push(`${id}: ${b.outside.filter((o) => o.unit !== undefined).length} letterboxes for ${b.units.length} flats`);
   const floors: Storey[][] = b.shell.map((s, k) => [s, ...b.units.filter((u) => u.storey === k).map((u) => u.layout)]);
   const facing = (seed % 4) as Facing;
@@ -394,9 +395,10 @@ buildMs.sort((a, b) => a - b);
 const atShare = (q: number) => buildMs[Math.min(buildMs.length - 1, Math.floor(q * buildMs.length))];
 console.log(`${flatStats.buildings} buildings of flats (${flatStats.flats} flats, ${flatStats.shells} shells, ${flatStats.bays} bays), ${flatStats.over} places with ${flatStats.overFlats} flats over them, ${flatStats.floors} places with ${flatStats.floorRooms} rooms on storeys above`);
 console.log(`  a building of flats in ${atShare(0.5).toFixed(1)} ms (median; 90%: ${atShare(0.9).toFixed(1)}, most ${atShare(1).toFixed(1)}), ${flatsStats.made} made in ${flatsStats.ms.toFixed(0)} ms in all`);
-if (atShare(0.5) > 15) problems.push(`a building of flats takes ${atShare(0.5).toFixed(1)} ms (median), more than 15`);
+if (timing && atShare(0.5) > 15) problems.push(`a building of flats takes ${atShare(0.5).toFixed(1)} ms (median), more than 15`);
 if (flatPrices.length) prices.set('flat', flatPrices);
 
+if (stats.made < stats.tried * 0.9) problems.push(`only ${stats.made} of ${stats.tried} houses made`);
 writeFileSync(out, JSON.stringify(towns));
 console.log(`${stats.made} of ${stats.tried} houses made (${stats.two} with two storeys, ${stats.basements} with a basement) → ${out}`);
 const per = (n: number) => (n / Math.max(1, stats.made)).toFixed(1);

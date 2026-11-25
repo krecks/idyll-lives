@@ -1,15 +1,15 @@
 //! G2, the flower beds: tulips, daffodils, daisies, sunflowers, poppies, marigolds, pansies, lilies, lupins,
 //! forget-me-nots and cosmos, each on its soil mound.
 
-use artkit::botany::{clumps, fit_to, palette, polar};
+use artkit::botany::{clumps, fit_to, lupin_spike, palette, polar};
 use artkit::far::{is_low, low};
 use artkit::math::{V3, v3};
 use artkit::parts::{join_all, settle};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{
-    _put, cupped, cut_leaf, florets, lump, lupin_spike, mound, outline, pinnate, rays, rosettes,
-    sphere, spiral, stalk, tulip_head, twig,
+    _put, cupped, cut_leaf, florets, lump, mound, outline, pinnate, rays, rosettes, sphere, spiral,
+    stalk, tulip_head, twig,
 };
 
 /// Tulips: a soil mound of tulips in five colours, closed cups of petals on straight, slightly bowed stems, broad
@@ -171,19 +171,20 @@ pub fn daisies() -> Vec<Obj> {
     let mut rng = Random::new(53);
     let top = mound!(&p);
     rosettes!(
-        &p,
         &mut rng,
         5,
         0.3,
         top - 0.01,
         &[m("leaf"), m("leaf_dark"), m("leaf_light")],
         leaves = 4,
-        length = 0.17,
-        width = 0.065,
+        // (a lawn daisy's spoon-shaped leaves, under its flowers)
+        length = 0.12,
+        width = 0.05,
         tilt = (15.0, 35.0)
     );
     for (i, (x, y, _)) in spiral!(15, 0.38, &mut rng).into_iter().enumerate() {
-        let h = rng.uniform(0.25, 0.36);
+        // (lawn daisies, Bellis perennis: a carpet flowering 8-15 cm up, a large-flowered kind's heads)
+        let h = rng.uniform(0.25, 0.36) * 0.4;
         let (yaw, tilt) = (rng.uniform(0.0, 360.0), rng.uniform(0.0, 30.0));
         stalk!(
             format!("stem{i}"),
@@ -195,7 +196,7 @@ pub fn daisies() -> Vec<Obj> {
         rays!(
             format!("daisy{i}"),
             (x, y, h),
-            0.045,
+            0.03,
             10,
             m("bloom"),
             yaw = yaw,
@@ -212,24 +213,29 @@ pub fn daisies() -> Vec<Obj> {
                 material = m("centre"),
                 segments = 5,
                 rings = 3,
-                scale = (0.015, 0.015, 0.009)
+                scale = (0.01, 0.01, 0.006)
             );
             _put!(eye, (x, y, h), yaw = yaw, tilt = tilt, lift = 0.004);
         }
     }
-    fit_to(&meshes(), 0.84, 0.376, 0.84);
+    // (short stems: along their path, their ends stretched the texture over 2x)
+    artkit::uv::box_named(&["stem"]);
+    fit_to(&meshes(), 0.84, 0.15, 0.84);
     settle(&[join_all("daisies")])
 }
 
 /// Sunflowers: four tall, hairy stalks with big, drooping heart-shaped leaves, their heavy heads turned to the
 /// front: two rows of golden petals round a domed brown disc of seeds, green behind.
 pub fn sunflowers() -> Vec<Obj> {
-    let p = palette(&[
-        ("bloom", "#F5C518"),
-        ("bloom2", "#E8A812"),
-        ("centre_dark", "#5A3A1E"),
-        ("stem", "#5E8C3A"),
-    ]);
+    let p = super::leafy_petals(
+        palette(&[
+            ("bloom", "#F5C518"),
+            ("bloom2", "#E8A812"),
+            ("centre_dark", "#5A3A1E"),
+            ("stem", "#5E8C3A"),
+        ]),
+        &["bloom", "bloom2"],
+    );
     let m = |name: &str| p.get(name);
     let mut rng = Random::new(54);
     let top = mound!(&p);
@@ -338,6 +344,7 @@ pub fn sunflowers() -> Vec<Obj> {
             segments = low(10, 5)
         );
     }
+    artkit::uv::box_named(&["stalk", "petiole"]);
     fit_to(&meshes(), 0.84, 2.108, 0.907);
     settle(&[join_all("sunflowers")])
 }
@@ -356,7 +363,6 @@ pub fn poppies() -> Vec<Obj> {
     let mut rng = Random::new(55);
     let top = mound!(&p);
     rosettes!(
-        &p,
         &mut rng,
         6,
         0.3,
@@ -440,7 +446,6 @@ pub fn marigolds() -> Vec<Obj> {
     let mut rng = Random::new(56);
     let top = mound!(&p);
     clumps(
-        &p,
         &mut rng,
         7,
         0.33,
@@ -482,7 +487,7 @@ pub fn marigolds() -> Vec<Obj> {
             seed = i as f64 * 0.7
         );
     }
-    fit_to(&meshes(), 0.885, 0.34, 0.84);
+    fit_to(&meshes(), 0.885, 0.334, 0.84);
     settle(&[join_all("marigolds")])
 }
 
@@ -493,7 +498,7 @@ pub fn pansies() -> Vec<Obj> {
         ("bloom", "#5B3A8E"),
         ("bloom2", "#F2C94C"),
         ("bloom3", "#3F5FB0"),
-        ("bloom4", "#8E2A4A"),
+        ("bloom4", "#8E2A3A"),
         ("bloom5", "#F4F0E8"),
         ("centre", "#F2C94C"),
         ("centre_dark", "#3A2A4E"),
@@ -502,7 +507,6 @@ pub fn pansies() -> Vec<Obj> {
     let mut rng = Random::new(57);
     let top = mound!(&p);
     rosettes!(
-        &p,
         &mut rng,
         8,
         0.34,
@@ -572,14 +576,16 @@ pub fn lilies() -> Vec<Obj> {
     let p = palette(&[
         ("bloom", "#F07A2A"),
         ("bloom2", "#F5EFE4"),
-        ("bloom3", "#E98AA8"),
+        // (a rose-red, as Asiatic lilies come: orange, red or yellow)
+        ("bloom3", "#E8586C"),
     ]);
     let m = |name: &str| p.get(name);
     let mut rng = Random::new(58);
     let top = mound!(&p);
     let cols = [m("bloom"), m("bloom2"), m("bloom3")];
     for (i, (x, y, a)) in spiral!(6, 0.27, &mut rng).into_iter().enumerate() {
-        let h = rng.uniform(0.71, 0.87);
+        // (Asiatic lilies flower at 1-1.5 m)
+        let h = rng.uniform(0.71, 0.87) * 1.2;
         let tip = v3(x * 1.15, y * 1.15, h);
         stalk!(
             format!("stem{i}"),
@@ -653,7 +659,7 @@ pub fn lilies() -> Vec<Obj> {
             rings = 3
         );
     }
-    fit_to(&meshes(), 0.84, 0.939, 0.869);
+    fit_to(&meshes(), 0.84, 1.08, 0.869);
     settle(&[join_all("lilies")])
 }
 
@@ -712,13 +718,12 @@ pub fn lupins() -> Vec<Obj> {
             m("stem"),
             r = 0.007
         );
-        lupin_spike!(
+        lupin_spike(
             format!("spike{i}"),
             (tip.0, tip.1, h - 0.36),
             0.36,
             0.045,
             cols[i % 4],
-            seed = i as f64
         );
     }
     fit_to(&meshes(), 0.84, 0.987, 0.84);
@@ -737,7 +742,6 @@ pub fn forget_me_nots() -> Vec<Obj> {
     let mut rng = Random::new(60);
     let top = mound!(&p);
     clumps(
-        &p,
         &mut rng,
         7,
         0.33,

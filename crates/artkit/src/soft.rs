@@ -290,13 +290,14 @@ pub fn soft_box(name: impl AsRef<str>, size: impl Into<shapes::Size>, o: SoftBox
         // the face pairs across axis a
         let (b, c) = ((a + 1) % 3, (a + 2) % 3);
         for side in [-1, 1] {
-            let plain = a == thin && Some(side) == hidden && count[b] > 1 && count[c] > 1;
+            // (an axis no longer than the rounding has one middle point, whatever its count)
             let (i0, i1, j0, j1) = (
                 round_segments,
-                round_segments + count[b],
+                steps[b].len() - 1 - round_segments,
                 round_segments,
-                round_segments + count[c],
+                steps[c].len() - 1 - round_segments,
             );
+            let plain = a == thin && Some(side) == hidden && i1 - i0 > 1 && j1 - j0 > 1;
             let point = |i: usize, j: usize| {
                 let mut p = [0.0; 3];
                 p[a] = side as f64 * h[a];

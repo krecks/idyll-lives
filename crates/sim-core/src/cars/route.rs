@@ -326,7 +326,7 @@ impl Route {
         travel: &Travel,
         home: bool,
     ) -> Option<Route> {
-        use crate::travel::{RoadPath, dist};
+        use crate::travel::RoadPath;
         let g = &travel.graph;
         let m = car.mouth(travel)?;
         let mp = g.point(m);
@@ -457,28 +457,17 @@ impl Route {
         }
         .map(|(bay, d)| (bay, d, bay.entry(d)));
         let mut on = false;
-        // (Which way the lane goes at its point `i`, and whether that's along the road at a bay's
-        // mouth going `d`: past a junction there it turns off, and its points on aren't the turn's.)
-        let way = |i: usize| {
-            let (a, b) = (lane[i.saturating_sub(1)], lane[(i + 1).min(lane.len() - 1)]);
-            let l = dist(a, b).max(1e-6);
-            [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
-        };
-        let along = |b: &Bay, i: usize, d: f32| {
-            let w = way(i);
-            (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
-        };
         for (i, &p) in lane.iter().enumerate() {
             if !on
                 && let Some((b, d, at, taken)) = start
                 && b.near(p, at, taken, d)
-                && along(b, i, d)
+                && along(lane, b, i, d)
             {
                 continue;
             }
             if let Some((b, d, (turn, at))) = &into
                 && b.near(p, *at, turn.taken, *d)
-                && along(b, i, -*d)
+                && along(lane, b, i, -*d)
             {
                 break;
             }
@@ -507,22 +496,12 @@ impl Route {
         if !on && (start.is_some() || park.is_some() && home) {
             legs.mouths.push((0, None));
         }
-        // (Into a driveway, a bay or a spot on the road: its mouth, from the lane.)
-        let lane_end = legs.len().saturating_sub(1);
-        match into {
-            Some((b, _, (turn, _))) => {
-                legs.mouths.push((lane_end, None));
-                b.enter(&mut legs, &turn)
-            }
-            // (On a trip to a spot on the road: into it at the end.)
-            None => {
-                if let (Some((at, _)), false) = (park, home) {
-                    legs.mouths.push((lane_end, None));
-                    let from = legs.last().unwrap_or(at);
-                    legs.line(from, at, false, SLOW);
-                }
-            }
-        }
+        // (Home, it's into the driveway: `into`.)
+        off_lane(
+            &mut legs,
+            into.as_ref().map(|(b, _, (turn, _))| (*b, turn)),
+            park,
+        );
         let trip = park.is_some();
         let mut route = legs.timed(!home || trip, home || trip);
         route.by_motorway = by_motorway;
@@ -735,15 +714,6 @@ impl Route {
             let entry = bay.entry(d);
             (bay, d, entry)
         });
-        let way = |i: usize| {
-            let (a, b) = (lane[i.saturating_sub(1)], lane[(i + 1).min(lane.len() - 1)]);
-            let l = dist(a, b).max(1e-6);
-            [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
-        };
-        let along = |b: &Bay, i: usize, d: f32| {
-            let w = way(i);
-            (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
-        };
         // (Onto the lane at its first point ahead of where it turned round, the way it faces
         // there, not across to one right beside it or behind it: a car doesn't step sideways,
         // and facing along such a step it swung its tail half across the road as it drove on,
@@ -764,7 +734,7 @@ impl Route {
             }
             if let Some((b, d, (turn, at))) = &into
                 && b.near(q, *at, turn.taken, *d)
-                && along(b, i, -*d)
+                && along(lane, b, i, -*d)
             {
                 break;
             }
@@ -778,20 +748,11 @@ impl Route {
                 laid.mark(i),
             );
         }
-        let lane_end = legs.len().saturating_sub(1);
-        match &into {
-            Some((b, _, (turn, _))) => {
-                legs.mouths.push((lane_end, None));
-                b.enter(&mut legs, turn);
-            }
-            None => {
-                if let Some((at, _)) = park {
-                    legs.mouths.push((lane_end, None));
-                    let from = legs.last().unwrap_or(at);
-                    legs.line(from, at, false, SLOW);
-                }
-            }
-        }
+        off_lane(
+            &mut legs,
+            into.as_ref().map(|(b, _, (turn, _))| (b, turn)),
+            park,
+        );
         Some(legs.timed(true, home || park.is_some()))
     }
 
@@ -851,6 +812,29 @@ impl Route {
             legs.line([x0 + k * r, lane_out], [end_x, lane_out], false, FAST);
         }
         legs.timed(!home, home)
+    }
+}
+
+/// Which way `lane` goes at its point `i`, and whether that's along the road at bay `b`'s mouth
+/// going `d`: past a junction there it turns off, and its points on aren't the turn's.
+fn along(lane: &[[f32; 2]], b: &Bay, i: usize, d: f32) -> bool {
+    let (p, q) = (lane[i.saturating_sub(1)], lane[(i + 1).min(lane.len() - 1)]);
+    let l = crate::travel::dist(p, q).max(1e-6);
+    let w = [(q[0] - p[0]) / l, (q[1] - p[1]) / l];
+    (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
+}
+
+/// Off the lane at its end into a driveway or a bay (`into`, by its turn in), else on a trip into
+/// its spot on the road (`park`) at the end: its mouth, from the lane.
+fn off_lane(legs: &mut Legs, into: Option<(&Bay, &Turn)>, park: Option<([f32; 2], f32)>) {
+    let lane_end = legs.len().saturating_sub(1);
+    if let Some((b, turn)) = into {
+        legs.mouths.push((lane_end, None));
+        b.enter(legs, turn);
+    } else if let Some((at, _)) = park {
+        legs.mouths.push((lane_end, None));
+        let from = legs.last().unwrap_or(at);
+        legs.line(from, at, false, SLOW);
     }
 }
 

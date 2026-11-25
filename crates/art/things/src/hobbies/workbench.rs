@@ -5,14 +5,17 @@
 //! slide shut on the plank while a resident tinkers (`vice`).
 
 use super::M;
-use super::common::{P, flat_quads, rr};
+use super::common::{P, flat_quads};
 use super::workbench_board::tool_board;
+use artkit::bevel::{EdgeOrder, bevel_edges};
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
 use artkit::math::{P3, PI, cos, sin};
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
+use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, revolve, slide, soft};
 
 /// The top's middle: its back on the wall face.
@@ -216,11 +219,11 @@ pub fn workbench() -> Vec<Obj> {
             fextrude!(
                 f,
                 format!("crate_grip{s}"),
-                &rr(0.4, 0.06, 0.004, 1),
+                &rounded_rect(0.4, 0.06, 0.004, 1),
                 0.012,
                 (-0.4 + sf * 0.194, 0.37, cz),
                 M.toolbox,
-                holes = vec![rr(0.1, 0.022, 0.01, 2)],
+                holes = vec![rounded_rect(0.1, 0.022, 0.01, 2)],
                 plane = Facing::Side,
                 bevel = 0.002,
                 bevel_segments = 1
@@ -342,7 +345,7 @@ pub fn workbench() -> Vec<Obj> {
             round = 1
         );
         // the drill lying on its side: a body, a grip and battery, a chuck and bit
-        fsweep!(
+        let drill = fsweep!(
             f,
             "drill_body",
             &[
@@ -357,13 +360,14 @@ pub fn workbench() -> Vec<Obj> {
             resolution = 2,
             scale = [0.8, 1.0, 1.0, 0.6]
         );
+        bevel_edges(drill, 0.003, 1, SHARP, &EdgeOrder::Corners); // its ends
         fsweep!(
             f,
             "drill_grip",
             &[(0.495, 0.89 + u, -0.16), (0.51, 0.82 + u, -0.16)],
             0,
             M.foot,
-            profile = rr(0.045, 0.035, 0.012, 2),
+            profile = rounded_rect(0.045, 0.035, 0.012, 2),
             up = (1, 0, 0)
         );
         fbox!(
@@ -422,7 +426,7 @@ pub fn workbench() -> Vec<Obj> {
             &[(-0.37, 0.791 + u, -0.033), (-0.19, 0.793 + u, 0.033)],
             0,
             M.plank,
-            profile = rr(0.022, 0.03, 0.008, 1),
+            profile = rounded_rect(0.022, 0.03, 0.008, 1),
             scale = [0.9, 1.0]
         );
         fsweep!(
@@ -478,7 +482,7 @@ pub fn workbench() -> Vec<Obj> {
                 verts = 6
             );
         }
-        fsweep!(
+        let jaw = fsweep!(
             f,
             "vice_jaw",
             &[
@@ -495,6 +499,7 @@ pub fn workbench() -> Vec<Obj> {
                 (-0.035, 0.02)
             ]
         );
+        bevel_edges(jaw, 0.003, 1, SHARP, &EdgeOrder::Corners);
         fbox!(
             f,
             "vice_pad",
@@ -518,7 +523,7 @@ pub fn workbench() -> Vec<Obj> {
     join(&still, "body", Some(P3::ZERO));
     let v = new_parts(|| {
         let z = VICE_Z + 0.044 + VICE_GAP;
-        fsweep!(
+        let jaw = fsweep!(
             f,
             "vice_front",
             &[
@@ -535,6 +540,7 @@ pub fn workbench() -> Vec<Obj> {
                 (-0.035, 0.02)
             ]
         );
+        bevel_edges(jaw, 0.003, 1, SHARP, &EdgeOrder::Corners);
         fbox!(
             f,
             "vice_front_pad",

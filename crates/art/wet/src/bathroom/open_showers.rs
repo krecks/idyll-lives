@@ -1,10 +1,11 @@
 //! The open showers: the walk-in shower behind one glass screen, and the rain shower in its stone corner.
 
 use super::M;
-use super::common::{bends, bottle, tube, wall_rose};
+use super::common::{bends, bottle, wall_rose};
 use super::shower_parts::{frame, grate, head, post, rain};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
@@ -98,15 +99,14 @@ pub fn shower_walk_in() -> Vec<Obj> {
             bevel = 0.003
         );
         post(&f, "post", 0.42, 0.2, 0.04, 2.04, M.frame_dark, 0.022);
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "bar",
             &[(0.42, 2.05, 0.2), (0.42, 2.05, -0.38), (0.42, 2.05, -0.415)],
             0.01,
             M.frame_dark,
-            8,
-            1,
-            1.0,
+            verts = 8,
+            round = 1
         );
         wall_rose(
             &f,
@@ -120,8 +120,8 @@ pub fn shower_walk_in() -> Vec<Obj> {
             12,
         );
         // a riser up the wall, bent over into an arm out over the middle, and the wide rain head
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "riser",
             &bends(
                 &[(0.0, 1.74, -0.4), (0.0, 2.245, -0.4), (0.0, 2.245, -0.08)],
@@ -130,9 +130,8 @@ pub fn shower_walk_in() -> Vec<Obj> {
             ),
             0.015,
             M.fittings_dark,
-            10,
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
         wall_rose(
             &f,
@@ -364,8 +363,8 @@ pub fn shower_rain() -> Vec<Obj> {
             0.012,
             14,
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "arm",
             &bends(
                 &[(0.0, 2.12, -0.405), (0.0, 2.12, -0.03), (0.0, 2.17, -0.03)],
@@ -374,9 +373,8 @@ pub fn shower_rain() -> Vec<Obj> {
             ),
             0.0125,
             M.fittings_dark,
-            10,
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
         soft!(
             f,
@@ -411,15 +409,14 @@ pub fn shower_rain() -> Vec<Obj> {
             round = 0.004,
             round_segments = 1
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "mixer_lever",
             &[(0.3, 1.14, -0.4), (0.3, 1.14, -0.37), (0.3, 1.1, -0.362)],
             0.008,
             M.fittings_dark,
-            8,
-            2,
-            1.0,
+            verts = 8,
+            round = 2
         );
     });
     join(&still, "body", Some((0, 0, 0).into()));

@@ -134,3 +134,37 @@ fn a_part_is_cut_filled_and_triangulated_as_blenders_bmesh_does_it() {
     // (the stone's two fractures were cut before Blender had worked out where it stands)
     assert_eq!(stale, 5);
 }
+
+#[test]
+fn a_sharp_edge_the_cut_splits_stays_sharp_on_both_sides() {
+    scene::reset();
+    let o = artkit::shapes::cylinder("drum", 0.5, 1.0, Default::default());
+    artkit::forms::bisect(o, (0.0, 0.0, 0.0), (1.0, 0.3, 0.0), true);
+    let mesh = o.read(|p| p.mesh.clone());
+    // the faces along each edge, but the cap the cut made (flat, its edges sharp by shading)
+    let mut along: std::collections::BTreeMap<(u32, u32), Vec<usize>> = Default::default();
+    for f in 0..mesh.faces.len() {
+        let c = mesh.corners(f);
+        for (i, &a) in c.iter().enumerate() {
+            along
+                .entry(artkit::mesh::edge(a, c[(i + 1) % c.len()]))
+                .or_default()
+                .push(f);
+        }
+    }
+    let mut rims = 0;
+    for (e, fs) in &along {
+        if let [f, g] = fs[..]
+            && mesh.faces[f].smooth
+            && mesh.faces[g].smooth
+            && mesh.face_normal(f).dot(mesh.face_normal(g)) < 0.5
+        {
+            rims += 1;
+            assert!(mesh.sharp.contains(e), "rim edge {e:?} not sharp");
+        }
+    }
+    assert!(rims > 0);
+    for e in &mesh.sharp {
+        assert!(along.contains_key(e), "sharp {e:?} is not an edge");
+    }
+}

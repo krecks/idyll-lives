@@ -1,6 +1,6 @@
 //! Hay: the round bale and the stack of square bales, and their far versions.
 
-use super::common::{F, M};
+use super::common::{F, M, eased};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::math::{TAU, cos, radians, sin};
@@ -53,7 +53,7 @@ pub fn hayBale() -> Vec<Obj> {
             let r = 0.05 + 0.45 * t;
             pts.push((sf * (hl - 0.002), y + r * sin(a), r * cos(a)));
         }
-        fsweep!(
+        eased(fsweep!(
             F,
             format!("spiral{s}"),
             &pts,
@@ -61,7 +61,7 @@ pub fn hayBale() -> Vec<Obj> {
             M.hay_dark,
             verts = 4,
             scale = [0.7, 1.0, 1.0, 1.1]
-        );
+        ));
         sphere!(
             format!("core{s}"),
             0.07,
@@ -192,21 +192,17 @@ pub fn hayBale_far() -> Vec<Obj> {
     settle(&[join_all("hayBale_far")])
 }
 
-/// A small square bale lying flat, `x` across and its middle `y` up: pressed in flakes along its length, each a
-/// little proud of the next, tied twice round its length, the cut ends darker.
-fn square_bale(name: &str, x: f64, y: f64, detail: bool) {
+/// A small square bale lying flat, `x` across, its middle `y` up and `z` deep, `d` deep: pressed in flakes along
+/// its length, each a little proud of the next, tied twice round its length, the cut ends darker.
+fn square_bale(name: &str, x: f64, y: f64, z: f64, d: f64, detail: bool) {
+    let twine = [-0.22 * d / 0.86, 0.22 * d / 0.86];
     if !detail {
-        cube!(
-            name,
-            (0.92, 0.86, 0.44),
-            at = F.at(x, y, 0),
-            material = M.hay
-        );
-        for dz in [-0.22, 0.22] {
+        cube!(name, (0.92, d, 0.44), at = F.at(x, y, z), material = M.hay);
+        for dz in twine {
             cube!(
                 format!("{name}_twine{}", float_repr(dz)),
                 (0.935, 0.02, 0.455),
-                at = F.at(x, y, dz),
+                at = F.at(x, y, z + dz),
                 material = M.twine
             );
         }
@@ -232,11 +228,11 @@ fn square_bale(name: &str, x: f64, y: f64, detail: bool) {
             format!("{name}_flake{i}"),
             u1 - u0 + 0.004,
             0.44 * k - 0.004,
-            0.86 * (2.0 - k) - 0.004,
+            d * (2.0 - k) - 0.004,
             (
                 x + (u0 + u1) / 2.0,
                 y + 0.004 * sin(fi * 1.9),
-                0.005 * cos(fi * 2.2)
+                z + 0.005 * cos(fi * 2.2)
             ),
             if i == 0 || i == n - 1 {
                 M.hay_dark
@@ -248,10 +244,10 @@ fn square_bale(name: &str, x: f64, y: f64, detail: bool) {
             flat = 1
         );
     }
-    for dz in [-0.22, 0.22] {
+    for dz in twine {
         let lp: Vec<(f64, f64, f64)> = rounded_rect(0.935, 0.455, 0.04, 2)
             .iter()
-            .map(|&(u, v)| (x + u, y + v, dz))
+            .map(|&(u, v)| (x + u, y + v, z + dz))
             .collect();
         fsweep!(
             F,
@@ -271,8 +267,8 @@ fn square_bale(name: &str, x: f64, y: f64, detail: bool) {
             F,
             format!("{name}_wisp{i}"),
             &[
-                (x + u, y + 0.223, -0.3 + 0.17 * fi),
-                (x + u + 0.1, y + 0.226, -0.24 + 0.17 * fi)
+                (x + u, y + 0.223, z + (-0.3 + 0.17 * fi) * d / 0.86),
+                (x + u + 0.1, y + 0.226, z + (-0.24 + 0.17 * fi) * d / 0.86)
             ],
             0.005,
             M.straw,
@@ -282,15 +278,22 @@ fn square_bale(name: &str, x: f64, y: f64, detail: bool) {
     }
 }
 
-/// Three square bales: two side by side and one on top, a little askew.
+/// The content's `seat` (height, forward): the bottom bales' tops, the two slots' hips at x = ±0.5 in front of
+/// the top bale.
+pub(super) const STACK_SEAT: (f64, f64) = (0.45, 0.25);
+/// The top bale, half as deep as the others, lies across the back: a backrest, clear of the sitters.
+const TOP_Z: f64 = -0.2;
+
+/// Three square bales: two side by side and one on top at the back, a little askew.
 #[allow(non_snake_case)]
 pub fn hayStack_detail(detail: bool) -> Vec<Obj> {
-    square_bale("bale_l", -0.48, 0.225, detail);
-    square_bale("bale_r", 0.48, 0.225, detail);
+    let y = STACK_SEAT.0 / 2.0;
+    square_bale("bale_l", -0.48, y, 0.0, 0.86, detail);
+    square_bale("bale_r", 0.48, y, 0.0, 0.86, detail);
     let top = new_parts(|| {
-        square_bale("bale_top", 0.0, 0.685, detail);
+        square_bale("bale_top", 0.0, 0.685, TOP_Z, 0.43, detail);
     });
-    let joined = join(&top, "bale_top", Some(F.at(0, 0.685, 0)));
+    let joined = join(&top, "bale_top", Some(F.at(0, 0.685, TOP_Z)));
     joined.set_rotation_euler_axis(2, radians(3.0));
     settle(&[join_all(if detail { "hayStack" } else { "hayStack_far" })])
 }

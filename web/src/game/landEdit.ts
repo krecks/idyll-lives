@@ -665,8 +665,8 @@ export class LandEditor {
   }
 
   /**
-   * What the change `patch` holds the old values of costs, at `prices` (negative: a refund, for a
-   * patch `undo` returned). The shape tools: the earth moved, Σ|Δh| × 4 m², at `earth` a m³ (the
+   * What the change `patch` holds the old values of costs, at `prices` (negative: a refund, for a reset or a
+   * stroke's patch `undo` returned; a reset's patch `undo` returned is charged). The shape tools: the earth moved, Σ|Δh| × 4 m², at `earth` a m³ (the
    * mountain tools and a reset at `mountain`); the water tools: the ground made wet or dry, at
    * `water` a m²; the cover tools: the ground painted, at its cover's price a m² (`clear` for
    * open ground). Whole dollars.
@@ -674,6 +674,8 @@ export class LandEditor {
   cost(patch: LandPatch, prices: LandPrices): number {
     const kept = this.kept.get(patch) ?? { tool: 'raise', refund: false };
     const kind = kept.tool === 'reset' ? 'reset' : TOOL_KIND[kept.tool];
+    // (A reset takes strokes back: done it refunds, undone it charges, the other way round from a stroke.)
+    const back = kept.refund !== (kind === 'reset');
     const { cols } = this.land;
     const { rect } = patch;
     const w = rect.i1 - rect.i0;
@@ -705,12 +707,12 @@ export class LandEditor {
         for (let q = c.i0; q < c.i1; q++) {
           const [now, then] = [this.land.cover[r * cw + q], data[(r - c.j0) * (c.i1 - c.i0) + (q - c.i0)]];
           // (Priced by what the stroke painted: the new cover, or for a refund, the cover it takes away.)
-          if (now !== then) total += COVER_CELL * COVER_CELL * prices[names[kept.refund ? then : now] ?? 'clear'];
+          if (now !== then) total += COVER_CELL * COVER_CELL * prices[names[back ? then : now] ?? 'clear'];
         }
       }
     }
     const dollars = Math.round(total);
-    return kept.refund || kind === 'reset' ? -dollars : dollars;
+    return back ? -dollars : dollars;
   }
 
   // ---- The stacks ----------------------------------------------------------------------------

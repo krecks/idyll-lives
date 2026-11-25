@@ -1,7 +1,7 @@
 //! The baths: a tub, its taps and the bath water.
 //!
 //! 2 x 1 tiles, centred; the resident sits along the tub, back at the end without the taps and legs out towards
-//! them (characters.ts SEATS: 0.25-0.28 m, so the tub's floor is 10-13 cm below). Each tub is one closed shell
+//! them (furniture.json `seats`: 0.25-0.28 m, so the tub's floor is 10-13 cm below). Each tub is one closed shell
 //! lofted through rounded rings (`loft`): up the outside, over the rim and down the inside to the floor, so its
 //! inside faces up into the tub. Two moving parts: the tap's stream (`tap_on`, 0.4 s, held 2.4 s so the tap runs
 //! while the tub fills) and the bath water (`fill`): a body of water in the tub's shape up to two thirds of its
@@ -10,13 +10,15 @@
 
 use super::M;
 use super::bath_parts::{
-    Section, bath_water, draped_towel, duck, fill, folded_towel, ring, stream, tub, waste,
+    Section, bath_water, draped_towel, duck, fill, folded_towel, ring, tub, waste,
 };
-use super::common::{LATHE, Lathe, bends, lathe, rose, tube};
+use super::common::{LATHE, Lathe, bends, lathe, rose};
+use crate::common::stream;
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::math::{cos, radians, sin};
-use artkit::parts::{join, new_parts, settle_all};
+use artkit::parts::{ASIDE, aside, join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, py, soft};
@@ -24,12 +26,14 @@ use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, py, soft};
 pub fn bathtub() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let (rim, floor_y) = (0.58, 0.15);
-    let sections: [Section; 8] = [
+    let sections: [Section; 10] = [
         (0.70, 0.24, 0.12, 3.0),
         (0.79, 0.33, 0.48, 4.0), // the tub's outside, behind the panels
         (0.91, 0.43, 0.50, 10.0),
-        (0.91, 0.43, rim, 10.0), // the deck's edge
-        (0.77, 0.29, rim, 4.0),
+        (0.91, 0.43, rim - 0.004, 10.0), // the deck's edge, eased
+        (0.906, 0.426, rim, 10.0),
+        (0.774, 0.294, rim, 4.0),
+        (0.769, 0.289, rim - 0.003, 4.0),
         (0.765, 0.285, rim - 0.012, 4.0), // the deck, and the inside's lip
         (0.71, 0.25, 0.25, 3.5),
         (0.66, 0.2, floor_y, 3.0), // down the inside to the floor
@@ -87,12 +91,13 @@ pub fn bathtub() -> Vec<Obj> {
                 (rim + 0.08, 0.022, 0.022),
                 (rim + 0.095, 0.026, 0.026),
                 (rim + 0.11, 0.02, 0.02),
+                (rim + 0.113, 0.016, 0.016), // its top eased
             ],
             M.chrome,
             Lathe { verts: 14, ..LATHE },
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "spout",
             &bends(
                 &[
@@ -105,9 +110,9 @@ pub fn bathtub() -> Vec<Obj> {
             ),
             0.015,
             M.chrome,
-            10,
-            1,
-            [1.0, 1.0, 0.9],
+            verts = 10,
+            round = 1,
+            scale = [1.0, 1.0, 0.9]
         );
         for z in [-0.1, 0.1] {
             rose(
@@ -132,8 +137,8 @@ pub fn bathtub() -> Vec<Obj> {
                 bevel = 0.004,
                 bevel_segments = 1
             );
-            tube(
-                &f,
+            kit::tube!(
+                f,
                 format!("handle_lever{}", float_repr(z)),
                 &[
                     (-0.85, rim + 0.045, z),
@@ -142,9 +147,9 @@ pub fn bathtub() -> Vec<Obj> {
                 ],
                 0.006,
                 M.chrome,
-                8,
-                2,
-                [1.2, 1.0, 0.8],
+                verts = 8,
+                round = 2,
+                scale = [1.2, 1.0, 0.8]
             );
         }
         folded_towel(&f, "towel", 0.4, 0.12, 0.55, rim, 0.36, M.towel, 2, 0.024);
@@ -152,7 +157,16 @@ pub fn bathtub() -> Vec<Obj> {
     });
     let (floor_ring, top) = rings.unwrap();
     join(&still, "body", Some((0, 0, 0).into()));
-    let stream = stream(&f, (-0.68, rim + 0.045, 0), floor_y, "stream");
+    let stream = stream(
+        &f,
+        "stream",
+        (-0.68, rim + 0.045, 0),
+        floor_y,
+        M.water,
+        0.011,
+        10,
+        0.0,
+    );
     let water = bath_water(&f, floor_ring, top, 0.006);
     settle_all();
     fill(stream, water);
@@ -166,7 +180,7 @@ fn claw(f: &GameFrame, x: f64, z: f64) {
         if z > 0.0 { 1.0 } else { -1.0 },
     );
     let (xs, zs) = (float_repr(x), float_repr(z));
-    tube(
+    kit::tube!(
         f,
         format!("leg{xs}{zs}"),
         &[
@@ -176,9 +190,8 @@ fn claw(f: &GameFrame, x: f64, z: f64) {
         ],
         0.03,
         M.feet,
-        10,
-        3,
-        [1.3, 0.85, 0.75],
+        verts = 10,
+        scale = [1.3, 0.85, 0.75]
     );
     fsphere!(
         f,
@@ -195,7 +208,7 @@ fn claw(f: &GameFrame, x: f64, z: f64) {
         let l = py::hypot(dx, dz);
         let (dx, dz) = (dx / l, dz / l);
         let (cx, cz) = (x + sx * 0.012, z + sz * 0.008);
-        tube(
+        kit::tube!(
             f,
             format!("claw{xs}{zs}{k}"),
             &[
@@ -206,9 +219,9 @@ fn claw(f: &GameFrame, x: f64, z: f64) {
             ],
             0.009,
             M.feet,
-            6,
-            2,
-            [1.0, 1.0, 0.8, 0.5],
+            verts = 6,
+            round = 2,
+            scale = [1.0, 1.0, 0.8, 0.5]
         );
     }
 }
@@ -252,9 +265,30 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             }
         }
         waste(&f, -0.45, rim, floor_y, -0.775, M.brass);
-        // a brass filler on the left end: a riser up over the rim and out over the water, two cross handles on a bar
-        tube(
+        // a towel over the back rim at the right end
+        draped_towel(
             &f,
+            "towel",
+            0.5,
+            0.32,
+            &[
+                (rim + 0.008, -0.31),
+                (rim + 0.012, -0.37),
+                (rim, -0.415),
+                (rim - 0.04, -0.425),
+                (rim - 0.24, -0.424),
+            ],
+            M.towel,
+            0.009, // a terry towel's one layer: its cut end too thin to show an edge
+        );
+    });
+    let (floor_ring, top) = rings.unwrap();
+    join(&still, "body", Some((0, 0, 0).into()));
+    // the taps: drawn, not the tub's size
+    let taps = new_parts(|| {
+        // a brass filler on the left end: a riser up over the rim and out over the water, two cross handles on a bar
+        kit::tube!(
+            f,
             "filler",
             &bends(
                 &[
@@ -268,9 +302,8 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             ),
             0.016,
             M.brass,
-            10,
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
         fcyl!(
             f,
@@ -281,15 +314,14 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             M.brass,
             verts = 10
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "filler_bar",
             &[(-0.785, 0.8, -0.09), (-0.785, 0.8, 0.09)],
             0.013,
             M.brass,
-            10,
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
         for z in [-0.08, 0.08] {
             let zs = float_repr(z);
@@ -315,8 +347,8 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             );
             for a in [0, 90] {
                 let (ca, sa) = (cos(radians(a as f64)), sin(radians(a as f64)));
-                tube(
-                    &f,
+                kit::tube!(
+                    f,
                     format!("filler_cross{zs}{a}"),
                     &[
                         (-0.785 - ca * 0.032, 0.845, z - sa * 0.032),
@@ -324,9 +356,8 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
                     ],
                     0.006,
                     M.brass,
-                    6,
-                    1,
-                    1.0,
+                    verts = 6,
+                    round = 1
                 );
                 for s in [-1, 1] {
                     fsphere!(
@@ -346,8 +377,8 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             }
         }
         // a telephone hand shower on its cradle on the riser
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "cradle",
             &bends(
                 &[
@@ -360,19 +391,18 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             ),
             0.008,
             M.brass,
-            8,
-            1,
-            1.0,
+            verts = 8,
+            round = 1
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "handset",
             &[(-0.785, 0.93, 0.03), (-0.785, 0.945, 0.11)],
             0.012,
             M.brass,
-            10,
-            1,
-            [0.9, 1.1],
+            verts = 10,
+            round = 1,
+            scale = [0.9, 1.1]
         );
         fcyl!(
             f,
@@ -386,26 +416,19 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             bevel = 0.005,
             bevel_segments = 1
         );
-        // a towel over the back rim at the right end
-        draped_towel(
-            &f,
-            "towel",
-            0.5,
-            0.32,
-            &[
-                (rim + 0.008, -0.31),
-                (rim + 0.012, -0.37),
-                (rim, -0.415),
-                (rim - 0.04, -0.425),
-                (rim - 0.24, -0.424),
-            ],
-            M.towel,
-            0.012,
-        );
     });
-    let (floor_ring, top) = rings.unwrap();
-    join(&still, "body", Some((0, 0, 0).into()));
-    let stream = stream(&f, (-0.6, 0.919, 0), floor_y, "stream");
+    aside(&taps, "taps");
+    let stream = stream(
+        &f,
+        // the taps' water: drawn with them, not the tub's size
+        &format!("stream{ASIDE}"),
+        (-0.6, 0.919, 0),
+        floor_y,
+        M.water,
+        0.011,
+        10,
+        0.0,
+    );
     let water = bath_water(&f, floor_ring, top, 0.006);
     settle_all();
     fill(stream, water);
@@ -415,12 +438,13 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
 pub fn bathtub_freestanding() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let (rim, floor_y) = (0.58, 0.15);
-    let sections: [Section; 10] = [
+    let sections: [Section; 11] = [
         (0.66, 0.27, 0.0, 2.2),
         (0.7, 0.3, 0.03, 2.2),
         (0.86, 0.395, 0.45, 2.3), // the outside
         (0.895, 0.41, 0.56, 2.3),
-        (0.885, 0.405, rim, 2.3), // the rim
+        (0.889, 0.4075, rim - 0.006, 2.3), // the rim, rolled
+        (0.882, 0.4035, rim, 2.3),
         (0.85, 0.372, rim, 2.3),
         (0.832, 0.356, rim - 0.025, 2.3),
         (0.77, 0.315, 0.35, 2.25),
@@ -431,11 +455,32 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
     let still = new_parts(|| {
         rings = Some(tub(&sections, rim, floor_y));
         waste(&f, 0.5, rim, floor_y, 0.84, M.chrome);
+        // a towel over the back rim at the left end
+        draped_towel(
+            &f,
+            "towel",
+            -0.5,
+            0.32,
+            &[
+                (rim + 0.008, -0.3),
+                (rim + 0.012, -0.36),
+                (rim, -0.41),
+                (rim - 0.04, -0.415),
+                (rim - 0.22, -0.41),
+            ],
+            M.towel,
+            0.009, // a terry towel's one layer: its cut end too thin to show an edge
+        );
+    });
+    let (floor_ring, top) = rings.unwrap();
+    join(&still, "body", Some((0, 0, 0).into()));
+    // the floor-standing filler: drawn, not the tub's size
+    let filler = new_parts(|| {
         // a floor-standing filler at the right end: a rose on the floor, a column with its mixer and a handset,
         // bent over into a spout above the water
         rose(&f, "filler_base", 0.93, 0.0, 0.12, 0.07, M.chrome, 0.02, 20);
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "filler",
             &bends(
                 &[
@@ -449,9 +494,8 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
             ),
             0.019,
             M.chrome,
-            12,
-            1,
-            1.0,
+            verts = 12,
+            round = 1
         );
         fcyl!(
             f,
@@ -476,25 +520,25 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
             M.chrome,
             Lathe { verts: 14, ..LATHE },
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "filler_lever",
             &[(0.93, 0.775, 0.12), (0.93, 0.79, 0.15), (0.93, 0.8, 0.19)],
             0.007,
             M.chrome,
-            8,
-            2,
-            [1.2, 1.0, 0.8],
+            verts = 8,
+            round = 2,
+            scale = [1.2, 1.0, 0.8]
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "handset",
             &[(0.955, 0.5, 0.12), (0.955, 0.66, 0.12)],
             0.012,
             M.chrome,
-            10,
-            1,
-            [0.9, 1.1],
+            verts = 10,
+            round = 1,
+            scale = [0.9, 1.1]
         );
         fcyl!(
             f,
@@ -507,8 +551,8 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
             bevel = 0.005,
             bevel_segments = 1
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "hose",
             &[
                 (0.955, 0.5, 0.12),
@@ -518,30 +562,21 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
             ],
             0.006,
             M.chrome,
-            6,
-            3,
-            1.0,
-        );
-        // a towel over the back rim at the left end
-        draped_towel(
-            &f,
-            "towel",
-            -0.5,
-            0.32,
-            &[
-                (rim + 0.008, -0.3),
-                (rim + 0.012, -0.36),
-                (rim, -0.41),
-                (rim - 0.04, -0.415),
-                (rim - 0.22, -0.41),
-            ],
-            M.towel,
-            0.012,
+            verts = 6
         );
     });
-    let (floor_ring, top) = rings.unwrap();
-    join(&still, "body", Some((0, 0, 0).into()));
-    let stream = stream(&f, (0.61, 0.81, 0.0), floor_y, "stream");
+    aside(&filler, "filler");
+    let stream = stream(
+        &f,
+        // the taps' water: drawn with them, not the tub's size
+        &format!("stream{ASIDE}"),
+        (0.61, 0.81, 0.0),
+        floor_y,
+        M.water,
+        0.011,
+        10,
+        0.0,
+    );
     let water = bath_water(&f, floor_ring, top, 0.006);
     settle_all();
     fill(stream, water);

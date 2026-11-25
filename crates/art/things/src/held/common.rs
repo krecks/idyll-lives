@@ -2,14 +2,16 @@
 //! material a band, prisms, boxes, discs, lumps of food, sausages, slices, leaves, smears, crusts and piped icing,
 //! and the plate everything is served on.
 
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::{self, rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, asin, atan2, cos, degrees, pow, radians, sin};
 use artkit::mesh::{Mesh, edge};
 use artkit::palette;
-use artkit::parts::{Settle, join_all, measure, settle_with};
+use artkit::parts::{Settle, join_all, settle_with};
 use artkit::place::{Coord, Facing, GameFrame, Spot};
 use artkit::scene::{self, Obj};
+use artkit::shapes::SHARP;
 use artkit::{boulder, cube, cylinder, fextrude, fsweep, jitter, sphere};
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -64,7 +66,6 @@ palette! { M:
     mozzarella = ("#F3E3B0", satin),
     pepperoni = ("#9C3024", satin),
     bun = ("#D69A55", satin),
-    bun_dark = ("#B5743A", satin),
     bun_base = ("#E8C48A", matte),
     pastry = ("#D8A257", matte),
     pastry_baked = ("#C08040", matte),
@@ -422,10 +423,12 @@ pub struct Prism {
     pub bottom: Option<Mat>,
     pub sides: Option<Vec<Mat>>,
     pub at: (f64, f64),
+    /// Its edges rounded this wide (0: kept sharp).
+    pub bevel: f64,
 }
 
 /// A flat-shaded upright prism over a polygon of game (x, depth) points, from height `y0` to `y1`:
-/// `top` on its top face, `side` (or `sides`, one per edge from point i to i + 1) round it.
+/// `top` on its top face, `side` (or `sides`, one per edge from point i to i + 1) round it; `bevel` rounds its edges.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn prism(
     name: impl AsRef<str>,
@@ -466,7 +469,11 @@ pub fn prism(
         (f.mat, f.smooth) = (s, false);
     }
     mesh.recalc_normals();
-    _object(name.as_ref(), mesh, P3::ZERO, P3::ZERO)
+    let obj = _object(name.as_ref(), mesh, P3::ZERO, P3::ZERO);
+    if o.bevel > 0.0 {
+        bevel_edges(obj, o.bevel, 2, SHARP, &EdgeOrder::Corners);
+    }
+    obj
 }
 
 /// `prism` with its options by name: `prism!(name, points, y0, y1, top, side, key = value, ...)`.
@@ -1204,19 +1211,6 @@ pub fn loft(
 /// A still model: everything joined into one node and stood on the floor, where it was built.
 pub fn done(name: &str) -> Vec<Obj> {
     let obj = join_all(name);
-    if std::env::var_os("HELD_MEASURE").is_some() {
-        let (lo, hi) = measure(&[obj]);
-        println!(
-            "[art] {name} built centred on game ({:.4}, {:.4}), size {:.3} x {:.3} x {:.3}, bottom {:.4}",
-            -(lo[0] + hi[0]) / 2.0,
-            -(lo[1] + hi[1]) / 2.0,
-            hi[0] - lo[0],
-            hi[2] - lo[2],
-            hi[1] - lo[1],
-            lo[2]
-        );
-        return settle_with(&[obj], Settle::default());
-    }
     settle_with(
         &[obj],
         Settle {
@@ -1234,14 +1228,19 @@ pub const WELL: f64 = 0.009;
 /// paler glaze; its foot at the game point `at`. `covered`: under another plate (the stack), its well flat at the
 /// rim's height, out of sight.
 pub fn plate(name: &str, at: G3, covered: bool) {
-    let mut profile = vec![
-        (0.0, 0.0),
-        (0.094, 0.0),
-        (0.1438, 0.0156),
-        (0.1408, 0.0172),
-        (0.124, 0.0162),
-    ];
-    let mut mats = vec![M.china; 5];
+    // (its rim rolled round, as glazed china is)
+    let mut profile = artkit::forms::round_at(
+        &[
+            (0.0, 0.0),
+            (0.094, 0.0),
+            (0.1438, 0.0156),
+            (0.1408, 0.0172),
+            (0.124, 0.0162),
+        ],
+        2,
+        0.0007,
+    );
+    let mut mats = vec![M.china; profile.len()];
     if covered {
         profile.push((0.0, 0.0162));
     } else {

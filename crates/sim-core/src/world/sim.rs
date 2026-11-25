@@ -193,6 +193,9 @@ pub struct Sim {
     pub(crate) being_served: bool,
     /// Ticks they've waited at a post for its server (`staff::hold`). Not saved.
     pub(crate) serve_wait: u32,
+    /// What the use they're at a post for costs, still unpaid: paid once as they're served, or
+    /// as it goes on with nobody serving after all (`world::route`). Not saved.
+    pub(crate) owes: i64,
     /// The bike (or e-scooter) they're on their way to for work or school, and the one they're
     /// on (`ride.rs`): an object at home, its slot theirs until they're back. Not saved (after a
     /// load it's at its place and they walk).
@@ -240,7 +243,8 @@ pub struct Sim {
     pub skills: [f32; MAX_SKILLS],
     /// Skills that reached a new level this tick (bitmask), reported by `life::update`.
     pub(crate) skill_ups: u32,
-    /// Grows while practising and fades otherwise, so Sims don't train for hours on end.
+    /// Grows while practising and fades otherwise, so Sims don't train for hours on end. Not
+    /// saved: a load starts it from fresh.
     pub(crate) practice_fatigue: f32,
     /// No nap until this tick (the last one was too recent; see `DayRhythm::nap_cooldown_hours`).
     pub(crate) nap_until: u64,
@@ -299,7 +303,8 @@ pub struct Sim {
     pub(crate) set_up: Option<u32>,
     /// When each accident can happen again (`Content::accidents`).
     pub(crate) accident_at: [u64; crate::content::MAX_ACCIDENTS],
-    /// Since when each accident's need has been empty (0: it isn't).
+    /// Since when each accident's need has been empty (0: it isn't). Not saved: after a load the
+    /// wait starts again.
     pub(crate) empty_since: [u64; crate::content::MAX_ACCIDENTS],
     /// Age in years (see `lifecycle.rs`); the life stage follows from it.
     pub age: f32,
@@ -307,7 +312,7 @@ pub struct Sim {
     pub gone: Option<Gone>,
     /// What they carry (ingredients, a plate, dirty dishes; see `cooking.rs`).
     pub held: Option<crate::items::Held>,
-    /// Told dinner's ready: keener to eat until this tick.
+    /// Told dinner's ready: keener to eat until this tick. Not saved.
     pub(crate) invited_until: u64,
     /// Their offer of something to eat or drink was taken up this tick by this resident: they go
     /// and fetch it (`hosting::update`). Not saved.

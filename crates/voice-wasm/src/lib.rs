@@ -10,7 +10,7 @@ compile_error!(
     "the wasm needs SIMD: a RUSTFLAGS in the environment replaces .cargo/config.toml's `-C target-feature=+simd128`, so add it there too"
 );
 
-use voice::{Engine, G2p, Lexicon, LineInputs, VoiceParams, dsp};
+use voice::{G2p, Lexicon, LineInputs, VoiceParams, dsp};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -36,7 +36,7 @@ fn start() {
 
 #[wasm_bindgen]
 pub struct Voice {
-    engine: Engine,
+    g2p: G2p,
 }
 
 /// One line for the model, and what to do with its output.
@@ -54,8 +54,7 @@ impl Line {
         self.inner.text.clone()
     }
 
-    /// The model's output (at `rate` Hz) at 24 kHz, trimmed and at the line's pitch, size and
-    /// speed; its mouth shapes are then in `visemes`.
+    /// The model's output (at `rate` Hz) at 24 kHz, trimmed and at the line's pitch and size; its mouth shapes are then in `visemes`.
     pub fn finish(&mut self, samples: &[f32], rate: u32) -> Vec<f32> {
         let (samples, visemes) = self.inner.finish(samples, rate);
         self.visemes = visemes;
@@ -76,17 +75,17 @@ impl Voice {
     #[wasm_bindgen(constructor)]
     pub fn new(lexicon: &str) -> Voice {
         Voice {
-            engine: Engine::new(G2p::new(Lexicon::parse(lexicon))),
+            g2p: G2p::new(Lexicon::parse(lexicon)),
         }
     }
 
-    /// A line with pitch, size and speed for its output (clamped to what sounds right).
-    pub fn line(&self, text: &str, speed: f32, pitch: f32, depth: f32) -> Line {
+    /// A line with pitch and size for its output (clamped to what sounds right); the model sets the speed.
+    pub fn line(&self, text: &str, pitch: f32, depth: f32) -> Line {
         Line {
-            inner: self.engine.line(
+            inner: self.g2p.line(
                 text,
                 VoiceParams {
-                    speed,
+                    speed: 1.0,
                     pitch,
                     depth,
                 },

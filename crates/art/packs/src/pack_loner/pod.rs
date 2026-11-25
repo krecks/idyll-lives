@@ -1,10 +1,11 @@
 //! The hush-shell reading pod and the shortwave radio desk.
 
 use super::common::{_book, _chair, _desk, _mug, M, WALL};
+use artkit::bevel::ease;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, PI, cos, cosd, pow, sin, sind};
-use artkit::parts::{hinged, join, new_parts, numbered, settle};
+use artkit::parts::{ASIDE, aside, hinged, join, new_parts, numbered, settle};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, settle, slide, soft, swing, torus};
@@ -90,7 +91,7 @@ pub fn quiet_pod() -> Vec<Obj> {
                 puff = 0.01,
                 flat = 2
             );
-            fsweep!(
+            let edge = fsweep!(
                 f,
                 numbered("wing_edge"),
                 &[
@@ -103,6 +104,7 @@ pub fn quiet_pod() -> Vec<Obj> {
                 verts = 14,
                 resolution = 2
             );
+            ease(edge, 60.0, 1);
             fsweep!(
                 f,
                 numbered("wing_piping"),
@@ -323,6 +325,8 @@ pub fn shortwave_radio() -> Vec<Obj> {
     let still = new_parts(|| {
         _desk(f, 0.16, 0.45, 0.84, 0.74, M.oak, M.oak, 6);
         _chair(f, -0.02, M.oak, M.seatpad, 6);
+    });
+    let on_desk = new_parts(|| {
         // the receiver: its face (a framed dial window with its scale, a meter, knobs, a speaker grille) towards the
         // operator, vents to the room, a carry handle on top
         fbox!(
@@ -607,6 +611,8 @@ pub fn shortwave_radio() -> Vec<Obj> {
         _mug(f, 0.33, 0.74, 0.4, M.terra, 200.0);
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the radio set, its antenna, the microphone and what lies by them on the desk: drawn on it, not its own size
+    aside(&on_desk, "on_desk");
     // The tuning knob: a big ridged knob with a skirt and a pointer, turned by `dial`.
     let dial = new_parts(|| {
         kit::turned!(
@@ -638,7 +644,11 @@ pub fn shortwave_radio() -> Vec<Obj> {
             M.cream
         );
     });
-    let dial = hinged(join(&dial, "dial", None), f.at(DIAL.0, DIAL.1, DIAL.2));
+    // (set aside too, as the radio set it turns and runs up from)
+    let dial = hinged(
+        join(&dial, &format!("dial{ASIDE}"), None),
+        f.at(DIAL.0, DIAL.1, DIAL.2),
+    );
     // The antenna's inner section, down in the tube (and the case) at rest: `antenna` runs it up 45 cm.
     let ant = new_parts(|| {
         kit::tube!(
@@ -660,7 +670,10 @@ pub fn shortwave_radio() -> Vec<Obj> {
             rings = 5
         );
     });
-    let ant = hinged(join(&ant, "antenna", None), f.at(ANTENNA.0, 1.0, ANTENNA.1));
+    let ant = hinged(
+        join(&ant, &format!("antenna{ASIDE}"), None),
+        f.at(ANTENNA.0, 1.0, ANTENNA.1),
+    );
     let objs = settle!(centre = false);
     swing!(dial, "dial", 150.0, seconds = 1.0, axis = Axis::Y);
     slide!(ant, "antenna", (0.0, 0.0, 0.45), seconds = 1.0);

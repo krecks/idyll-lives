@@ -2,10 +2,10 @@
 
 use super::*;
 use crate::forms::{self, Extrude, Holes, Loft, rounded_rect};
-use crate::kit::least;
 use crate::materials::Mat;
 use crate::math::P3;
 use crate::place::{Coord, Facing, GameFrame};
+use crate::py::min_of;
 use crate::scene::Obj;
 use crate::shapes::{Cube, SHARP, options};
 
@@ -34,7 +34,7 @@ pub fn shaker(
         material,
         Extrude {
             holes: Holes(vec![hole]),
-            bevel: least(&[0.004, t * 0.2]),
+            bevel: min_of(&[0.004, t * 0.2]),
             bevel_segments: 1,
             ..Extrude::default()
         },
@@ -60,7 +60,7 @@ pub fn shaker(
     }
     // a raised panel: a thin edge inside the frame, rising over a wide shallow chamfer to a flat field
     let (x, y, z) = (at.0.f(), at.1.f(), at.2.f());
-    let b = least(&[rail * 0.7, pw * 0.25, ph * 0.25]);
+    let b = min_of(&[rail * 0.7, pw * 0.25, ph * 0.25]);
     let ring = |hw: f64, hh: f64, d: f64| -> Vec<P3> {
         [(hw, hh), (-hw, hh), (-hw, -hh), (hw, -hh)]
             .iter()

@@ -30,12 +30,12 @@ floor).
   sign on its front (a bun, a sausage with rounded ends and a mustard zigzag), squeeze bottles, a napkin box with a
   napkin pulled up, a stack of paper trays, four posts on feet and a striped awning (six slats, red and white, a
   scalloped valance) leaning down to the front. The hot plate (a steel tray, a ribbed dark plate, five bowed sausages
-  and two split buns) has a hinged, rounded steel lid (`lid`) with a bar handle on its back edge:
-  `lid_open` lifts it 75° in 0.9 s a second into the sale, for 1.4 s, as the vendor behind it takes a sausage.
+  and two split buns) has a rounded steel lid (`lid`) hinged on its front edge, with a bar handle on its back edge:
+  `lid_open` lifts it 75° away from the vendor in 0.9 s a second into the sale, for 1.4 s, as they take a sausage.
 
 ## The machines
 
-One shell for both (`cabinet`): a back block on levelling feet, side walls, a header with a lit sign (six letters on
+One shell for both (`cabinet`): a back block on its plinth, side walls, a header with a lit sign (six letters on
 it), a keypad column on the right (display, twelve keys, a card reader with its slot, a coin slot, a coin return with
 its cup), a rounded bezel round the window, and a kick panel round an open pick-up tray with its PUSH label. The inside is
 lined dark; the tray's well is open at the front, so what drops into it shows.
@@ -88,3 +88,12 @@ cargo art stalls --preview  # previews/stalls/<id>.png, <id>@<clip>.png, <id>.fa
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `hotDogStand`, `iceCreamCart`, `vendingSnack`; the same triangles.
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 60 (ice cream cart 30, hot dog stand 11, market stall 7, each machine 6); none now, none
+accepted. Eased (the crate's 4 mm chamfer on turns over 50°): the wheels' rims, the parasol's canopy, the hot dog
+sign's frame, the machines' keypad, window bezel and drink buttons, the chalk board's frame; the ice cream tubs and
+the scale's pan in two segments (their lips turn past 120°). The market stall's posts, shelf rails and braces lay
+their wood UVs on the chamfered box (as the kernel lays any box's: carried, their chamfers smeared the grain, `texels`). The machines'
+levelling feet are gone: they stood inside the plinth, 112 triangles nobody saw (the snack machine is under 8,000).

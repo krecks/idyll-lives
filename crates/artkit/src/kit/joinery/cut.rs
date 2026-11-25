@@ -4,7 +4,6 @@ use super::*;
 use crate::bevel::EdgeOrder;
 use crate::materials::Mat;
 use crate::math::V3;
-use crate::mesh::edge;
 use crate::scene::Obj;
 use crate::shapes::options;
 
@@ -74,17 +73,11 @@ pub fn cut(obj: Obj, cutter: Obj, o: Cut) -> Obj {
             co[k] = if side > 0.0 { chi[k] } else { clo[k] };
             let mut no = V3::ZERO;
             no[k] = -side;
-            // (the body's sharp edges, to find again what the cut leaves of each)
-            let sharp: Vec<(V3, V3)> = obj.edit(|part| {
+            obj.edit(|part| {
+                // (a bevel still to be given rounds the cut mesh, whose points are numbered anew)
                 if let Some(bevel) = &mut part.bevel {
                     (bevel.order, bevel.sides_from) = (EdgeOrder::Corners, None);
                 }
-                let at = |v: u32| part.mesh.verts[v as usize];
-                part.mesh
-                    .sharp
-                    .iter()
-                    .map(|&(v, w)| (at(v), at(w)))
-                    .collect()
             });
             let edges = crate::edit::bisect_plane(
                 obj,
@@ -96,42 +89,6 @@ pub fn cut(obj: Obj, cutter: Obj, o: Cut) -> Obj {
                 },
             );
             let made = crate::edit::holes_fill(obj, &edges);
-            obj.edit(|part| {
-                // a sharp edge the cut shortened is sharp still: from its end that is left to the cut's point on it
-                let mesh = &mut part.mesh;
-                let on_cut: std::collections::BTreeSet<u32> =
-                    edges.iter().flat_map(|&(v, w)| [v, w]).collect();
-                let mut stubs = Vec::new();
-                for f in 0..mesh.faces.len() {
-                    let c = mesh.corners(f);
-                    for (i, &v) in c.iter().enumerate() {
-                        let w = c[(i + 1) % c.len()];
-                        let (end, cut_at) = match (on_cut.contains(&v), on_cut.contains(&w)) {
-                            (false, true) => (v, w),
-                            (true, false) => (w, v),
-                            _ => continue,
-                        };
-                        let (p, x) = (mesh.verts[end as usize], mesh.verts[cut_at as usize]);
-                        let along_one = sharp.iter().any(|&(from, to)| {
-                            let far = if p == from {
-                                to
-                            } else if p == to {
-                                from
-                            } else {
-                                return false;
-                            };
-                            // (the cut's point lies between the edge's ends, on their line)
-                            let (d, e) = (far - p, x - p);
-                            let t = e.dot(d) / d.dot(d);
-                            t > 0.0 && t < 1.0 && (e - d * t).length() < 1e-6
-                        });
-                        if along_one {
-                            stubs.push(edge(end, cut_at));
-                        }
-                    }
-                }
-                mesh.sharp.extend(stubs);
-            });
             obj.edit(|part| {
                 let slot = (o.lined && !tool.mats.is_empty()).then(|| part.mesh.slot(tool.mats[0]));
                 for f in made {

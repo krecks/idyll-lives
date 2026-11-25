@@ -158,17 +158,14 @@ fn combines_trait_and_perk_modifiers() {
 fn enforces_character_rules() {
     let c = Content::from_json(CONTENT).unwrap();
     let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
-    assert!(
-        c.character_modifiers(&s(&[]), &s(&[])).is_err(),
-        "min traits"
-    );
+    assert!(c.check_trait_count(&s(&[])).is_err(), "min traits");
     assert!(
         c.character_modifiers(&s(&["neat", "slob"]), &s(&[]))
             .is_err(),
         "conflict"
     );
     assert!(
-        c.character_modifiers(&s(&["neat", "lazy", "foodie"]), &s(&[]))
+        c.check_trait_count(&s(&["neat", "lazy", "foodie"]))
             .is_err(),
         "max traits"
     );
@@ -178,6 +175,7 @@ fn enforces_character_rules() {
         "budget"
     );
     assert!(c.character_modifiers(&s(&["neat"]), &s(&["iron"])).is_ok());
+    assert!(c.check_trait_count(&s(&["neat"])).is_ok());
 }
 
 #[test]

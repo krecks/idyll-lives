@@ -181,7 +181,7 @@ pub fn basketball_hoop() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        kit::moulding!(
+        artkit::bevel::eased(kit::moulding!(
             F,
             "board_frame",
             &[
@@ -193,7 +193,7 @@ pub fn basketball_hoop() -> Vec<Obj> {
             &[(0.0, -0.02), (0.0, 0.016), (0.022, 0.016), (0.022, -0.02)],
             M.post,
             at = 0.04
-        );
+        ));
         for y in [by + bh / 2.0 - 0.045, by - bh / 2.0 + 0.045] {
             fbox!(
                 F,

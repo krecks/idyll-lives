@@ -1,6 +1,6 @@
 use super::*;
 
-// --- The command line (argparse's rules, as far as they matter here) -------------------------------
+// --- The command line --------------------------------------------------------------------------------
 
 #[derive(Debug, Default)]
 pub struct Args {
@@ -36,209 +36,63 @@ fn fail(msg: impl Into<String>) -> Exit {
     }
 }
 
-enum Arg {
-    Positional,
-    /// A known option (by its full name) and its `=value`.
-    Opt(&'static str, Option<String>),
-    Unknown,
-}
-
-/// argparse's `_parse_optional`: exact name, `name=value`, unique prefix, negative number, space.
-fn classify(s: &str) -> Result<Arg, Exit> {
-    const OPTS: [&str; 8] = [
-        "-h",
-        "--help",
-        "--group",
-        "--label",
-        "--to",
-        "--dry-run",
-        "--content",
-        "--plan",
-    ];
-    if !s.starts_with('-') || s == "-" {
-        return Ok(Arg::Positional);
-    }
-    let full = |o: &'static str| if o == "-h" { "--help" } else { o };
-    if let Some(o) = OPTS.iter().find(|o| **o == s) {
-        return Ok(Arg::Opt(full(o), None));
-    }
-    let (name, explicit) = match s.split_once('=') {
-        Some((n, v)) => (n, Some(v.to_string())),
-        None => (s, None),
-    };
-    if let Some(o) = OPTS.iter().find(|o| **o == name) {
-        return Ok(Arg::Opt(full(o), explicit));
-    }
-    if name.starts_with("--") {
-        let hits: Vec<&'static str> = OPTS
-            .iter()
-            .copied()
-            .filter(|o| o.starts_with(name))
-            .collect();
-        match hits.len() {
-            0 => {}
-            1 => return Ok(Arg::Opt(hits[0], explicit)),
-            _ => {
-                return Err(usage_error(&format!(
-                    "ambiguous option: {name} could match {}",
-                    hits.join(", ")
-                )));
-            }
-        }
-    }
-    // `^-\d+$|^-\d*\.\d+$`
-    let num = &s[1..];
-    let digits = |t: &str| !t.is_empty() && t.bytes().all(|b| b.is_ascii_digit());
-    let negative = digits(num)
-        || num
-            .split_once('.')
-            .is_some_and(|(a, b)| (a.is_empty() || digits(a)) && digits(b));
-    if negative || s.contains(' ') {
-        return Ok(Arg::Positional);
-    }
-    Ok(Arg::Unknown)
-}
-
 pub fn parse_args(argv: &[String]) -> Result<Args, Exit> {
     let mut a = Args::default();
-    let mut chunks: Vec<Vec<String>> = Vec::new();
-    let mut extras: Vec<String> = Vec::new();
-    let mut in_chunk = false;
     let mut i = 0;
-    let mut rest = false;
     while i < argv.len() {
-        let s = &argv[i];
+        let s = argv[i].as_str();
         i += 1;
-        let kind = if rest || s == "--" {
-            Arg::Positional
-        } else {
-            classify(s)?
-        };
-        if s == "--" && !rest {
-            rest = true;
-            in_chunk = false;
-            continue;
-        }
-        let opt = match kind {
-            Arg::Positional => {
-                if !in_chunk {
-                    chunks.push(Vec::new());
-                    in_chunk = true;
-                }
-                chunks.last_mut().unwrap().push(s.clone());
-                continue;
+        let slot = match s {
+            "-h" | "--help" => {
+                return Err(Exit {
+                    code: 0,
+                    msg: String::new(),
+                });
             }
-            Arg::Unknown => {
-                in_chunk = false;
-                extras.push(s.clone());
-                continue;
-            }
-            Arg::Opt(o, explicit) => {
-                in_chunk = false;
-                (o, explicit)
-            }
-        };
-        let (opt, explicit) = opt;
-        match opt {
-            "--help" | "--dry-run" => {
-                if let Some(v) = explicit {
-                    return Err(usage_error(&format!(
-                        "argument {}: ignored explicit argument '{v}'",
-                        if opt == "--help" { "-h/--help" } else { opt }
-                    )));
-                }
-                if opt == "--help" {
-                    return Err(Exit {
-                        code: 0,
-                        msg: String::new(),
-                    });
-                }
+            "--dry-run" => {
                 a.dry_run = true;
+                continue;
+            }
+            "--group" => &mut a.group,
+            "--label" => &mut a.label,
+            "--to" => &mut a.to,
+            "--content" => &mut a.content,
+            "--plan" => &mut a.plan,
+            _ if s.starts_with('-') => return Err(usage_error(&format!("unknown option: {s}"))),
+            _ if a.what.is_empty() => {
+                if !["list", "in", "out"].contains(&s) {
+                    return Err(usage_error(&format!("list, in or out, not '{s}'")));
+                }
+                a.what = s.to_string();
+                continue;
             }
             _ => {
-                let v = match explicit {
-                    Some(v) => v,
-                    None => match argv.get(i) {
-                        Some(v)
-                            if !rest && v != "--" && matches!(classify(v)?, Arg::Positional) =>
-                        {
-                            i += 1;
-                            v.clone()
-                        }
-                        _ => {
-                            return Err(usage_error(&format!(
-                                "argument {opt}: expected one argument"
-                            )));
-                        }
-                    },
-                };
-                let slot = match opt {
-                    "--group" => &mut a.group,
-                    "--label" => &mut a.label,
-                    "--to" => &mut a.to,
-                    "--content" => &mut a.content,
-                    _ => &mut a.plan,
-                };
-                *slot = Some(v);
+                a.ids.push(s.to_string());
+                continue;
             }
-        }
-    }
-    // `what` takes the first positional; `ids` the rest of its run of positionals, else the next run.
-    let mut ids_done = false;
-    for (k, chunk) in chunks.into_iter().enumerate() {
-        if k == 0 {
-            let what = &chunk[0];
-            if !["list", "in", "out"].contains(&what.as_str()) {
-                return Err(usage_error(&format!(
-                    "argument what: invalid choice: '{what}' (choose from list, in, out)"
-                )));
-            }
-            a.what = what.clone();
-            if chunk.len() > 1 {
-                a.ids = chunk[1..].to_vec();
-                ids_done = true;
-            }
-        } else if !ids_done {
-            a.ids = chunk;
-            ids_done = true;
-        } else {
-            extras.extend(chunk);
-        }
+        };
+        let Some(v) = argv.get(i) else {
+            return Err(usage_error(&format!("{s} needs a value")));
+        };
+        *slot = Some(v.clone());
+        i += 1;
     }
     if a.what.is_empty() {
-        return Err(usage_error("the following arguments are required: what"));
-    }
-    if !extras.is_empty() {
-        return Err(usage_error(&format!(
-            "unrecognized arguments: {}",
-            extras.join(" ")
-        )));
+        return Err(usage_error("list, in or out?"));
     }
     Ok(a)
 }
 
-/// An insertion-ordered map with Python dict semantics (a re-assigned key keeps its place).
-struct Ordered<V> {
-    keys: Vec<String>,
-    map: HashMap<String, V>,
+/// The value of key `k` in `v`, in the order the content has them.
+fn find<'a, V>(v: &'a [(String, V)], k: &str) -> Option<&'a V> {
+    v.iter().find(|e| e.0 == k).map(|e| &e.1)
 }
 
-impl<V> Ordered<V> {
-    fn new() -> Self {
-        Ordered {
-            keys: Vec::new(),
-            map: HashMap::new(),
-        }
-    }
-
-    fn insert(&mut self, k: String, v: V) {
-        if self.map.insert(k.clone(), v).is_none() {
-            self.keys.push(k);
-        }
-    }
-
-    fn iter(&self) -> impl Iterator<Item = (&String, &V)> {
-        self.keys.iter().map(|k| (k, &self.map[k]))
+/// Sets key `k` to `x`: a key seen before keeps its place and takes the new value (the last file wins).
+fn put<V>(v: &mut Vec<(String, V)>, k: String, x: V) {
+    match v.iter_mut().find(|e| e.0 == k) {
+        Some(e) => e.1 = x,
+        None => v.push((k, x)),
     }
 }
 
@@ -252,7 +106,7 @@ fn dash(s: &Option<String>) -> String {
 
 /// Runs the tool; stdout goes to `out`.
 pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
-    let root = root();
+    let root = crate::repo_root();
     let content = a
         .content
         .as_deref()
@@ -263,21 +117,29 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
         .map_or_else(|| root.join("docs/objects"), py_path);
     let files = load(&content).map_err(fail)?;
     let mut eds: Vec<Editor> = files.iter().map(|f| Editor::new(&f.text)).collect();
-    let mut by_id: Ordered<(usize, &Node)> = Ordered::new();
+    let mut by_id: Vec<(String, (usize, &Node))> = Vec::new();
     for (fi, f) in files.iter().enumerate() {
         for o in f.array("objects") {
             if let Some(id) = o.get("id") {
-                by_id.insert(id.value.py().unwrap_or_else(|| "None".into()), (fi, o));
+                put(
+                    &mut by_id,
+                    id.value.py().unwrap_or_else(|| "None".into()),
+                    (fi, o),
+                );
             }
         }
     }
-    let mut cats: Ordered<(usize, &Node)> = Ordered::new();
+    let mut cats: Vec<(String, (usize, &Node))> = Vec::new();
     for (fi, f) in files.iter().enumerate() {
         for c in f.array("buyCategories") {
-            cats.insert(c.val("id").unwrap_or_else(|| "None".into()), (fi, c));
+            put(
+                &mut cats,
+                c.val("id").unwrap_or_else(|| "None".into()),
+                (fi, c),
+            );
         }
     }
-    let Some(&(vfile, vcat)) = cats.map.get("validate") else {
+    let Some(&(vfile, vcat)) = find(&cats, "validate") else {
         return Err(fail(
             "validate: there is no Validate category in the content",
         ));
@@ -286,8 +148,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
     let vitems: &[Node] = vgroups.map_or(&[], |g| &g.items);
     let where_ = |o: &Node| (o.val("category"), o.val("group"));
     let groups_of = |cat: &str| -> Vec<(String, &Node)> {
-        cats.map
-            .get(cat)
+        find(&cats, cat)
             .and_then(|(_, c)| c.get("groups"))
             .map_or(Vec::new(), |arr| {
                 arr.items
@@ -317,21 +178,23 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
     };
 
     if a.what == "list" {
-        let mut in_validate: Ordered<Vec<String>> = Ordered::new();
-        for (id, (_, o)) in by_id.iter() {
+        let mut in_validate: Vec<(String, Vec<String>)> = Vec::new();
+        for (id, (_, o)) in &by_id {
             let (cat, group) = where_(o);
             if cat.as_deref() == Some("validate") {
                 let g = opt(&group);
-                if !in_validate.map.contains_key(&g) {
-                    in_validate.insert(g.clone(), Vec::new());
+                match in_validate.iter_mut().find(|e| e.0 == g) {
+                    Some(e) => e.1.push(id.clone()),
+                    None => in_validate.push((g, vec![id.clone()])),
                 }
-                in_validate.map.get_mut(&g).unwrap().push(id.clone());
             }
         }
         for g in vitems {
             let gid = opt(&g.val("id"));
-            let items = in_validate.map.remove(&gid).unwrap_or_default();
-            in_validate.keys.retain(|k| *k != gid);
+            let items = match in_validate.iter().position(|e| e.0 == gid) {
+                Some(k) => in_validate.remove(k).1,
+                None => Vec::new(),
+            };
             w(out, format!("{gid} ({})", items.len()));
             for id in items {
                 let home = match homes.get(&id) {
@@ -341,7 +204,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
                 w(out, format!("  {id}  ->  {home}"));
             }
         }
-        for (gid, items) in in_validate.iter() {
+        for (gid, items) in &in_validate {
             w(
                 out,
                 format!("{gid} (not a Validate group!): {}", items.join(", ")),
@@ -354,7 +217,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
     if a.what == "out"
         && let Some(group) = &a.group
     {
-        for (id, (_, o)) in by_id.iter() {
+        for (id, (_, o)) in &by_id {
             if where_(o) == (Some("validate".into()), Some(group.clone())) && !ids.contains(id) {
                 ids.push(id.clone());
             }
@@ -365,7 +228,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
     }
     let missing: Vec<&str> = ids
         .iter()
-        .filter(|i| !by_id.map.contains_key(*i))
+        .filter(|i| find(&by_id, i).is_none())
         .map(|s| s.as_str())
         .collect();
     if !missing.is_empty() {
@@ -383,7 +246,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
         let existing: Vec<String> = groups_of("validate").into_iter().map(|(k, _)| k).collect();
         let mut outside = false;
         for id in &ids {
-            let (fi, o) = by_id.map[id];
+            let (fi, o) = *find(&by_id, id).unwrap();
             let (cat, g) = where_(o);
             if cat.as_deref() == Some("validate") {
                 return Err(fail(format!(
@@ -391,7 +254,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
                     opt(&g)
                 )));
             }
-            let Some(cat) = cat.clone().filter(|c| cats.map.contains_key(c)) else {
+            let Some(cat) = cat.clone().filter(|c| find(&cats, c).is_some()) else {
                 return Err(fail(format!(
                     "validate: {id} has no known category ({})",
                     opt(&cat)
@@ -456,7 +319,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
         let mut emptied: Vec<Option<String>> = Vec::new();
         let plan_s = plan.display().to_string();
         for id in &ids {
-            let (fi, o) = by_id.map[id];
+            let (fi, o) = *find(&by_id, id).unwrap();
             let (cat, group) = where_(o);
             if cat.as_deref() != Some("validate") {
                 return Err(fail(format!(
@@ -467,11 +330,8 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
             }
             let home = if let Some(to) = &a.to {
                 let (c, g) = to.split_once('/').unwrap_or((to, ""));
-                let g = py_strip(g);
-                (
-                    py_strip(c).to_string(),
-                    (!g.is_empty()).then(|| g.to_string()),
-                )
+                let g = g.trim();
+                (c.trim().to_string(), (!g.is_empty()).then(|| g.to_string()))
             } else if let Some(h) = homes.get(id) {
                 h.clone()
             } else {
@@ -479,7 +339,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
                     "validate: no \"Home\" for {id} in {plan_s}: give --to <category>/<group>"
                 )));
             };
-            if !cats.map.contains_key(&home.0) {
+            if find(&cats, &home.0).is_none() {
                 return Err(fail(format!("validate: {id}: no category \"{}\"", home.0)));
             }
             if let Some(hg) = &home.1 {
@@ -517,7 +377,7 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
         let still: HashSet<Option<String>> = by_id
             .iter()
             .filter(|(i, (_, o))| {
-                !expect.contains_key(*i) && where_(o).0.as_deref() == Some("validate")
+                !expect.contains_key(i) && where_(o).0.as_deref() == Some("validate")
             })
             .map(|(_, (_, o))| where_(o).1)
             .collect();
@@ -538,7 +398,10 @@ pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
             );
         }
         if dropped.len() == vitems.len() {
-            w(out, "Validate is empty now: remove the category and its icon (docs/objects/README.md, \"Validate\").".into());
+            w(
+                out,
+                "Validate is empty now: remove the category and its icon.".into(),
+            );
         }
     }
 

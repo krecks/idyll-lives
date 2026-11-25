@@ -3,7 +3,7 @@
 
 use super::common::disc;
 use super::shelves::{
-    WALL, book_row, bookcase, frame_photo, plant, prism, quarter, tips_out, vase,
+    WALL, book_row, bookcase, eased_bar, frame_photo, plant, quarter, tips_out, vase,
 };
 use super::{F, M};
 use artkit::forms::rounded_rect;
@@ -392,7 +392,14 @@ pub fn ladder_shelf() -> Vec<Obj> {
         (ladder_back(LADDER_H), LADDER_H),
     ];
     for x in [-0.3, 0.3] {
-        prism("rail", &outline, x - 0.0175, x + 0.0175, M.oak, true);
+        eased_bar(
+            "rail",
+            &outline,
+            (x - 0.0175, x + 0.0175),
+            0.004,
+            M.oak,
+            true,
+        );
     }
     let mut tops = Vec::new();
     for (i, y) in [0.36, 0.76, 1.14, 1.5].into_iter().enumerate() {
@@ -581,7 +588,9 @@ pub fn display_cabinet() -> Vec<Obj> {
             0.1,
             (-0.18, 0.655, z),
             M.cream_gloss,
-            verts = 16
+            verts = 16,
+            bevel = 0.003,
+            bevel_segments = 1
         );
         frame_photo(0.16, 0.605, z - 0.06, M.brass, 0.16, 0.2);
         vase(0.0, 1.055, z, 0.05, 0.2, M.red_gloss);
@@ -602,7 +611,9 @@ pub fn display_cabinet() -> Vec<Obj> {
             (-0.12, 1.615, WALL + 0.05),
             M.porcelain,
             rot = (78, 0, 0),
-            verts = 24
+            verts = 24,
+            bevel = 0.003,
+            bevel_segments = 1
         );
         fbox!(
             F,
@@ -685,7 +696,7 @@ pub fn display_cabinet() -> Vec<Obj> {
     swing!(
         door,
         "door_open",
-        -100.0,
+        100.0,
         seconds = 1.0,
         ease = Ease::BackOut
     );

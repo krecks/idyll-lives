@@ -59,6 +59,7 @@ pub fn at_red(w: &World, key: u64) -> bool {
 }
 
 /// How far along its way car `key` is (ticks); none, not on its way. For checks, with `waits_on`.
+#[cfg(any(test, feature = "test-support"))]
 pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
     let car = w.cars.get(crate::cars::car_index(key))?;
     matches!(

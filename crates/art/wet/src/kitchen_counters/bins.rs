@@ -74,7 +74,7 @@ pub fn trash_can() -> Vec<Obj> {
             M.lid,
             24,
         );
-        // the pedal, rounded, on its hinge block; the lid's hinge at the back
+        // the pedal, rounded, on its hinge block; the lid's hinge housing at the back, standing up over the lid
         let pedal = smooth_outline(
             &[(-0.05, -0.07), (0.05, -0.07), (0.045, 0.01), (-0.045, 0.01)],
             2,
@@ -106,9 +106,9 @@ pub fn trash_can() -> Vec<Obj> {
             f,
             "hinge",
             0.08,
-            0.03,
+            0.07,
             0.04,
-            (0, 0.625, -0.335),
+            (0, 0.645, -0.335),
             M.dark,
             bevel = 0.008,
             bevel_segments = 1
@@ -137,7 +137,8 @@ pub fn trash_can() -> Vec<Obj> {
             24,
         );
     });
-    let lid = hinged(join(&parts, "lid", None), f.at(0, 0.62, -0.355));
+    // the pin up in the housing, over the dome's back: turning about the rim's back edge, the dome tips into the wall
+    let lid = hinged(join(&parts, "lid", None), f.at(0, 0.672, -0.335));
     settle_all();
     swing!(lid, "lid_open", -75, seconds = 0.5, axis = Axis::X);
     meshes()
@@ -172,11 +173,35 @@ pub fn recycling_bins() -> Vec<Obj> {
                     at = (bx, by)
                 ),
                 ring!(0.145, 0.21, z = 0.6, verts = 16, square = 6, at = (bx, by)),
-                ring!(0.145, 0.21, z = 0.62, verts = 16, square = 6, at = (bx, by)),
+                // the rim's top eased 4 mm each side
+                ring!(
+                    0.145,
+                    0.21,
+                    z = 0.616,
+                    verts = 16,
+                    square = 6,
+                    at = (bx, by)
+                ),
+                ring!(
+                    0.141,
+                    0.206,
+                    z = 0.62,
+                    verts = 16,
+                    square = 6,
+                    at = (bx, by)
+                ),
+                ring!(
+                    0.136,
+                    0.201,
+                    z = 0.62,
+                    verts = 16,
+                    square = 6,
+                    at = (bx, by)
+                ),
                 ring!(
                     0.132,
                     0.197,
-                    z = 0.62,
+                    z = 0.616,
                     verts = 16,
                     square = 6,
                     at = (bx, by)
@@ -278,16 +303,17 @@ pub fn recycling_bins() -> Vec<Obj> {
                     format!("lid{i}_hinge{s}"),
                     0.01,
                     0.06,
-                    (x + s as f64 * 0.09, 0.635, -0.43),
+                    (x + s as f64 * 0.09, 0.65, -0.43),
                     m,
                     rot = (0, 90, 0),
                     verts = 8
                 );
             }
         });
+        // hinged on its top back edge, the knuckles': a lid turning about its bottom edge tips its top into the wall
         lids.push(hinged(
             join(&parts, &format!("lid{i}"), None),
-            f.at(x, 0.62, -0.44),
+            f.at(x, 0.66, -0.44),
         ));
     }
     settle_all();

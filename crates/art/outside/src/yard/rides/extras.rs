@@ -1,10 +1,11 @@
 //! What each kind of bike adds to the shape: stands, racks, baskets and motors.
 
 use super::*;
-use crate::yard::common::{F, M, bent, board, rod};
+use crate::yard::common::{F, M, bent, rod};
 use crate::yard::play::Bike;
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::{cosd, pow, sind};
 use artkit::parts::numbered;
 use artkit::{fbox, fcyl, fextrude, fsweep, loft, ring, torus};
@@ -51,7 +52,7 @@ pub(super) fn city_extras(s: &Bike) {
     let p = F.at(cx, 0, z);
     let (px, pz) = (p.x, p.y);
     let n: usize = low(24, 8);
-    loft!(
+    artkit::bevel::eased(loft!(
         "basket",
         &[
             ring!(
@@ -81,7 +82,7 @@ pub(super) fn city_extras(s: &Bike) {
             )
         ],
         material = M.basket
-    );
+    ));
     let rim: Vec<(f64, f64, f64)> =
         rounded_rect(2.0 * hx + 0.004, 2.0 * hz + 0.004, 0.05, low(3, 1))
             .iter()
@@ -186,6 +187,7 @@ pub(super) fn city_extras(s: &Bike) {
             0.03,
             low(6, 4),
             3,
+            1.0,
         );
         rod(
             &numbered("carrier_strut"),
@@ -469,7 +471,8 @@ pub(super) fn mtb_extras(s: &Bike) {
 pub(super) fn road_extras(s: &Bike) {
     let z = s.z;
     bb_shell(s, 0.07);
-    board(
+    kit::board(
+        &F,
         "bottle",
         (0.19, 0.49, z),
         (0.12, 0.37, z),
@@ -623,7 +626,7 @@ pub(super) fn cargo_extras(s: &Bike) {
 pub(super) fn ebike_extras(s: &Bike) {
     let z = s.z;
     bb_shell(s, 0.08);
-    fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "motor",
         0.06,
@@ -632,8 +635,9 @@ pub(super) fn ebike_extras(s: &Bike) {
         M.motor,
         rot = (90, 0, 0),
         verts = low(14, 7)
-    );
-    board(
+    ));
+    kit::board(
+        &F,
         "battery",
         (0.26, 0.55, z),
         (0.02, 0.37, z),

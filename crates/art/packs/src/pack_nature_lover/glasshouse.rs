@@ -1,8 +1,8 @@
 //! The fern glasshouse (2x2): a white-framed glass room, a bench for two, ferns, orchids and palms.
 
-use super::common::{_m, _pot, _rosette, M};
+use super::common::{_pot, _rosette, M};
 use super::ferns::{_fern, _orchid, _palm};
-use artkit::forms::{rect, smooth_outline};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, atan2, cosd, degrees, sind};
 use artkit::motion::Ease;
@@ -10,6 +10,7 @@ use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::{hypot, int};
 use artkit::scene::Obj;
+use artkit::{bevel::ease, shapes::AUTO_WIDTH};
 use artkit::{boulder, fbox, fextrude, fsweep, settle, soft, swing};
 
 // width, depth, wall height, ridge height
@@ -80,7 +81,8 @@ fn _glasshouse_frame(f: &GameFrame, hx: f64, hz: f64, slope: f64, run: f64) {
             M.frame,
             profile = vec![
                 (0.0, 0.02),
-                (-0.02, 0.0),
+                (-0.017, 0.003),
+                (-0.017, -0.003),
                 (0.0, -0.02),
                 (0.003, -0.016),
                 (-0.014, 0.0),
@@ -351,14 +353,18 @@ pub fn glasshouse() -> Vec<Obj> {
                 bevel = 0.006,
                 bevel_segments = 1
             );
-            fsweep!(
-                f,
-                format!("bench_back_post{}", float_repr(x)),
-                &[(x, 0.39, -0.21), (x, 0.82, -0.29)],
-                0.0,
-                M.cedar_dark,
-                profile = rect(0.04, 0.04),
-                up = (0, 1, 0)
+            ease(
+                fsweep!(
+                    f,
+                    format!("bench_back_post{}", float_repr(x)),
+                    &[(x, 0.39, -0.21), (x, 0.82, -0.29)],
+                    0.0,
+                    M.cedar_dark,
+                    profile = rounded_rect(0.04, 0.04, AUTO_WIDTH, 1),
+                    up = (0, 1, 0)
+                ),
+                60.0,
+                1,
             );
         }
         for x in [-0.36, 0.36] {
@@ -373,7 +379,8 @@ pub fn glasshouse() -> Vec<Obj> {
                 round = 0.014,
                 puff = 0.008,
                 flat = 2,
-                round_segments = 1
+                round_segments = 1,
+                resting = true
             );
         }
         // the back shelf: orchids and ferns
@@ -420,7 +427,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 x,
                 sy,
                 -0.66,
-                _m(["orchid", "white", "orchid_b"][i]),
+                [M.orchid, M.white, M.orchid_b][i],
             );
         }
         for (k, x) in [-0.6, -0.07, 0.43].into_iter().enumerate() {
@@ -460,7 +467,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 0.26,
                 None,
                 true,
-                None,
+                Some(12),
             );
             _palm(f, &format!("palm{s}"), s as f64 * 0.64, sy, 0.6, s);
         }
@@ -489,7 +496,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 0.14,
                 None,
                 true,
-                None,
+                Some(12),
             );
             _rosette(
                 f,
@@ -506,7 +513,7 @@ pub fn glasshouse() -> Vec<Obj> {
                 "oval",
                 0.3,
                 None,
-                3,
+                2,
                 3,
                 int(x * 10.0) as i128,
                 0.0,
@@ -529,7 +536,8 @@ pub fn glasshouse() -> Vec<Obj> {
                     M.green_dark,
                     verts = 4,
                     resolution = 2,
-                    scale = [1.0, 0.6]
+                    scale = [1.0, 0.6],
+                    angle = 95.0 // a round stem: its four sides shaded round
                 );
             }
         }

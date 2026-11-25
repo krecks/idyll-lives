@@ -32,10 +32,6 @@ impl<T> OMap<T> {
         self.0.iter().find(|e| e.0 == k).map(|e| &e.1)
     }
 
-    pub fn get_mut(&mut self, k: &str) -> Option<&mut T> {
-        self.0.iter_mut().find(|e| e.0 == k).map(|e| &mut e.1)
-    }
-
     pub fn contains(&self, k: &str) -> bool {
         self.get(k).is_some()
     }

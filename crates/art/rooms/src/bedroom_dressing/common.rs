@@ -72,10 +72,10 @@ pub fn ellipse(a: f64, b: f64, n: usize) -> Vec<(f64, f64, f64, f64)> {
 
 /// A frame's cross-section [(o, d)]: `w` wide along the outline's normal (o: - in, + out) and `d` deep (+ to the
 /// front): a flat back, a rounded outer edge, a cove and a bead, and a lip falling to the glass, standing well in
-/// front of it (the glass is set in behind).
+/// front of it (the glass is set in behind). Its square corners are eased 3 mm.
 pub fn moulding(w: f64, d: f64) -> Vec<(f64, f64)> {
     let (hw, hd) = (w / 2.0, d / 2.0);
-    vec![
+    let section = vec![
         (-hw, -hd),
         (hw, -hd),
         (hw, hd * 0.2),
@@ -87,7 +87,9 @@ pub fn moulding(w: f64, d: f64) -> Vec<(f64, f64)> {
         (-hw * 0.6, hd * 0.92),
         (-hw * 0.85, hd * 0.82),
         (-hw, hd * 0.75),
-    ]
+    ];
+    // its back's and the lip's square corners eased (the gate's `edges`)
+    artkit::forms::eased_loop(&section, 0.003)
 }
 
 /// A frame swept round `outline` (in the mirror's plane, about game `centre`), its cross-section `section` [(o, d)]:
@@ -197,24 +199,6 @@ pub fn oval(
         segments = 48,
         scale = (1.0, h / w, 1.0),
         rot = (90, 0, 0)
-    )
-}
-
-/// A turned post at game (x, z): `profile` is [(radius, height)], bottom first.
-pub fn turned(
-    name: &str,
-    x: impl Coord,
-    z: impl Coord,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = F.at(x, 0, z),
-        material = material,
-        segments = segments
     )
 }
 

@@ -3,6 +3,7 @@
 
 use super::{F, M};
 use artkit::parts::{join_all, settle};
+use artkit::py;
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsphere, settle};
 
@@ -64,7 +65,7 @@ pub fn gate() -> Vec<Obj> {
     // the brace, a strip from the lower left to the upper right, cut as one outline so it stays in the leaf's plane
     let (x0, y0, x1, y1) = (-0.68, 0.30, 0.68, 1.02);
     let (dx, dy): (f64, f64) = (x1 - x0, y1 - y0);
-    let len = dx.hypot(dy);
+    let len = py::hypot(dx, dy);
     let (px, py) = (-dy / len * 0.035, dx / len * 0.035);
     let brace = [
         (x0 + px, y0 + py),

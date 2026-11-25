@@ -2,39 +2,21 @@
 // `continued`): the two meet end to end, one street on through, and a country road from there ran
 // on along the other street a few metres off before turning away across it, a junction knotted
 // into two a few metres apart (Canalside's Queen'ston Lane, from Foundry Street's end by Union
-// Street, the dense world of the play-test, meta.seed 808114082). Nor a T off one of the streets there
-// (`sideT`): since the motorway went down before the villages (2026-11-24) Canalside's villages are others,
-// and in Station Square (dense, seed 14) Station Square Lane came into a street where another village's
-// street's end comes up to it; King's Row (dense, seed 45) has two such streets.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+// Street, the dense world of the play-test, meta.seed 808114082). Since the motorway went down before the
+// villages (2026-11-24) Canalside's villages are others; King's Row (dense, seed 45) has two such streets, the
+// world checked here. (A T off one of the streets there, `sideT`, isn't checked here.)
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { nearest } from '../src/game/roads';
 import { CLASSIC } from './support/classicWorlds';
 
-const WEB = new URL('../', import.meta.url).pathname;
-
 describe('country roads by streets meeting end to end', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { generateFromSpec } = await import('../src/game/macro');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   test(
     "big dense 45 (King's Row): the two streets meet, and no country road leaves where they do",

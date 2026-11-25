@@ -3,8 +3,8 @@
 use super::common::M;
 use artkit::forms::rect;
 use artkit::materials::Mat;
-use artkit::math::P3;
-use artkit::parts::{join, new_parts};
+use artkit::math::{P3, pow};
+use artkit::parts::{aside, join, new_parts, numbered};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::{boulder, fbox, fcyl, fsweep, jitter, leaf, loft, revolve, ring, settle, slide};
@@ -22,13 +22,29 @@ fn _fir(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, h: f64, r: f64, mater
         prof.extend([(rr * 0.35, y0 + 0.04 * h), (rr, y0)]);
     }
     prof.push((0.0, h));
-    revolve!(
-        name,
-        &prof,
-        at = f.at(x, y, z),
-        material = material,
-        segments = 8
-    );
+    // a lathe a tier (each from its inner point to the next's; the first open below, under its branches), so each
+    // tier's texture is laid round at its own radius, not stretched to the whole tree's; its steep side in three
+    // bands, each narrowing by the same share (the texture is laid at one radius round a band)
+    for k in 0..tiers {
+        let (rim, next) = (prof[2 * k + 2], prof[2 * k + 3]);
+        let mut tier = prof[2 * k + 1..=2 * k + 2].to_vec();
+        tier.extend((1..=3).map(|i| {
+            let r = if next.0 > 0.0 {
+                rim.0 * pow(next.0 / rim.0, i as f64 / 3.0)
+            } else {
+                rim.0 * (3 - i) as f64 / 3.0
+            };
+            let t = (rim.0 - r) / (rim.0 - next.0);
+            (r, rim.1 + (next.1 - rim.1) * t)
+        }));
+        revolve!(
+            numbered(name),
+            &tier,
+            at = f.at(x, y, z),
+            material = material,
+            segments = 8
+        );
+    }
     fcyl!(
         f,
         format!("{name}_trunk"),
@@ -52,7 +68,8 @@ pub fn moss_terrarium() -> Vec<Obj> {
                 (0.155, 0.03),
                 (0.09, 0.05),
                 (0.07, 0.075),
-                (0.08, 0.09),
+                (0.077, 0.084), // its bead's crown cut across: two turns under the gate's 60°
+                (0.0765, 0.0935),
                 (0.05, 0.12),
                 (0.042, 0.3),
                 (0.048, 0.42),
@@ -155,7 +172,10 @@ pub fn moss_terrarium() -> Vec<Obj> {
                 segments = 10
             );
         }
-        // the mister on the floor beside it, and a round braided rug
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the mister on the floor beside it, and a round braided rug: drawn with it, not part of its size
+    let floor = new_parts(|| {
         let P3 {
             x: bx,
             y: by,
@@ -210,7 +230,7 @@ pub fn moss_terrarium() -> Vec<Obj> {
             scale = (1, 0.75, 1)
         );
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&floor, "floor");
     // The glass cloche and its knob, resting on the plate: `lid_open` lifts it.
     let lid = new_parts(|| {
         revolve!(

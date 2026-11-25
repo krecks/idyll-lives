@@ -61,6 +61,22 @@ pub(super) struct Sampler {
 impl Sampler {
     /// None if its positions can't be read here (compressed).
     pub(super) fn new(g: &Glb, entry: &J, pose: Option<&Pose>) -> R<Option<Sampler>> {
+        Self::without(g, entry, pose, &HashSet::new())
+    }
+
+    /// The model's own body at rest (`cargo review sizes`' top and table): what it carries (`aside_nodes`, a moving
+    /// part too) left out.
+    pub(super) fn own(g: &Glb, entry: &J) -> R<Option<Sampler>> {
+        Self::without(g, entry, None, &aside_nodes(&g.gltf))
+    }
+
+    /// `new` with the parts `skip` (their nodes, or the moving parts they are on) left out.
+    fn without(
+        g: &Glb,
+        entry: &J,
+        pose: Option<&Pose>,
+        skip: &HashSet<usize>,
+    ) -> R<Option<Sampler>> {
         let materials = g.gltf.get("materials").and_then(J::list).unwrap_or(&[]);
         let no_overrides = J::Obj(Vec::new());
         let overrides = entry.get("materials").unwrap_or(&no_overrides);
@@ -78,6 +94,7 @@ impl Sampler {
         // (A part flattened to nothing: one of its axes under a hundredth of its longest, G.grow from 0.001.)
         let placed: Vec<Placed> = node_matrices(&g.gltf, pose, None)?
             .into_iter()
+            .filter(|p| !skip.contains(&p.node) && !p.part.is_some_and(|q| skip.contains(&q)))
             .filter(|p| {
                 let axis =
                     |k: usize| hypot(&[p.m[k * 4].f(), p.m[k * 4 + 1].f(), p.m[k * 4 + 2].f()]);
@@ -295,6 +312,7 @@ pub(super) fn open_pose(g: &Glb, clip: &J) -> R<Pose> {
 
 /// A functional height of a content object (where residents sit or lie on it, where things stand on its top,
 /// where its lamp shines from) and what its model has there (`heights`).
+#[derive(Default)]
 pub struct Height {
     /// `seat`, `surface`, `mattress`, `lower bunk`, `upper bunk` or `light`.
     pub what: &'static str,
@@ -409,12 +427,14 @@ fn for_baby(object: &J) -> bool {
 }
 
 /// Each slot's place of content object `object` (sim-core `slot_position`, `slot_yaw`), `fwd` m ahead of it the
-/// way its user faces (m right of the footprint's middle and forward of it): its `places`, else spread across
-/// its width, facing its front.
+/// way its user faces (m right of the footprint's middle and forward of it): its `places` (but those stood at,
+/// `pose: "stand"`: the masseur's beside a massage table is no seat or mattress), else spread across its width,
+/// facing its front.
 fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
     if let Some(places) = object.get("places").and_then(J::list) {
         return places
             .iter()
+            .filter(|p| p.get("pose").and_then(J::str) != Some("stand"))
             .map(|p| {
                 let at = |k| {
                     p.get("at")
@@ -532,7 +552,7 @@ pub(super) fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
 /// - its seat (`seat_of`), at each of its hips' points (the worst reported);
 /// - its top (content `surface`: at its `at`, else the middle);
 /// - its mattress (furniture.json `bunks`, `beds`, else `defaultBed` for one lain on; a hammock's sling at its
-///   low point), `fwd` forward, at each slot (in the middle for one lain on across, but a baby's at its slot), held open if it opens;
+///   low point), `fwd` forward, at each slot (for one lain on across, `fwd` along it from its middle at the slot's depth, but a baby's at its slot), held open if it opens;
 ///   with `every_slot` false at slot 0 only (`cargo review sizes`: a crib's slot 1 is its changing table);
 /// - its lamp's light (content `light`, only with an `at`: the shade).
 pub(super) fn heights(
@@ -705,7 +725,10 @@ pub(super) fn heights(
                 let slots = slot_points(object, fwd);
                 let n = if every_slot { slots.len() } else { 1 };
                 let points: Vec<[f64; 2]> = if across {
-                    vec![[0.0, fwd]]
+                    // Lain on across, along it: moved to its middle from the slot, then `fwd` along it, at the
+                    // slot's depth (residents.ts `bedFwd`).
+                    let depth = slot_points(object, 0.0).first().map_or(0.0, |p| p[1]);
+                    vec![[fwd, depth]]
                 } else {
                     slots.into_iter().take(n).collect()
                 };

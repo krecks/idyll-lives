@@ -18,15 +18,15 @@ mod home;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_kind",
         M.palette(),
         vec![
             Model::new(
                 "neighbourlyOven",
                 bake::neighbourly_oven,
-                (1.832, 1.717, 0.640),
+                (1.832, 1.08, 0.640),
             )
             .key("model.kind.neighbourlyOven")
             // the door drops while the dish goes in, then shuts for the bake (`hold`). Keyed by the bake step's
@@ -38,7 +38,7 @@ pub fn family() -> Option<Family> {
                 ("towel", "Fabric"),
                 ("cabinet", "Cupboards"),
             ]),
-            Model::new("givingJar", bake::giving_jar, (0.641, 1.32, 0.655))
+            Model::new("givingJar", bake::giving_jar, (0.44, 1.32, 0.44))
                 .key("model.kind.givingJar")
                 .centre(0.101, 0.057)
                 .motions(json!({"uses": {"donate": "coin"}}))
@@ -55,7 +55,7 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "welcomeTeaTable",
                 home::welcome_tea_table,
-                (1.94, 0.499, 0.864),
+                (0.403, 0.501, 0.56),
             )
             .key("model.kind.welcomeTeaTable")
             .centre(0.0, -0.005)
@@ -85,5 +85,5 @@ pub fn family() -> Option<Family> {
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves \
          while it is used: the oven door drops, a coin drops into the jar, the rocker rocks, the teapot pours, the \
          feeder's roof lifts and songbirds fly out, and the settee's cushions sink.",
-    ))
+    )
 }

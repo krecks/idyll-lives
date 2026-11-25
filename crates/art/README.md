@@ -30,7 +30,7 @@ A family is a folder, `crates/art/<group>/src/<family>/` (snake case: `pack_couc
 
 | File | Holds |
 |---|---|
-| `mod.rs` | The palette, the family's constants, and `pub fn family() -> Option<Family>`: every model with its facts |
+| `mod.rs` | The palette, the family's constants, and `pub fn family() -> Family`: every model with its facts |
 | `common.rs` | The family's own helpers |
 | `<group>.rs` | The builds, a file a group of models (`chairs.rs`, `tables.rs`), a `pub fn <model>() -> Vec<Obj>` each |
 | `NOTES.md` | What the models are, the facts they keep, the faults found |
@@ -131,7 +131,7 @@ rewrites the models, the pack and centres.json in the tree.
    `crates/art/<group>/src/<family>/mod.rs`; split the builds into files of their own as it grows. Rename the
    family and its models; `cargo art template --preview` shows what it builds.
 2. **Register it.** `pub mod <family>;` and a row `("<family>", <family>::family())` in `families()` in the group's
-   `src/lib.rs`; `family()` returns `Some(Family::new(..))`. The name is the models' folder
+   `src/lib.rs`; `family()` returns `Family::new(..)`. The name is the models' folder
    (`models/<family>/`), the default key prefix (`model.<family>.<id>`) and the pack's folder
    (`.pack("<name>")` for another).
 3. **The content.** Each model's key must be one a content object or item names, or one a manifest has, or the
@@ -186,10 +186,13 @@ rewrites the models, the pack and centres.json in the tree.
    - `extrude!` (`fextrude!`): an outline with `holes` into a slab: a carved apron, a headboard, a grille;
      `forms::rounded_rect` and `smooth_outline` draw outlines;
    - `soft_box!` (`soft!`): cushions, pillows, mattresses, duvets (below, "Soft things");
-   - `forms::mirrored`, `forms::bisect` (a cut along a plane), `jitter!` (a hand-made wobble);
+   - `forms::bisect` (a cut along a plane), `jitter!` (a hand-made wobble);
    - `artkit::kit`: whole parts more than one family uses (`kit::tube!`, `fillet!`, `pull!`, `knob!`, `shaker!`,
-     `moulding!`, `cabriole!`, `scroll!`, `bench_end!`, `songbird!`, `letters!`, `cut!`, `recessed_box!`:
-     [kit/mod.rs](../artkit/src/kit/mod.rs) has an example of each); `artkit::botany` for plants and trees.
+     `moulding!`, `cabriole!`, `scroll!`, `bench_end!`, `songbird!`, `letters!`, `cut!`, `recessed_box!`, `mug!`,
+     `throw!`, `board`, `tiled_walls!`, `steam_iron`, `duvet!` with `duvet_flap!` and `turn_down!`, `pleats!`,
+     `figure8`, `turn_round`, and `kit::WALL`, the wall's face in a one-deep footprint:
+     [kit/mod.rs](../artkit/src/kit/mod.rs) has an example of each); `artkit::botany` for plants and trees; a
+     family's helper's options are written with `artkit::options!`, as the kit's are.
 
    The options are each builder's struct (`shapes::Cube`, `Round`; `forms::Sweep`, `Loft`, `Extrude`;
    `soft::SoftBox`), set by name in the macro: `fbox!(F, "top", 1.2, 0.03, 0.8, (0, 0.735, 0), M.oak, bevel =
@@ -413,7 +416,8 @@ Playwright headless with full Chrome for Testing, at 1 % volume (`page.addInitSc
 ## Traps
 
 - **Wall face.** A model built on the tile's back edge sits inside the house wall; wall faces are 7 cm in. The gate
-  fails a model whose back reaches over 1 cm past the face.
+  fails a model whose back reaches over 1 cm past the face, at rest (`wall`) or opened (`opened`: any key of a
+  use's, `open`'s or `night`'s clip; a door swung back past 90°, a lid tipped past upright).
 - **Against a wall, on the floor.** Centred on its tile, a counter or a fridge stands 3–13 cm off the wall and off
   its content `surface`. Give its `Model` a `centre` (the back of a counter or a fridge is 0.43 m in from the
   middle of its tile); a failed size or centre check prints the measured centre to copy. No content fact says a
@@ -451,6 +455,17 @@ Playwright headless with full Chrome for Testing, at 1 % volume (`page.addInitSc
 - **Boxes come chamfered.** A `cube!` or `fbox!` that names no `bevel` takes a 4 mm chamfer (`shapes::AUTO_BEVEL`)
   where the gate's `edges` would find its edges hard (every side 12 mm or more, the longest 5 cm or more), none in a
   far version. `bevel = 0` keeps one sharp: a plate set in a frame, a liner whose edges hide inside something.
+- **Easing what isn't a box.** The kernel's helpers, one for every family (a family keeps no copy of its own):
+  `bevel::eased(obj)` (a part's turns over 50° chamfered 4 mm, none on a part too small for the gate to find or in a
+  far version; `bevel::ease(obj, angle, segments)` at another angle), `forms::eased(profile, r)` and
+  `forms::eased_loop` (a lathe's or a moulding's corners of 60° or more rounded on an arc), `forms::round_at` (one
+  corner rolled in four steps), `forms::inset` (an outline moved in) and `place::eased_prism` (a body with chamfered
+  ends). Botany's pots, saucers and raised beds come chamfered; a `boulder!` is scaled in its mesh. A bevel that
+  would end where no other bevelled edge goes (a mitre, a loft's end) is left off those edges, and the gate says
+  where; a profile closed on its first point turns into a welded ring.
+- **UVs on the bevel.** A textured part's box or round UVs are made on its bevelled mesh, so a one-strip chamfer
+  takes the texture as a face of its own (carried, its strip had no area: `texels` found it smeared); UVs made
+  already (a sweep's) are carried. `uv::box_named` lays some parts a box a face where their own UVs stretch.
 - **`up` is the kernel's.** `fsweep!` maps the points to game axes but passes `up` (which way a profile's first
   side faces) as it is, in the kernel's axes: `up = (0, 1, 0)` on a path along game x flips a profile down.
 - **The bevel is lazy.** `bevel = ..` only asks: the part is rounded when it is joined or written. Until then its

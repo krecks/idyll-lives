@@ -50,16 +50,16 @@ The generator's `.rs` files are in `crates/tools/src/characters/`.
 | To change | Edit |
 |---|---|
 | proportions per family and life stage, bone positions | `rig.rs` (`proportions`) |
-| the body's shape, skin weights, fields and tone | `body.rs`, `cage.rs`, `subdiv.rs` |
+| the body's shape, skin weights, fields and tone | `body/`, `cage.rs`, `subdiv.rs` |
 | the head, the face's place | `head.rs` (the head interface the face and hair build on) |
-| eyes, lids, brows, lips, teeth, tongue, the expression and viseme shapes | `face.rs` |
-| a face per resident: the identity channels (how they are made, where they are kept off) | `identity.rs`; how much each adds, in `head.rs` (`JAW_WIDTH` ... `Bump`, `NOSE_LENGTH` ...) and `face.rs` (`LIP_FULLNESS`, `EYE_TILT`, `EYE_OPEN`); the names in `contract.rs` (`IDENTITY`) and `web/src/game/household.ts` (`FACE_CHANNELS`, `FACE_GROUPS`) |
+| eyes, lids, brows, lips, teeth, tongue, the expression and viseme shapes | `face/` |
+| a face per resident: the identity channels (how they are made, where they are kept off) | `identity.rs`; how much each adds, in `head.rs` (`JAW_WIDTH` ... `Bump`, `NOSE_LENGTH` ...) and `face/` (`LIP_FULLNESS`, `EYE_TILT`, `EYE_OPEN`); the names in `contract.rs` (`IDENTITY`) and `web/src/game/household.ts` (`FACE_CHANNELS`, `FACE_GROUPS`) |
 | how a resident's face is drawn and its eyes moved | `web/src/render/shared/characters/identity.ts`, `pose.ts` (`Placement.eyes`) |
-| hairstyles and the beard | `hair.rs`, built from `prims.rs` |
-| which hair hangs loose and how much (tone.x) | `hair.rs` (`Comp::sway`, `loose`, `SWAY_*`) |
+| hairstyles and the beard | `hair/`, built from `prims.rs` |
+| which hair hangs loose and how much (tone.x) | `hair/` (`Comp::sway`, `loose`, `SWAY_*`) |
 | how hair and hems swing (the springs, how far, the dead band), and where a hem is loose | `web/src/render/shared/characters/sway.ts`; `web/src/render/pc/shaders/character.ts` (`gameSimSway`, `SWAY_HEM`) |
-| garment cuts and shells | `clothes.rs`, `garments.rs` |
-| the trousers' shell (every bottom with legs) and the long top's (every regular top): their meshes; who wears them; how they are lifted, cut and shaded | `clothes.rs` (`trousers`, `LEGGED`, `tops`, `REGULAR`); `web/src/render/shared/characters/outfit.ts` (`LEGGED`, `REGULAR`); `web/src/render/pc/shaders/character.ts` (`CUT`, `GAME_SIM_CUT`, `GAME_SIM_FAR`) |
+| garment cuts and shells | `clothes/`, `garments.rs` |
+| the trousers' shell (every bottom with legs) and the long top's (every regular top): their meshes; who wears them; how they are lifted, cut and shaded | `clothes/` (`trousers`, `LEGGED`, `tops`, `REGULAR`); `web/src/render/shared/characters/outfit.ts` (`LEGGED`, `REGULAR`); `web/src/render/pc/shaders/character.ts` (`CUT`, `GAME_SIM_CUT`, `GAME_SIM_FAR`) |
 | clips | `clips/*.ts` (`dsl.ts` for the format, `ik.ts` for arm and leg placement) |
 | how a walk starts and stops (the first step, the last steps, the feet kept where they stand) | `web/src/render/shared/characters/stride.ts` (`STRIDE`) |
 | how residents use clips, seats, beds, carried things, what they ride | `web/src/render/shared/characters/` (`residents.ts`, `seats.ts`, `props.ts`, `vehicles.ts` for bikes and e-scooters) |

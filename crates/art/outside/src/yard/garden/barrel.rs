@@ -60,9 +60,9 @@ pub fn rain_barrel() -> Vec<Obj> {
             })
             .collect();
     }
-    loft!("barrel", &secs, material = M.barrel, angle = 35);
+    artkit::bevel::eased(loft!("barrel", &secs, material = M.barrel, angle = 35));
     // the lid: a domed disc with a raised rim, a mesh inlet at the back and its ring
-    revolve!(
+    artkit::bevel::eased(revolve!(
         "lid",
         &[
             (0.0, 0.0),
@@ -76,8 +76,8 @@ pub fn rain_barrel() -> Vec<Obj> {
         at = F.at(0, 0.925, RB_Z),
         material = M.barrel_dark,
         segments = low(24, 10)
-    );
-    fcyl!(
+    ));
+    artkit::bevel::eased(fcyl!(
         F,
         "lid_inlet",
         0.065,
@@ -85,9 +85,9 @@ pub fn rain_barrel() -> Vec<Obj> {
         (0, 0.962, RB_Z - 0.1),
         M.barrel_dark,
         verts = low(12, 6)
-    );
+    ));
     if !is_low() {
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "inlet_mesh",
             0.05,
@@ -95,7 +95,7 @@ pub fn rain_barrel() -> Vec<Obj> {
             (0, 0.969, RB_Z - 0.1),
             M.tyre,
             verts = 12
-        );
+        ));
         for k in 0..3 {
             let a = 120 * k + 30;
             fbox!(
@@ -113,7 +113,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         }
     }
     // the brass tap at the front: a flange, a body, a spout curving down, a lever on top
-    fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "tap_flange",
         0.032,
@@ -122,7 +122,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         M.brass,
         rot = (90, 0, 0),
         verts = low(10, 6)
-    );
+    ));
     kit::tube!(
         F,
         "tap_spout",
@@ -140,7 +140,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         verts = low(10, 6),
         round = 1
     );
-    fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "tap_body",
         0.024,
@@ -148,8 +148,8 @@ pub fn rain_barrel() -> Vec<Obj> {
         (0, 0.2, RB_Z + 0.33),
         M.brass,
         verts = low(10, 6)
-    );
-    fsweep!(
+    ));
+    artkit::bevel::eased(fsweep!(
         F,
         "tap_lever",
         &[(0, 0.23, RB_Z + 0.33), (0, 0.235, RB_Z + 0.37)],
@@ -158,6 +158,6 @@ pub fn rain_barrel() -> Vec<Obj> {
         profile = rounded_rect(0.012, 0.03, 0.004, 1),
         up = (1, 0, 0),
         scale = [1.0, 1.2]
-    );
+    ));
     settle!(&[join_all("rainBarrel")], centre = false)
 }

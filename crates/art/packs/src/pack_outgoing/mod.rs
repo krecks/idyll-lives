@@ -25,8 +25,8 @@ mod stage;
 pub use common::M;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_outgoing",
         M.palette(),
         vec![
@@ -42,10 +42,10 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "conversationSectional",
                 bar::conversation_sectional,
-                (1.9, 1.42, 1.86),
+                (1.9, 0.863, 1.563),
             )
             .key("model.outgoing.conversationSectional")
-            .centre(0.0, 0.0)
+            .centre(0.0, 0.0026)
             .motions(json!({"uses": {"hangOut": "sink_in"}}))
             .paint(&[("frame", "Body"), ("upholstery", "Upholstery")]),
             Model::new("karaokeStage", stage::karaoke_stage, (1.9, 1.63, 0.894))
@@ -57,10 +57,10 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "videoCallNook",
                 stage::video_call_nook,
-                (0.84, 1.283, 0.788),
+                (0.84, 0.989, 0.768),
             )
             .key("model.outgoing.videoCallNook")
-            .centre(0.0, 0.077)
+            .centre(0.0, 0.081)
             .motions(json!({"uses": {"call": "ring_light"}}))
             .paint(&[
                 ("body", "Body"),
@@ -82,5 +82,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each \
          moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring \
          light swings up, the dance floor's tiles pulse and a new photo grows.",
-    ))
+    )
 }

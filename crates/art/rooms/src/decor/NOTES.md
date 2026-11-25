@@ -67,7 +67,8 @@ sizes (within 2 %), centres, parts, clips, motions, paint and draws; every model
   corbels, moulded jambs and lintel with corner blocks, rosettes and a keystone, three hearth slabs (top still at
   `HEARTH`), a swept grate with finials, jittered logs with pale ends (`log_end`), lofted flames; the mantel's things
   moved in front of the flue (they stood inside it, unseen).
-- **Curtains**: pleats deeper at a thickened hem, easing to the heading tape; turned finials, swept brackets.
+- **Curtains**: pleats deeper at a thickened hem, easing to the heading tape; turned finials, swept brackets. Each
+  panel is built drawn, its folds 15 cm apart (`FOLD`), and gathered open at rest (below, "Curtains gather").
 - **Rugs**: woven motifs as stepped outlines (`diamond`): medallions, corner pieces, the round rug's leaf garland
   and star, the patterned rug's three-tier medallion and zigzag border; knotted fringes swept (the large rug's body
   is 2.75 m, its new fringe making the 2.85 m).
@@ -85,7 +86,7 @@ small from the game camera, on a wall thing most houses have several of. Revisit
 | `grandfatherClock` | `door_open` | use `wind` | the trunk door swings open 100° on its left edge (seen from the front) as the clock is wound, and back when the use ends (`swing`, 0.8 s) |
 | `hangingPlant` | `sway` | use `water`, `hold` 0.8 s | the plant, pot and hanger swing 5° out about the ceiling hook (`swing`, eased) and, played back after the hold, home: one sway (it was a `rock`, which played back swung twice) |
 | `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`grow`) for the whole use; the light is the content's |
-| `curtains`, `curtainsWide`, `curtainsLong` | `close` | night (held while the sim has them drawn: sim-core `curtains.rs`) | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`squash` in x, about the rail end) |
+| `curtains`, `curtainsWide`, `curtainsLong` | `close` | night (held while the sim has them drawn: sim-core `curtains.rs`) | the two pleated panels, gathered open at the sides (their nodes scaled in x, about the rail end), let out to their built width until they meet (`grow` in x) |
 
 The grandfather clock takes **5 draw calls**, the one model whose entry says so (`.draws(5)`): its body, all plain (1),
 the two hands, the pendulum and the trunk door. Since 2026-10-21 (review A-decor-01) its walnut is a polished satin,
@@ -117,9 +118,9 @@ tabs are their own fabric, so the moving panels cost one draw call each.
 | `model.coatRack` | 0.44 × 1.79 × 0.36 m | 5,080 | 3 | Body |
 | `model.hangingPlant` | 0.46 × 1.81 × 0.47 m | 4,966 | 3 | Pot, Cord |
 | `model.fireplace` | 1.96 × 2.80 × 0.88 m | 5,492 | 3 | Surround, Mantel |
-| `model.curtains` | 1.30 × 1.67 × 0.10 m | 3,540 | 3 | Fabric, Rail |
-| `model.curtainsWide` | 2.46 × 1.67 × 0.10 m | 4,564 | 3 | Fabric, Rail |
-| `model.curtainsLong` | 2.46 × 2.58 × 0.10 m | 4,564 | 3 | Fabric, Rail |
+| `model.curtains` | 1.30 × 1.67 × 0.10 m | 4,052 | 3 | Fabric, Rail |
+| `model.curtainsWide` | 2.46 × 1.67 × 0.10 m | 6,100 | 3 | Fabric, Rail |
+| `model.curtainsLong` | 2.46 × 2.58 × 0.10 m | 6,100 | 3 | Fabric, Rail |
 | `model.rugRound` | 1.90 × 0.02 × 1.90 m | 3,388 | 1 | Rug |
 | `model.rugLarge` | 2.85 × 0.02 × 1.85 m | 2,396 | 1 | Rug |
 | `model.rugRunner` | 0.80 × 0.02 × 2.80 m | 1,808 | 1 | Rug |
@@ -143,3 +144,29 @@ No change to the build: its soft boxes take the shared form's new shape (the sof
 
 Built in Rust since 2026-11-18 (`cargo art decor`), proved against the last Blender build (`ref/blender`). The curtains' `accept`
 still names this file by its old name (decor.md).
+
+## Hard edges eased (2026-11-25)
+
+The gate's `edges` and `texels` find none left. Every moulding's profile is eased all round (`artkit::forms::eased_loop`,
+3 mm: the frames, their backs on the wall too, the painting's bead, the canvas's float frame, the pedestals' caps,
+the clock's cornice, the pictures on the shelf and the mantel); the shelf boards and the mantel have their backs on
+the wall eased and their ends chamfered; the surround's jambs and lintel are eased where they meet the breast; the
+vases' lips, the clock's hood columns and its bob's knife edge are rolled (`artkit::forms::eased`); the bust's neck
+ends inside the head. The coat on the stand is lofted through flat oval rings, where it was a lathe squashed after
+its UVs were laid (its cloth stretched 2.2× at the hem and shoulders).
+
+The grandfather clock still takes 5 draw calls (the gate's aim is 3): its body, the two hands, the pendulum and the
+trunk door each move on their own, so each is a draw; with its clips kept it can't be fewer.
+
+## Curtains gather (2026-11-25)
+
+The curtains' `close` was their open panels scaled out 2.95× (`curtains`: 0.2 m gathered to 0.59 m drawn) and 3.9×
+(`curtainsWide`, `curtainsLong`: 0.3 to 1.17 m), so drawn, the linen was stretched over 2× on 98–99 % of it and its
+five folds were 23 cm wide. Each panel is now built drawn (to 1 cm past the middle) with a fold every 15 cm (4 in a
+`curtains` panel, 8 in the wide ones', where there were 3 and 5), and its node is scaled in to the gathered width at
+rest; `close` (`grow` in x) lets it out to as built. Drawn, the cloth is as made (0.7 % of it over 2×, the gate's
+texels now measures a clip's largest key); open, it is gathered: the same width and fold depth as before, the folds
+closer (3.75 cm in the wide pairs, 5 cm in the window pair, where they were 6 and 6.7) and the linen pressed together
+across the folds' fronts (over 2× on 22–34 % of it, finer, never coarser, which the play camera does not show). The
+tabs are built as wide as drawn tabs (stretched along the rail) and gathered with the panel to their old shape.
+Triangles 3,540 → 4,052 and 4,564 → 6,100 for the extra folds; the sizes are the same.

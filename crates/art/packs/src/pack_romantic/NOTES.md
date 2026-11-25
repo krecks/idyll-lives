@@ -100,3 +100,20 @@ cargo art pack_romantic --preview  # previews/pack_romantic/<id>.png, <id>@<clip
 ## The soft forms pass (2026-11-13)
 
 The rose arbour swing's pillows are sewn flat and stuffed (`waist`), its seat cushion `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `candlelitTable`, `letterBureau`, `roseArbourSwing`; 20,346 to 21,140 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate's `edges` found is eased (56 → 0). The heart tub's outline is laid evenly along its length
+and smoothed over the four points either side of its point and its dip (moulded acrylic has no sharp corner), and its
+rim's rolls and the plinth's top are drawn in square to the outline (`_heart_in`), not scaled about the middle, which
+narrowed them to a knife edge at the point and the dip; the cloth rolls over the table's edge in four steps; the
+mirror's moulding (`bevel_edges`), its back, the apron, the crest, the bureau's apron and the arbour's rafters (a
+chamfered section, eased ends) are bevelled; the vases', the wine glasses', the horn's (`eased`) and the cut bloom's
+rims are rolled (a rose 5.5 cm or more round only: a smaller one's petal edges are under 5 cm a side); the perfume
+bottles take 12 sides. The arbour's climbing leaves take two rows (11,956 triangles, under its 12,000 aim; was
+12,528).
+
+Sizes (`cargo review sizes`): the candlelit table stands 1.6 cm lower (the cloth's top 0.756, the runner's 0.759, a
+dining table's; the candles' tops 1.09); the vanity's pouf and the gramophone's record sleeves are `aside` (drawn, not
+the piece's own size, no draw call more), the vanity measuring 0.80 × 1.62 × 0.37 m and the gramophone 0.66 × 1.50 ×
+0.55 m; the gramophone's horn sits 4 cm lower on a shorter neck.

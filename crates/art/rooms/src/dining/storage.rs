@@ -14,7 +14,7 @@ use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, revolve, swing};
 
-pub(super) const WALL: f64 = -0.43; // where the storage is built from (game depth); `settle()` then moves it to the old part's centre
+pub(super) use artkit::kit::WALL;
 pub(super) const LEG_H: f64 = 0.16; // a sideboard's legs
 pub const DOOR_SECONDS: f64 = 0.9; // a storage door swings open in this long, while clean things are put away (a `cupboard`)
 
@@ -382,22 +382,23 @@ pub fn sideboard() -> Vec<Obj> {
             Some(M.brass),
         );
         crockery(cup, zf, M.body_walnut);
+        // a 24 cm vase (its top 1.04, a sideboard's ornament under its kind's height)
         turned(
             "vase",
             &[
                 (0.0, 0.0),
                 (0.05, 0.0),
-                (0.052, 0.01),
-                (0.068, 0.07),
-                (0.066, 0.12),
-                (0.048, 0.2),
-                (0.033, 0.26),
-                (0.031, 0.28),
-                (0.04, 0.295),
-                (0.038, 0.3),
-                (0.03, 0.3),
-                (0.026, 0.28),
-                (0.0, 0.27),
+                (0.052, 0.008),
+                (0.068, 0.056),
+                (0.066, 0.096),
+                (0.048, 0.16),
+                (0.033, 0.208),
+                (0.031, 0.224),
+                (0.04, 0.236),
+                (0.038, 0.24),
+                (0.03, 0.24),
+                (0.026, 0.224),
+                (0.0, 0.216),
             ],
             (-0.6, h, -0.3),
             M.cream,

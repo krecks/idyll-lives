@@ -19,7 +19,8 @@ use super::np::{degrees, linspace_open, radians};
 use super::rig::{
     BASE_STAGE, BONES, CLIP_BONES, RUNTIME_BONES, STAGES, proportions, target_height,
 };
-use super::{V3, repo_root, v3};
+use super::{V3, v3};
+use crate::repo_root;
 
 /// body: the skin (~4.8k), the lids and lips (~0.5k) and the ears (324 each, ear.rs).
 /// lod.body: the cage at its limit (~0.9k) plus the eyelids (~0.2k) and plain ears (24 each).

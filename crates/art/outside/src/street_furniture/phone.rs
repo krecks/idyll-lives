@@ -82,7 +82,14 @@ fn pediment(f: &GameFrame, name: &str, face: i32, along_z: bool, material: Mat, 
     ];
     let face = face as f64;
     if along_z {
-        fextrude!(f, name, &pts, 0.03, (0, 2.56, face * 0.455), material);
+        artkit::bevel::eased(fextrude!(
+            f,
+            name,
+            &pts,
+            0.03,
+            (0, 2.56, face * 0.455),
+            material
+        ));
         fextrude!(
             f,
             format!("{name}_crown"),
@@ -92,7 +99,7 @@ fn pediment(f: &GameFrame, name: &str, face: i32, along_z: bool, material: Mat, 
             crown
         );
     } else {
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             name,
             &pts,
@@ -100,7 +107,7 @@ fn pediment(f: &GameFrame, name: &str, face: i32, along_z: bool, material: Mat, 
             (face * 0.455, 2.56, 0),
             material,
             plane = Facing::Side
-        );
+        ));
         fextrude!(
             f,
             format!("{name}_crown"),
@@ -374,7 +381,7 @@ pub fn phone_booth() -> Vec<Obj> {
         glazing(
             &f,
             "door",
-            m.glass,
+            m.pane,
             red,
             &|x: N, y: f64, d: N| (x, y, N::F(FACE + d.f())),
             0.0,

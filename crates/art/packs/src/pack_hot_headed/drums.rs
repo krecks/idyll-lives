@@ -29,26 +29,14 @@ fn drum(
     } else {
         (tilt, 0.0, 0.0)
     };
-    fcyl!(
-        f,
+    // the shell an open tube: its ends are under the heads
+    revolve!(
         numbered("shell"),
-        r,
-        depth,
-        (x, y, z),
-        M.shell,
-        rot = rot,
-        verts = 24
-    );
-    fcyl!(
-        f,
-        numbered("head"),
-        r * 0.97,
-        depth + 0.006,
-        (x, y, z),
-        M.head,
-        rot = rot,
-        verts = 24,
-        smooth = false
+        &[(r, -depth / 2.0), (r, depth / 2.0)],
+        at = f.at(x, y, z),
+        material = M.shell,
+        segments = 24,
+        rot = rot
     );
 
     // The game point `t` along the drum's axis from its middle, `u` across in x, `v` out along its other side.
@@ -59,6 +47,21 @@ fn drum(
         let (c, s) = (cosd(tilt), sind(tilt)); // the shell turned about x: its axis (height, depth) is (c, s)
         (x + u, y + t * c - v * s, z + t * s + v * c)
     };
+    // a head on each end, 3 mm thick over the shell's whole end: its edge a band too narrow to show hard, and the
+    // shell's rim under it
+    for e in [-1.0, 1.0] {
+        fcyl!(
+            f,
+            numbered("head"),
+            r,
+            0.003,
+            along(e * (depth / 2.0 + 0.0015), 0.0, 0.0),
+            M.head,
+            rot = rot,
+            verts = 24,
+            smooth = false
+        );
+    }
     for e in [-1.0, 1.0] {
         let p = along(e * depth / 2.0, 0.0, 0.0);
         torus!(
@@ -68,7 +71,7 @@ fn drum(
             at = f.at(p.0, p.1, p.2),
             material = M.chrome,
             rot = rot,
-            major_segments = 20,
+            major_segments = 18,
             minor_segments = 3
         );
     }
@@ -180,7 +183,7 @@ fn cymbal(f: &GameFrame, name_: &str, x: f64, y: f64, z: f64, d: f64) {
         ],
         at = f.at(x, y, z),
         material = M.cymbal,
-        segments = 20
+        segments = 18
     );
     fcyl!(
         f,

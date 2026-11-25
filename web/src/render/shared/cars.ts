@@ -10,6 +10,7 @@
  */
 
 import type { SnapshotLayout } from '../../core/snapshot';
+import { hash as latticeHash } from '../../game/noise';
 import { wrapAngle } from './characters/rig';
 import { EASE, facing, type V3 } from './geometry';
 import type { Painter, Rect } from './street';
@@ -19,9 +20,8 @@ export const CAR_PAINT = ['#C9CDD2', '#F0F0EC', '#1E2328', '#2B4A7A', '#9E2A2B',
 
 /** A number 0..1 from a spot and a salt: the same each time (what the street and the cars look like). */
 export function hash(x: number, z: number, salt: number): number {
-  let h = (Math.imul(Math.round(x * 10) | 0, 374761393) + Math.imul(Math.round(z * 10) | 0, 668265263) + Math.imul(salt, 2147483647)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  // (The spot to 0.1 m: noise's lattice hash.)
+  return latticeHash(Math.round(x * 10), Math.round(z * 10), salt);
 }
 
 /** One of `list`, by `hash`. */

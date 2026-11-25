@@ -9,6 +9,7 @@ use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{PI, TAU, cos, radians, sin, tan};
 use artkit::place::Facing;
+use artkit::py;
 use artkit::scene::Obj;
 use artkit::{fextrude, jitter};
 
@@ -440,7 +441,7 @@ fn _frill(pts: &[(f64, f64)], grow: f64, amp: f64, n: usize) -> Vec<(f64, f64)> 
         for k in 0..n {
             let f = k as f64 / n as f64;
             let (x, z) = (p.0 + (q.0 - p.0) * f, p.1 + (q.1 - p.1) * f);
-            let mut d = (x - cx).hypot(z - cz);
+            let mut d = py::hypot(x - cx, z - cz);
             if d == 0.0 {
                 d = 1.0;
             }
@@ -456,7 +457,7 @@ fn _frill(pts: &[(f64, f64)], grow: f64, amp: f64, n: usize) -> Vec<(f64, f64)> 
 pub fn sandwich() -> Vec<Obj> {
     plate0();
     let (nx, nz) = (0.052, 0.058);
-    let n = f64::hypot(nx, nz);
+    let n = py::hypot(nx, nz);
     for (half, pts, cut, sign) in _halves((0.058, 0.052), 0.012) {
         let s = sign as f64;
         _sandwich_half(
@@ -501,7 +502,8 @@ pub fn _sandwich_half(
                 M.bread,
                 M.crust,
                 sides = sides,
-                at = off
+                at = off,
+                bevel = 0.003
             );
         } else if m == M.lettuce {
             let outline: Vec<(f64, f64)> = _frill(pts, 0.07, 0.004, 4)
@@ -621,7 +623,18 @@ pub fn cake_slice() -> Vec<Obj> {
         let mut sides = vec![cut];
         sides.extend(vec![M.cake_icing; wedge.len() - 2]);
         sides.push(cut);
-        prism!(name, &wedge, y, y + h, top, cut, sides = sides);
+        // (the sponge's edges soft)
+        let bevel = if h > 0.01 { 0.002 } else { 0.0 };
+        prism!(
+            name,
+            &wedge,
+            y,
+            y + h,
+            top,
+            cut,
+            sides = sides,
+            bevel = bevel
+        );
         y += h;
     }
     let mut sides = vec![M.sponge_crumb];

@@ -163,9 +163,6 @@
         "brass": {
           "finish": "material.finish.metal"
         },
-        "candle_flame": {
-          "finish": "material.finish.gloss"
-        },
         "flame": {
           "finish": "material.finish.gloss",
           "glow": "#FFC870"

@@ -1,8 +1,10 @@
 //! The grand cinema wall and the Pixel Arcade console: a screen on the wall, the seats in front of it. Each is
 //! built with the seats at the back and the screen at the front edge facing them, then turned round.
 
-use super::common::{M, cup, driver, pleats, popcorn, screen, turn_round};
+use super::common::{M, cup, driver, pleats, popcorn, screen};
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::kit::turn_round;
 use artkit::math::{P3, cos, radians, sin};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
@@ -39,7 +41,8 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
         M.leather,
         round = 0.035,
         puff = 0.012,
-        flat = 2
+        flat = 2,
+        resting = true
     );
     let a = radians(14.0);
     let (up, back) = ((cos(a), sin(a)), (0.32, -0.23));
@@ -69,7 +72,8 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
             round = 0.05,
             puff = 0.025,
             flat = 2,
-            round_segments = 1
+            round_segments = 1,
+            resting = true
         );
     }
     soft!(
@@ -94,7 +98,8 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
         M.leather,
         round = 0.022,
         flat = 1,
-        round_segments = 1
+        round_segments = 1,
+        resting = true
     );
     fextrude!(
         f,
@@ -103,7 +108,9 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
         0.05,
         (x, 0.025, -0.06),
         M.dark,
-        plane = Facing::Top
+        plane = Facing::Top,
+        bevel = 0.004,
+        bevel_segments = 1
     );
 }
 
@@ -135,7 +142,8 @@ pub fn cinema_wall() -> Vec<Obj> {
             M.leather,
             round = 0.018,
             flat = 1,
-            round_segments = 1
+            round_segments = 1,
+            resting = true
         );
         for z in [0.08, 0.17] {
             torus!(
@@ -261,7 +269,7 @@ pub fn cinema_wall() -> Vec<Obj> {
             f.at(s * 0.78, 1.42, zc - 0.012),
         ));
     }
-    turn_round(&meshes());
+    turn_round(&meshes(), 0.0);
     let objs = settle_all(); // on its Model centre: the screen's back on the wall face
     for cur in parts {
         squash(
@@ -429,7 +437,7 @@ pub fn game_console() -> Vec<Obj> {
                 vec![(0.44, s * -0.035)],
             ]
             .concat();
-            fsweep!(
+            let arm = fsweep!(
                 f,
                 numbered("arm"),
                 &[(s * 0.4, 0, -0.39), (s * 0.4, 0, 0.15)],
@@ -438,6 +446,7 @@ pub fn game_console() -> Vec<Obj> {
                 profile = profile,
                 angle = 50
             );
+            ease(arm, 60.0, 1);
             for lz in [-0.37, 0.13] {
                 let pts = [
                     (s * 0.37, 0.06, lz),
@@ -583,7 +592,7 @@ pub fn game_console() -> Vec<Obj> {
         );
     });
     let tray = join(&tray, "tray", None);
-    turn_round(&meshes());
+    turn_round(&meshes(), 0.0);
     let objs = settle_all(); // on its Model centre: the screen's back on the wall face
     slide!(tray, "tray", (0, -0.09, 0), seconds = 0.6); // 9 cm towards the players (+Z game, once turned round)
     objs

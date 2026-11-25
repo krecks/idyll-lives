@@ -15,6 +15,12 @@ Object.assign(globalThis, {
 });
 afterAll(() => Object.assign(globalThis, real));
 const { HeldFrames } = await import('../src/render/pc/heldFrames');
+const { fixFrameClock } = await import('../src/render/shared/frameClock');
+// The renderer's own clock, fixed and moved by hand: a slow machine can't change what is drawn.
+let clock = 1000;
+const wait = (ms: number) => fixFrameClock((clock += ms));
+fixFrameClock(clock);
+afterAll(() => fixFrameClock(null));
 
 function view(enabled = true) {
   const canvas = { width: 1, height: 1, style: {}, addEventListener() {}, removeEventListener() {}, getBoundingClientRect: () => ({ width: 1, height: 1 }) } as unknown as HTMLCanvasElement;
@@ -62,28 +68,28 @@ describe('held frames', () => {
     expect(preset.held.holding).toBe(false);
   });
 
-  test("the paused game's change is drawn for `settleMs` (what is drawn at a rate of its own comes a little later)", async () => {
+  test("the paused game's change is drawn for `settleMs` (what is drawn at a rate of its own comes a little later)", () => {
     const { held, frames } = view();
     held.active = true;
     held.settleMs = 60;
     frames(4);
     held.changed();
     expect(frames(6).every(Boolean)).toBe(true);
-    await Bun.sleep(80);
+    wait(80);
     expect(frames(2)).toEqual([false, false]);
   });
 
-  test('water flowing in view: a held view is drawn again every `motionMs`, its clocks going on between', async () => {
+  test('water flowing in view: a held view is drawn again every `motionMs`, its clocks going on between', () => {
     const { held, frames } = view();
     held.active = true;
     frames(4);
     expect(held.holding).toBe(true);
     held.motionMs = 40;
     // (The last drawn some frames ago: drawn now, then not until 40 ms on, not holding meanwhile.)
-    await Bun.sleep(45);
+    wait(45);
     expect(frames(3)).toEqual([true, false, false]);
     expect(held.holding).toBe(false);
-    await Bun.sleep(45);
+    wait(45);
     expect(frames(2)).toEqual([true, false]);
     // No water in view: held again.
     held.motionMs = 0;

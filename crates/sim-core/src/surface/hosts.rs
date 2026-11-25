@@ -2,11 +2,6 @@
 
 use super::*;
 
-/// Which way an object faces, turn included (radians; see `ObjectInstance::angle`).
-pub(super) fn angle(o: &ObjectInstance) -> f32 {
-    o.angle()
-}
-
 /// Where an object's middle is, its offset included (tiles).
 pub fn middle(content: &Content, o: &ObjectInstance) -> [f32; 2] {
     let c = o.centre(content);

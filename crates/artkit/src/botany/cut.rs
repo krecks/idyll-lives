@@ -2,7 +2,6 @@
 //! cut from: families/plants.py's detail pass.
 
 use crate::botany::leaf::profile;
-use crate::botany::polyfill;
 use crate::far::is_low;
 use crate::materials::Mat;
 use crate::math::{
@@ -10,6 +9,7 @@ use crate::math::{
     sqrt, v3,
 };
 use crate::mesh::{Mesh, edge, normal_of};
+use crate::polyfill;
 use crate::scene::{self, Obj};
 use crate::shapes::options;
 use std::collections::{BTreeMap, BTreeSet};
@@ -72,24 +72,8 @@ pub fn cut_leaf(
         ribs = 1.max(ribs / 3);
     }
     let bend = 2.0 * o.droop;
-    // the point `x` across, `t` along and `z` up off the flat leaf, bent along its midrib and twisted
-    let place = |x: f64, t: f64, z: f64| {
-        let a = -bend * t;
-        let (c, n) = if bend < 1e-4 {
-            (v3(0, length * t, 0), v3(0, 0, 1))
-        } else {
-            (
-                v3(
-                    0,
-                    length * sin(bend * t) / bend,
-                    -length * (1.0 - cos(bend * t)) / bend,
-                ),
-                v3(0, -sin(a), cos(a)),
-            )
-        };
-        let tw = radians(o.twist * t);
-        c + v3(x * cos(tw) - z * sin(tw), 0, 0) + n * (x * sin(tw) + z * cos(tw))
-    };
+    let place =
+        |x: f64, t: f64, z: f64| crate::botany::leaf::on_midrib(length, bend, o.twist, x, t, z);
     // each point drawn flat (where the faces are cut into triangles), and where it goes
     let (mut flat, mut placed): (Vec<V3>, Vec<V3>) = (Vec::new(), Vec::new());
     let mut vert = |x: f64, t: f64, z: f64| -> u32 {

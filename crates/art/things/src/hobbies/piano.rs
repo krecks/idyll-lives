@@ -4,9 +4,10 @@
 //! sheet music leans back for reading.
 
 use super::M;
-use super::common::{flat_quads, rr, sheet_music, turn_round, turned};
-use artkit::forms::smooth_outline;
+use super::common::{flat_quads, sheet_music};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
+use artkit::kit::turn_round;
 use artkit::kit::{self};
 use artkit::math::{Axis, P3, PI, TAU, cos, sin};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
@@ -65,7 +66,7 @@ pub fn piano() -> Vec<Obj> {
             &[(-0.75, 1.256, 0.3), (0.75, 1.256, 0.3)],
             0,
             M.piano_trim,
-            profile = rr(0.012, 0.012, 0.005, 1)
+            profile = rounded_rect(0.012, 0.012, 0.005, 1)
         );
         // the upper front: a raised panel either side of the music desk, a moulded rail under them
         for s in [-1, 1] {
@@ -88,7 +89,7 @@ pub fn piano() -> Vec<Obj> {
             &[(-0.74, 0.86, 0.296), (0.74, 0.86, 0.296)],
             0,
             M.piano_trim,
-            profile = rr(0.026, 0.014, 0.005, 1)
+            profile = rounded_rect(0.026, 0.014, 0.005, 1)
         );
         fbox!(
             f,
@@ -182,9 +183,9 @@ pub fn piano() -> Vec<Obj> {
                 bevel_segments = 2
             );
             // a turned console leg under each cheek, on a scrolled toe block
-            turned(
-                &f,
-                &format!("leg{s}"),
+            kit::turned!(
+                f,
+                format!("leg{s}"),
                 sf * 0.7,
                 0.03,
                 0.16,
@@ -203,8 +204,7 @@ pub fn piano() -> Vec<Obj> {
                     (0.0, 0.62),
                 ],
                 M.piano,
-                12,
-                P3::ONE,
+                segments = 12
             );
             fextrude!(
                 f,
@@ -225,9 +225,9 @@ pub fn piano() -> Vec<Obj> {
                 bevel_segments = 1
             );
             // brass candlesticks on the lid
-            turned(
-                &f,
-                &format!("sconce{s}"),
+            kit::turned!(
+                f,
+                format!("sconce{s}"),
                 sf * 0.6,
                 1.29,
                 0.38,
@@ -245,8 +245,7 @@ pub fn piano() -> Vec<Obj> {
                     (0.0, 0.07),
                 ],
                 M.brass,
-                10,
-                P3::ONE,
+                segments = 10
             );
             fcyl!(
                 f,
@@ -255,7 +254,8 @@ pub fn piano() -> Vec<Obj> {
                 0.12,
                 (sf * 0.6, 1.42, 0.38),
                 M.candle,
-                verts = 12
+                verts = 12,
+                bevel = 0.003
             );
             fcyl!(
                 f,
@@ -354,7 +354,7 @@ pub fn piano() -> Vec<Obj> {
                 ],
                 0,
                 M.brass,
-                profile = rr(0.008, 0.024, 0.003, 1),
+                profile = rounded_rect(0.008, 0.024, 0.003, 1),
                 resolution = 2,
                 scale = [0.8, 0.9, 1.15, 1.1]
             );
@@ -387,9 +387,9 @@ pub fn piano() -> Vec<Obj> {
         );
         for sx in [-1, 1] {
             for z in [-0.33, -0.07] {
-                turned(
-                    &f,
-                    &format!("bench_leg{sx}{}", r(z)),
+                kit::turned!(
+                    f,
+                    format!("bench_leg{sx}{}", r(z)),
                     sx as f64 * 0.38,
                     0.0,
                     z,
@@ -405,8 +405,7 @@ pub fn piano() -> Vec<Obj> {
                         (0.0, 0.39),
                     ],
                     M.piano,
-                    10,
-                    P3::ONE,
+                    segments = 10
                 );
             }
             fbox!(

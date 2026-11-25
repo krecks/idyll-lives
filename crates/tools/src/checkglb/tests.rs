@@ -112,6 +112,58 @@ fn a_part_turning_too_fast_is_warned_of() {
     assert!(!fast(24.0), "two turns a second");
 }
 
+/// A loop that ends a part moved at an even speed is a scroll only if the part looks the same moved: a belt of six
+/// slats 5 cm apart moved one or two slats on passes, moved half a slat or a lone part moved 30 cm fails.
+#[test]
+fn a_scroll_moves_by_whole_repeats() {
+    let belt = |slats: usize, moved: f32| {
+        let mut bin: Vec<u8> = (0..slats)
+            .flat_map(|k| {
+                let x = k as f32 * 0.05;
+                [[x, 0.0, 0.0], [x + 0.03, 0.0, 0.0], [x, 0.0, 0.4]]
+            })
+            .flatten()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
+        let at = bin.len();
+        for c in [
+            0.0f32,
+            0.5,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            moved / 2.0,
+            0.0,
+            0.0,
+            moved,
+            0.0,
+            0.0,
+        ] {
+            bin.extend(c.to_le_bytes());
+        }
+        let json = format!(
+            r#"{{"asset": {{"version": "2.0"}}, "scenes": [{{"nodes": [0]}}], "nodes": [{{"name": "slats", "mesh": 0}}],
+            "meshes": [{{"primitives": [{{"attributes": {{"POSITION": 0}}}}]}}],
+            "bufferViews": [{{"byteOffset": 0, "byteLength": {at}}}, {{"byteOffset": {at}, "byteLength": 12}}, {{"byteOffset": {}, "byteLength": 36}}],
+            "accessors": [{{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": {}, "min": [0, 0, 0], "max": [1, 0, 0.4]}},
+                {{"bufferView": 1, "componentType": 5126, "type": "SCALAR", "count": 3}}, {{"bufferView": 2, "componentType": 5126, "type": "VEC3", "count": 3}}],
+            "animations": [{{"name": "belt_run", "channels": [{{"sampler": 0, "target": {{"node": 0, "path": "translation"}}}}], "samplers": [{{"input": 1, "output": 2}}]}}]}}"#,
+            at + 12,
+            slats * 3
+        );
+        let g = parse_glb(&glb::tests::glb(&json, &bin)).unwrap();
+        let entry = json::loads_text(br#"{"motions": {"loops": {"run": "belt_run"}}}"#).unwrap();
+        let (errors, warnings) = check_clips(&g, &entry).unwrap();
+        assert!(warnings.iter().all(|w| !w.contains("loop")), "{warnings:?}");
+        errors.iter().all(|e| !e.contains("loop"))
+    };
+    assert!(belt(6, 0.05), "one slat on");
+    assert!(belt(6, 0.10), "two");
+    assert!(!belt(6, 0.025), "half a slat");
+    assert!(!belt(1, 0.3), "a jump");
+}
+
 /// A face whose normals point against its winding is lit from behind (a bevel's arc miter did it to a frame).
 #[test]
 fn faces_lit_from_behind_are_found() {
@@ -152,6 +204,83 @@ fn a_model_may_allow_itself_more_draws() {
     assert!(allowed(r#"{"draws": 9}"#).is_err(), "past the eight");
     assert!(allowed(r#"{"draws": 4.5}"#).is_err(), "a whole number");
     assert!(allowed(r#"{"draws": "5"}"#).is_err(), "a number");
+}
+
+/// The aim of three is the still model's: each moving part, the glass and metal hardware alone on a still body
+/// are a draw more; two finishes on one moving part, or a still body's paint, are not.
+#[test]
+fn moving_parts_glass_and_hardware_each_add_a_draw_to_the_aim() {
+    let glass = |f: &str| f == "material.finish.glass";
+    let groups = |g: &[(Option<usize>, &str)]| -> BTreeSet<(Option<usize>, String)> {
+        g.iter().map(|(p, f)| (*p, f.to_string())).collect()
+    };
+    let plain = |f: &[&str]| -> BTreeSet<String> { f.iter().map(|s| s.to_string()).collect() };
+    let wood = "material.finish.wood";
+    let fabric = "material.finish.fabric";
+    let aim = |g: &[(Option<usize>, &str)], p: &[&str], declared| {
+        draws_aimed(&groups(g), &glass, &plain(p), declared)
+    };
+    let still = [(None, "plain"), (None, wood), (None, fabric)];
+    assert_eq!(aim(&still, &["material.finish.satin"], None), 3);
+    assert_eq!(
+        aim(
+            &[&still[..], &[(Some(4), wood)]].concat(),
+            &["material.finish.satin"],
+            None
+        ),
+        4,
+        "a door"
+    );
+    assert_eq!(
+        aim(
+            &[&still[..], &[(Some(4), wood), (Some(4), fabric)]].concat(),
+            &[],
+            None
+        ),
+        4,
+        "a door's second finish is not"
+    );
+    assert_eq!(
+        aim(
+            &[
+                &still[..],
+                &[(Some(4), "plain"), (Some(4), "material.finish.glass")]
+            ]
+            .concat(),
+            &[],
+            None
+        ),
+        5,
+        "a glass door"
+    );
+    assert_eq!(
+        aim(
+            &[&still[..], &[(None, "material.finish.glass")]].concat(),
+            &[],
+            None
+        ),
+        4,
+        "glass"
+    );
+    assert_eq!(
+        aim(
+            &still,
+            &["material.finish.metal", "material.finish.chrome"],
+            None
+        ),
+        4,
+        "metal hardware alone"
+    );
+    assert_eq!(
+        aim(
+            &still,
+            &["material.finish.metal", "material.finish.matte"],
+            None
+        ),
+        3,
+        "hardware with paint"
+    );
+    assert_eq!(aim(&still, &[], Some(5)), 5, "the entry's `draws`");
 }
 
 #[test]
@@ -374,6 +503,12 @@ fn a_seat_front_is_where_the_seat_ends_in_front() {
 }
 
 fn quads(quads: &[[f32; 5]]) -> Glb {
+    let names: Vec<String> = (0..quads.len()).map(|k| format!("q{k}")).collect();
+    named_quads(&names, quads)
+}
+
+/// `quads` with their nodes named `names`.
+fn named_quads(names: &[String], quads: &[[f32; 5]]) -> Glb {
     let mut bin = Vec::new();
     for [y, x0, x1, z0, z1] in quads {
         for v in [
@@ -389,7 +524,7 @@ fn quads(quads: &[[f32; 5]]) -> Glb {
     bin.extend([0u16, 1, 2, 0, 2, 3].iter().flat_map(|i| i.to_le_bytes()));
     let n = quads.len();
     let nodes: Vec<String> = (0..n)
-        .map(|k| format!(r#"{{"name": "q{k}", "mesh": {k}}}"#))
+        .map(|k| format!(r#"{{"name": "{}", "mesh": {k}}}"#, names[k]))
         .collect();
     let meshes: Vec<String> = (0..n)
         .map(|k| {
@@ -540,6 +675,53 @@ fn the_review_takes_a_cribs_mattress_at_slot_0() {
     let (at, mesh) = mattress(true);
     assert_eq!(at, [0.5, 0.0], "the gate takes the worst slot");
     assert!((mesh.unwrap() - 0.8).abs() < 1e-6);
+}
+
+/// A sofa lain on across is lain on along it (residents.ts `bedFwd`): its mattress is `fwd` along it at the slots'
+/// depth, on the seat, not `fwd` back on the back's foot; a place stood at (a masseur's) is no mattress.
+#[test]
+fn a_mattress_is_where_the_renderer_lays_the_sleeper() {
+    // A three-seat sofa: its seat 0.44 m up from 0.3 m back to 0.4 m forward, the back's foot 0.32 m behind it.
+    let sofa = quads(&[[0.44, -1.4, 1.4, -0.3, 0.4], [0.32, -1.4, 1.4, -0.45, -0.3]]);
+    let furniture = Furniture {
+        seats: J::Obj(Vec::new()),
+        default_seat: json::loads_text(br#"{"h": 0.45, "fwd": 0}"#).unwrap(),
+        beds: json::loads_text(
+            br#"{"sofa3": {"h": 0.44, "fwd": -0.42, "across": true}, "massage": {"h": 0.79}}"#,
+        )
+        .unwrap(),
+        default_bed: json::loads_text(br#"{"h": 0.5}"#).unwrap(),
+        bunks: J::Obj(Vec::new()),
+    };
+    let mattress = |g: &Glb, object: &[u8], furniture: &Furniture| {
+        heights(
+            g,
+            &J::Obj(Vec::new()),
+            &json::loads_text(object).unwrap(),
+            furniture,
+            true,
+        )
+        .unwrap()
+        .into_iter()
+        .find(|h| h.what == "mattress")
+        .map(|h| (h.at, h.mesh.map(|m| (m * 100.0).round())))
+        .unwrap()
+    };
+    let sofa3 =
+        br#"{"id": "sofa3", "footprint": [3, 1], "slots": 3, "interactions": [{"pose": "lie"}]}"#;
+    assert_eq!(
+        mattress(&sofa, sofa3, &furniture),
+        ([-0.42, 0.0], Some(44.0))
+    );
+    // A massage table's top 0.79 m up, game x -1 to 0; its masseur stands at x 0.5, off it.
+    let table = quads(&[[0.79, 0.0, 1.0, -0.5, 0.5]]);
+    let massage =
+        br#"{"id": "massage", "footprint": [2, 1], "slots": 2, "interactions": [{"pose": "lie"}],
+        "places": [{"at": [-0.5, 0]}, {"at": [0.5, 0], "facing": -90, "pose": "stand"}]}"#;
+    assert_eq!(
+        mattress(&table, massage, &furniture),
+        ([-0.5, 0.0], Some(79.0))
+    );
 }
 
 #[test]
@@ -738,6 +920,75 @@ fn strict_findings_fail_unless_accepted_with_a_reason() {
     // Every strict check has its name once.
     let names: HashSet<&str> = STRICT.iter().map(|(k, _)| *k).collect();
     assert_eq!(names.len(), STRICT.len());
+}
+
+/// A texture is judged on a part at its largest: washing a clip grows on the line from flattened (scale y 0.001) is
+/// measured grown, 1 m tall; a cloth a clip stretches to three times as built is measured stretched, and found so;
+/// a cushion a clip squashes, at rest; the edges at rest.
+#[test]
+fn texels_are_measured_on_a_part_at_its_largest() {
+    let tall = |rest: f32, grown: f32, read| {
+        let mut bin: Vec<u8> = [[0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+            .iter()
+            .flatten()
+            .chain(&[0f32, 0.0, 1.0, 0.0, 0.0, 1.0])
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
+        for c in [0f32, 1.0, 1.0, rest, 1.0, 1.0, grown, 1.0] {
+            bin.extend(c.to_le_bytes());
+        }
+        let json = format!(
+            r#"{{"asset": {{"version": "2.0"}}, "scenes": [{{"nodes": [0]}}],
+            "nodes": [{{"name": "washing", "mesh": 0, "scale": [1, {rest}, 1]}}],
+            "materials": [{{"name": "cloth"}}],
+            "meshes": [{{"primitives": [{{"attributes": {{"POSITION": 0, "TEXCOORD_0": 1}}, "material": 0}}]}}],
+            "bufferViews": [{{"byteOffset": 0, "byteLength": 36}}, {{"byteOffset": 36, "byteLength": 24}}, {{"byteOffset": 60, "byteLength": 8}}, {{"byteOffset": 68, "byteLength": 24}}],
+            "accessors": [{{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [1, 1, 0]}},
+                {{"bufferView": 1, "componentType": 5126, "type": "VEC2", "count": 3}},
+                {{"bufferView": 2, "componentType": 5126, "type": "SCALAR", "count": 2}}, {{"bufferView": 3, "componentType": 5126, "type": "VEC3", "count": 2}}],
+            "animations": [{{"name": "hang", "channels": [{{"sampler": 0, "target": {{"node": 0, "path": "scale"}}}}], "samplers": [{{"input": 2, "output": 3}}]}}]}}"#
+        );
+        let g = parse_glb(&glb::tests::glb(&json, &bin)).unwrap();
+        let fin = Finishes {
+            plain: HashMap::from([("material.finish.fabric".to_string(), false)]),
+            see_through: HashSet::new(),
+            textures: HashMap::from([("material.finish.fabric".to_string(), (1.0, String::new()))]),
+        };
+        let entry = j(r#"{"materials": {"cloth": {"finish": "material.finish.fabric"}}}"#);
+        let file = ModelFile {
+            key: "model.clothesline",
+            entry: &entry,
+            glb: &g,
+            fin: &fin,
+            far: false,
+        };
+        let m = meshes::read(&file, read).unwrap().unwrap();
+        let textures = crate::texels::Textures::from([(
+            "fabric".to_string(),
+            crate::texels::Texture {
+                uv_scale: 1.0,
+                px: None,
+            },
+        )]);
+        let stretched = crate::texels::measure(&m, &textures)
+            .first()
+            .is_some_and(|t| !crate::texels::findings(t).is_empty());
+        let top = m[0].positions.iter().map(|p| p[1]).fold(0.0, f64::max);
+        (top, stretched)
+    };
+    let near = |a: (f64, bool), b: f64| (a.0 - b).abs() < 1e-6;
+    assert!(near(tall(0.001, 1.0, meshes::Read::Textured), 1.0), "grown");
+    assert!(
+        near(tall(0.001, 1.0, meshes::Read::Shape), 0.001),
+        "at rest"
+    );
+    let cloth = tall(1.0, 3.0, meshes::Read::Textured);
+    assert!(near(cloth, 3.0) && cloth.1, "stretched: {cloth:?}");
+    assert!(!tall(1.0, 1.0, meshes::Read::Textured).1, "as built");
+    assert!(
+        near(tall(1.0, 0.5, meshes::Read::Textured), 1.0),
+        "squashed"
+    );
 }
 
 /// A held tool (a coin 2 mm thick) is never on a floor, so the floor drawn over thin things isn't held against
@@ -1075,11 +1326,17 @@ fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
     // Over every model, a key that is no model is stale, and taken out.
     set("{\"edges\": {\"model.gone\": 2}}\n");
     let none: &[(&'static str, FileCheck)] = &[("edges", nothing)];
-    // (A stub check finds nothing, so a model that accepts `edges` fails for its accept being unused: counted
-    // apart, each with that one error.)
-    let unused = |t: &str| t.matches("error: `accept.edges` is unused").count();
+    // (A stub check finds nothing, so a model that accepts `edges` fails for its accept being unused; and this
+    // baseline has no `opened` section, strict for every model, so the models it finds fail too.)
+    let expected = |t: &str| {
+        t.lines().filter(|l| l.contains("error: ")).all(|l| {
+            l.contains("`accept.edges` is unused")
+                || l.contains("error: opened (")
+                || l.contains("no model the gate checked")
+        })
+    };
     let r = run_gate(&paths, &[], none, &[]);
-    assert_eq!(r.failed, 1 + unused(&r.text), "{}", r.text);
+    assert!(expected(&r.text), "{}", r.text);
     assert!(
         r.text.contains(
             "FAIL gate-baseline.json\n       error: edges: model.gone is no model the gate checked"
@@ -1098,7 +1355,11 @@ fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
     // The built world's sections are its own gate's to judge (`built::CHECKS`): left as they are.
     set("{\"built.edges\": {\"house.cottage\": 3}}\n");
     let r = run_gate(&paths, &[], none, &[]);
-    assert_eq!(r.failed, unused(&r.text), "{}", r.text);
+    assert!(
+        expected(&r.text) && !r.text.contains("FAIL gate-baseline.json"),
+        "{}",
+        r.text
+    );
     assert!(update_with(&paths, &[], none, &[]).unwrap().is_empty());
     assert_eq!(read(), "{\"built.edges\": {\"house.cottage\": 3}}\n");
     // A baseline that can't be read fails the gate.
@@ -1109,4 +1370,166 @@ fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
             .starts_with("FAIL gate-baseline.json\n       error: cannot read it: ")
     );
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn an_argument_it_does_not_know_is_a_usage_error() {
+    for args in [["--valdate"], ["chair"]] {
+        let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+        assert_eq!(main(&args), 2, "{args:?}");
+    }
+}
+
+/// A door that opens back into the wall: at rest its back is clear of the wall's face, but opened it isn't (a display
+/// cabinet's door swung -100° about its hinge). The same door swung forward is fine.
+#[test]
+fn a_door_opened_into_the_wall_fails() {
+    let opened = |degrees: f32| {
+        // a panel 0.9 wide hinged at the front's left (glTF x -0.25, depth 0.25), turned about y
+        let json = r#"{"asset": {"version": "2.0"}, "scenes": [{"nodes": [0]}],
+            "nodes": [{"name": "door", "mesh": 0, "translation": [-0.25, 0, 0.25]}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+            "animations": [{"name": "door_open", "channels": [{"sampler": 0, "target": {"node": 0, "path": "rotation"}}],
+                "samplers": [{"input": 1, "output": 2}]}],
+            "bufferViews": [{"byteOffset": 0, "byteLength": 36}, {"byteOffset": 36, "byteLength": 8},
+                {"byteOffset": 44, "byteLength": 32}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [0.9, 0.8, 0]},
+                {"bufferView": 1, "componentType": 5126, "type": "SCALAR", "count": 2},
+                {"bufferView": 2, "componentType": 5126, "type": "VEC4", "count": 2}]}"#;
+        let half = (degrees / 2.0).to_radians();
+        let bin: Vec<u8> = [
+            0f32,
+            0.0,
+            0.0,
+            0.9,
+            0.0,
+            0.0,
+            0.0,
+            0.8,
+            0.0, // the panel
+            0.0,
+            1.0, // the clip's times
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            half.sin(),
+            0.0,
+            half.cos(),
+        ]
+        .iter()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+        let g = parse_glb(&glb::tests::glb(json, &bin)).unwrap();
+        let entry = j(r#"{"motions": {"uses": {"openDoor": "door_open"}}}"#);
+        let facts = Facts {
+            id: J::Str("cabinet".into()),
+            footprint: j("[1, 1]"),
+            layer: J::Str("floor".into()),
+            outside: false,
+            stairs: false,
+            radius: 0.12,
+            object: J::Obj(Vec::new()),
+        };
+        let pose = HashMap::new();
+        let ((lo, hi), parts) = bounds(&g.gltf, &pose, &HashSet::new()).unwrap();
+        let w = content_warnings(
+            Some(&facts),
+            &lo,
+            &(lo, hi),
+            &parts,
+            Num::I(1),
+            &g,
+            &pose,
+            &entry,
+            false,
+        )
+        .unwrap();
+        w.into_iter()
+            .filter(|w| w.contains("opened ('door_open', use 'openDoor')"))
+            .count()
+    };
+    assert_eq!(opened(100.0), 1, "swung back into the wall");
+    assert_eq!(opened(-100.0), 0, "swung forward");
+}
+
+/// The treadmill's belt (`belt_run`) scrolls its slats one slat on, its ends hidden: most of it lands where it was.
+#[test]
+fn the_treadmills_belt_scrolls_by_whole_slats() {
+    let path = join(
+        &repo_root(),
+        "web/public/assets/models/fitness/treadmill.glb",
+    );
+    let g = parse_glb(&std::fs::read(&path).unwrap()).unwrap();
+    let nodes = g.gltf.get("nodes").unwrap();
+    let a = g.gltf.get("animations").and_then(J::list).unwrap();
+    let belt = a
+        .iter()
+        .find(|a| a.get("name").map(J::key).as_deref() == Some("belt_run"))
+        .unwrap();
+    let c = &key(belt, "channels").unwrap().list().unwrap()[0];
+    let s = sampler(belt, c).unwrap();
+    let out = key(s, "output").unwrap();
+    let (first, last) = (
+        first_value(&g, out, false).unwrap().unwrap(),
+        first_value(&g, out, true).unwrap().unwrap(),
+    );
+    let node = node_index(nodes, key(key(c, "target").unwrap(), "node").unwrap()).unwrap();
+    let landed = lands_on_itself(&g, node, &first, &last).unwrap().unwrap();
+    assert!(landed > 0.5 && landed < 1.0, "{landed}");
+}
+
+/// `cargo review sizes` measures a model's own body: a desk's top and its height as a table leave out the screen it
+/// carries (`_aside`), which the gate's heights (where residents sit) still see; a bench no content draws has the
+/// seat its kind looks for.
+#[test]
+fn the_review_measures_the_body_not_what_it_carries() {
+    let desk = named_quads(
+        &["top".into(), "screen_aside".into()],
+        &[[0.74, 0.0, 1.0, -0.4, 0.4], [1.2, 0.3, 0.7, -0.1, 0.1]],
+    );
+    let none = J::Obj(Vec::new());
+    let all = Sampler::new(&desk, &none, None).unwrap().unwrap();
+    let own = Sampler::own(&desk, &none).unwrap().unwrap();
+    assert!(
+        (all.height_by(0.74).unwrap() - 1.2).abs() < 1e-6,
+        "the screen on it"
+    );
+    assert!(
+        (own.height_by(0.74).unwrap() - 0.74).abs() < 1e-6,
+        "the desk alone"
+    );
+    assert_eq!(
+        top_near(&own, [0.72, 0.76], &[]).map(|(_, h)| (h * 100.0).round()),
+        Some(74.0)
+    );
+    // A bench: its seat 0.45 m up, its back's top rail 0.9 m behind it.
+    let bench = quads(&[[0.45, -0.8, 0.8, -0.2, 0.2], [0.9, -0.8, 0.8, -0.25, -0.2]]);
+    let s = Sampler::own(&bench, &none).unwrap().unwrap();
+    assert_eq!(
+        seat_near(&s, [0.42, 0.48]).map(|h| (h * 100.0).round()),
+        Some(45.0)
+    );
+}
+
+/// A crib's changing table: its pad's top is its top, though the pad's underside is level with the top of a rail
+/// in front, which itself stands on the mattress's height: only what stands on nothing found bears things.
+#[test]
+fn a_top_on_a_pad_is_not_taken_for_a_thing_on_a_rail() {
+    // (file x is game -x) the mattress 0.56 m at game x -1 to 0; the changing board 0.78 at 0 to 1, its pad
+    // 0.805 to 0.843 over the middle back; a rail in front 0.80, a bar under it 0.56.
+    let crib = quads(&[
+        [0.56, 0.02, 1.0, -0.5, 0.5],
+        [0.78, -1.0, -0.02, -0.5, 0.5],
+        [0.805, -0.7, -0.3, -0.4, 0.1],
+        [0.843, -0.7, -0.3, -0.4, 0.1],
+        [0.80, -0.6, -0.4, 0.2, 0.3],
+        [0.56, -0.6, -0.4, 0.2, 0.3],
+    ]);
+    let s = Sampler::own(&crib, &J::Obj(Vec::new())).unwrap().unwrap();
+    assert_eq!(
+        top_near(&s, [0.85, 0.95], &[]).map(|(_, h)| (h * 1000.0).round()),
+        Some(843.0)
+    );
 }

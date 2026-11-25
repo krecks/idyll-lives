@@ -12,8 +12,6 @@
 //! cells, and residents look at those within reach of where they are (`usable_near`, content
 //! `autonomy.reach`), still in id order.
 
-use std::borrow::Cow;
-
 use crate::world::Plot;
 
 /// Spatial cells for public objects (m).
@@ -109,7 +107,7 @@ impl ObjectIndex {
 
     /// What people living on `home` (or nowhere) may use from `pos`: their own things, and the
     /// public ones within about `reach` m (the cells it touches), in id order.
-    pub fn usable_near(&self, home: Option<u32>, pos: [f32; 2], reach: f32) -> Cow<'_, [u32]> {
+    pub fn usable_near(&self, home: Option<u32>, pos: [f32; 2], reach: f32) -> Vec<u32> {
         let own: &[u32] = home
             .and_then(|p| self.usable.get(p as usize))
             .map_or(&[], Vec::as_slice);
@@ -127,7 +125,7 @@ impl ObjectIndex {
         }
         near.extend_from_slice(own);
         near.sort_unstable();
-        Cow::Owned(near)
+        near
     }
 
     /// Objects on `plot`.

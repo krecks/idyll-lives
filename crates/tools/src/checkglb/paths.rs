@@ -47,7 +47,7 @@ impl Paths {
 
 /// The checkout this crate is in.
 pub fn repo_root() -> String {
-    normpath(&join(env!("CARGO_MANIFEST_DIR"), "../.."))
+    crate::repo_root().to_string_lossy().into_owned()
 }
 
 pub(crate) fn read_json(path: &str) -> Result<J, String> {

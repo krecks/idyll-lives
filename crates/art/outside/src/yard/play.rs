@@ -796,7 +796,8 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             .iter()
             .map(|&(u, hw, th)| {
                 (0..360)
-                    .step_by(low(45, 90))
+                    // twelve round: at eight the flattened sides turned past 80°
+                    .step_by(low(30, 90))
                     .map(|a| {
                         F.at(
                             x0 + u,
@@ -807,7 +808,8 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
                     .collect()
             })
             .collect();
-        loft!("saddle", &secs, material = M.saddle);
+        // shaded smooth round its padded rows; only its ends stay sharp
+        loft!("saddle", &secs, material = M.saddle, angle = 80);
         rod(
             "stem",
             at(s.stem.0, 0.0),
@@ -817,7 +819,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             8,
         );
         let bars: Vec<(f64, f64, f64)> = s.bars.iter().map(|&(x, h, dz)| (x, h, bz + dz)).collect();
-        bent("bars", &bars, 0.011 * k, M.rim, s.bend, low(8, 5), 3);
+        bent("bars", &bars, 0.011 * k, M.rim, s.bend, low(8, 5), 3, 1.0);
         for &(a, b) in &s.grips {
             rod(
                 &numbered("grip"),
@@ -950,6 +952,7 @@ pub fn bike_rack() -> Vec<Obj> {
                 0.15,
                 low(10, 6),
                 low(5, 2),
+                1.0,
             );
             for e in [-1.0, 1.0] {
                 fbox!(

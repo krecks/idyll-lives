@@ -1,7 +1,8 @@
 //! L6, the staircases: the closed flight (base manifest `model.stairs`), the spiral and the open-tread flight the
 //! player buys.
 
-use super::common::{disc, mesh, prism_faces};
+use super::common::disc;
+use super::shelves::eased_bar;
 use super::{F, M};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
@@ -36,7 +37,7 @@ fn string_top(z: f64) -> f64 {
 }
 
 /// A closed string: a band along the flight, cut level on the floor in front and the floor above at the back, from
-/// game x0 to x1.
+/// game x0 to x1, its arrises eased.
 fn string(name: &str, x0: f64, x1: f64, material: Mat) -> Obj {
     let slope = RISE / RUN;
     let bottom = |z: f64| slope * (2.0 - z) - STRING_DOWN;
@@ -50,9 +51,7 @@ fn string(name: &str, x0: f64, x1: f64, material: Mat) -> Obj {
         (-2.0, bottom(-2.0)),
         (z_foot, 0.0),
     ];
-    let mut verts: Vec<(f64, f64, f64)> = outline.iter().map(|&(z, y)| (x0, y, z)).collect();
-    verts.extend(outline.iter().map(|&(z, y)| (x1, y, z)));
-    mesh(name, &verts, &prism_faces(outline.len()), material)
+    eased_bar(name, &outline, (x0, x1), 0.004, material, true)
 }
 
 /// The staircase: oak treads with a bullnose nosing over a small cove on white risers, between closed white strings
@@ -85,7 +84,7 @@ pub fn stairs() -> Vec<Obj> {
             let a = radians(f64::from(a));
             (nose - r + r * cos(a), y - r + r * sin(a))
         }));
-        outline.push((back, y));
+        outline.extend([(back + 0.004, y), (back, y - 0.004)]); // its back edge eased (the top one shows)
         fextrude!(
             F,
             format!("tread{i}"),
@@ -375,12 +374,8 @@ fn open_string(name: &str, x: f64, material: Mat) -> Obj {
         (-2.0, top(-2.0)),
         (-2.0, top(-2.0) - OPEN_STRING_D),
     ];
-    let mut verts: Vec<(f64, f64, f64)> = outline
-        .iter()
-        .map(|&(z, y)| (x - OPEN_STRING / 2.0, y, z))
-        .collect();
-    verts.extend(outline.iter().map(|&(z, y)| (x + OPEN_STRING / 2.0, y, z)));
-    mesh(name, &verts, &prism_faces(outline.len()), material)
+    let (x0, x1) = (x - OPEN_STRING / 2.0, x + OPEN_STRING / 2.0);
+    eased_bar(name, &outline, (x0, x1), 0.004, material, true)
 }
 
 /// An open-tread flight: 14 oak boards on two slim steel plates, no risers, a thin steel handrail on a post at the

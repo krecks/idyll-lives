@@ -31,7 +31,7 @@ pub mod preview;
 pub mod template;
 
 /// Every family by its name on the command line (`cargo art <name>`).
-pub fn registry() -> Vec<(&'static str, Option<Family>)> {
+pub fn registry() -> Vec<(&'static str, Family)> {
     let mut all = art_nature::families();
     all.extend(art_wet::families());
     all.extend(art_rooms::families());
@@ -42,10 +42,10 @@ pub fn registry() -> Vec<(&'static str, Option<Family>)> {
 }
 
 /// The families `names` asks for, in the order asked (`all`: every family of the registry). An error for a name the
-/// registry doesn't have, and for a family whose module builds nothing (`family()` gives `None`).
+/// registry doesn't have.
 pub fn pick<'a>(
     names: &[String],
-    registry: &'a [(&'static str, Option<Family>)],
+    registry: &'a [(&'static str, Family)],
     all: bool,
 ) -> Result<Vec<&'a Family>, String> {
     let listed = || {
@@ -62,8 +62,7 @@ pub fn pick<'a>(
     asked
         .into_iter()
         .map(|name| match registry.iter().find(|(n, _)| *n == name) {
-            Some((_, Some(family))) => Ok(family),
-            Some((_, None)) => Err(format!("{name}: its module builds nothing (its family() gives None)")),
+            Some((_, family)) => Ok(family),
             None if name == template::NAME => Err(format!(
                 "{name}: the template only previews (cargo art {name} --preview); copy it to make a family (crates/art/README.md)"
             )),

@@ -1,6 +1,6 @@
 /**
  * One line of speech with Supertone's Supertonic 3, the same way everywhere: the voice worker
- * (`tts.worker.ts`) and the Node tools (`tools/voice/check.mjs`, `samples.mjs`) call this, so the
+ * (`tts.worker.ts`) and the Node tools (`tools/voice/check.mjs`) call this, so the
  * checks hear exactly what the game plays. Plain TypeScript with type-only imports (Node runs it
  * by stripping the types). Ported from Supertone's reference code (`web/helper.js`,
  * github.com/supertone-inc/supertonic).
@@ -42,7 +42,7 @@ interface Line {
   free(): void;
 }
 export interface Phonemizer {
-  line(text: string, speed: number, pitch: number, depth: number): Line;
+  line(text: string, pitch: number, depth: number): Line;
 }
 
 /** `tts.json`, the parts used here. */
@@ -149,7 +149,7 @@ export interface LineTiming {
  */
 export async function synthesizeLine(engine: Engine, text: string, voice: VoiceParams): Promise<{ samples: Float32Array; visemes: Float32Array; finishMs: number; timing: LineTiming }> {
   // The model speaks at the voice's speed itself; our WASM gives the pitch and size.
-  const line = engine.phonemizer.line(text, 1, voice.pitch, voice.depth);
+  const line = engine.phonemizer.line(text, voice.pitch, voice.depth);
   try {
     const plain = line.text;
     if (!plain) return { samples: new Float32Array(0), visemes: Float32Array.of(0, 0), finishMs: 0, timing: { duration: 0, text: 0, vector: 0, vocoder: 0, finish: 0 } };
@@ -164,31 +164,35 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
       ids.push(BigInt(c < engine.indexer.length ? engine.indexer[c] : -1));
     }
     const n = ids.length;
-    const floats = (data: Float32Array, dims: readonly number[]) => (engine.upload ? engine.upload(data, dims) : new ort.Tensor('float32', data, dims));
-    const textIds = new ort.Tensor('int64', BigInt64Array.from(ids), [1, n]);
-    const textMask = floats(new Float32Array(n).fill(1), [1, 1, n]);
-    const styleTtl = floats(style.ttl.data, style.ttl.dims);
-    const styleDp = new ort.Tensor('float32', style.dp.data, style.dp.dims);
-    let t = performance.now();
-    const durationOut = (await sessions.duration.run({ text_ids: textIds, style_dp: styleDp, text_mask: textMask })).duration;
-    // The duration is one number; the output may be on the GPU when the session keeps its outputs there.
-    const durationData = (durationOut.getData ? await durationOut.getData() : durationOut.data) as Float32Array;
-    const seconds = durationData[0] / speed;
-    durationOut.dispose?.();
-    const durationMs = performance.now() - t;
-    t = performance.now();
-    const textEmb = (await sessions.text.run({ text_ids: textIds, style_ttl: styleTtl, text_mask: textMask })).text_emb;
-    const textMs = performance.now() - t;
-    const rate = config.ae.sample_rate;
-    const chunk = config.ae.base_chunk_size * config.ttl.chunk_compress_factor;
-    const dim = config.ttl.latent_dim * config.ttl.chunk_compress_factor;
-    const frames = Math.max(1, Math.ceil(Math.floor(seconds * rate) / chunk));
-    let latent = new ort.Tensor('float32', noise(hashString(`${voice.style}|${speed.toFixed(3)}|${plain}`), dim * frames), [1, dim, frames]);
-    const latentMask = floats(new Float32Array(frames).fill(1), [1, 1, frames]);
-    const total = floats(Float32Array.of(STEPS), [1]);
-    const steps = Array.from({ length: STEPS }, (_, step) => floats(Float32Array.of(step), [1]));
-    let vectorMs = 0;
+    // Every tensor made here is freed however the line ends (a failed run included); the latent as it changes.
+    const made: OrtTensor[] = [];
+    const own = (x: OrtTensor) => (made.push(x), x);
+    const floats = (data: Float32Array, dims: readonly number[]) => own(engine.upload ? engine.upload(data, dims) : new ort.Tensor('float32', data, dims));
+    let latent: OrtTensor | undefined;
     try {
+      const textIds = own(new ort.Tensor('int64', BigInt64Array.from(ids), [1, n]));
+      const textMask = floats(new Float32Array(n).fill(1), [1, 1, n]);
+      const styleTtl = floats(style.ttl.data, style.ttl.dims);
+      const styleDp = own(new ort.Tensor('float32', style.dp.data, style.dp.dims));
+      let t = performance.now();
+      const durationOut = (await sessions.duration.run({ text_ids: textIds, style_dp: styleDp, text_mask: textMask })).duration;
+      // The duration is one number; the output may be on the GPU when the session keeps its outputs there.
+      const durationData = (durationOut.getData ? await durationOut.getData() : durationOut.data) as Float32Array;
+      const seconds = durationData[0] / speed;
+      durationOut.dispose?.();
+      const durationMs = performance.now() - t;
+      t = performance.now();
+      const textEmb = own((await sessions.text.run({ text_ids: textIds, style_ttl: styleTtl, text_mask: textMask })).text_emb);
+      const textMs = performance.now() - t;
+      const rate = config.ae.sample_rate;
+      const chunk = config.ae.base_chunk_size * config.ttl.chunk_compress_factor;
+      const dim = config.ttl.latent_dim * config.ttl.chunk_compress_factor;
+      const frames = Math.max(1, Math.ceil(Math.floor(seconds * rate) / chunk));
+      latent = new ort.Tensor('float32', noise(hashString(`${voice.style}|${speed.toFixed(3)}|${plain}`), dim * frames), [1, dim, frames]);
+      const latentMask = floats(new Float32Array(frames).fill(1), [1, 1, frames]);
+      const total = floats(Float32Array.of(STEPS), [1]);
+      const steps = Array.from({ length: STEPS }, (_, step) => floats(Float32Array.of(step), [1]));
+      let vectorMs = 0;
       // Keep each step's latent where the runtime put it (on the GPU in the browser): the next
       // pass and the vocoder take it as it is, with no download and upload between the graphs.
       for (let step = 0; step < STEPS; step++) {
@@ -203,7 +207,7 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
           total_step: total,
         });
         vectorMs += performance.now() - stepStart;
-        const previous = latent;
+        const previous: OrtTensor = latent;
         latent = out.denoised_latent;
         if (previous !== latent) previous.dispose?.();
       }
@@ -217,15 +221,8 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
       const finishMs = performance.now() - start;
       return { samples, visemes, finishMs, timing: { duration: durationMs, text: textMs, vector: vectorMs, vocoder: vocoderMs, finish: finishMs } };
     } finally {
-      latent.dispose?.();
-      textEmb.dispose?.();
-      styleTtl.dispose?.();
-      styleDp.dispose?.();
-      textIds.dispose?.();
-      textMask.dispose?.();
-      latentMask.dispose?.();
-      total.dispose?.();
-      for (const t of steps) t.dispose?.();
+      latent?.dispose?.();
+      for (const x of made) x.dispose?.();
     }
   } finally {
     line.free();

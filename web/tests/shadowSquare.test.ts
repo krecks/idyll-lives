@@ -7,6 +7,7 @@ const realLocation = globalThis.location;
 Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
 afterAll(() => Object.assign(globalThis, { location: realLocation }));
 const { CASTER_REACH, SunShadows, fitSquare } = await import('../src/render/pc/sunShadows');
+const { fixFrameClock } = await import('../src/render/shared/frameClock');
 
 function sun(rate = 0) {
   const canvas = { width: 1, height: 1, style: {}, addEventListener() {}, removeEventListener() {}, getBoundingClientRect: () => ({ width: 1, height: 1 }) } as unknown as HTMLCanvasElement;
@@ -43,7 +44,9 @@ describe("the sun's shadow square", () => {
     expect(shadows.reaches(500, 500)).toBe(false);
   });
 
-  test('a moved caster draws it again (what the cars and residents trigger), a pose at the shadow rate', async () => {
+  test('a moved caster draws it again (what the cars and residents trigger), a pose at the shadow rate', () => {
+    // The renderer's own clock, moved by hand: a slow machine can't make the rate pass early.
+    fixFrameClock(1000);
     const { shadows, drawn } = sun(10);
     shadows.setSquare(100, 200, 40);
     expect(drawn()).toBe(true);
@@ -53,7 +56,7 @@ describe("the sun's shadow square", () => {
     expect(drawn()).toBe(false);
     shadows.frame();
     expect(drawn()).toBe(false);
-    await Bun.sleep(110);
+    fixFrameClock(1110);
     shadows.frame();
     expect(shadows.waiting).toBe(true);
     expect(drawn()).toBe(true);
@@ -61,6 +64,7 @@ describe("the sun's shadow square", () => {
     // The sun, the walls, a thing placed: at once.
     shadows.moved();
     expect(drawn()).toBe(true);
+    fixFrameClock(null);
   });
 
   test("in the menus' town everything counts (the map follows the view)", () => {

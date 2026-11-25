@@ -100,6 +100,9 @@ impl From<P3> for Size {
     }
 }
 
+/// A function's options, as artkit's own are written: a struct with defaults, `options! { Name { field: Type =
+/// default, ... } }`. Exported for the families' own helpers.
+#[macro_export]
 macro_rules! options {
     ($(#[$doc:meta])* $name:ident { $($field:ident : $ty:ty = $default:expr),* $(,)? }) => {
         $(#[$doc])*
@@ -268,12 +271,22 @@ pub fn rod(name: impl AsRef<str>, a: impl Into<V3>, b: impl Into<V3>, radius: f6
 /// Surface of revolution around z. `profile` is [(r, z), ...] in metres, top last. Smooth, it stays smooth
 /// where the profile turns less than `angle` degrees (a few points round a jar's shoulder) and sharp where it
 /// turns more (a rim, a step, the edge of its base). `segments` round: by default 24, and more for one over
-/// 12 cm in radius, as many as keep its outline within a millimetre of the circle (`sides`).
+/// 12 cm in radius, as many as keep its outline within a millimetre of the circle (`sides`). A profile closed on its
+/// first point (a ring's section) is turned as a loop, its last point welded to its first, so its seam doesn't stop a
+/// bevel.
 pub fn revolve(name: impl AsRef<str>, profile: &[(f64, f64)], o: Revolve) -> Obj {
     let segments = o.segments.unwrap_or_else(|| {
         let widest = profile.iter().map(|p| p.0.abs()).fold(0.0, f64::max);
         sides(widest * o.scale.x.abs().max(o.scale.y.abs()), 24, 64)
     });
+    let (first, last) = (profile[0], profile[profile.len() - 1]);
+    let closed =
+        profile.len() > 3 && (first.0 - last.0).abs() < 1e-9 && (first.1 - last.1).abs() < 1e-9;
+    let profile = if closed {
+        &profile[..profile.len() - 1]
+    } else {
+        profile
+    };
     let n = profile.len();
     let mut verts = Vec::with_capacity(segments * n);
     for s in 0..segments {
@@ -286,14 +299,15 @@ pub fn revolve(name: impl AsRef<str>, profile: &[(f64, f64)], o: Revolve) -> Obj
     let mut faces = Vec::new();
     for s in 0..segments {
         let s2 = (s + 1) % segments;
-        for i in 0..n - 1 {
-            if profile[i].0.abs() < 1e-6 && profile[i + 1].0.abs() < 1e-6 {
+        for i in 0..if closed { n } else { n - 1 } {
+            let i2 = (i + 1) % n;
+            if profile[i].0.abs() < 1e-6 && profile[i2].0.abs() < 1e-6 {
                 continue; // both ends on the axis: the quad collapses
             }
             faces.push(vec![
                 (s * n + i) as u32,
-                (s * n + i + 1) as u32,
-                (s2 * n + i + 1) as u32,
+                (s * n + i2) as u32,
+                (s2 * n + i2) as u32,
                 (s2 * n + i) as u32,
             ]);
         }
@@ -338,7 +352,7 @@ macro_rules! torus {
     }};
 }
 
-/// A lumpy, deterministic boulder: an icosphere displaced by noise, bottom on z = 0.
+/// A lumpy, deterministic boulder: an icosphere displaced by noise, bottom on z = 0, then scaled by `scale`.
 pub fn boulder(name: impl AsRef<str>, radius: f64, o: Boulder) -> Obj {
     let obj = scene::add_primitive(
         "Icosphere",
@@ -366,7 +380,9 @@ pub fn boulder(name: impl AsRef<str>, radius: f64, o: Boulder) -> Obj {
             v.z -= low;
         }
     });
-    obj.set_scale(o.scale)
+    // (its scale in its mesh, as the other shapes': UVs made on it lay its texture at its own size, not squashed)
+    scale_mesh(obj, o.scale);
+    obj
 }
 
 /// Scales the new part's mesh (not the part).

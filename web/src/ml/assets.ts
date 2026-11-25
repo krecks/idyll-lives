@@ -22,13 +22,13 @@ export async function openCache(prefix: string, name: string): Promise<Cache | n
  * URL is hashed by the build, so a new runtime comes under a new name (`pruneRuntime` drops the
  * old one).
  */
-export function openRuntimeCache(): Promise<Cache | null> {
+function openRuntimeCache(): Promise<Cache | null> {
   return openCache(RUNTIME_PREFIX, `${RUNTIME_PREFIX}v1`);
 }
 const RUNTIME_PREFIX = 'littlelives-ort-';
 
 /** Drops cached files this version no longer uses (an older build's wasm, models no longer used). */
-export async function prune(cache: Cache | null, keep: string[]): Promise<void> {
+async function prune(cache: Cache | null, keep: string[]): Promise<void> {
   if (!cache) return;
   const wanted = new Set(keep.map((url) => new URL(url, location.href).href));
   try {
@@ -54,16 +54,42 @@ export async function gunzip(bytes: ArrayBuffer): Promise<ArrayBuffer> {
   return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 }
 
-/** Unpacks a gzipped file, or reads it as text if a server already unpacked it. */
-export async function gunzipText(bytes: ArrayBuffer): Promise<string> {
-  const head = new Uint8Array(bytes, 0, 2);
-  if (head[0] !== 0x1f || head[1] !== 0x8b) return new TextDecoder().decode(bytes);
-  return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+/**
+ * A worker's model files. `built`: imported through Vite; in dev their URLs aren't hashed, so a rebuilt one would
+ * otherwise come back stale from the cache: those are fetched fresh there. `runtime`: ONNX Runtime's binary, in the
+ * cache both workers share (`openRuntimeCache`).
+ */
+export type ModelFile = { url: string; size: number; sha256?: string; built?: boolean; runtime?: boolean };
+
+/**
+ * Every file's bytes (in order), from the worker's cache (`prefix` + version `name`; the runtime from the shared one)
+ * or downloaded, with the bytes `progress` so far of `total`. Files the caches no longer need are dropped.
+ */
+export async function fetchFiles(prefix: string, name: string, files: ModelFile[], progress: (loaded: number, total: number) => void): Promise<ArrayBuffer[]> {
+  const total = files.reduce((n, f) => n + f.size, 0);
+  const done = files.map(() => 0);
+  const [cache, runtime] = await Promise.all([openCache(prefix, name), openRuntimeCache()]);
+  const bytes = await Promise.all(
+    files.map((f, i) =>
+      fetchOnce(
+        f.built && import.meta.env.DEV ? null : f.runtime ? runtime : cache,
+        f.url,
+        (n) => {
+          done[i] = Math.min(n, f.size);
+          progress(done.reduce((a, b) => a + b, 0), total);
+        },
+        f.sha256,
+      ),
+    ),
+  );
+  void prune(cache, files.filter((f) => !f.runtime).map((f) => f.url));
+  void prune(runtime, files.filter((f) => f.runtime).map((f) => f.url));
+  return bytes;
 }
 
 /** Each file once per worker (a load tried again after failing only fetches what it's missing); a `packed` one comes unpacked. */
 const fetched = new Map<string, Promise<ArrayBuffer>>();
-export function fetchOnce(cache: Cache | null, url: string, progress: (bytes: number) => void, sha256?: string): Promise<ArrayBuffer> {
+function fetchOnce(cache: Cache | null, url: string, progress: (bytes: number) => void, sha256?: string): Promise<ArrayBuffer> {
   let p = fetched.get(url);
   if (!p) {
     p = fetchCached(cache, url, progress, sha256);
@@ -113,6 +139,8 @@ export async function fetchCached(cache: Cache | null, url: string, progress: (b
     bytes.set(c, at);
     at += c.byteLength;
   }
+  // The chunks are copied: let them go before unpacking, not with the file and its unpacked copy.
+  chunks.length = 0;
   const file = unpack ? await gunzip(bytes.buffer) : bytes.buffer;
   if (sha256 && (await sha256Hex(file)) !== sha256) throw new Error(`${url}: not the file expected (SHA-256 differs)`);
   await cache?.put(url, new Response(bytes, { headers: { 'Content-Type': res.headers.get('Content-Type') ?? 'application/octet-stream' } })).catch(() => {});

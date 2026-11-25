@@ -69,7 +69,6 @@ palette! { M:
     bin3 = ("#E3B23C", satin),
     lid = ("#2F3236", satin),               // a bin's lid
     walnut = ("#7A5234", satin),            // a bar's body and slats
-    island = ("#9DAF8C", satin),            // the kitchen island's sage stool seats
     towel = ("#B4483C", satin),             // a red tea towel
 }
 
@@ -97,10 +96,10 @@ const BASE_PAINT: [(&str, &str); 3] = [
 ];
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
     // its top under its content `surface`.
-    Some(Family::new(
+    Family::new(
         "kitchen_counters",
         M.palette(),
         vec![
@@ -110,7 +109,7 @@ pub fn family() -> Option<Family> {
                 // sandwich slides the top drawer out
                 .motions(json!({"uses": {"sandwich": "drawer_open"}, "hold": (HOLD)}))
                 .paint(&BASE_PAINT),
-            Model::new("counterCorner", counters::counter_corner, (1.0, 1.26, 0.93))
+            Model::new("counterCorner", counters::counter_corner, (1.0, 0.95, 0.93))
                 .key("model.counterCorner")
                 .centre(0.0, 0.035)
                 // sandwich, as the counter
@@ -278,5 +277,5 @@ pub fn family() -> Option<Family> {
          and bars (K6) add freestanding islands with their cupboards at the front and a worktop \
          overhanging the back for stools, and slatted bars with a top at 1.06, the kitchen island \
          sliding a drawer out between its stools for a sandwich.",
-    ))
+    )
 }

@@ -265,7 +265,7 @@ pub fn market_stall() -> Vec<Obj> {
             );
         }
         fbox!(f, "board", 0.34, 0.18, 0.016, (0.5, 1.62, 0.4), M.slate);
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "board_frame",
             &rounded_rect(0.38, 0.22, 0.006, 1),
@@ -273,7 +273,7 @@ pub fn market_stall() -> Vec<Obj> {
             (0.5, 1.62, 0.4),
             M.timber,
             holes = [rounded_rect(0.34, 0.18, 0.004, 1)]
-        );
+        ));
         for (k, (w, dy)) in [(0.18, 0.04), (0.12, 0.0), (0.16, -0.045)]
             .into_iter()
             .enumerate()
@@ -313,19 +313,23 @@ pub fn market_stall() -> Vec<Obj> {
             material = M.steel,
             segments = 10
         );
-        revolve!(
-            "scale_pan",
-            &[
-                (0.0, 0.18),
-                (0.08, 0.18),
-                (0.1, 0.21),
-                (0.092, 0.212),
-                (0.075, 0.192),
-                (0.0, 0.192)
-            ],
-            at = f.at(0.8, 0.825, -0.31),
-            material = M.steel,
-            segments = 12
+        artkit::bevel::ease(
+            revolve!(
+                "scale_pan",
+                &[
+                    (0.0, 0.18),
+                    (0.08, 0.18),
+                    (0.1, 0.21),
+                    (0.092, 0.212),
+                    (0.075, 0.192),
+                    (0.0, 0.192)
+                ],
+                at = f.at(0.8, 0.825, -0.31),
+                material = M.steel,
+                segments = 12
+            ),
+            50.0,
+            2,
         );
         fcyl!(
             f,

@@ -3,6 +3,7 @@
 use super::beds::bun;
 use super::common::{P, block, place, star, still, teddy, walls};
 use super::{F, M};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit;
@@ -10,6 +11,7 @@ use artkit::math::{Axis, PI, TAU, cos, sin};
 use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
+use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, sphere, swing};
 
 /// Toys heaped inside a box, seen with the lid open: a ball, two blocks, a teddy and a toy car's wheels.
@@ -95,6 +97,8 @@ pub fn toy_box() -> Vec<Obj> {
             )
         );
     }
+    // the hand holds' cut edges eased
+    bevel_edges(box_walls, 0.003, 1, SHARP, &EdgeOrder::Corners);
     // a rounded rim along the walls' top edge, under the lid
     let rim = rounded_rect(0.775, 0.475, 0.018, 3);
     let path: Vec<P> = rim.iter().map(|&(u, v)| (u, 0.445, z + v)).collect();
@@ -229,15 +233,16 @@ pub fn toy_box() -> Vec<Obj> {
             "hinge",
             0.006,
             0.7,
-            (0, 0.462, z - 0.252),
+            (0, 0.505, z - 0.218),
             M.handle,
             rot = (0, 90, 0),
             verts = 8
         );
     });
-    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.46, z - 0.26));
+    // hinged 4 cm in from the lid's back, near its top: it swings up to stand on the back rim, clear of the wall
+    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.5, z - 0.218));
     place(0.0);
-    swing!(lid, "lid_open", -100.0, seconds = 1.0, axis = Axis::X);
+    swing!(lid, "lid_open", -90.0, seconds = 1.0, axis = Axis::X);
     meshes()
 }
 
@@ -461,8 +466,9 @@ pub fn toy_chest() -> Vec<Obj> {
             M.eye
         );
     });
-    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.44, z - 0.25));
+    // hinged inside the dome, 5 cm in from its back: it swings up to stand on its back end, clear of the wall
+    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.5, z - 0.196));
     place(0.0);
-    swing!(lid, "lid_open", -100.0, seconds = 1.0, axis = Axis::X);
+    swing!(lid, "lid_open", -90.0, seconds = 1.0, axis = Axis::X);
     meshes()
 }

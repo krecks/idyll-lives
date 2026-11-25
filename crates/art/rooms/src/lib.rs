@@ -13,7 +13,7 @@ pub mod living;
 pub mod office;
 
 /// The group's families by their names on the command line (`cargo art <name>`).
-pub fn families() -> Vec<(&'static str, Option<Family>)> {
+pub fn families() -> Vec<(&'static str, Family)> {
     vec![
         ("living", living::family()),
         ("dining", dining::family()),

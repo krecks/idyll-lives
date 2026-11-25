@@ -12,10 +12,11 @@ import { PLAYBACK_RATE } from '../src/render/shared/gameSpeed';
 import { RUN_MAX_RATE } from '../src/render/shared/characters/actions';
 import { gaitFor, gaitSlide } from '../src/render/shared/characters/gait';
 import { locomotionClips } from '../src/render/shared/characters/clips/locomotion';
+import { PACE } from '../src/render/shared/doors';
 
 const WEB = new URL('../', import.meta.url).pathname;
-/** Metres a Sim walks per second at game speed 1 (sim-core `world::WALK_SPEED`), and the fastest walkers' factor (traits and perks). */
-const WALK = 1.5;
+/** Metres a Sim walks per second at game speed 1 (sim-core `world::WALK_SPEED`, held to it by doors.test.ts), and the fastest walkers' factor (traits and perks). */
+const WALK = PACE;
 const FASTEST = 1.38;
 
 describe('gaits', () => {

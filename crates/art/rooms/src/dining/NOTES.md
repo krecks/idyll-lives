@@ -22,7 +22,7 @@ K9 (2026-10-14): catalog2's `sideboard`, `buffet`, `chinaCabinet` and `barCart`.
   its top (seen in play). The planked tops (banquet, farmhouse, the oak set, the bench) are separate planks meeting
   in a shallow rounded joint, their tops at the height; no joint lies on the middle line (the gate's probe), and the
   oak set's breadboard pegs stand 0.5 mm proud.
-- **Seats** at `characters.ts` SEATS or the content's `seat`: the seat's (hard) top at that height, the pad or
+- **Seats** at furniture.json `seats` or the content's `seat`: the seat's (hard) top at that height, the pad or
   cushion a little above, as the old parts: the sets' chairs 0.46 (at the content's `places`, `fwd` 0), the bar
   stool 0.74 (sitters at 0.72), the counter stool 0.685 (0.68), the high stool 0.805 (0.8), the
   chairs 0.46–0.48, the carver chair's board 0.425 under a cushion to 0.475 (0.47, a dining chair's height: G-30),
@@ -155,3 +155,15 @@ The high bar stool's seat and back (`leather`) are leather. It goes from 2 draws
 
 Built in Rust since 2026-11-18 (`cargo art dining`), proved against the last Blender build (`ref/blender`). Its tubes are the kit's
 (`kit::tube!`).
+
+## Gate to zero (2026-11-25)
+
+No hard edge shows unbevelled any more (34 → 0). The tops' moulded edges turn onto the top in steps under 60°
+(`slab`, `round_slab`), the moulded chair's shell and the Windsor seat have a round bead along their rims (the seat drawn
+2.25 cm in so it keeps its size), the folding chair's and the high stool's backs are padded boards with round ends
+(`bowed_pad`), the end chairs' crest rails end in the posts, the vases' and the bar cart's bowl's lips are rounded and a
+short vase's belly scales with it, the china cabinet's crown and the bar table's hub are eased. The square legs are swept
+(`sq_leg`) so their grain runs along them (the bench's splayed legs were stretched 10 %). The bar stool's seat is at
+0.715 (sitters at 0.695), a counter stool's for the 0.95 worktops; the sideboard's vase is 24 cm; the dining table for
+two is a dining set in docs/review/reference.json (its two chairs' backs and the vase make its 1.02 m). The sideboard's
+and the china cabinet's fourth draw call is their moving door's wood and brass, or glass: left as it is.

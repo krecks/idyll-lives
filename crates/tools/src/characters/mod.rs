@@ -48,17 +48,9 @@ pub const fn v3(x: f64, y: f64, z: f64) -> V3 {
     V3::new(x, y, z)
 }
 
-/// The repo's root (the Python found it from `__file__`).
-pub fn repo_root() -> PathBuf {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..");
-    std::fs::canonicalize(&root).unwrap_or(root)
-}
-
 /// The committed set.
 pub fn default_out() -> PathBuf {
-    repo_root()
+    crate::repo_root()
         .join("web")
         .join("public")
         .join("assets")

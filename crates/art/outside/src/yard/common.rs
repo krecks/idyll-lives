@@ -1,9 +1,8 @@
 //! What the play and yard things are built from: the palette, the frame, and the shapes more than one of them
 //! makes (ground, clumps, pots, slabs from outlines).
 
-pub use crate::outdoor::common::{F, board, rod};
+pub use crate::outdoor::common::{F, bent, rod};
 use artkit::far::low;
-use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::V3;
 use artkit::noise::noise;
@@ -213,28 +212,6 @@ pub fn pot(x: f64, y: f64, z: f64, r: f64, h: f64, material: Option<Mat>) {
         material = material.unwrap_or(M.terra),
         segments = low(12, 6)
     );
-}
-
-/// One length of round bar or tube through game points, its corners bent round about `bend` (no overshoot):
-/// hoops, handles, frames.
-pub fn bent(
-    name: &str,
-    pts: &[(f64, f64, f64)],
-    r: f64,
-    material: Mat,
-    bend: f64,
-    verts: usize,
-    steps: usize,
-) -> Obj {
-    kit::tube!(
-        F,
-        name,
-        &kit::fillet!(pts, bend, steps),
-        r,
-        material,
-        verts = verts,
-        round = 1
-    )
 }
 
 /// A ground surface `w` by `d` at height `y` (sand, soil): a grid raised in soft lumps up to `bump` (noise, the

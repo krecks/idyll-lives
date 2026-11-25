@@ -32,8 +32,10 @@ pub(super) fn crown(
         (0.008, 0.011),
         (0.018, 0.019),
         (0.026, 0.03),
-        (0.03, depth),
-        (0.0, depth),
+        (0.03, depth - 0.004), // its top's edges eased
+        (0.026, depth),
+        (0.004, depth),
+        (0.0, depth - 0.004),
     ];
     let zf = z_back + d;
     let path = [
@@ -582,15 +584,18 @@ pub fn bar_cart() -> Vec<Obj> {
         // a lemon dish on the top tier; an ice bucket with tongs and a woven basket on the lower one
         turned(
             "dish",
-            &[
-                (0.0, 0.0),
-                (0.035, 0.0),
-                (0.055, 0.012),
-                (0.062, 0.016),
-                (0.056, 0.016),
-                (0.035, 0.006),
-                (0.0, 0.006),
-            ],
+            &artkit::forms::eased(
+                &[
+                    (0.0, 0.0),
+                    (0.035, 0.0),
+                    (0.055, 0.012),
+                    (0.062, 0.016),
+                    (0.056, 0.016),
+                    (0.035, 0.006),
+                    (0.0, 0.006),
+                ],
+                0.002,
+            ),
             (0.1, 0.766, -0.1),
             M.porcelain,
             16,

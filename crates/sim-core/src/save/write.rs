@@ -19,7 +19,6 @@ impl World {
                 rot: o.rot,
                 quality: o.quality,
                 colors: crate::world::colors_hex(&o.colors),
-                color: None,
                 value: Some(o.value),
                 turn: o.turn,
                 offset: o.offset,
@@ -118,6 +117,13 @@ impl World {
                         .map(|(i, n)| (n.id.clone(), finite(s.needs[i], 0.75)))
                         .collect(),
                     feelings,
+                    accidents: content
+                        .accidents
+                        .iter()
+                        .enumerate()
+                        .filter(|&(a, _)| s.accident_at[a] > self.tick)
+                        .map(|(a, d)| (d.id.clone(), minutes_left(s.accident_at[a])))
+                        .collect(),
                     skills: content
                         .skills
                         .iter()
@@ -167,7 +173,6 @@ impl World {
                         a: a as u32,
                         b: b as u32,
                         rel,
-                        chemistry: None,
                     });
                 }
             }

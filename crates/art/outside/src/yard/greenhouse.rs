@@ -1,8 +1,9 @@
 //! The greenhouse (2x3): a white frame on a dwarf wall, glazed; staging and tomatoes inside; its door and its roof
 //! vent open (`door_open`). Built in the script's order, its one long build split where its comments part it.
 
-use super::common::{F, M, blob, board, pot, prism, rod};
+use super::common::{F, M, blob, pot, prism, rod};
 use artkit::far::{is_low, low};
+use artkit::kit;
 use artkit::math::{Axis, atan2, degrees};
 use artkit::motion::{Ease, Swing, swing};
 use artkit::parts::numbered;
@@ -191,7 +192,8 @@ fn frame() {
                 (s * (hx - 0.025), (GH_EAVE + WALL_TOP) / 2.0, z),
                 M.gh_frame
             );
-            board(
+            kit::board(
+                &F,
                 &numbered("rafter"),
                 (s * 0.03, GH_RIDGE, z),
                 (s * (hx - 0.02), GH_EAVE + 0.01, z),
@@ -199,7 +201,7 @@ fn frame() {
                 0.04,
                 M.gh_frame,
                 (0, 0, 1),
-                0.0,
+                0.004,
             );
         }
     }
@@ -214,7 +216,7 @@ fn frame() {
     );
     for z in [-hz + 0.01, hz - 0.01] {
         // a finial at each end of the ridge
-        revolve!(
+        artkit::bevel::eased(revolve!(
             numbered("finial"),
             &[
                 (0.0, 0.0),
@@ -226,7 +228,7 @@ fn frame() {
             at = F.at(0, GH_RIDGE + 0.03, z),
             material = M.gh_frame,
             segments = low(8, 4)
-        );
+        ));
     }
     if !is_low() {
         for z in (0..4).map(|k| -hz + 0.025 + (GHD - 0.05) * k as f64 / 4.0) {
@@ -288,7 +290,8 @@ fn frame() {
     // the vent's frame on the left slope (the vent's glass is its own part)
     let (vz0, vz1) = VENT_Z;
     for z in [vz0, vz1] {
-        board(
+        kit::board(
+            &F,
             &numbered("vent_rafter"),
             (-0.03, GH_RIDGE, z),
             (-(hx - 0.02), GH_EAVE + 0.01, z),
@@ -296,7 +299,7 @@ fn frame() {
             0.04,
             M.gh_frame,
             (0, 0, 1),
-            0.0,
+            0.004,
         );
     }
 }

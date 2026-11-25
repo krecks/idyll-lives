@@ -280,6 +280,38 @@ pattern and the habit's likeness are judged by eye against the kind's sources, o
 - `model.garden.lemonTree` (Citrus × limon 'Meyer'), 2026-11-17, same previews: a round head on a clear stem in a
   terracotta pot, yellow fruit, like.
 
+## The gate's edges and texels (2026-11-25)
+
+The gate judges hard edges on everything but leaves, bark, glass and what glows (by finish), and textured finishes'
+UVs. What changed so each tree prints no warning:
+
+- **Magnolia:** its goblets are petals, so their colours (`fruit`, `fruit2`, `fruit3`) are on `foliage` (`magnolia::petals`,
+  the build's palette and the model's): they sway with the crown, and their lips are a petal's, not an edge (119 were
+  found). Their UVs are a box a face (botany's `cupped` lays them so): turned, then tilted, their own round UVs
+  stretched the foliage over 2×.
+- **Birch:** its boughs have six sides (`bough_verts`; four showed four hard edges along each white bough, 68), its
+  lenticels are short dashes under 12 mm across (a triangle 6.8 mm round, too narrow to bevel; were 2.4 cm, 16
+  found), three points round the stem, at 0.97 of its radius so they stand proud of its flat sides and its corners;
+  its black foot's bark is laid round its axis (`UvWay::Round`; along its path, its ragged top stretched it). 4,498
+  triangles (was 4,310), under the trees' 4,500. The white bark stays plain `matte`: the bark texture would darken it
+  past a birch's luminance.
+- **Lemon tree:** its pot's square rim is chamfered (`bevel_edges`, one strip, 4 mm), its stem and boughs are on the
+  plain bark (`birch_bark` in the bark's tone, `#5C4C3E`, so `cargo review sizes` still counts them as its trunk) and
+  round (six sides), the pot and its band 20 round: three draw calls (four with the bark's own), 4,858 triangles (its pot's rims chamfered). Its
+  crown's top is 8 cm lower and 4 cm narrower (`CENTRE`, `RADII`): 1.48 m of tree over its pot, a Meyer lemon's
+  1-1.5 m (was 1.56). The lemons hang where they did.
+- **Pine, spruce:** the sprays' needles are laid a box a face (`uv::box_named`): along their path, a bent spray stretched the
+  foliage over 2× on up to 48 % of it.
+- **Apple:** its crown's top 14 cm lower (`CENTRE` 2.53, `RADII` z 1.08, its underside where it was): 3.98 m, a
+  semi-dwarf's 3-4 m; its fourth apple a paler red (`#D2503A`), not the trees' yellow. It keeps four draw calls: the
+  still tree (bark, cards), its fruit (`ripen`) and the picked apple (`pick`, and `ripen` too) are three parts, each
+  a draw; no merge keeps both clips.
+
+What `cargo review sizes` still finds (held, for the owner to decide): the oak, maple, birch and willow are 60-95 %
+of their species' heights and crowns, every broadleaf's and the spruce's crown starts higher than the species'
+(residents walk under them), the cypress is 7.95 m of a 12-18 m species, and the pine's and oak's bark is darker
+than the species' even at `#FFFFFF` (the bark texture's).
+
 ## Rebuild
 
 ```

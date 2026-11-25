@@ -13,7 +13,7 @@ pub mod media;
 pub mod tabletop;
 
 /// The group's families by their names on the command line (`cargo art <name>`).
-pub fn families() -> Vec<(&'static str, Option<Family>)> {
+pub fn families() -> Vec<(&'static str, Family)> {
     vec![
         ("hobbies", hobbies::family()),
         ("kids", kids::family()),

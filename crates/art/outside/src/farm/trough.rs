@@ -165,7 +165,7 @@ fn trough_tank(prof: &[(f64, f64)], n: usize) {
     }
 }
 
-/// The trough from afar: plain sides and rim (no corrugations), the water, the skids, the valve.
+/// The trough from afar: plain sides and rim (no corrugations), the water, the skids, the valve, the feed pipe.
 pub fn trough_far() -> Vec<Obj> {
     let (y0, top) = (0.1, 0.65);
     trough_tank(
@@ -186,6 +186,25 @@ pub fn trough_far() -> Vec<Obj> {
         0.08,
         (-0.78, top - 0.04, -0.12),
         M.steel
+    );
+    // the feed pipe and its tap, the farthest out at that end, so it stands where the trough does
+    fcyl!(
+        F,
+        "feed",
+        0.016,
+        0.5,
+        (-0.935, 0.25, -0.2),
+        M.steel,
+        verts = 6
+    );
+    fcyl!(
+        F,
+        "feed_tap",
+        0.024,
+        0.05,
+        (-0.935, 0.3, -0.2),
+        M.steel,
+        verts = 8
     );
     settle(&[join_all("trough_far")])
 }

@@ -104,57 +104,65 @@ const { browser } = await launch();
 /** The room's page in one variant, preset, backend and hour: furnished, paused, nobody in it. */
 async function open(tune, preset, backend, hour, more = '') {
   const context = await benchContext(browser);
-  await context.addInitScript(() => {
-    const key = 'open-sims-wasm.settings';
-    localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key) ?? '{}'), directorDelay: 0, autonomy: false }));
-    window.__loadingNow = () => !!document.querySelector('.loading[role=progressbar]') || ['Moving in', 'Drawing portraits', 'Building the world', 'Warming up'].some((l) => (document.body?.innerText ?? '').includes(l));
-  });
-  const page = await context.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('console', (m) => m.text().startsWith('[tune]') && errors.push(m.text()));
-  const query = ['state=review-stage', 'debug', 'hud=0', `hour=${hour}`, `quality=${preset}`, backend === 'webgl' ? 'renderer=webgl' : '', 'res=1', tune ? `tune=${encodeURIComponent(tune)}` : '', more].filter(Boolean).join('&');
-  await page.goto(`${base}/?${query}`, { timeout: 120_000 });
-  await page.waitForFunction(() => typeof window.__sims === 'function' && window.__world?.() && window.__sims().length > 0, null, { timeout: 120_000 });
-  const settled = () => page.waitForFunction(() => !window.__loadingNow(), null, { timeout: 120_000, polling: 250 });
-  await settled();
-  await page.waitForTimeout(1000);
-  await page.evaluate(() => {
-    window.__send({ type: 'setAutonomy', enabled: false, household: 0 });
-    window.__addFunds(1_000_000);
-  });
-  for (const [def, at, offset] of ROOM) {
-    const before = await page.evaluate(() => window.__world().objects.map((o) => o.id));
-    await page.evaluate(({ def, at, offset }) => window.__send({ type: 'buy', household: 0, object: def, at, ...(offset ? { offset } : {}) }), { def, at, offset });
-    const id = await page
-      .waitForFunction(({ def, before }) => window.__world().objects.find((o) => o.def === def && !before.includes(o.id))?.id, { def, before }, { timeout: 10_000 })
-      .then((h) => h.jsonValue())
-      .catch(() => null);
-    if (id === null) errors.push(`not bought: ${def} at ${at} (${await page.evaluate(() => [...document.querySelectorAll('.toast')].map((e) => e.textContent.trim()).join(' | '))})`);
-  }
-  if (covering) {
-    // (The state's room: (4, 6) to (16, 18).)
-    const tiles = [];
-    for (let z = 6; z < 18; z++) for (let x = 4; x < 16; x++) tiles.push({ x, z, covering });
-    await page.evaluate((tiles) => window.__send({ type: 'paintFloor', household: 0, tiles }), tiles);
-  }
-  // A moment of play (the lamps come on, the things settle), then the picture held still.
-  await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 1 }));
-  await page.waitForTimeout(1500);
-  await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 0 }));
-  const look = async (radius) => {
-    await page.evaluate((pose) => {
-      window.__controls.follow(null);
-      window.__camera(pose);
-    }, { ...CAMERA, target: [CAMERA.target[0] + nudge, CAMERA.target[1], CAMERA.target[2] + nudge], radius });
-    await page.waitForTimeout(600);
+  try {
+    await context.addInitScript(() => {
+      const key = 'open-sims-wasm.settings';
+      localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key) ?? '{}'), directorDelay: 0, autonomy: false }));
+      window.__loadingNow = () => !!document.querySelector('.loading[role=progressbar]') || ['Moving in', 'Drawing portraits', 'Building the world', 'Warming up'].some((l) => (document.body?.innerText ?? '').includes(l));
+    });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => m.text().startsWith('[tune]') && errors.push(m.text()));
+    const query = ['state=review-stage', 'debug', 'hud=0', `hour=${hour}`, `quality=${preset}`, backend === 'webgl' ? 'renderer=webgl' : '', 'res=1', tune ? `tune=${encodeURIComponent(tune)}` : '', more].filter(Boolean).join('&');
+    await page.goto(`${base}/?${query}`, { timeout: 120_000 });
+    await page.waitForFunction(() => typeof window.__sims === 'function' && window.__world?.() && window.__sims().length > 0, null, { timeout: 120_000 });
+    const settled = () => page.waitForFunction(() => !window.__loadingNow(), null, { timeout: 120_000, polling: 250 });
     await settled();
-    await page.waitForTimeout(2200);
-  };
-  return { page, look, errors, done: () => context.close() };
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => {
+      window.__send({ type: 'setAutonomy', enabled: false, household: 0 });
+      window.__addFunds(1_000_000);
+    });
+    for (const [def, at, offset] of ROOM) {
+      const before = await page.evaluate(() => window.__world().objects.map((o) => o.id));
+      await page.evaluate(({ def, at, offset }) => window.__send({ type: 'buy', household: 0, object: def, at, ...(offset ? { offset } : {}) }), { def, at, offset });
+      const id = await page
+        .waitForFunction(({ def, before }) => window.__world().objects.find((o) => o.def === def && !before.includes(o.id))?.id, { def, before }, { timeout: 10_000 })
+        .then((h) => h.jsonValue())
+        .catch(() => null);
+      if (id === null) errors.push(`not bought: ${def} at ${at} (${await page.evaluate(() => [...document.querySelectorAll('.toast')].map((e) => e.textContent.trim()).join(' | '))})`);
+    }
+    if (covering) {
+      // (The state's room: (4, 6) to (16, 18).)
+      const tiles = [];
+      for (let z = 6; z < 18; z++) for (let x = 4; x < 16; x++) tiles.push({ x, z, covering });
+      await page.evaluate((tiles) => window.__send({ type: 'paintFloor', household: 0, tiles }), tiles);
+    }
+    // A moment of play (the lamps come on, the things settle), then the picture held still.
+    await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 1 }));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 0 }));
+    const look = async (radius) => {
+      await page.evaluate((pose) => {
+        window.__controls.follow(null);
+        window.__camera(pose);
+      }, { ...CAMERA, target: [CAMERA.target[0] + nudge, CAMERA.target[1], CAMERA.target[2] + nudge], radius });
+      await page.waitForTimeout(600);
+      await settled();
+      await page.waitForTimeout(2200);
+    };
+    return { page, look, errors, done: () => context.close() };
+  } catch (err) {
+    await context.close();
+    throw err;
+  }
 }
 
-const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+const median = (xs) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return (s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2;
+};
 
 if (gpuSecs) {
   // GPU time: one page at a time, the variants in turn, the round repeated (interleaved: the machine's drift is every variant's).
@@ -166,8 +174,10 @@ if (gpuSecs) {
       for (const hour of hours) {
         for (const v of variants) {
           const key = `${preset}/${backend} ${HOURS[hour] ?? hour} · ${v.name}`;
+          let opened = null;
           try {
-            const { page, look, done } = await open(v.tune, preset, backend, hour, 'gpustats');
+            opened = await open(v.tune, preset, backend, hour, 'gpustats');
+            const { page, look } = opened;
             await look(radii[0]);
             const samples = [];
             const until = Date.now() + gpuSecs * 1000;
@@ -176,12 +186,13 @@ if (gpuSecs) {
               const ms = await page.evaluate(() => window.__gameStats?.().gpuMs ?? null);
               if (ms !== null) samples.push(ms);
             }
-            await done();
             const ms = samples.length ? median(samples) : null;
             times.set(key, [...(times.get(key) ?? []), ms]);
             console.log(`${key}: ${ms === null ? 'n/a' : ms.toFixed(2)} ms (${samples.length} samples)`);
           } catch (err) {
             console.log(`${key}: failed: ${err}`);
+          } finally {
+            await opened?.done();
           }
         }
       }
@@ -201,18 +212,21 @@ if (gpuSecs) {
     for (let job = jobs.shift(); job; job = jobs.shift()) {
       const { v, preset, backend, hour } = job;
       const what = `${v.name} ${preset}/${backend} ${HOURS[hour] ?? hour}`;
+      let opened = null;
       try {
         mkdirSync(v.dir, { recursive: true });
-        const { page, look, errors, done } = await open(v.tune, preset, backend, hour);
+        opened = await open(v.tune, preset, backend, hour);
+        const { page, look, errors } = opened;
         for (const radius of radii) {
           await look(radius);
           await page.screenshot({ path: join(v.dir, `${preset}-${backend}-room-${HOURS[hour] ?? hour}-${Math.round(radius * 100)}.png`), clip: { x: clip[0], y: clip[1], width: clip[2], height: clip[3] } });
         }
-        await done();
         console.log(`${what}: ok${errors.length ? ` (${errors.join('; ')})` : ''}`);
       } catch (err) {
         failed++;
         console.log(`${what}: failed: ${err}`);
+      } finally {
+        await opened?.done();
       }
     }
   };

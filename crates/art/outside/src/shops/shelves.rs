@@ -2,7 +2,7 @@
 //! on its tiles as the game places it.
 
 use super::common::{M, bottle, prism};
-use artkit::math::{Axis, P3};
+use artkit::math::P3;
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
@@ -143,8 +143,6 @@ pub fn grocery_shelf() -> Vec<Obj> {
                             z - 0.035,
                             z + 0.035,
                             M.bread,
-                            Axis::Z,
-                            0.0,
                         );
                     }
                     fbox!(
@@ -154,7 +152,8 @@ pub fn grocery_shelf() -> Vec<Obj> {
                         0.014,
                         0.072,
                         (cx, top + 0.05, -0.06),
-                        M.filling
+                        M.filling,
+                        bevel = 0 // (a slice proud of the pack's faces, its sides inside it)
                     );
                     fbox!(
                         f,
@@ -163,7 +162,8 @@ pub fn grocery_shelf() -> Vec<Obj> {
                         0.03,
                         0.074,
                         (cx, top + 0.022, -0.06),
-                        c
+                        c,
+                        bevel = 0 // (a label proud of the pack's faces, its sides inside it)
                     );
                 } else if k.is_multiple_of(3) {
                     // tins, two deep, a label round each

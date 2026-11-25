@@ -153,8 +153,8 @@ pub fn shaker(
 }
 
 /// A worktop from game depth `zb` (its back, on the wall) to `zf` (its front), drawn through f's depths, y0 to y1
-/// high: the front edge rolled over (postformed), its underside eased; the ends cut square, so the tops of a run
-/// meet without a seam.
+/// high: the front edge rolled over (postformed), its underside eased; the ends and the back's top edge eased only
+/// 1.5 mm, so the tops of a run meet in a hairline.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn worktop(
     f: &GameFrame,
@@ -171,7 +171,8 @@ pub fn worktop(
     let (zb, zf) = (f.depth(zb), f.depth(zf));
     let mut prof = vec![(zb, y0), (zf - 0.004, y0), (zf, y0 + 0.004)];
     prof.extend(arc(zf - r, y1 - r, r, 0, 90, 4));
-    prof.push((zb, y1));
+    // its back top edge (on the wall) and its ends eased 1.5 mm: a run's tops meet in a hairline, no groove
+    prof.extend([(zb + 0.0015, y1), (zb, y1 - 0.0015)]);
     fextrude!(
         plain(f),
         name,
@@ -180,7 +181,9 @@ pub fn worktop(
         (x, 0, 0),
         material,
         plane = Facing::Side,
-        smooth = true
+        smooth = true,
+        bevel = 0.0015,
+        bevel_segments = 1
     )
 }
 

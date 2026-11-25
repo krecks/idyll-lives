@@ -13,11 +13,11 @@ at the back. Desk tops are at the content's `surface` height: 0.74 (catalog2), 0
 ## The desks with their own chair
 
 The computer, writing, laptop and gaming desks keep the old part's chair: residents sit in the back half of the
-footprint, 17 cm behind its middle at 0.44 m (`characters.ts` SEATS), facing the desk, so the screen faces the wall
+footprint, 17 cm behind its middle at 0.44 m (furniture.json `seats`), facing the desk, so the screen faces the wall
 and its back the room. The chair is part of the still desk (no swivel) and its back stops short of the wall (leant 7°,
 5° with the gaming chair's headrest).
 
-- **Computer desk:** the keyboard and mouse are on a tray under the top, which slides 15 cm out to the resident
+- **Computer desk:** the keyboard and mouse are on a tray under the top, which slides 20 cm out to the resident
   (`tray_out`) for code, write, markets, browse and homework, for the whole use.
 - **Writing desk:** a drawer of letters and pencils slides 22 cm out (`drawer_open`) for write and homework; `hold`
   2.5 s, so it shuts once they've taken their paper.
@@ -127,3 +127,21 @@ The executive chair's upholstery (`leather`, `leather2`) and the executive desk'
 Built in Rust since 2026-11-18 (`cargo art office`), proved against the last Blender build (`ref/blender`). `fillet`, `pull`, `shaker` and
 `moulding` are the kit's (`kit::fillet!` and the rest); the Blender script's `_slab`, `_box`, `_rod` and
 `_pull` were never called and are not ported.
+
+## Hard edges eased, desks deepened (2026-11-25)
+
+The gate's `edges` and `texels` find none left in the office:
+- **Chairs:** the backs shade round (a padded back is round all over) and take UVs a box a face, where round about
+  their height stretched the cloth across their sides (the task chair's mesh 54 %, the office chair's 19 %, the
+  executive's leather 15 %); the spine's top end is chamfered.
+- **Boards:** the whiteboard's and the corkboard's frames are eased all round (`artkit::forms::eased_loop`, their
+  backs on the wall too). The architect's lamp's shade rim is rolled.
+- **Filing cabinet:** the plant's leaves taper less sharply at the base and the tip (0.5 to 1 to 0.3, was 0.4 to 1 to
+  0.15): a sweep's UVs shear where its width changes fast, and they stretched 10 % of the leaves.
+- **Computer and writing desks:** their tops are 0.5 m deep (were 0.38 and 0.42), from 5 cm behind the tile's middle
+  to its front, over the knees of the resident at the desk's own chair as a real desk is; the computer desk's
+  keyboard tray slides 20 cm (was 15) to clear the deeper top, and its monitor stands 1 cm lower (its top 1.205 m).
+
+## Measured as the piece (2026-11-25)
+
+`deskCorner` and `deskStanding`: what they carry is set aside (`parts::aside`, `carried_aside`, as the other desks): the corner desk's chair, laptop, mug, paper tray, cactus and notebook, the standing desk's monitor with its cable, mug and cactus. Drawn as before; `cargo review sizes` measures the desks: the corner desk 0.74 m high as a table (was 1.01 with the chair's back and the laptop), the standing desk 1.05 m (was 1.54 with the monitor).

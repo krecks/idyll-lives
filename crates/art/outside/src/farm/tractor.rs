@@ -2,14 +2,15 @@
 //! and steering wheel under a canopy on two bent roll frames, front weights and a three-point hitch. Its far
 //! version is its own build without the small parts.
 
-use super::common::{F, M};
+use super::common::{F, M, bar_on, eased};
 use artkit::forms::rounded_rect;
 use artkit::math::{P3, TAU, cos, radians, sin};
 use artkit::parts::{join_all, settle};
 use artkit::scene::Obj;
+use artkit::shapes::AUTO_WIDTH;
 use artkit::{
     cube, cylinder, fbox, fcyl, fextrude, fsphere, fsweep, kit_fillet, kit_tube, loft, revolve,
-    ring, rod, soft, sweep, torus,
+    ring, rod, soft, torus,
 };
 
 // --- the tractor -----------------------------------------------------------------------------------------
@@ -41,7 +42,7 @@ fn wheel(name: &str, x: f64, z: f64, r: f64, w: f64, lugs: usize, segments: usiz
             rot = (0, 90, 0)
         );
     } else {
-        revolve!(
+        eased(revolve!(
             format!("{name}_tyre"),
             &[
                 (r * 0.6, -hw),
@@ -58,12 +59,13 @@ fn wheel(name: &str, x: f64, z: f64, r: f64, w: f64, lugs: usize, segments: usiz
             material = M.tyre,
             segments = segments,
             rot = (0, 90, 0)
-        );
+        ));
     }
+    // the rim set into the tyre's bore, its face a millimetre in from the sidewall
     cylinder!(
         format!("{name}_rim"),
-        r * 0.6,
-        w - 0.04,
+        r * 0.6 + 0.005,
+        w - 0.002,
         at = at,
         material = M.rims,
         verts = segments - 4,
@@ -76,7 +78,9 @@ fn wheel(name: &str, x: f64, z: f64, r: f64, w: f64, lugs: usize, segments: usiz
         at = at,
         material = M.rims,
         verts = segments - 8,
-        rot = (0, 90, 0)
+        rot = (0, 90, 0),
+        bevel = if detail { 0.004 } else { 0.0 },
+        bevel_segments = 1
     );
     cylinder!(
         format!("{name}_hub"),
@@ -118,39 +122,31 @@ fn wheel(name: &str, x: f64, z: f64, r: f64, w: f64, lugs: usize, segments: usiz
             );
         }
     }
-    let h = if r > 0.5 { 0.05 } else { 0.035 };
+    // a tread bar 3.5 cm deep, ending where the shoulder starts to round off (its end under 5 cm tall)
+    let h = 0.035;
+    let outer = (w / 2.0 - 0.045) / w;
     for i in 0..lugs {
         let a = TAU * i as f64 / lugs as f64;
         let side = if i % 2 != 0 { 1.0 } else { -1.0 };
-        let mut pts = Vec::new();
-        for (u, da) in [(0.47, 0.0), (0.04, if r > 0.5 { 0.16 } else { 0.2 })] {
-            // from the shoulder in, slanting forward
-            let b = a + da * (r * 0.0 + 1.0) * 0.5;
-            pts.push(F.at(
+        // from the shoulder in, slanting forward, standing out from the tread
+        let [p, q] = [(outer, 0.0), (0.04, if r > 0.5 { 0.16 } else { 0.2 })].map(|(u, da)| {
+            let b = a + da * 0.5;
+            [
                 x + side * u * w,
-                r + (r - 0.012) * sin(b),
-                z + (r - 0.012) * cos(b),
-            ));
-        }
-        let mid = F.at(x, r + sin(a), z + cos(a));
-        let up = P3 {
-            x: mid.x - at.x,
-            y: mid.y - at.y,
-            z: mid.z - at.z,
-        };
-        sweep!(
-            format!("{name}_lug{i}"),
-            &pts,
-            0.0,
-            material = M.tyre,
-            up = up,
-            smooth = false,
-            profile = [
-                (h + 0.012, -0.035),
-                (h + 0.012, 0.035),
-                (0.0, 0.045),
-                (0.0, -0.045)
+                r + (r - 0.016) * sin(b),
+                z + (r - 0.016) * cos(b),
             ]
+        });
+        bar_on(
+            &format!("{name}_lug{i}"),
+            p,
+            q,
+            [0.0, sin(a), cos(a)],
+            0.09,
+            0.07,
+            h + 0.016,
+            AUTO_WIDTH,
+            M.tyre,
         );
     }
 }
@@ -172,7 +168,7 @@ fn hood(detail: bool) {
                 .collect::<Vec<P3>>(),
         );
     }
-    loft!("hood", &secs, material = M.tractor, angle = 50);
+    eased(loft!("hood", &secs, material = M.tractor, angle = 50));
 }
 
 /// The tractor (`detail`), or its far version.
@@ -309,7 +305,8 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         bevel = if detail { 0.03 } else { 0.0 }
     );
     if !detail {
-        // from afar: the lamps, exhaust and canopy; no grille bars, vents, weights or levers
+        // from afar: the lamps, exhaust and canopy, the front weights one block (as far out as they are, so it
+        // stands where the tractor does); no grille bars, vents or levers
         cylinder!(
             "exhaust",
             0.045,
@@ -319,6 +316,7 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
             verts = 6
         );
         fbox!(F, "canopy", 1.32, 0.08, 1.38, (0, 2.42, -0.52), green);
+        fbox!(F, "weights", 0.64, 0.22, 0.13, (0, 0.6, 1.69), M.iron);
         return settle(&[join_all("tractor_far")]);
     }
     soft!(
@@ -348,7 +346,9 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         0.03,
         (0, 0.95, 1.635),
         green,
-        holes = holes
+        holes = holes,
+        bevel = 0.004,
+        bevel_segments = 1
     );
     for s in [-1, 1] {
         let sf = s as f64;
@@ -471,7 +471,9 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         0.08,
         at = F.at(-0.24, 1.5, 1.22),
         material = M.lamp,
-        verts = 12
+        verts = 12,
+        bevel = 0.004,
+        bevel_segments = 1
     );
     // the dashboard with its gauges, the steering wheel on three spokes, the seat
     fbox!(
@@ -511,7 +513,7 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         material = M.seat,
         rot = (-55, 0, 0),
         major_segments = 18,
-        minor_segments = 6
+        minor_segments = 8
     );
     let hub = F.at(0, 1.64, -0.3);
     for k in 0..3 {
@@ -527,7 +529,7 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
             tip,
             0.01,
             material = M.seat,
-            verts = 4
+            verts = 8
         );
     }
     cylinder!(
@@ -633,8 +635,8 @@ pub fn tractor() -> Vec<Obj> {
     tractor_detail(true)
 }
 
-/// The tractor from afar: plain cylinder tyres without lugs, plain fenders and roll frames, no grille, vents,
-/// weights or levers.
+/// The tractor from afar: plain cylinder tyres without lugs, plain fenders and roll frames, the weights one block, no
+/// grille, vents or levers.
 pub fn tractor_far() -> Vec<Obj> {
     tractor_detail(false)
 }

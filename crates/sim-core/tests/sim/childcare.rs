@@ -182,7 +182,8 @@ const OUT: &str = r#"{
     "socials":[{"id":"chat","label":"Chat","minutes":10,"tags":["social"],"acceptance":{"base":1.0},"needs":{"social":0.3}}],
     "visits":{"needs":{"social":0.8},"hours":2,"minFriendship":10,"earliestHour":9,"latestHour":21},
     "phone":{"seatRange":0,"actions":[
-      {"id":"askOver","label":"Ask to come over","minutes":5,"contact":true,"meet":"there","autonomous":false,"tags":["social"],"acceptance":{"base":1.0}}]},
+      {"id":"askOver","label":"Ask to come over","minutes":5,"contact":true,"meet":"there","autonomous":false,"tags":["social"],"acceptance":{"base":1.0}},
+      {"id":"invite","label":"Invite over","minutes":5,"contact":true,"meet":"here","autonomous":false,"tags":["social"],"acceptance":{"base":1.0}}]},
     "life":{"daysPerYear":2,"stages":[
         {"id":"baby","label":"Baby","from":0,"baby":true},
         {"id":"child","label":"Child","from":2,"school":true},
@@ -314,6 +315,30 @@ fn without_money_for_a_babysitter_the_last_grown_up_cannot_be_sent_out() {
     run_to(&mut w, 1, 12.0);
     assert!(!out(&w, 0), "Ada stayed home");
     assert!(!w.events.iter().any(|e| e.kind == EventKind::Babysitter));
+}
+
+/// Bo invites Ada over while she's home alone with Cleo and has no money for a babysitter: she
+/// says yes, but doesn't go.
+#[test]
+fn without_money_for_a_babysitter_the_last_grown_up_does_not_come_when_invited_over() {
+    let mut w = street_world(true, "");
+    run_to(&mut w, 1, 10.0);
+    w.households[0].funds = 10;
+    let invite = w.content.phone.action_index("invite").unwrap();
+    w.apply(Command::Phone {
+        sim: 2,
+        action: invite,
+        contact: Some(0),
+    })
+    .unwrap();
+    run_to(&mut w, 1, 12.0);
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::Declined && (e.a, e.b) == (2, 0)),
+        "turned down"
+    );
+    assert!(!out(&w, 0), "Ada stayed home");
 }
 
 /// Ada as the UI is told: why she can't be sent out, and why asking Bo to come over to his is

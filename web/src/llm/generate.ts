@@ -310,115 +310,119 @@ export async function generate(
   if (promptTokens >= engine.positions) throw new Error(`prompt of ${promptTokens} tokens: the model reads ${engine.positions}`);
   const maxTokens = Math.min(params.maxTokens, engine.positions - promptTokens);
   let state: State = emptyState(engine);
-  let past = 0;
-  let cachedTokens = 0;
-  let first: number[];
-  if (!useCache) {
-    first = partIds.flat();
-  } else {
-    // The deepest part already read: start after it.
-    const keys = parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join(''));
-    let from = 0;
-    for (let i = keys.length - 1; i >= 0; i--) {
-      const hit = engine.prefixes.get(keys[i]);
-      if (!hit) continue;
-      release(engine, state);
-      state = hit.state;
-      past = cachedTokens = hit.length;
-      from = i + 1;
-      break;
-    }
-    if (from > 0) engine.prefixes.hits++;
-    if (from < keys.length) engine.prefixes.misses++;
-    // Read the rest of the kept parts, keeping the state after each.
-    for (let i = from; i < keys.length; i++) {
-      if (!partIds[i].length) continue;
-      const next = (await step(engine, partIds[i], state, past, false)).state;
-      release(engine, state);
-      state = next;
-      past += partIds[i].length;
-      engine.prefixes.set(keys[i], { state, length: past });
-    }
-    first = partIds[partIds.length - 1];
-  }
-  let ran = await step(engine, first, state, past, true);
-  release(engine, state);
-  state = ran.state;
-  past += first.length;
-  const prefillMs = performance.now() - t0;
-
-  const t1 = performance.now();
-  const rand = mulberry32(params.seed);
-  const barred = new Set((params.avoidStart ?? []).map((t) => tokenizer.encode(t.trim(), { add_special_tokens: false }).ids[0]).filter((id) => id !== undefined));
-  const ids: number[] = [];
-  let text = '';
-  let stop: GenResult['stop'] = 'length';
-  let nonFinite = false;
-  const seen = { nonFinite: false };
-  const wanted = params.sentences ?? 0;
-  const steps = { run: 0, read: 0, pick: 0 };
-  for (;;) {
-    const pickAt = performance.now();
-    const logits = ran.logits!;
-    if (!ids.length) for (const id of barred) logits[id] = -Infinity;
-    // Not done yet: only plain speech, so it can't end (or drift off) here.
-    const plain = wanted > 0 && sentencesIn(text) < wanted ? plainTokens(engine, logits.length) : null;
-    if (plain) for (const id of plain.barred) logits[id] = -Infinity;
-    let id = sample(logits, params, ids, rand, seen);
-    // A broken model shows here (the text is garbage, and the caller throws it away): the chosen
-    // token isn't a number, or `sample` skipped a NaN or +Infinity on its way.
-    nonFinite ||= seen.nonFinite || !Number.isFinite(logits[id]);
-    // A sentence's end with a closing quote: the sentence ends, the quote doesn't come.
-    if (plain) id = plain.ends.get(id) ?? id;
-    if (engine.stopIds.has(id)) {
-      stop = 'eos';
-      break;
-    }
-    ids.push(id);
-    text = tokenizer.decode(ids, { skip_special_tokens: true });
-    if (params.stopAtNewline) {
-      const start = text.length - text.trimStart().length;
-      const nl = text.indexOf('\n', start);
-      if (nl >= 0) {
-        text = text.slice(0, nl);
-        stop = 'newline';
+  // Freed however the run ends (a failed step leaves the last state unfreed otherwise).
+  try {
+    let past = 0;
+    let cachedTokens = 0;
+    let first: number[];
+    if (!useCache) {
+      first = partIds.flat();
+    } else {
+      // The deepest part already read: start after it.
+      const keys = parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join(''));
+      let from = 0;
+      for (let i = keys.length - 1; i >= 0; i--) {
+        const hit = engine.prefixes.get(keys[i]);
+        if (!hit) continue;
+        release(engine, state);
+        state = hit.state;
+        past = cachedTokens = hit.length;
+        from = i + 1;
         break;
       }
+      if (from > 0) engine.prefixes.hits++;
+      if (from < keys.length) engine.prefixes.misses++;
+      // Read the rest of the kept parts, keeping the state after each.
+      for (let i = from; i < keys.length; i++) {
+        if (!partIds[i].length) continue;
+        const next = (await step(engine, partIds[i], state, past, false)).state;
+        release(engine, state);
+        state = next;
+        past += partIds[i].length;
+        engine.prefixes.set(keys[i], { state, length: past });
+      }
+      first = partIds[partIds.length - 1];
     }
-    const at = firstOf(text, params.stopAt);
-    if (at >= 0) {
-      text = text.slice(0, at);
-      stop = 'text';
-      break;
-    }
-    // The last sentence wanted is finished: that's the reply.
-    if (wanted > 0 && /[.!?…]["'”’)\]]*$/.test(text.trimEnd()) && sentencesIn(text.trimEnd()) >= wanted) {
-      stop = 'text';
-      break;
-    }
-    if (ids.length >= maxTokens) break;
-    if (aborted()) {
-      stop = 'aborted';
-      break;
-    }
-    steps.pick += performance.now() - pickAt;
-    ran = await step(engine, [id], state, past, true, steps);
+    let ran = await step(engine, first, state, past, true);
     release(engine, state);
     state = ran.state;
-    past++;
+    past += first.length;
+    const prefillMs = performance.now() - t0;
+
+    const t1 = performance.now();
+    const rand = mulberry32(params.seed);
+    const barred = new Set((params.avoidStart ?? []).map((t) => tokenizer.encode(t.trim(), { add_special_tokens: false }).ids[0]).filter((id) => id !== undefined));
+    const ids: number[] = [];
+    let text = '';
+    let stop: GenResult['stop'] = 'length';
+    let nonFinite = false;
+    const seen = { nonFinite: false };
+    const wanted = params.sentences ?? 0;
+    const steps = { run: 0, read: 0, pick: 0 };
+    for (;;) {
+      const pickAt = performance.now();
+      const logits = ran.logits!;
+      if (!ids.length) for (const id of barred) logits[id] = -Infinity;
+      // Not done yet: only plain speech, so it can't end (or drift off) here.
+      const plain = wanted > 0 && sentencesIn(text) < wanted ? plainTokens(engine, logits.length) : null;
+      if (plain) for (const id of plain.barred) logits[id] = -Infinity;
+      let id = sample(logits, params, ids, rand, seen);
+      // A broken model shows here (the text is garbage, and the caller throws it away): the chosen
+      // token isn't a number, or `sample` skipped a NaN or +Infinity on its way.
+      nonFinite ||= seen.nonFinite || !Number.isFinite(logits[id]);
+      // A sentence's end with a closing quote: the sentence ends, the quote doesn't come.
+      if (plain) id = plain.ends.get(id) ?? id;
+      if (engine.stopIds.has(id)) {
+        stop = 'eos';
+        break;
+      }
+      ids.push(id);
+      text = tokenizer.decode(ids, { skip_special_tokens: true });
+      if (params.stopAtNewline) {
+        const start = text.length - text.trimStart().length;
+        const nl = text.indexOf('\n', start);
+        if (nl >= 0) {
+          text = text.slice(0, nl);
+          stop = 'newline';
+          break;
+        }
+      }
+      const at = firstOf(text, params.stopAt);
+      if (at >= 0) {
+        text = text.slice(0, at);
+        stop = 'text';
+        break;
+      }
+      // The last sentence wanted is finished: that's the reply.
+      if (wanted > 0 && /[.!?…]["'”’)\]]*$/.test(text.trimEnd()) && sentencesIn(text.trimEnd()) >= wanted) {
+        stop = 'text';
+        break;
+      }
+      if (ids.length >= maxTokens) break;
+      if (aborted()) {
+        stop = 'aborted';
+        break;
+      }
+      steps.pick += performance.now() - pickAt;
+      ran = await step(engine, [id], state, past, true, steps);
+      release(engine, state);
+      state = ran.state;
+      past++;
+    }
+    return {
+      text: text.trim(),
+      ids,
+      promptTokens,
+      cachedTokens,
+      prefillMs,
+      decodeMs: performance.now() - t1,
+      stop,
+      nonFinite,
+      steps,
+    };
+  } finally {
+    release(engine, state);
   }
-  release(engine, state);
-  return {
-    text: text.trim(),
-    ids,
-    promptTokens,
-    cachedTokens,
-    prefillMs,
-    decodeMs: performance.now() - t1,
-    stop,
-    nonFinite,
-    steps,
-  };
 }
 
 /** Token count of some text (prompt budgets). */

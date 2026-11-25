@@ -76,7 +76,7 @@ pub(crate) fn rack_in(sim: &mut Sim, content: &Content, o: &mut ObjectInstance, 
         return;
     }
     o.rack = o.rack.saturating_add(n.max(1)).min(def.rack);
-    if o.rack >= def.rack || (!more && o.rack * 3 >= def.rack) {
+    if o.rack >= def.rack || (!more && u16::from(o.rack) * 3 >= u16::from(def.rack)) {
         o.run = def.runs;
         sim.reshaped = true;
     }

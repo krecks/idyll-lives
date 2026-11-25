@@ -88,3 +88,28 @@ cargo art pack_outgoing --preview  # previews/pack_outgoing/<id>.png, <id>@<clip
 ## The soft forms pass (2026-11-13)
 
 The conversation sectional's three pillows are sewn flat and stuffed (`waist`), its seat and back cushions `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `conversationSectional`, `videoCallNook`; 11,448 to 12,580 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate found (47) is gone, and the photo wall's legs no longer smear their wood:
+- **Party bar:** the fluted counter's four upright corners cut across 4 mm, the lime bowl's rim rolled over in three
+  turns, the square bottles squared at 2.6 (at 5 their eight points turned 73° at the corners), the tap tower's end
+  eased; the counter 2.5 cm higher, its top at 1.005 (a bar counter's 1.00-1.10), the tap with it; the stools' foot
+  rings 4 round (7,980 triangles).
+- **Conversation sectional:** the lamp base's top chamfered; the console table behind it with its lamp, plant, books
+  and magazines set aside (`aside`, as a desk's chair), so it measures as the sofa, 1.90 × 0.86 × 1.56 m; the back
+  cushions unpiped (their cords cost 320 triangles past the aim) and the hidden base, chaise base and back panels
+  rounded in one step; the lamp, pot, tray, cups and console legs a few sides fewer, the plant's leaves 2 rows
+  (7,996 triangles, was 9,200).
+- **Karaoke stage and dance floor:** the speakers' cones and the moving-head spots eased (`artkit::forms::eased`);
+  the dance floor's steel edge mitred across its corners.
+- **Video-call corner:** the chair shell's rim chamfered, the plant pot's rim cut, the chair back 1 cm forward (0.77 m
+  deep, a small desk's 0.70 + 10 %).
+- **Photo wall:** the frame moulding's back corners cut and its inner chamfer under 60°; the legs' bevel in two
+  segments (one laid the wood as lines on two corners).
+
+What stands on the party bar's counter (the beer tower over its drip tray, the drinks, the limes) is `aside` (`on_top`),
+and so is the tap's lever, a moving part (`lever_aside`, still pulled by `tap`): the bar's height as a table is its
+counter's. The video-call corner's ring light stand is `aside` (`stand`) and its ring a moving one (`ring_aside`, still
+swung by `ring_light`): it measures 0.84 × 0.99 × 0.77 m, the desk and chair. No draw call more (2026-11-25). The photo
+wall is a free-standing board on legs, which the wall pinboard's kind (6 cm deep) can't be.

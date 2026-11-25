@@ -4,11 +4,14 @@ use super::common::{F, M, WALL, mesh};
 use artkit::forms::Plane;
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, TAU, V3, cos, sin};
+use artkit::math::{Axis, P3, PI, TAU, V3, cos, sin};
 use artkit::parts::{hinged, join, join_all, new_parts};
 use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{cube, cylinder, extrude, revolve, settle, squash, sweep, torus};
+use artkit::{cube, cylinder, extrude, grow, revolve, settle, sweep, torus};
+
+/// How far apart a drawn curtain's folds are (m).
+const FOLD: f64 = 0.15;
 
 /// A gathered curtain panel from game x `x_out` to `x_in` and height `y0` to `y1`, its pleats a sine round game depth
 /// `z`, `t` thick: deepest at the hem, where a turned-up hem thickens it, easing up the drop and drawn flat into the
@@ -25,10 +28,6 @@ fn pleats(
     waves: usize,
 ) -> Obj {
     let (amp, t) = (0.018, 0.008);
-    let n = waves * 8;
-    let xs: Vec<f64> = (0..=n)
-        .map(|k| x_out + (x_in - x_out) * k as f64 / n as f64)
-        .collect();
     let h = y1 - y0;
     let rows = [
         (y0, 1.0, 1.4, 0.0),
@@ -40,56 +39,22 @@ fn pleats(
         (y1 - 0.065, 0.42, 1.3, 0.45),
         (y1, 0.38, 1.3, 0.45),
     ];
-    let mut verts: Vec<V3> = Vec::new();
-    let mut m = 0;
-    for &(y, af, tf, phase) in &rows {
-        let front: Vec<(f64, f64)> = xs
-            .iter()
-            .enumerate()
-            .map(|(k, &x)| {
-                (
-                    x,
-                    z + t * tf / 2.0
-                        + amp * af * sin(2.0 * PI * waves as f64 * k as f64 / n as f64 + phase),
-                )
-            })
-            .collect();
-        let back: Vec<(f64, f64)> = front.iter().map(|&(x, d)| (x, d - t * tf)).collect();
-        let mut ring = front.clone();
-        ring.extend(back.iter().rev());
-        m = ring.len();
-        verts.extend(ring.iter().map(|&(x, d)| V3::from(F.at(x, y, d))));
-    }
-    let mut faces: Vec<Vec<u32>> = Vec::new();
-    for r in 0..rows.len() - 1 {
-        let (a, b) = (r * m, (r + 1) * m);
-        for i in 0..m {
-            faces.push(vec![
-                (a + i) as u32,
-                (a + (i + 1) % m) as u32,
-                (b + (i + 1) % m) as u32,
-                (b + i) as u32,
-            ]);
-        }
-    }
-    let smooth = faces.len();
-    for base in [0, (rows.len() - 1) * m] {
-        // the bottom and top edges: a strip of quads across the cloth's thickness
-        for k in 0..n {
-            faces.push(vec![
-                (base + k) as u32,
-                (base + k + 1) as u32,
-                (base + m - 2 - k) as u32,
-                (base + m - 1 - k) as u32,
-            ]);
-        }
-    }
-    mesh(name, verts, &faces, material, smooth) // the cloth smooth, its hems flat
+    let (verts, faces) = kit::pleats!(F, &rows, x_out, x_in, z, waves, amp, t, per_fold = 8);
+    let smooth = faces.len() - 2 * waves * 8; // the cloth smooth, its hems flat
+    mesh(
+        name,
+        verts.into_iter().map(V3::from).collect(),
+        &faces,
+        material,
+        smooth,
+    )
 }
 
-/// Two pleated panels on a rail, gathered open at the sides (rest). At night `close` draws them across: each widens
-/// from its outer end until they meet in the middle. The rail ends in turned finials, on brackets from round wall
-/// plates.
+/// Two pleated panels on a rail, gathered open at the sides (rest). Each is built drawn, reaching 1 cm past the
+/// middle with its folds a hand apart (`FOLD`), and gathered in to `gathered` at rest by its node's scale in x about
+/// the rail's end; at night `close` lets it out to its built width, so the cloth is never stretched past how it was
+/// made, only gathered. Its cloth tabs over the rail are built as wide as drawn tabs are, gathered with it. The rail
+/// ends in turned finials, on brackets from round wall plates.
 fn curtains_of(w: f64, top: f64, bottom: f64, gathered: f64) -> Vec<Obj> {
     let (rail_y, z) = (top + 0.05, WALL + 0.08);
     let still = new_parts(|| {
@@ -155,16 +120,18 @@ fn curtains_of(w: f64, top: f64, bottom: f64, gathered: f64) -> Vec<Obj> {
         }
     });
     join(&still, "body", Some(P3::ZERO));
+    let drawn = w / 2.0 + 0.01;
+    let open = gathered / drawn;
     let mut panels = Vec::new();
     for s in [-1, 1] {
         let sf = s as f64;
         let x_out = sf * w / 2.0;
         let parts = new_parts(|| {
-            let waves = 3.max(py::round(gathered / 0.06)) as usize;
+            let waves = 3.max(py::round(drawn / FOLD)) as usize;
             pleats(
                 &format!("panel{s}"),
                 x_out,
-                x_out - sf * gathered,
+                x_out - sf * drawn,
                 bottom,
                 top + 0.02,
                 z,
@@ -173,12 +140,12 @@ fn curtains_of(w: f64, top: f64, bottom: f64, gathered: f64) -> Vec<Obj> {
             );
             for k in 0..4 {
                 // cloth tabs over the rail (the panel's own fabric: no draw call of their own)
-                torus!(
+                let tab = torus!(
                     format!("tab{s}_{k}"),
                     0.018,
                     0.006,
                     at = F.at(
-                        x_out - sf * (0.02 + k as f64 * (gathered - 0.04) / 3.0),
+                        x_out - sf * (0.02 + k as f64 * (gathered - 0.04) / 3.0) / open,
                         rail_y,
                         z
                     ),
@@ -187,6 +154,7 @@ fn curtains_of(w: f64, top: f64, bottom: f64, gathered: f64) -> Vec<Obj> {
                     major_segments = 12,
                     minor_segments = 5
                 );
+                tab.edit(|t| t.scale[2] = (1.0 / open) as f32); // along the rail, turned
             }
         });
         let name = if s < 0 { "panel_left" } else { "panel_right" };
@@ -194,12 +162,8 @@ fn curtains_of(w: f64, top: f64, bottom: f64, gathered: f64) -> Vec<Obj> {
     }
     settle!(centre = false, floor = false);
     for panel in panels {
-        squash!(
-            panel,
-            "close",
-            ((w / 2.0 + 0.01) / gathered, 1, 1),
-            seconds = 1.2
-        );
+        panel.edit(|p| p.scale[0] = open as f32);
+        grow!(panel, "close", seconds = 1.2, axis = Axis::X);
     }
     meshes()
 }

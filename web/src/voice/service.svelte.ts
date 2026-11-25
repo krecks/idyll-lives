@@ -195,7 +195,7 @@ export async function ensureVoice(device?: VoiceDevice): Promise<void> {
   voiceStatus.error = '';
   voiceStatus.state = 'loading';
   voiceStatus.device = target;
-  post({ type: 'load', base: import.meta.env.BASE_URL, language: settings.voiceLanguage, device: target });
+  post({ type: 'load', base: import.meta.env.BASE_URL, device: target });
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
 }
 

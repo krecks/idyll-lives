@@ -3,8 +3,9 @@
 //! photos on its first page.
 
 use super::M;
-use super::common::{P, ends, flat_quads, rr, stool};
-use artkit::forms::circle;
+use super::common::{P, ends, flat_quads, stool};
+use artkit::forms::round_at;
+use artkit::forms::{circle, rounded_rect};
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
 use artkit::math::{Axis, P3};
@@ -28,7 +29,7 @@ pub fn craft_table() -> Vec<Obj> {
         fextrude!(
             f,
             "top",
-            &rr(1.7, 0.5, 0.015, 2),
+            &rounded_rect(1.7, 0.5, 0.015, 2),
             0.035,
             (0, 0.735, 0.2),
             M.craft_top,
@@ -252,7 +253,7 @@ pub fn craft_table() -> Vec<Obj> {
         fextrude!(
             f,
             "ruler",
-            &rr(0.3, 0.03, 0.002, 1),
+            &rounded_rect(0.3, 0.03, 0.002, 1),
             0.002,
             (-0.05, TABLE_TOP + 0.003, 0.36),
             M.chrome,
@@ -292,13 +293,22 @@ pub fn craft_table() -> Vec<Obj> {
         {
             revolve!(
                 format!("tape{k}"),
-                &[
-                    (0.026, 0.0),
-                    (0.052, 0.0),
-                    (0.052, 0.015),
-                    (0.026, 0.015),
-                    (0.026, 0.0)
-                ],
+                // (the roll's top edges worn round)
+                &round_at(
+                    &round_at(
+                        &[
+                            (0.026, 0.0),
+                            (0.052, 0.0),
+                            (0.052, 0.015),
+                            (0.026, 0.015),
+                            (0.026, 0.0),
+                        ],
+                        3,
+                        0.0015
+                    ),
+                    2,
+                    0.0015
+                ),
                 at = f.at(x, TABLE_TOP, z),
                 material = colour,
                 segments = 16
@@ -347,7 +357,7 @@ pub fn craft_table() -> Vec<Obj> {
             M.tape_gold,
             bevel = 0.004
         );
-        stool(&f, -0.25, 0.48, 0.19, M.craft_metal, M.craft_top, 0.0);
+        stool(&f, -0.25, 0.478, 0.19, M.craft_metal, M.craft_top, 0.0); // (its top just under 0.48 m once stood on the floor)
     });
     join(&still, "body", Some(P3::ZERO));
     let c = new_parts(|| {

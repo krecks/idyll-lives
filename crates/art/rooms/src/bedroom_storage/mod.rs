@@ -22,13 +22,13 @@ const CHANGE_DRAWER: &str = r#"{"uses": {"outfit": "drawer_open"}}"#;
 const CHANGE_DOORS: &str = r#"{"uses": {"outfit": "doors_open"}}"#;
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // the three-drawer nightstand's snack
     let snack_drawer = format!(
         r#"{{"uses": {{"snack": "drawer_open"}}, "hold": {}}}"#,
         artkit::json::float_repr(common::DRAWER_HOLD)
     );
-    Some(Family::new(
+    Family::new(
         "bedroom_storage",
         common::M.palette(),
         vec![
@@ -49,10 +49,10 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "nightstandRound",
                 small::nightstand_round,
-                (0.54, 0.57, 0.56),
+                (0.54, 0.57, 0.549),
             )
             .key("model.nightstandRound")
-            .centre(0.0, -0.0498)
+            .centre(0.0, -0.0555)
             .paint(&[("clay", "Body"), ("brass", "Handles")]),
             Model::new(
                 "nightstandDrawers",
@@ -131,5 +131,5 @@ pub fn family() -> Option<Family> {
          blanket chest, the laundry hamper and the bed-end bench (BR2), and the dressers, chests and wardrobes (BR3). \
          Listed in the base manifest's packs. A dresser or chest slides its middle drawer out 30 cm (`drawer_open`), \
          a wardrobe swings its doors open (`doors_open`, `door_open`) while a resident picks an outfit.",
-    ))
+    )
 }

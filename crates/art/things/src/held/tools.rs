@@ -1,4 +1,4 @@
-//! The tools on a station while a resident cooks (the chopping board, the pan, food on the grill, the mixing bowl),
+//! The tools on a station while a resident cooks (the chopping board, food on the grill, the mixing bowl),
 //! the bites eaten by hand and the cook's tool in hand.
 
 use super::M;
@@ -7,13 +7,12 @@ use super::plates::{_cookie, _halves, _pizza_slice, _sandwich_half};
 use super::quick::{_burger, _toast_half};
 use super::town::_hot_dog;
 use artkit::forms::{by, rounded_rect};
-use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{PI, TAU, V3, cos, pow, radians, sin};
+use artkit::math::{PI, TAU, V3, cos, radians, sin};
 use artkit::parts::new_parts;
 use artkit::place::Facing;
 use artkit::scene::Obj;
-use artkit::{cylinder, fextrude, fsweep, jitter, join, sphere};
+use artkit::{fextrude, fsweep, jitter, join, sphere};
 
 /// The chopping board: rounded corners, a juice groove round its face and a slot to hang it by; a carrot half
 /// chopped into coins and chopped parsley. (The knife is in the cook's hand: `knife`, actions.ts `PROPS.knife`.)
@@ -109,180 +108,6 @@ pub fn board() -> Vec<Obj> {
         );
     }
     done("board")
-}
-
-/// The frying pan on the stove, its handle to the back (+depth: away from the cook, as the old part's,
-/// out of the way of the hands): a heavy rolled rim, the handle riveted on through a bracket and ending in a
-/// rounded grip; a heap of stir-fry, strips of beef, broccoli, peppers and carrot.
-pub fn pan() -> Vec<Obj> {
-    lathe!(
-        "pan",
-        &[
-            (0.0, 0.0),
-            (0.112, 0.0),
-            (0.118, 0.003),
-            (0.1385, 0.044),
-            (0.14, 0.0482),
-            (0.1372, 0.0502),
-            (0.1342, 0.0472),
-            (0.113, 0.0115),
-            (0.105, 0.009),
-            (0.0, 0.009)
-        ],
-        M.iron,
-        segments = 24
-    );
-    kit::tube!(
-        F,
-        "bracket",
-        &[(0, 0.03, 0.128), (0, 0.04, 0.152), (0, 0.044, 0.172)],
-        0.0075,
-        M.iron,
-        verts = 6,
-        round = 1
-    );
-    for t in [-1, 1] {
-        cylinder!(
-            format!("rivet{t}"),
-            0.004,
-            0.004,
-            at = F.at(t as f64 * 0.008, 0.03, 0.129),
-            material = M.iron,
-            rot = (90, 0, 0),
-            verts = 6
-        );
-    }
-    fsweep!(
-        F,
-        "handle",
-        &[
-            (0, 0.043, 0.166),
-            (0, 0.045, 0.2),
-            (0, 0.047, 0.235),
-            (0, 0.048, 0.25),
-            (0, 0.048, 0.2545)
-        ],
-        0.0,
-        M.grip,
-        profile = rounded_rect(0.018, 0.026, 0.008, 2),
-        up = (0, 0, 1),
-        scale = [0.85, 0.92, 1.0, 0.88, 0.55]
-    );
-    let heap = lump!(
-        "heap",
-        0.075,
-        (0.0, 0.006, 0.0),
-        M.stew,
-        scale = (1.0, 0.32, 1.0),
-        seed = 8.5,
-        noise = 0.15,
-        subdivisions = 2
-    );
-    jitter!(heap, 0.003, size = 0.025, seed = 8.5);
-    let top = |x: f64, z: f64| {
-        let k = 1.0 - pow(x.hypot(z) / 0.08, 2.0);
-        0.012 + 0.04 * (if k > 0.0 { k } else { 0.0 }).sqrt()
-    };
-    for (i, (x, z, yaw)) in [
-        (0.02, -0.01, 10.0),
-        (-0.04, 0.02, 40.0),
-        (0.05, 0.04, 70.0),
-        (-0.02, -0.05, 25.0),
-        (0.0, 0.03, 120.0),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        box_!(
-            format!("beef{i}"),
-            0.034,
-            0.008,
-            0.012,
-            (x, top(x, z) + 0.002, z),
-            M.beef,
-            yaw = yaw,
-            tilt = ((10 * (i as i64 % 3 - 1)) as f64, 6.0),
-            bevel = 0.0025
-        );
-    }
-    for (i, (x, z)) in [
-        (0.05, -0.035),
-        (-0.055, -0.02),
-        (-0.03, 0.055),
-        (0.07, 0.01),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let y = top(x, z) - 0.006;
-        cylinder!(
-            format!("stem{i}"),
-            0.004,
-            0.012,
-            at = F.at(x, y + 0.006, z),
-            material = M.pea,
-            verts = 5
-        );
-        lump!(
-            format!("floret{i}"),
-            0.0115,
-            (x, y + 0.009, z),
-            M.broccoli,
-            scale = (1.0, 0.8, 1.0),
-            seed = i as f64 * 2.3,
-            rough = 0.25
-        );
-    }
-    for (i, (x, z, yaw, m)) in [
-        (-0.01, -0.025, 30.0, M.pepper_red),
-        (0.035, 0.015, 100.0, M.pepper_yellow),
-        (-0.05, 0.035, 150.0, M.pepper_red),
-        (0.02, 0.06, 60.0, M.pepper_yellow),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let a = radians(yaw);
-        let (ca, sa) = (cos(a), sin(a));
-        let y = top(x, z) + 0.002;
-        fsweep!(
-            F,
-            format!("pepper{i}"),
-            &[
-                (x - 0.017 * ca, y - 0.002, z + 0.017 * sa),
-                (x + 0.004 * sa, y + 0.001, z + 0.004 * ca),
-                (x + 0.017 * ca, y - 0.002, z - 0.017 * sa)
-            ],
-            0.0,
-            m,
-            profile = [
-                (-0.002, -0.0045),
-                (0.002, -0.0045),
-                (0.002, 0.0045),
-                (-0.002, 0.0045)
-            ],
-            resolution = 2
-        );
-    }
-    for (i, (x, z, t)) in [
-        (0.0, -0.06, 14.0),
-        (-0.065, 0.0, -10.0),
-        (0.04, -0.06, 8.0),
-        (0.06, 0.06, -12.0),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        coin!(
-            format!("carrot{i}"),
-            0.02,
-            0.004,
-            (x, top(x, z) - 0.004, z),
-            (M.carrot, M.carrot_core),
-            tilt = (t, t * 0.5)
-        );
-    }
-    done("pan")
 }
 
 /// On the grill: two sausages, bent and marked by the bars, and a burger with its rounded, rough edge and
@@ -468,7 +293,8 @@ pub fn bite_cracker() -> Vec<Obj> {
         0.012,
         M.cheese_cut,
         M.cheese_cut,
-        sides = vec![M.cheese_cut, M.cheese, M.cheese_cut]
+        sides = vec![M.cheese_cut, M.cheese, M.cheese_cut],
+        bevel = 0.002
     );
     done("biteCracker")
 }

@@ -44,6 +44,7 @@ import { hashNumbers, hashString } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
 import { perfEnd, perfStart } from '../../debug/perf';
+import { smoothstep } from '../../game/noise';
 
 /** Height that labels and fits allow for (roofs, crowns). */
 const HIGHLIGHT_INSET = 0.55;
@@ -343,8 +344,7 @@ export class TownOverview {
 
   /** The camera's distance from its target (m), each frame: from far out the lit lots are washed over whole (`WASH_FROM`). */
   setReach(radius: number): void {
-    const t = Math.min(1, Math.max(0, (radius - WASH_FROM) / (WASH_FULL - WASH_FROM)));
-    const far = t * t * (3 - 2 * t);
+    const far = smoothstep(WASH_FROM, WASH_FULL, radius);
     if (Math.abs(far - this.far) < 0.01 && (far > 0 || this.far === 0)) return;
     this.far = far;
     this.dirty = true;

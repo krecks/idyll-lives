@@ -7,7 +7,7 @@
 // as the hand reaches the handle.)
 import { describe, expect, test } from 'bun:test';
 import { PLAYBACK_RATE } from '../src/render/shared/gameSpeed';
-import { DOOR_SWING, MOVER, PACE, doorLead, goingThrough } from '../src/render/shared/doors';
+import { DOOR_SWING, PACE, doorLead, goingThrough } from '../src/render/shared/doors';
 import { rustConst } from './snapshotLayout';
 
 /**
@@ -103,9 +103,5 @@ describe('doors', () => {
   test('a doorway in a wall along z works the same, across x', () => {
     expect(goingThrough(movers([-0.7, 0, 2, 0, 1.5]), 'v', door, false, lead)).toBe(1);
     expect(goingThrough(movers([0.7, 0, -2, 0, 1.5]), 'v', door, false, lead)).toBe(-1);
-  });
-
-  test('the movers are packed as the renderer packs them', () => {
-    expect(movers([1, 2, 3, 4, 1.5]).length).toBe(MOVER);
   });
 });

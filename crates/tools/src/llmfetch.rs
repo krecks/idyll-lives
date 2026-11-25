@@ -112,7 +112,7 @@ const OBSOLETE: [&str; 9] = [
 ];
 
 fn out() -> PathBuf {
-    crate::characters::repo_root()
+    crate::repo_root()
         .join("web")
         .join("public")
         .join("llm")

@@ -3,11 +3,10 @@
 use super::common::{M, WALL, lofted};
 use artkit::forms::{by, rounded_rect};
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, cosd, sin, sind};
+use artkit::math::{P3, PI, cos, cosd, sin, sind};
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
 use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
-use artkit::py::round;
 use artkit::scene::Obj;
 use artkit::{
     fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, revolve, ring, settle, slide,
@@ -132,25 +131,24 @@ pub fn power_blender() -> Vec<Obj> {
             bevel_segments = 1
         );
         // the worktop, its front rolled (postformed)
-        fsweep!(
+        fextrude!(
             f,
             "worktop",
             &[
-                (-w / 2.0, h - t / 2.0, z0 + d / 2.0),
-                (w / 2.0, h - t / 2.0, z0 + d / 2.0)
+                (-d / 2.0, -t / 2.0),
+                (d / 2.0 - 0.014, -t / 2.0),
+                (d / 2.0 - 0.004, -t / 2.0 + 0.006),
+                (d / 2.0, 0.0),
+                (d / 2.0 - 0.004, t / 2.0 - 0.006),
+                (d / 2.0 - 0.016, t / 2.0),
+                (-d / 2.0, t / 2.0)
             ],
-            0,
+            w,
+            (0.0, h - t / 2.0, z0 + d / 2.0),
             M.worktop,
-            profile = vec![
-                (-t / 2.0, d / 2.0),
-                (t / 2.0, d / 2.0),
-                (t / 2.0, -d / 2.0 + 0.016),
-                (t / 2.0 - 0.006, -d / 2.0 + 0.004),
-                (0.0, -d / 2.0),
-                (-t / 2.0 + 0.006, -d / 2.0 + 0.004),
-                (-t / 2.0, -d / 2.0 + 0.014)
-            ],
-            up = (0, 0, 1)
+            plane = Facing::Side,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         kit::shaker!(
             f,
@@ -253,7 +251,9 @@ pub fn power_blender() -> Vec<Obj> {
             0.02,
             (jx, TOP + 0.11, jz),
             M.dark,
-            verts = 16
+            verts = 16,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         let P3 {
             x: bx,
@@ -295,13 +295,19 @@ pub fn power_blender() -> Vec<Obj> {
             up = (0, 1, 0)
         );
         // a fruit bowl with oranges, an apple, a lime and two bananas; a board with lemon halves and a knife
-        let bowl = [
+        // its rim rolled over (a 4 mm round in 30° steps) into the inside, down to the fruit
+        let mut bowl = vec![
             (0.0, 0.05, 0.05),
             (0.008, 0.06, 0.06),
             (0.05, 0.13, 0.13),
             (0.09, 0.16, 0.16),
-            (0.1, 0.162, 0.162),
         ];
+        for i in 0..=6 {
+            let a = PI * i as f64 / 6.0;
+            let r = 0.158 + 0.004 * cos(a);
+            bowl.push((0.098 + 0.004 * sin(a), r, r));
+        }
+        bowl.push((0.085, 0.146, 0.146));
         lofted(f, "bowl", 0.16, TOP, -0.1, &bowl, M.bowl, 18, 2.0);
         for (x, y, z, r, m) in [
             (0.1, 0.12, -0.08, 0.04, M.orange),
@@ -453,7 +459,7 @@ pub fn power_blender() -> Vec<Obj> {
             y: by_,
             z: bz,
         } = f.at(jx, TOP + 0.13, jz);
-        let secs: Vec<Vec<P3>> = [(0.0, 0.054), (0.02, 0.066), (0.16, 0.066)]
+        let secs: Vec<Vec<P3>> = [(0.0, 0.054), (0.02, 0.066), (0.155, 0.066), (0.16, 0.061)]
             .iter()
             .map(|&(hh, r)| ring!(r, r, z = bz + hh, verts = 14, square = 3.2, at = (bx, by_)))
             .collect();
@@ -501,76 +507,6 @@ pub fn power_blender() -> Vec<Obj> {
 }
 
 // --- the contrast rain shower (1x1): a cabin of its own tile, a square rain head, hot and cold dials -----------------
-
-/// The back wall (game x0..x1 at the back z0) and the left wall (at x0, z0..z1): grout backing, square tiles with
-/// softened edges.
-#[allow(clippy::too_many_arguments)]
-fn tiled_walls(
-    f: &GameFrame,
-    x0: f64,
-    x1: f64,
-    z0: f64,
-    z1: f64,
-    y0: f64,
-    y1: f64,
-    t: f64,
-    size: f64,
-    gap: f64,
-) {
-    fbox!(
-        f,
-        "grout_back",
-        x1 - x0,
-        y1 - y0,
-        t,
-        ((x0 + x1) / 2.0, (y0 + y1) / 2.0, z0 + t / 2.0),
-        M.grout
-    );
-    fbox!(
-        f,
-        "grout_left",
-        t,
-        y1 - y0,
-        z1 - z0 - t,
-        (x0 + t / 2.0, (y0 + y1) / 2.0, (z0 + t + z1) / 2.0),
-        M.grout
-    );
-    let rows = 1.max(round((y1 - y0) / size));
-    let th = (y1 - y0) / rows as f64;
-    let cols = 1.max(round((x1 - x0 - t) / size));
-    let tw = (x1 - x0 - t) / cols as f64;
-    let deep = 1.max(round((z1 - z0 - t) / size));
-    let td = (z1 - z0 - t) / deep as f64;
-    for j in 0..rows {
-        let y = y0 + th * (j as f64 + 0.5);
-        for i in 0..cols {
-            fbox!(
-                f,
-                numbered("tile"),
-                tw - gap,
-                th - gap,
-                0.008,
-                (x0 + t + tw * (i as f64 + 0.5), y, z0 + t + 0.004),
-                M.tile,
-                bevel = 0.002,
-                bevel_segments = 1
-            );
-        }
-        for i in 0..deep {
-            fbox!(
-                f,
-                numbered("tile"),
-                0.008,
-                th - gap,
-                td - gap,
-                (x0 + t + 0.004, y, z0 + t + td * (i as f64 + 0.5)),
-                M.tile,
-                bevel = 0.002,
-                bevel_segments = 1
-            );
-        }
-    }
-}
 
 const HEAD: (f64, f64, f64) = (0.0, 2.0, -0.02); // the rain head's underside
 const DOOR_HALF: f64 = 0.28; // half the glass door's width, across the middle of the front
@@ -637,7 +573,19 @@ pub fn contrast_shower() -> Vec<Obj> {
                 M.tray
             );
         }
-        tiled_walls(f, -s, s, -s, s, 0.058, top, 0.03, 0.3, 0.005);
+        kit::tiled_walls!(
+            f,
+            (-s, s),
+            (-s, s),
+            (0.058, top),
+            0.03,
+            0.3,
+            0.005,
+            M.grout,
+            M.tile,
+            thick = 0.008,
+            bevel = 0.002
+        );
         fbox!(
             f,
             "glass_side",
@@ -877,7 +825,7 @@ pub fn contrast_shower() -> Vec<Obj> {
                     (0.36, 1.12, -0.36)
                 ],
                 0.012,
-                steps = 2
+                steps = 5
             ),
             0,
             M.towel,

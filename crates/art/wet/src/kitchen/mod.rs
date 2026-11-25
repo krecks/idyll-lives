@@ -96,10 +96,10 @@ fn fridge_uses() -> Json {
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
     // its top under its content `surface`.
-    Some(Family::new(
+    Family::new(
         "kitchen",
         M.palette(),
         vec![
@@ -117,7 +117,7 @@ pub fn family() -> Option<Family> {
                     ("trim", "Plinth & badge"),
                     ("liner", "Inside"),
                 ]),
-            Model::new("fridgeMini", fridges::fridge_mini, (0.60, 1.00, 0.60))
+            Model::new("fridgeMini", fridges::fridge_mini, (0.60, 0.965, 0.60))
                 .key("model.fridgeMini")
                 .centre(0.0, -0.128)
                 .motions(json!({"uses": {"fetch": "fridge_open", "cook": "fridge_open"}, "hold": 3.0}))
@@ -202,5 +202,5 @@ pub fn family() -> Option<Family> {
          a resident takes food or a drink (`motions`); the French-door freezer slides and the wine \
          fridge's top shelf of bottles slides out once its glass door is open; every freezer door and \
          the French freezer drawer open for 'Get some ice cream'.",
-    ))
+    )
 }

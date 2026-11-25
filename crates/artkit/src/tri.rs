@@ -1,20 +1,9 @@
-//! Triangles of a polygon of five corners or more (a cylinder's cap, a swept profile's end, the underside of a
-//! cushion that rests on it): the ones Blender's mesh is drawn, exported and hit by, its ears clipped as Blender
-//! clips them (`polyfill`), every other corner round a polygon with no hollow.
-//! And the triangles that fill outlines with holes (`fill`: a slab's two faces), as Blender's `triangle_fill`
+//! The triangles that fill outlines with holes (`fill`: a slab's two faces), as Blender's `triangle_fill`
 //! cuts them: its sweep (BLI_scanfill) and its beauty pass (BLI_polyfill_beautify, bmesh_beautify), GPL-2.0-or-later,
 //! worked through again here.
 
-use crate::math::V3;
+use crate::polyfill::{cross_tri_v2, turn_gain};
 use std::collections::{BTreeMap, BTreeSet};
-
-/// The triangles of the polygon `p` (five corners or more; `normal`: its unit normal by Newell's sum,
-/// `mesh::normal_newell`), as places among its corners: the ones Blender's mesh has for it (`polyfill::ngon`).
-pub fn polygon(p: &[V3], normal: V3) -> Vec<[u32; 3]> {
-    crate::polyfill::ngon(p, normal)
-}
-
-// ---- outlines filled as Blender fills them --------------------------------------------------------------
 
 /// The triangles that fill the closed outlines `loops` (flat, their points numbered on through them), as
 /// Blender's `triangle_fill` with `use_beauty` leaves them: a sweep from the top that clips at each point in turn,
@@ -394,48 +383,6 @@ fn cos_at(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
     u[0] * v[0] + u[1] * v[1]
 }
 
-fn cross_tri(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
-    (a[0] - b[0]) * (b[1] - c[1]) + (a[1] - b[1]) * (c[0] - b[0])
-}
-
-fn len2(a: [f32; 2], b: [f32; 2]) -> f32 {
-    let (x, y) = (b[0] - a[0], b[1] - a[1]);
-    (x * x + y * y).sqrt()
-}
-
-/// What turning the edge 2-4 of the quad 1, 2, 3, 4 into 1-3 would gain: under zero if the two new triangles
-/// are rounder (the sum of area over perimeter) than the two there.
-fn turn_gain(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2], v4: [f32; 2]) -> f32 {
-    let eps_zero_area = 1.0e-12_f32;
-    let area_234 = cross_tri(v2, v3, v4);
-    let area_241 = cross_tri(v2, v4, v1);
-    let area_123 = cross_tri(v1, v2, v3);
-    let area_134 = cross_tri(v1, v3, v4);
-    // (1-3) would fold the quad over, or leave a triangle of no area
-    if (area_123 >= 0.0) != (area_134 >= 0.0) {
-        return f32::MAX;
-    }
-    if area_123.abs() <= eps_zero_area || area_134.abs() <= eps_zero_area {
-        return f32::MAX;
-    }
-    // (2-4) is folded or flat itself: turn it
-    if (area_234 >= 0.0) != (area_241 >= 0.0) {
-        return -f32::MAX;
-    }
-    if area_234.abs() <= eps_zero_area || area_241.abs() <= eps_zero_area {
-        return -f32::MAX;
-    }
-    let (len_12, len_23, len_34, len_41) = (len2(v1, v2), len2(v2, v3), len2(v3, v4), len2(v4, v1));
-    let (len_13, len_24) = (len2(v1, v3), len2(v2, v4));
-    let prim_a = len_23 + len_34 + len_24;
-    let prim_b = len_41 + len_12 + len_24;
-    let fac_24 = (area_234 / prim_a) + (area_241 / prim_b);
-    let prim_c = len_12 + len_23 + len_13;
-    let prim_d = len_34 + len_41 + len_13;
-    let fac_13 = (area_123 / prim_c) + (area_134 / prim_d);
-    fac_24 - fac_13
-}
-
 /// Blender's heap: the least first; of equals, as its sifting leaves them.
 #[derive(Default)]
 struct Heap {
@@ -556,8 +503,8 @@ fn beautify(xy: &[[f32; 2]], tris: &mut Vec<[u32; 3]>, outline: &BTreeSet<(u32, 
         let p = |v: u32| xy[v as usize];
         // seen from the side the two triangles face: mirrored if they are wound clockwise
         let (no_a, no_b) = (
-            cross_tri(p(v2), p(v3), p(v4)),
-            cross_tri(p(v2), p(v4), p(v1)),
+            cross_tri_v2(p(v2), p(v3), p(v4)),
+            cross_tri_v2(p(v2), p(v4), p(v1)),
         );
         let no = no_a + no_b;
         if no == 0.0 {
@@ -575,10 +522,10 @@ fn beautify(xy: &[[f32; 2]], tris: &mut Vec<[u32; 3]>, outline: &BTreeSet<(u32, 
                 0
             }
         };
-        if sign(cross_tri(q2, q3, q4) / scale) + sign(cross_tri(q2, q4, q1) / scale) == 0 {
+        if sign(cross_tri_v2(q2, q3, q4) / scale) + sign(cross_tri_v2(q2, q4, q1) / scale) == 0 {
             return f32::MAX;
         }
-        turn_gain(q1, q2, q3, q4)
+        turn_gain(q1, q2, q3, q4).0
     };
     let mut heap = Heap::default();
     for (i, &e) in inner.iter().enumerate() {
@@ -636,51 +583,5 @@ fn beautify(xy: &[[f32; 2]], tris: &mut Vec<[u32; 3]>, outline: &BTreeSet<(u32, 
     }
     if let Some(free) = free {
         tris.remove(free);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::math::v3;
-
-    #[test]
-    fn a_hexagon_is_clipped_at_every_other_corner() {
-        let p: Vec<V3> = (0..6)
-            .map(|i| {
-                let a = std::f64::consts::TAU * i as f64 / 6.0;
-                v3(a.cos(), a.sin(), 0.0)
-            })
-            .collect();
-        assert_eq!(
-            polygon(&p, V3::Z),
-            [[5, 0, 1], [1, 2, 3], [3, 4, 5], [1, 3, 5]]
-        );
-    }
-
-    #[test]
-    fn a_dented_polygon_is_filled_inside_its_outline() {
-        // an arrow head: the dent at corner 3
-        let p = [
-            v3(0, 0, 0),
-            v3(2, 0, 0),
-            v3(2, 2, 0),
-            v3(1, 0.5, 0),
-            v3(0, 2, 0),
-        ];
-        let tris = polygon(&p, V3::Z);
-        assert_eq!(tris.len(), 3);
-        let area: f64 = tris
-            .iter()
-            .map(|t| {
-                let (a, b, c) = (p[t[0] as usize], p[t[1] as usize], p[t[2] as usize]);
-                ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) as f64 / 2.0
-            })
-            .sum();
-        assert!(tris.iter().all(|t| {
-            let (a, b, c) = (p[t[0] as usize], p[t[1] as usize], p[t[2] as usize]);
-            (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) > 0.0
-        }));
-        assert!((area - 2.5).abs() < 1e-6, "{area}");
     }
 }

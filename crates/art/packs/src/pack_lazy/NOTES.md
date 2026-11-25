@@ -97,3 +97,20 @@ cargo art pack_lazy --preview  # previews/pack_lazy/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 The snoozecloud bed's mattress halves and pillows are `resting`, the nap pod's pillow sewn flat and stuffed (`waist`). Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `deliveryLocker`, `napPod`, `quiltTable`, `snoozecloudBed`, `vibePlate`; 30,332 to 31,556 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the play camera showed is eased (14 to 0): the pod's lip a half round, its stem eased, the quilt's
+drapes' ends eased, the bowl's and plate's rims rounded, the plate's column ends and collar eased. The quilt table
+pays with plainer mandarins, mugs and poufs (7,972 triangles), the bed with plainer feet under its base (7,900).
+The locker's doorstep order and the hub's robot are drawn `aside`. The quilt table stays a `lowTable` it doesn't
+match (its poufs at 0.45, its top at 0.635): no kind in docs/review/reference.json is a raised kotatsu.
+
+## Audit (2026-11-25)
+
+`napPod`: its bevels take their angles from the kernel's Blender arc sine (artkit `bevel`; a hair of shape at most,
+towards Blender's build).
+
+The quilt table's poufs (where residents sit), their back cushions and the bowl, mugs and biscuits on its top are
+`aside` (`set`): it measures 1.82 × 0.67 × 0.56 m, the table under its quilt, its top at chair height (0.63 m), a
+high kotatsu sat at from poufs. No draw call more (2026-11-25).

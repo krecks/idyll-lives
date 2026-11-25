@@ -5,6 +5,7 @@
  * the town's, on the grid (`gardenFences.slow.test.ts`): this town has none.
  */
 import { describe, expect, test } from 'bun:test';
+import { streetOptions as options } from './support/streetWorld';
 import type { PlotInfo, WorldStructure } from '../src/core/protocol';
 import type { StreetPlan } from '../src/render/shared/street';
 
@@ -49,7 +50,6 @@ function town(turn: boolean): WorldStructure {
   } as unknown as WorldStructure;
 }
 
-const options = { has: () => true, entry: () => undefined, lived: false };
 
 /** Vertex positions (x, z) of a mesh, sorted, rounded to the centimetre. */
 const points = (pos: ArrayLike<number>, turn: boolean) => {

@@ -18,21 +18,21 @@ use artkit::json;
 
 mod bag;
 mod calm;
-mod common;
+pub(crate) mod common;
 mod drums;
 
 pub use common::M;
 
 /// The wall's face in a 1-deep footprint, game depth.
-const WALL: f64 = -0.43;
+use artkit::kit::WALL;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "pack_hotHeaded",
         M.palette(),
         vec![
-            Model::new("heavyBag", bag::heavy_bag, (0.86, 2.01, 0.86))
+            Model::new("heavyBag", bag::heavy_bag, (0.722, 2.002, 0.766))
                 .key("model.hotHeaded.heavyBag")
                 .centre(0.0, 0.0)
                 .motions(json!({"loops": {"pound": "swing"}}))
@@ -51,7 +51,7 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "coolDownCushion",
                 calm::cool_down_cushion,
-                (0.9, 0.236, 0.9),
+                (0.86, 0.236, 0.86),
             )
             .centre(0.0, 0.02)
             .key("model.hotHeaded.coolDownCushion")
@@ -73,5 +73,5 @@ pub fn family() -> Option<Family> {
          group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock \
          while the kit is played, the zafu sinks, the desk drawer slides out and the plunge tub's slatted cover \
          rolls back.",
-    ))
+    )
 }

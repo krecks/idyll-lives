@@ -83,3 +83,14 @@ cargo art pack_neat --preview  # previews/pack_neat/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 The steam mop's spare pad lying askew is left unpinched (a corner is the model's outermost point). Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `entryConsole`, `organizerDesk`, `robotVacuumDock`, `steamMopDock`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the play camera showed is eased (93 to 0): the shirts' cut outlines bevelled, the scarf and the
+filler's towel folded round their hooks, the baskets' rims, the iron's top, the bins' lips, the shoes' tops and the
+pot's and vase's lips rounded. The laundry centre pays for its bevels with the drum and porthole windows behind the
+door (16 and 20 sides; 7,946 triangles). The docks' bucket, pads, rug and plant and the console's vase, back panel,
+mirror, hooks, tote and scarf are drawn `aside`, not the pieces' sizes; the robot's dock is 5 cm shallower and the
+robot 5 cm further back, and the desk's top is at 0.758 and its hutch 4 cm lower (1.208), so each is within its kind
+(`cargo review sizes`). The shower keeps its fourth draw (its door and its rain each a moving part, its fixed panes
+glass on the still body).

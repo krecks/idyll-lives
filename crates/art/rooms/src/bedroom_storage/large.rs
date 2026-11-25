@@ -2,7 +2,7 @@
 
 use super::common::{
     DOOR_SECONDS, DRAWER_SECONDS, F, M, PULL, Style, WALL, drawer, folded, front, gap, hanging,
-    knob, pull, shell, top,
+    shell, top,
 };
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -153,27 +153,25 @@ pub fn dresser() -> Vec<Obj> {
                 Style::Plain,
                 None,
             );
-            pull(
+            kit::pull!(
+                F,
                 &format!("pull_top{s}"),
                 sf * 0.35,
                 0.75,
                 front_z + 0.02,
                 0.1,
                 M.brass,
-                0.006,
-                0.014,
-                false,
+                out = 0.014
             );
-            pull(
+            kit::pull!(
+                F,
                 &format!("pull_low{s}"),
                 sf * 0.35,
                 0.27,
                 front_z + 0.02,
                 0.1,
                 M.brass,
-                0.006,
-                0.014,
-                false,
+                out = 0.014
             );
         }
         front(
@@ -290,16 +288,15 @@ pub fn dresser() -> Vec<Obj> {
         M.oak,
         &|| {
             for s in [-1, 1] {
-                pull(
+                kit::pull!(
+                    F,
                     &format!("pull_mid{s}"),
                     s as f64 * 0.35,
                     0.51,
                     front_z + 0.02,
                     0.1,
                     M.brass,
-                    0.006,
-                    0.014,
-                    false,
+                    out = 0.014
                 );
             }
         },
@@ -499,16 +496,17 @@ pub fn wardrobe() -> Vec<Obj> {
                 Style::Shaker,
                 Some(0.09),
             );
-            pull(
+            kit::pull!(
+                F,
                 &format!("handle{s}"),
                 sf * 0.06,
                 1.1,
                 front_z + 0.02,
                 0.36,
                 M.brass,
-                0.008,
-                0.018,
-                true,
+                r = 0.008,
+                out = 0.018,
+                upright = true
             );
         });
         let name = if s < 0 { "door_left" } else { "door_right" };
@@ -587,16 +585,16 @@ pub fn chest_of_drawers() -> Vec<Obj> {
                 Style::Shaker,
                 Some(0.04),
             );
-            pull(
+            kit::pull!(
+                F,
                 &format!("pull{i}"),
                 0.0,
                 y + 0.031,
                 front_z + 0.02,
                 0.14,
                 M.brass,
-                0.005,
-                0.016,
-                false,
+                r = 0.005,
+                out = 0.016
             );
         }
         gap("drawer", 0.815, 0.194, 0, 0.595, front_z, M.plinth);
@@ -612,16 +610,16 @@ pub fn chest_of_drawers() -> Vec<Obj> {
         0.42,
         M.linen,
         &|| {
-            pull(
+            kit::pull!(
+                F,
                 "pull_mid",
                 0.0,
                 0.626,
                 front_z + 0.02,
                 0.14,
                 M.brass,
-                0.005,
-                0.016,
-                false,
+                r = 0.005,
+                out = 0.016
             );
         },
         Some(&|x, y, z| drawer_clothes(x, y, z, 0.72, 0.34)),
@@ -702,16 +700,16 @@ pub fn dresser_low() -> Vec<Obj> {
                     Style::Plain,
                     None,
                 );
-                pull(
+                kit::pull!(
+                    F,
                     &format!("pull{}{}", float_repr(x), float_repr(y)),
                     x,
                     y + 0.032,
                     front_z + 0.02,
                     0.14,
                     M.iron,
-                    0.005,
-                    0.016,
-                    false,
+                    r = 0.005,
+                    out = 0.016
                 );
             }
         }
@@ -728,16 +726,16 @@ pub fn dresser_low() -> Vec<Obj> {
         0.5,
         M.oak,
         &|| {
-            pull(
+            kit::pull!(
+                F,
                 "pull_mid",
                 0.0,
                 0.467,
                 front_z + 0.02,
                 0.14,
                 M.iron,
-                0.005,
-                0.016,
-                false,
+                r = 0.005,
+                out = 0.016
             );
         },
         Some(&|x, y, z| drawer_clothes(x, y, z, 0.5, 0.4)),
@@ -791,16 +789,17 @@ pub fn wardrobe_single() -> Vec<Obj> {
             Style::Shaker,
             Some(0.08),
         );
-        pull(
+        kit::pull!(
+            F,
             "handle",
             w / 2.0 - 0.06,
             1.1,
             front_z + 0.02,
             0.44,
             M.brass,
-            0.008,
-            0.018,
-            true,
+            r = 0.008,
+            out = 0.018,
+            upright = true
         );
     });
     let door = hinged(
@@ -820,33 +819,44 @@ pub fn wardrobe_single() -> Vec<Obj> {
 
 // --- the armoire: mahogany, a cornice, raised-panel doors with brass knobs, on bun feet -------------------
 /// A crown moulding round the front and sides at height `y` (its bottom), its path `x` either side and at game depth
-/// `front`: a cove rising and swelling out `out` to a flat top. Its back edge reaches only 1 cm in from the path,
-/// inside the path's 1.2 cm corners: reaching farther, it folded back on itself round each front corner (faces
-/// turned inside out).
+/// `front`: a cove rising and swelling out `out` to a flat top, its top's corners eased and its ends (on the wall's
+/// face) chamfered. Its back edge reaches only 1 cm in from the path, inside the path's 1.2 cm corners: reaching
+/// farther, it folded back on itself round each front corner (faces turned inside out).
 #[allow(clippy::too_many_arguments)]
 fn crown(name: &str, x: f64, front_z: f64, back: f64, y: f64, material: Mat, h: f64, out: f64) {
-    let prof = [
+    // the cove as drawn for the 6.9 cm crown that reaches 5 cm, scaled to this one
+    let (ku, kv) = (h / 0.069, out / 0.05);
+    let mut prof: Vec<(f64, f64)> = [
         (0.0, 0.0),
         (0.0, -0.006),
         (0.012, -0.012),
         (0.024, -0.02),
         (0.036, -0.032),
         (0.046, -0.044),
-        (0.054, -out),
-        (h, -out),
-        (h, 0.01),
-        (0.0, 0.01),
-    ];
-    let path = kit::fillet(
-        &[
-            (-x, y, back),
-            (-x, y, front_z),
-            (x, y, front_z),
-            (x, y, back),
-        ],
-        0.012,
+        (0.054, -0.05),
+    ]
+    .iter()
+    .map(|&(u, v)| (u * ku, v * kv))
+    .collect();
+    prof.extend([(h, -out), (h, 0.01), (0.0, 0.01)]);
+    // swept about its middle (`c`), so the rings at its ends can shrink into it: a chamfer
+    let c = (h / 2.0, (0.01 - out) / 2.0);
+    let centred: Vec<(f64, f64)> = prof.iter().map(|&(u, v)| (v - c.1, u - c.0)).collect();
+    // (eased with height as its v: what it leaves sharp is its bottom, on the cornice)
+    let prof: Vec<(f64, f64)> = artkit::forms::eased(&centred, 0.004)
+        .iter()
+        .map(|&(v, u)| (u, v))
+        .collect();
+    let (x, front_z, y) = (x - c.1, front_z - c.1, y + c.0); // the path through its middle, out by -c.1
+    let (z0, z1) = (back, back + 0.004);
+    let mut path = vec![(-x, y, z0)];
+    path.extend(kit::fillet(
+        &[(-x, y, z1), (-x, y, front_z), (x, y, front_z), (x, y, z1)],
+        0.012 - c.1,
         2,
-    );
+    ));
+    path.push((x, y, z0));
+    let end = 1.0 - 0.004 / (h / 2.0).min((0.01 + out) / 2.0); // each end's ring 4 mm in all round
     fsweep!(
         F,
         name,
@@ -855,7 +865,8 @@ fn crown(name: &str, x: f64, front_z: f64, back: f64, y: f64, material: Mat, h: 
         material,
         profile = prof,
         up = (0, 0, 1),
-        angle = 30
+        angle = 30,
+        scale = artkit::forms::by(move |w| if w <= 0.0 || w >= 1.0 { end } else { 1.0 })
     );
 }
 
@@ -1029,11 +1040,14 @@ pub fn armoire() -> Vec<Obj> {
                     smooth = false
                 );
             }
-            knob(
-                &format!("knob{s}"),
+            kit::knob!(
+                F,
+                format!("knob{s}"),
+                sf * 0.09,
+                1.08,
+                front_z + 0.025,
                 0.024,
-                (sf * 0.09, 1.08, front_z + 0.025),
-                M.brass,
+                M.brass
             );
             if s > 0 {
                 soft!(

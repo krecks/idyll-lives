@@ -96,7 +96,7 @@ pub const HOLDS: [Mat; 7] = [
     M.hold_a, M.hold_b, M.hold_c, M.hold_d, M.hold_e, M.hold_f, M.hold_g,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A body standing on `y` at (x, z), lofted through rings (height, half width, half depth) from its foot up.
 #[allow(clippy::too_many_arguments)]

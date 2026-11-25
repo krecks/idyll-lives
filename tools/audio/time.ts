@@ -38,6 +38,8 @@ const wasm = arg('--wasm');
 await loadSynth(readFileSync(wasm ? path(wasm) : new URL('../../web/src/audio/wasm-pkg/sound_wasm_bg.wasm', import.meta.url)));
 
 const RUNS = Math.max(1, Number(arg('--runs') ?? 3) | 0);
+const maxMusic = arg('--max-music');
+if (maxMusic !== undefined && !(Number(maxMusic) > 0)) throw new Error(`--max-music ${maxMusic}: not a time in ms`);
 const FAMILIES = ['music', 'made', 'outdoors', 'mono', 'blips', 'steps', 'birds', 'rooms'] as const;
 type Family = (typeof FAMILIES)[number];
 
@@ -84,7 +86,9 @@ for (const job of jobs) {
       job.make();
       best = Math.min(best, performance.now() - t0);
     }
-  } catch {
+  } catch (e) {
+    // (Only another build may lack a sound: this one's failing is a fault.)
+    if (!wasm) throw e;
     unmade.push(job.name);
     continue;
   }
@@ -121,7 +125,6 @@ if (json) {
   writeFileSync(path(json), `${JSON.stringify(timing, null, 2)}\n`);
   console.log(`\nwrote ${path(json)}`);
 }
-const maxMusic = arg('--max-music');
 if (maxMusic !== undefined && families.music > Number(maxMusic)) {
   console.error(`\nthe music took ${families.music.toFixed(1)} ms, over ${maxMusic}`);
   process.exit(1);

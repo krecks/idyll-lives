@@ -95,60 +95,6 @@ pub fn bowl(
     lathe(p, name, &prof, x, y, z, material, verts)
 }
 
-/// A mug standing on `y`: hollow, its handle out at `turn` degrees (0: +x, 90: to the front).
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn mug(
-    p: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    r: f64,
-    h: f64,
-    material: Mat,
-    turn: f64,
-    verts: usize,
-) {
-    lathe(
-        p,
-        name,
-        &[
-            (0.0, 0.0),
-            (0.88 * r, 0.0),
-            (r, 0.06 * h),
-            (r, h),
-            (0.86 * r, h),
-            (0.86 * r, 0.15 * h),
-            (0.0, 0.15 * h),
-        ],
-        x,
-        y,
-        z,
-        material,
-        verts,
-    );
-    let (c, s) = (cos(radians(turn)), sin(radians(turn)));
-    let pts: Vec<(f64, f64, f64)> = [
-        (r - 0.003, 0.8),
-        (r + 0.016, 0.82),
-        (r + 0.024, 0.55),
-        (r + 0.015, 0.27),
-        (r - 0.003, 0.25),
-    ]
-    .into_iter()
-    .map(|(d, t)| (x + c * d, y + t * h, z + s * d))
-    .collect();
-    fsweep!(
-        p,
-        format!("{name}_handle"),
-        &pts,
-        0.0045,
-        material,
-        verts = 6,
-        resolution = 2
-    );
-}
-
 /// A pitcher standing on `y`: a full belly narrowing to a flared neck, hollow at the top, a handle at `turn`.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn jug(
@@ -280,7 +226,8 @@ pub fn can(
             (r, 0.52 * h),
             (r, 0.95 * h),
             (1.03 * r, 0.97 * h),
-            (1.03 * r, h),
+            (1.03 * r, h - 0.003),
+            (1.03 * r - 0.003, h), // the lid's rim eased
             (0.0, h),
         ],
         x,

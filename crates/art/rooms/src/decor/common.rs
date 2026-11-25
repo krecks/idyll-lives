@@ -109,7 +109,7 @@ palette! { M:
 }
 
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, game depth
+pub use artkit::kit::WALL;
 
 // --- flat shapes ------------------------------------------------------------------------------------------
 /// A mesh object from Blender points and faces, its normals made outward; the first `smooth` faces shaded smooth,
@@ -276,12 +276,12 @@ pub fn frame(
         (border, depth - 0.007),
         (border, 0.0),
     ];
-    let profile = profile.unwrap_or(&default);
+    let profile = artkit::forms::eased_loop(profile.unwrap_or(&default), 0.003);
     kit::moulding!(
         F,
         "frame",
         &rect(w, h, yc, 0.0),
-        profile,
+        &profile,
         material,
         at = WALL
     );
@@ -689,15 +689,18 @@ pub fn pedestal(h: f64, w: f64, material: Mat) {
         F,
         "plinth_cap",
         &box_outline(2.0 * m, 2.0 * m, 0.0),
-        &[
-            (0.04, 0.0),
-            (0.02, 0.0),
-            (0.012, 0.005),
-            (0.006, 0.013),
-            (0.0, 0.018),
-            (0.0, 0.03),
-            (0.04, 0.03)
-        ],
+        &artkit::forms::eased_loop(
+            &[
+                (0.04, 0.0),
+                (0.02, 0.0),
+                (0.012, 0.005),
+                (0.006, 0.013),
+                (0.0, 0.018),
+                (0.0, 0.03),
+                (0.04, 0.03)
+            ],
+            0.003
+        ),
         material,
         at = h - 0.03,
         plane = Facing::Top

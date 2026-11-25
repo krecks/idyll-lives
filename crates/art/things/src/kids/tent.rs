@@ -1,8 +1,9 @@
 //! KD2: the play tent.
 
-use super::common::{Frame, P, add, mul, place, plane, slab, still, turned};
+use super::common::{Frame, P, add, mul, place, plane, slab, still};
 use super::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::{P3, PI, cos, radians, sin, sqrt};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{hinged, join};
@@ -71,7 +72,9 @@ pub fn play_tent() -> Vec<Obj> {
         .iter()
         .map(|&t| canvas_ring(t, 0.0, 4))
         .collect();
-    loft!("canvas", &canvas, material = M.canvas);
+    let cloth = loft!("canvas", &canvas, material = M.canvas);
+    // (its cloth laid on from the sides, not round it: round, it stretches up the narrowing cone)
+    cloth.edit(|o| o.uv = artkit::mesh::UvWay::Box);
     // a hem round its foot
     let hem: Vec<Vec<P3>> = [0.0, 0.045]
         .iter()
@@ -117,9 +120,11 @@ pub fn play_tent() -> Vec<Obj> {
         );
     }
     // a round padded mat on the floor, two cushions on it
-    turned(
+    kit::turned!(
+        F,
         "floor_mat",
         0,
+        0.0,
         0,
         &[
             (0.0, 0.0),
@@ -130,8 +135,7 @@ pub fn play_tent() -> Vec<Obj> {
             (0.0, 0.031),
         ],
         M.tent_mat,
-        24,
-        0.0,
+        segments = 24
     );
     soft!(
         F,

@@ -121,8 +121,8 @@ fn shower_curtain() -> Json {
 }
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(Family::new(
+pub fn family() -> Family {
+    Family::new(
         "bathroom",
         M.palette(),
         vec![
@@ -194,10 +194,10 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "toiletCompact",
                 toilets::toilet_compact,
-                (0.59, 0.809, 0.631),
+                (0.56, 0.809, 0.631),
             )
             .key("model.toiletCompact")
-            .centre(0.09, -0.1145)
+            .centre(0.075, -0.1145)
             .motions(toilet())
             .paint(&[
                 ("porcelain", "Bowl"),
@@ -296,7 +296,7 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "bathtubClawfoot",
                 baths::bathtub_clawfoot,
-                (1.73, 1.02, 0.829),
+                (1.73, 0.717, 0.829),
             )
             .key("model.bathtubClawfoot")
             .motions(bath())
@@ -309,7 +309,7 @@ pub fn family() -> Option<Family> {
             Model::new(
                 "bathtubFreestanding",
                 baths::bathtub_freestanding,
-                (1.895, 0.919, 0.837),
+                (1.79, 0.597, 0.83),
             )
             .key("model.bathtubFreestanding")
             .motions(bath())
@@ -342,5 +342,5 @@ pub fn family() -> Option<Family> {
         "The bathroom (crates/art/wet/src/bathroom, built by cargo art). Listed in the base manifest's packs. \
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each \
          sink has a `water_on` clip (the stream from the tap) played while a resident washes.",
-    ))
+    )
 }

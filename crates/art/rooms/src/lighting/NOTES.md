@@ -139,3 +139,10 @@ shade, and the tiles it reaches over count as its own. Khronos validator: 0 erro
 Built in Rust since 2026-11-18 (`cargo art lighting`), proved against the last Blender build (`ref/blender`). The content's
 lights the bulbs are checked against are read from web/public/content (base.json, furniture.json,
 catalog2/lighting.json), built into the crate.
+
+## Hard edges eased (2026-11-25)
+
+The gate's `edges` found none left: the ceiling canopies' rims against the ceiling and the wall plates' rims on the
+wall chamfered 3 mm, the ceiling light's canopy and the eaves of its lid, the track's top corners, the floor lamp's
+shade bands (all four corners), the bulkhead's hood (its back on the wall eased, its ends chamfered) and the swing-arm
+lamp's shade rim. Same sizes and looks; a few triangles more (the chandelier 3,996, under its 4,000).

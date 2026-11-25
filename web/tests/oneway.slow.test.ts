@@ -4,37 +4,21 @@
 // ends joined, none where a country road goes on (a way out of town), and no more than the size's pairs; none in a
 // hamlet's or a village's main town. A city whose shape has a through road has it as an avenue, 14 m wide, out of
 // town (on to the country roads; on an island, one way out may end short); no other place has one.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { isSeparated } from '../src/core/roadKinds';
 import { cutOffRoads } from '../src/game/oneway';
 
-const WEB = new URL('../', import.meta.url).pathname;
 const SEEDS = [7, 3141, 271828];
 
 describe('one-way pairs and avenues in generated worlds', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { generateWorld, useTownContent } = await import('../src/game/town');
   const { WORLD_KINDS } = await import('../src/game/world');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** Whether road `i`'s end `e` is where another road (a country road) goes on from it, end to end. */
   const goesOn = (roads: readonly RoadPlan[], i: number, e: 0 | 1) => {
@@ -56,7 +40,7 @@ describe('one-way pairs and avenues in generated worlds', async () => {
             // in town) nor from the world beyond the ways out.
             expect(cutOffRoads(roads, { within: true }), `${tag}: cut off in town`).toEqual([]);
             expect(cutOffRoads(roads), `${tag}: cut off`).toEqual([]);
-            // (The motorway's carriageways and ramps are one-way too: theirs are the motorway's own tests, `motorway.test.ts` and `motorwayFit.slow.test.ts`.)
+            // (The motorway's carriageways and ramps are one-way too: theirs are the motorway's own tests, `motorway.test.ts`, `motorway.slow.test.ts` and `motorwayFit.slow.test.ts`.)
             const ways = roads.flatMap((r, i) => (r.oneway && !isSeparated(r.kind) ? [i] : []));
             if (size === 'village') expect(ways, `${tag}: one-way roads`).toEqual([]);
             expect(ways.length, `${tag}: one-way roads`).toBeLessThanOrEqual(size === 'city' ? 6 : size === 'town' ? 4 : 0);

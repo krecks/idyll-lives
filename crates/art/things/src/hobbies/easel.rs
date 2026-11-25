@@ -2,8 +2,8 @@
 //! part, built on the canvas and grown across it from its left edge while a resident paints (`painting`).
 
 use super::M;
-use super::common::{P, ends, rr};
-use artkit::forms::smooth_outline;
+use super::common::{P, ends};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{Axis, P3, PI, TAU, cos, radians, sin};
 use artkit::motion::{Grow, grow};
 use artkit::parts::{Settle, join, new_parts, settle_with};
@@ -30,7 +30,7 @@ fn on_canvas<U: Coord>(u: U, v: f64, out: f64) -> (U, f64, f64) {
 pub fn easel() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let tilt = (EASEL_TILT, 0.0, 0.0);
-    let leg = rr(0.034, 0.024, 0.005, 1);
+    let leg = rounded_rect(0.034, 0.024, 0.005, 1);
     let still = new_parts(|| {
         // three legs of square section, tapering to their feet, a brass-capped hinge where they meet
         for (name, at, length, rotate) in [

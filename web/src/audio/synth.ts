@@ -70,7 +70,7 @@ export function stepSamples(surface: Surface, wear: Footwear, version: number, r
 
 /** One version of a bird's song (0 to `VERSIONS` - 1). */
 export function songSamples(bird: Voice, version: number, rate: number): Float32Array {
-  return wasm.song(bird.species, bird.seed, bird.pitch, bird.pace, bird.near, version, rate);
+  return made(bird.species, wasm.song(bird.species, bird.seed, bird.pitch, bird.pace, bird.near, version, rate));
 }
 
 /** A room's impulse response (two channels, its energy 1 a channel on average). */
@@ -79,10 +79,9 @@ export function roomResponse(size: RoomSize, rate: number): Stereo {
 }
 
 /**
- * `x` through a two-pole filter as a Web Audio `BiquadFilterNode` computes it (its `Q` in dB for a low-pass and a
- * high-pass, a plain quality factor for a band-pass). `loop`: `x` is a loop, and the filter has run over its end
- * before its start, so the result loops as smoothly as `x` did.
+ * `x` through a low-pass filter as a Web Audio `BiquadFilterNode` computes it (its `Q` in dB). `loop`: `x` is a
+ * loop, and the filter has run over its end before its start, so the result loops as smoothly as `x` did.
  */
-export function nodeFilter(x: Float32Array, rate: number, type: 'lowpass' | 'highpass' | 'bandpass', frequency: number, q: number, loop: boolean): Float32Array {
-  return wasm.filter(x, rate, type, frequency, q, loop);
+export function lowpass(x: Float32Array, rate: number, frequency: number, q: number, loop: boolean): Float32Array {
+  return wasm.lowpass(x, rate, frequency, q, loop);
 }

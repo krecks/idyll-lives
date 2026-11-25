@@ -2,10 +2,10 @@
 
 use super::M;
 use super::common::{_mesh, SKY, blade, stem};
-use crate::plants::common::options;
 use artkit::far::{is_low, low};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, TAU, V3, atan2, cos, degrees, pow, radians, sin, sqrt, v3};
+use artkit::options;
 use artkit::parts::{Settle, join_all, settle, settle_with};
 use artkit::rand::Random;
 use artkit::scene::Obj;

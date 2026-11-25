@@ -10,9 +10,9 @@ import type { ObjectPlacement, PlotInfo, WorldStructure } from '../src/core/prot
 import type { ChunkPlan } from '../src/render/shared/street';
 
 const LOTS = 12;
-/** The street of `town(objects)` drawn, hashed: as it was before land that slopes (see the test). Taken again when the neighbours' silhouettes, the parked cars or the kerbs change (last: the walls', posts' and roofs' tops eased, the mailboxes' lids and the bridges' noses). */
-const FLAT_STREET = 2124564854;
-const FLAT_STREET_FOCUS = 3672397484;
+/** The street of `town(objects)` drawn, hashed: as it was before land that slopes (see the test). Taken again when the neighbours' silhouettes, the parked cars or the kerbs change (last: the kerbs' upright faces drawn plain, with the props). */
+const FLAT_STREET = 79053710;
+const FLAT_STREET_FOCUS = 3027582260;
 const LOT_W = 20;
 
 /** Lots along both sides of a road running along x at z = 23 (lots north z 0..20, south z 26..46). */
@@ -335,7 +335,9 @@ describe('the street in chunks', async () => {
   };
   const { blankLand, encodeLand, LAND_CELL } = await import('../src/game/land');
   const { surfaceOf } = await import('../src/render/shared/landSurface');
-  const { ROAD_Y, WALK_Y } = await import('../src/render/shared/roads');
+  const { ROAD_Y } = await import('../src/render/shared/roads');
+  const { STREET_LOOK } = await import('../src/render/shared/paving');
+  const { asDrawn } = await import('../src/render/shared/house');
   /** `world` on a land rising 6 % along x and 3 % along z, its town following it (or drawn, `seeded`). */
   const onLand = (world: WorldStructure, seeded: 'follow' | 'drawn' = 'follow'): WorldStructure => {
     const land = blankLand(world.width, world.depth, seeded);
@@ -392,12 +394,18 @@ describe('the street in chunks', async () => {
     const signs = street.chunkIds().flatMap((cid) => street.chunk(cid, NO_FOCUS).batches.get('model.street.sign') ?? []);
     expect(signs.length).toBeGreaterThan(0);
     for (const [x, z, , , , y] of signs) expect(y ?? 0).toBeCloseTo(surface.at(x, z), 4);
-    // Lifted, not moved: the same houses' vertices across, their heights the only change; the props as many.
+    // Lifted, not moved: the same houses' vertices across, their heights the only change; the props as many (but the
+    // sidewalks' upright faces, drawn with them, `WalkGeo`: their sidewalks climb the land in more pieces).
     const xs = (c: ChunkPlan) => c.silhouettes.parts.map((q) => q.geo.pos.filter((_, k) => k % 3 !== 1).join(','));
     expect(xs(b)).toEqual(xs(a));
-    for (const cid of street.chunkIds()) expect(street.chunk(cid, NO_FOCUS).props.pos.length).toBe(flat.chunk(cid, NO_FOCUS).props.pos.length);
-    // A lamp's post on the sidewalk: its foot at the walk's height over the road there.
-    void WALK_Y;
+    const walkFaces = new Set([STREET_LOOK.kerb, STREET_LOOK.walk].map((c) => asDrawn(c, 'material.sidewalk').slice(1).toLowerCase()));
+    const props = (c: ChunkPlan) => {
+      const col = c.props.col;
+      let n = 0;
+      for (let k = 0; k < col.length; k += 4) if (!walkFaces.has([col[k], col[k + 1], col[k + 2]].map((v) => v.toString(16).padStart(2, '0')).join(''))) n++;
+      return n;
+    };
+    for (const cid of street.chunkIds()) expect(props(street.chunk(cid, NO_FOCUS))).toBe(props(flat.chunk(cid, NO_FOCUS)));
   });
 
   test('a chunk whose heights moved is planned again (its key has the heights in it)', () => {

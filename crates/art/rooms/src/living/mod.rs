@@ -13,7 +13,7 @@
 //! The sofa bed is a boxy two-seater against the wall (the old part's size), whose mattress, folded away inside
 //! the base under the seat at rest, pulls out forward over the seat and onto the floor in front (`bed_out`), held
 //! out while the object is open (dozing on it, "Pull out the bed"; "Fold the bed away"). Sleepers lie with their
-//! heads on the seat and the rest on the mattress (characters.ts BEDS['sofaBed']: its top and how far forward).
+//! heads on the seat and the rest on the mattress (furniture.json beds.sofaBed: its top and how far forward).
 //!
 //! The sofas and sectionals copy the old primitive parts, where they stand. Their seat cushions are a part of
 //! their own that sinks 2 cm while sat or dozed on (`sink_in`). The armchairs too, but for the recliner (it
@@ -139,8 +139,9 @@ palette! { M:
     bin_sage = ("#9DAF8C", fabric), // the cube shelf's fabric bins
     bin_clay = ("#C98F6B", fabric),
     bin_hole = ("#3A3530", matte),
-    vitrine = ("#7A5234", wood), // the display cabinet
-    vitrine_back = ("#E8E2D6", wood),
+    // the display cabinet, in a plain finish (as its ornaments): its door's brass and glass draw on their own
+    vitrine = ("#7A5234", satin),
+    vitrine_back = ("#E8E2D6", satin),
     shelf_glass = ("#CFDCDF", gloss), // its shelves: plain, so its door is the only glass
     book_e = ("#2B2B2E", satin),
     book_f = ("#D8D2C4", satin),
@@ -169,13 +170,13 @@ fn sofa_uses() -> Json {
 }
 
 /// The family, as far as it is built here.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let sit = json!({"uses": {"sit": "sink_in"}});
     let sit_read = json!({"uses": {"sit": "sink_in", "read": "sink_in"}});
     let book_out =
         json!({"uses": {"read": "book_out", "study": "book_out", "homework": "book_out"}});
     let read = json!({"uses": {"read": "book_out"}});
-    Some(Family::new(
+    Family::new(
         "living",
         M.palette(),
         vec![
@@ -252,7 +253,7 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, -0.02)
                 .motions(sofa_uses())
                 .paint(&[("teal", "Upholstery"), ("teal_cushion", "Cushions"), ("brass", "Frame"), ("brass_legs", "Legs")]),
-            Model::new("sofaThreeSeat", sectionals::sofa_three_seat, (2.86, 0.823, 0.88))
+            Model::new("sofaThreeSeat", sectionals::sofa_three_seat, (2.82, 0.823, 0.88))
                 .key("model.sofaThreeSeat")
                 .centre(0.0, 0.01)
                 .motions(sofa_uses())
@@ -283,9 +284,9 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, 0.015)
                 .motions(sofa_uses())
                 .paint(&[SECTIONAL[0], SECTIONAL[1], SECTIONAL[2], ("pillow_mustard", "Pillow")]),
-            Model::new("chaise", sectionals::chaise, (0.96, 0.823, 1.9))
+            Model::new("chaise", sectionals::chaise, (0.96, 0.823, 1.84))
                 .key("model.chaise")
-                .centre(0.0, 0.02)
+                .centre(0.0, -0.01)
                 .motions(sofa_uses())
                 .paint(&[SECTIONAL[0], SECTIONAL[1], SECTIONAL[2], ("throw_oat", "Throw")]),
             // L2: the armchairs and small seats
@@ -351,10 +352,10 @@ pub fn family() -> Option<Family> {
                 .key("model.coffeeTable")
                 .motions(json!({"uses": {"magazine": "drawer_open"}, "hold": 2.5}))
                 .paint(&[("oak", "Wood"), ("brass", "Knob")]),
-            Model::new("coffeeTableGlass", tables::coffee_table_glass, (1.3, 0.6, 0.74))
+            Model::new("coffeeTableGlass", tables::coffee_table_glass, (1.3, 0.525, 0.74))
                 .key("model.coffeeTableGlass")
                 .paint(&[("chrome", "Frame"), ("glass", "Glass")]),
-            Model::new("coffeeTableMarble", tables::coffee_table_marble, (0.88, 0.58, 0.88))
+            Model::new("coffeeTableMarble", tables::coffee_table_marble, (0.88, 0.535, 0.88))
                 .key("model.coffeeTableMarble")
                 .paint(&[("marble", "Top"), ("brass", "Base")]),
             Model::new("sideTable", tables::side_table, (0.55, 0.55, 0.45))
@@ -424,5 +425,5 @@ pub fn family() -> Option<Family> {
         ],
         "The living room (crates/art/rooms/src/living, built by cargo art). The materials map onto the game's \
          finishes so a model costs one draw call per finish group.",
-    ))
+    )
 }

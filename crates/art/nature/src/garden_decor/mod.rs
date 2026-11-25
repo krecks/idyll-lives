@@ -19,7 +19,6 @@ mod stonework;
 palette! { M:
     stone = ("#B9B2A6", matte),
     stone_dark = ("#8F887C", matte),
-    stone_warm = ("#C6BCA9", matte),
     water = ("#6FA8C0", gloss), // opaque, like the old parts' water
     moss = ("#5E8A3C", foliage),
     leaf = ("#4E7A34", foliage),
@@ -56,9 +55,8 @@ const F: GameFrame = GameFrame::new(0.0);
 const TOLERANCE: f64 = 0.1;
 
 /// The family.
-pub fn family() -> Option<Family> {
-    Some(
-        Family::new(
+pub fn family() -> Family {
+    Family::new(
             "garden",
             M.palette(),
             vec![
@@ -97,6 +95,4 @@ pub fn family() -> Option<Family> {
              and lights like the rest of the garden.",
         )
         .pack("gardenDecor")
-        ,
-    )
 }

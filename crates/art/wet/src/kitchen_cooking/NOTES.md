@@ -110,8 +110,9 @@ printed double ring), `oven` (the cavity cut out of the carcass (`hollow`: the f
 rack on runners and a lamp: an open door shows an oven, not a dark face), `oven_door`/`oven_face` (a dark frame
 round a black window, an inner pane, a round bar handle on stand-offs in one piece), `strip` (a rounded fascia with a
 clock display), `shaker` and `pull` (shaker fronts and one-piece bar pulls on every cabinet), `stock_pot`,
-the frying pan, `tray`, `cup`, `canister`, `basket` (a dishwasher's wire basket), `fillet` (round a bent tube's
-corners without the Catmull-Rom overshoot `kit::tube!` makes between a long span and a short one).
+the frying pan, `tray`, `cup`, `canister`, `basket` (a dishwasher's wire basket). A bent tube's corners are rounded by
+`kit::fillet` (no Catmull-Rom overshoot between a long span and a short one; its own copy is gone, 2026-11-25:
+the range cooker's and the coffee machine's rails moved under a micrometre).
 
 - **stoveElectric**: printed zones, a rounded splash guard with a vent, a fascia with a clock, a real oven, a drawer
   with a bar pull.
@@ -193,3 +194,13 @@ column), so its turntable shows through the window and the open door.
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `breakfastCounter`, `coffeeMachine`, `cooktopCounter`, `dishwasher`, `dishwasherCompact`, `microwave`, `wallOven`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+No hard edge shows unbevelled any more (60 → 0): the pulls shade round, the pan supports are six-sided bars shaded
+round, the range cooker's tea towel folds over its rail in more steps and has round edges, the bowls', saucers' and lids'
+rims are rounded (`artkit::forms::eased`), and the wall oven's cornice has its top edges eased. The gas range's stock pot
+is 16 cm, so the range is 1.09 m high with it; the cooker kind takes a cooker drawn to its 1 m counter tile (0.92 m),
+the dishwasher kind the dishwashers drawn with the cupboard beside them (docs/review/reference.json). The fourth draw
+call of the stoves, the microwave and the breakfast counter is a moving part each (door, knob, flame, turntable, lid):
+left as it is.

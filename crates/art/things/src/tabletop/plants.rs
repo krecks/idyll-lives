@@ -525,7 +525,7 @@ pub fn pot_cactus() -> Vec<Obj> {
     ]
     .into_iter()
     .map(|(z, r)| {
-        ribbed!(r, 7, depth = 0.16, verts = 21)
+        ribbed!(r, 7, depth = 0.16, verts = 35)
             .into_iter()
             .map(|(u, v)| P3::from((u, v, z)))
             .collect()

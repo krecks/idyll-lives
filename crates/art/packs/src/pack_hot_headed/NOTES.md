@@ -101,3 +101,18 @@ No change to the build: its soft boxes take the shared form's new shape (the sha
 ## Leather (2026-11-13)
 
 The heavy bag's body (`bag`) is leather. It goes from 2 draws to 3. The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (artkit's `uv` makes them) and a draw call of its own.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate found (37) is gone, and the smash bin's posts no longer smear their wood:
+- **Heavy bag:** the T foot's swept ends eased, the weight plates' lathe eased all round (`artkit::forms::eased`, closed
+  from the middle of the back face so the hole's rim is eased too); the rubber floor mat set aside (`aside`) and the
+  long foot 1 cm shorter, so the stand measures 0.72 × 2.00 × 0.77 m, a heavy bag stand's footprint.
+- **Smash bin:** the plates' rims a 4 mm band (too narrow to show hard: a lathe rim at no extra triangles); the
+  posts' bevel 4 mm in one segment (its wood's UVs laid on the bevel; carried, they smeared 2.8 % of `crate_dark`).
+- **Cool-down cushion:** the singing bowl stand's, the candle dish's, the candle's and the pot's rims cut once more
+  where they turned over 70°; the round mat 0.86 m across (was 0.90; a floor cushion's mat), 40 sides.
+- **Grudge journal:** the cactus fluted in 48 points (32 made its ribs 71° ridges), the pot's rim chamfered, the chair
+  back's swept ends eased.
+- **Thunder drums:** each drum's head two 3 mm discs over the shell's ends (its edge a band too narrow to show hard)
+  and the shell an open tube under them; the hoops 18 round, the cymbals 18 (7,954 triangles).

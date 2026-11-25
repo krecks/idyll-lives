@@ -190,6 +190,7 @@ fn a_top_the_content_hasnt_a_table_without_its_seats_and_a_stairs_top_step() {
                     m.top = Some(([0.0, 0.0], 0.74))
                 }),
             )]),
+            seats: BTreeMap::new(),
         },
         &r,
     );
@@ -304,6 +305,7 @@ fn a_top_the_content_hasnt_a_table_without_its_seats_and_a_stairs_top_step() {
         &Measures {
             models: BTreeMap::new(),
             objects: BTreeMap::from([("stairs".to_string(), m)]),
+            seats: BTreeMap::new(),
         },
         &r,
     );
@@ -382,6 +384,7 @@ fn the_kind_is_by_id_then_model_then_category_and_group_then_group() {
         &Measures {
             models,
             objects: found,
+            seats: BTreeMap::new(),
         },
         &r,
     );

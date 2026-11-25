@@ -68,7 +68,7 @@ old part (`catalog.double_vanity`) has none either.
 `model.toiletWallHung`, built 2026-10-14. They sat in Validate › Toilets until checked in play.
 
 - **Against the wall, not centred.** The game sits a resident at the footprint's middle plus the seat's
-  `fwd` (characters.ts `SEATS`, else the content's `seat`), so each toilet is built where the game places it:
+  `fwd` (furniture.json `seats`, else the content's `seat`), so each toilet is built where the game places it:
    the cistern (or the boxed-in cistern) on the wall face at game depth -0.43,
   settled with `centre: false`, and `centre` on its `Model`. The bowl's middle is 8–16 cm in front of the hips.
 - **Seat heights.** The seat's top is the seat height: 0.43 m (`toilet`, `toiletCompact`), 0.44 m
@@ -134,7 +134,7 @@ Validate › Showers until checked in play.
   gathered into that corner at rest
   (scaled to 0.32 along the rail about its origin there); `curtain_draw` grows it across in 0.9 s, 1 s into the
   use, held till the use ends (A-bathroom-02). The water comes on at 1.8 s.
-- **Tiles** (`tiled_walls`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
+- **Tiles** (`kit::tiled_walls!`) are thin satin squares a little proud of a grout backing: the base shower 30 cm,
   the stall 25 cm. The walk-in shower's stone wall has grooved joints; the rain shower's walls are plain stone.
   The rain shower's front glass covers only the left half: the right half is the way in.
 - **Details (2026-10-22).** Trays are one loft with a raised lip round a floor falling to the drain (`_tray`), the
@@ -235,3 +235,17 @@ cargo art bathroom --preview        # tools/art/previews/bathroom/sink.png, sink
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 9 models changed shape: `bathCabinetTall`, `bathtub`, `mirrorCabinet`, `showerRain`, `sinkPedestal`, `sinkVessel`, `toiletSmart`, `toiletWallHung`, `vanityDouble`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+No hard edge shows unbevelled any more (36 → 0). The basins' and baths' rims roll over in steps of under 60°, the
+pedestal toilet's foot rolls in, the shower curtains' faces stand square to their folds (and the gathered one's hems
+square as it hangs gathered, its folds in more steps), the draped towels are 9 mm (a terry towel's layer), the rolled
+towels' ends are eased, the round mirror's back edge and the deck taps' tops are eased, the toilet rolls bevelled
+(14 sides, for the compact toilet's triangles). The compact toilet's roll is 3 cm nearer it (0.56 m wide). Still
+outside their kinds (reported): the clawfoot and the freestanding bath with their taps (1.02, 0.92 m), the smart and the
+wall-hung toilet with the boxing of their cisterns (0.90 × 1.20, 0.60 × 1.10 m).
+
+## Measured as the piece (2026-11-25)
+
+`bathtubClawfoot` and `bathtubFreestanding`: the taps (the clawfoot's riser filler, bar and hand shower; the freestanding bath's floor-standing filler and handset) and the stream they run (`stream_aside`, still grown by `tap_on`) are set aside (`parts::aside`): drawn as before, not the tub's size. `cargo review sizes` measures the tubs: 1.73 × 0.72 × 0.83 m (was 1.02 m high) and 1.79 × 0.60 × 0.83 m (was 1.90 × 0.92). The toilets keep their boxing: set aside, the wall-hung pans would measure 0.25 m high (they float), so their kind is the reference's to give.

@@ -1,13 +1,9 @@
 // The render resolution (`render/shared/resolution.ts`): 720p, 1080p, 1440p or 2160p lines of pixels,
 // never more than the canvas has.
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_RESOLUTION, isResolution, renderScale } from '../src/render/shared/resolution';
+import { isResolution, renderScale } from '../src/render/shared/resolution';
 
 describe('the render resolution', () => {
-  test('1080p is the default', () => {
-    expect(DEFAULT_RESOLUTION).toBe(1080);
-  });
-
   test('a canvas taller than the setting is drawn at its lines, scaled up', () => {
     // A Retina window 1600 device pixels tall.
     expect(renderScale(1600, 1080)).toBeCloseTo(0.675);

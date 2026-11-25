@@ -611,6 +611,65 @@ pub use tones::*;
 mod mono;
 pub use mono::*;
 
+/// What the tests measure sounds by.
+#[cfg(test)]
+pub(crate) mod check {
+    use super::Stereo;
+    use super::m::PI;
+
+    /// The biggest step between neighbouring samples of a channel, and the step from its last sample round to
+    /// its first.
+    pub fn steps(ch: &[f32]) -> (f64, f64) {
+        let inside = ch
+            .windows(2)
+            .map(|w| (w[1] as f64 - w[0] as f64).abs())
+            .fold(0.0, f64::max);
+        (inside, (ch[0] as f64 - ch[ch.len() - 1] as f64).abs())
+    }
+
+    /// How bright a sound is: the root mean square of its sample-to-sample change over that of its samples, as
+    /// a frequency (Hz).
+    pub fn brightness(d: &[f32], rate: f64) -> f64 {
+        let (mut change, mut level) = (0.0, 0.0);
+        for i in 1..d.len() {
+            let (a, b) = (d[i - 1] as f64, d[i] as f64);
+            change += (b - a) * (b - a);
+            level += b * b;
+        }
+        (change / level).sqrt() * rate / (2.0 * PI)
+    }
+
+    /// A sound as made (before the game's level): both sides as long, over half a second, never past full scale
+    /// (rounded off above 0.7: `set_level`), with sound in it, and, `looped`, its end running on into its start.
+    pub fn whole(what: &str, s: &Stereo, rate: f64, looped: bool) {
+        let Stereo { left, right } = s;
+        assert_eq!(left.len(), right.len(), "{what}");
+        assert!(
+            left.len() as f64 > rate / 2.0,
+            "{what}: {} samples",
+            left.len()
+        );
+        let (mut peak, mut sum) = (0.0f64, 0.0f64);
+        for ch in [left, right] {
+            for &v in ch {
+                peak = peak.max((v as f64).abs());
+                sum += v as f64 * v as f64;
+            }
+        }
+        // (A NaN or an infinity anywhere carries into the sum.)
+        assert!(sum.is_finite(), "{what}: not finite");
+        assert!(peak <= 1.0 + 1e-6, "{what}: peak {peak}");
+        let rms = (sum / (2.0 * left.len() as f64)).sqrt();
+        assert!(rms > 0.004, "{what}: rms {rms}");
+        if looped {
+            for ch in [left, right] {
+                let (inside, seam) = steps(ch);
+                assert!(seam <= inside, "{what}: seam {seam} over {inside}");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -13,7 +13,8 @@
 
 import { add, cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { TAU } from './idle';
-import { armIK, axisAngle, euler, mul, smooth, toEuler, wrist } from './ik';
+import { armIK, axisAngle, euler, mul, toEuler, wrist } from './ik';
+import { smooth } from '../../../../game/noise';
 
 /** Seconds per loop: asleep six breaths of 1.5 s, awake four (and whole kicks, waves and a turn of the head). */
 const ASLEEP_S = 9;

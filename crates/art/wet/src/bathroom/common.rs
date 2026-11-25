@@ -1,41 +1,17 @@
 //! What the bathroom's things are built from: tubes, lathed shells, taps, pulls, panels, bottles, the water.
 
 use super::M;
-use artkit::forms::{Scale, rounded_rect};
+use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, cos, pow, sin};
-use artkit::place::{Coord, GameFrame, Spot};
+use artkit::place::{Coord, GameFrame};
 use artkit::py;
 use artkit::scene::Obj;
-use artkit::{Arg, fbox, fcyl, fextrude, loft};
+use artkit::{fbox, fcyl, fextrude, loft};
 
 /// The wall's face, game depth: the toilets' cisterns and the storage stand on it.
-pub const WALL: f64 = -0.43;
-
-/// A tube in one piece through game points, its bends rounded (the kit's tube).
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: impl AsRef<str>,
-    pts: &[P],
-    r: f64,
-    material: Mat,
-    verts: usize,
-    round: usize,
-    scale: impl Arg<Scale>,
-) -> Obj {
-    kit::tube!(
-        f,
-        name,
-        pts,
-        r,
-        material,
-        verts = verts,
-        round = round,
-        scale = scale
-    )
-}
+pub use artkit::kit::WALL;
 
 /// A closed loop of Blender points round game (cx, cz) at height `y`: `rx` across, `rz` to the front (`back`
 /// behind, if given), squarer towards a rounded rectangle as `square` grows, narrower to the front by `egg`.
@@ -229,7 +205,7 @@ pub fn gooseneck<X: Coord>(
     if end < cy - 0.01 {
         pts.push((x, end, spout_z));
     }
-    tube(f, name, &pts, r, material, 10, 2, 1.0);
+    kit::tube!(f, name, &pts, r, material, verts = 10, round = 2);
     fcyl!(
         f,
         format!("{name}_aerator"),
@@ -252,7 +228,7 @@ pub fn gooseneck<X: Coord>(
     );
     if lever {
         let ly = base_y + 0.07;
-        tube(
+        kit::tube!(
             f,
             format!("{name}_lever"),
             &[
@@ -262,9 +238,9 @@ pub fn gooseneck<X: Coord>(
             ],
             0.0065,
             material,
-            8,
-            2,
-            [1.3, 1.0, 0.75],
+            verts = 8,
+            round = 2,
+            scale = [1.3, 1.0, 0.75]
         );
     }
     (x, end - 0.014, spout_z)
@@ -301,7 +277,7 @@ pub fn pull(
         p(b, stand - 0.009),
         p(b, -0.002),
     ];
-    tube(f, name, &pts, r, material, 8, 2, 1.0)
+    kit::tube!(f, name, &pts, r, material, verts = 8, round = 2)
 }
 
 /// A shaker door or drawer front, its back on game depth `z`: a frame (an outline with a hole, its edges eased)
@@ -494,9 +470,12 @@ pub fn bowl_shell(
             ring(floor_y + h * 0.12, rx * (foot + 0.18 * belly)),
             ring(floor_y + h * 0.45, rx * (0.86 + 0.06 * belly)),
             ring(floor_y + h * 0.8, rx * 0.985),
-            ring(rim_y - 0.004, rx),
-            ring(rim_y, rx - wall * 0.35),
-            ring(rim_y - 0.002, rx - wall),
+            // the rim rounded over: no edge turns 60°
+            ring(rim_y - 0.006, rx),
+            ring(rim_y - 0.0015, rx - 0.0015),
+            ring(rim_y, rx - wall * 0.4),
+            ring(rim_y - 0.0005, rx - wall * 0.75),
+            ring(rim_y - 0.004, rx - wall - 0.0015),
             ring(floor_y + h * 0.6, rx * (0.92 + 0.03 * belly) - wall),
             ring(floor_y + h * 0.25, rx * 0.72 - wall),
             ring(floor_y + wall + 0.006, rx * 0.4),

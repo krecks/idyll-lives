@@ -6,7 +6,6 @@
 
 use super::common::{
     BOARD, PAGES_IN, SPINE, SPINE_STEPS, book, bulge, disc, hardback, hardback_end, knob, mesh,
-    prism_faces,
 };
 use super::{F, M};
 use artkit::forms::{Holes, rounded_rect};
@@ -18,7 +17,7 @@ use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsphere, fsweep, jitter, settle, swing};
 
-pub(super) const WALL: f64 = -0.43;
+pub(super) use artkit::kit::WALL;
 pub(super) const BOOK_TIP: f64 = 25.0;
 
 /// The covers the books are drawn from, by chance.
@@ -297,8 +296,8 @@ pub(super) fn plant(x: f64, y: f64, z: f64, r: f64, h: f64, pot: Mat, leaves: f6
             leaves * s,
             (x + dx * leaves, y + h + dy * leaves, z + dz * leaves),
             if i % 2 == 0 { M.plant } else { M.leaf_light },
-            segments = 10,
-            rings = 6
+            segments = 8,
+            rings = 5
         );
         jitter!(
             clump,
@@ -331,6 +330,7 @@ pub(super) fn plant(x: f64, y: f64, z: f64, r: f64, h: f64, pot: Mat, leaves: f6
             if i % 2 != 0 { M.leaf_light } else { M.plant },
             profile = [(0.0, -0.016), (0.003, 0.0), (0.0, 0.016), (-0.002, 0.0)],
             up = (0, 0, 1),
+            angle = 180.0, // a leaf: thin, its margins shade round
             resolution = 2,
             scale = [0.3, 1.0, 0.2]
         );
@@ -366,27 +366,41 @@ pub(super) fn frame_photo(x: f64, y: f64, z: f64, mat: Mat, w: f64, h: f64) {
 }
 
 /// The game outline `outline` [(p, q)] extruded: (x, depth) points from height a0 to a1 (`along_x` false); (depth,
-/// height) points from x = a0 to a1 (a ladder's rail).
-pub(super) fn prism(
+/// height) points from x = a0 to a1 (a ladder's rail); the edges round its two end faces chamfered `c` (the outline
+/// set in at each end, all of it `c` in): a board's arrises eased.
+pub(super) fn eased_bar(
     name: &str,
     outline: &[(f64, f64)],
-    a0: f64,
-    a1: f64,
+    (a0, a1): (f64, f64),
+    c: f64,
     material: Mat,
     along_x: bool,
 ) -> Obj {
+    let small = artkit::forms::inset(outline, c);
+    let k = outline.len() as u32;
     let mut verts: Vec<(f64, f64, f64)> = Vec::new();
-    for a in [a0, a1] {
+    for (a, o) in [
+        (a0, &small),
+        (a0 + c, &outline.to_vec()),
+        (a1 - c, &outline.to_vec()),
+        (a1, &small),
+    ] {
         verts.extend(
-            outline
-                .iter()
+            o.iter()
                 .map(|&(p, q)| if along_x { (a, q, p) } else { (p, a, q) }),
         );
     }
-    mesh(name, &verts, &prism_faces(outline.len()), material)
+    let mut faces = vec![(0..k).collect::<Vec<u32>>(), (3 * k..4 * k).rev().collect()];
+    for r in 0..3 {
+        for i in 0..k {
+            let (j, at) = ((i + 1) % k, r * k);
+            faces.push(vec![at + i, at + j, at + k + j, at + k + i]);
+        }
+    }
+    mesh(name, &verts, &faces, material)
 }
 
-/// A quarter-round board from y0 to y1: its corner on (cx, cz), round from +x (along the wall) to the front.
+/// A quarter-round board from y0 to y1, its edges eased: its corner on (cx, cz), round from +x (along the wall) to the front.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn quarter(
     name: &str,
@@ -403,7 +417,7 @@ pub(super) fn quarter(
         let a = PI / 2.0 * f64::from(i) / f64::from(segments);
         (cx + r * cos(a), cz + r * sin(a))
     }));
-    prism(name, &pts, y0, y1, material, false)
+    eased_bar(name, &pts, (y0, y1), 0.004, material, false)
 }
 
 /// An open bookcase w × h × d at x, its back on the wall's face: two sides, a top, a bottom board on a recessed kick,
@@ -544,7 +558,8 @@ pub fn bookshelf() -> Vec<Obj> {
             d,
             (s * 0.4325, 0.95, zm),
             M.oak,
-            bevel = 0.006
+            bevel = 0.006,
+            bevel_segments = 1
         );
     }
     fbox!(F, "top", 0.9, 0.035, d, (0, 1.9, zm), M.oak, bevel = 0.006);
@@ -576,7 +591,8 @@ pub fn bookshelf() -> Vec<Obj> {
         d - 0.012,
         (0, 0.0875, zm + 0.006),
         M.oak,
-        bevel = 0.003
+        bevel = 0.003,
+        bevel_segments = 1
     );
     fbox!(
         F,
@@ -598,7 +614,8 @@ pub fn bookshelf() -> Vec<Obj> {
             d - 0.012,
             (0, y - 0.0125, zm + 0.006),
             M.oak,
-            bevel = 0.003
+            bevel = 0.003,
+            bevel_segments = 1
         );
         fbox!(
             F,
@@ -680,7 +697,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
             d,
             (s * (w / 2.0 - t / 2.0), h / 2.0, zm),
             M.oak,
-            bevel = 0.003
+            bevel = 0.003,
+            bevel_segments = 1
         );
     }
     fbox!(
@@ -692,7 +710,7 @@ pub fn bookcase_wide() -> Vec<Obj> {
         (0, h - 0.015, zm),
         M.oak,
         bevel = 0.006,
-        bevel_segments = 2
+        bevel_segments = 1
     );
     fbox!(
         F,
@@ -722,7 +740,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
         d,
         (0, 0.04 + t / 2.0, zm),
         M.oak,
-        bevel = 0.002
+        bevel = 0.002,
+        bevel_segments = 1
     );
     fbox!(
         F,
@@ -750,7 +769,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
         d + 0.025,
         (0, 0.8, zm + 0.0125),
         M.oak,
-        bevel = 0.004
+        bevel = 0.004,
+        bevel_segments = 1
     );
     for x in [-0.69, -0.23, 0.23, 0.69] {
         fbox!(
@@ -761,7 +781,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
             0.02,
             (x, 0.425, zf + 0.01),
             M.oak,
-            bevel = 0.006
+            bevel = 0.006,
+            bevel_segments = 1
         );
         fbox!(
             F,
@@ -772,7 +793,7 @@ pub fn bookcase_wide() -> Vec<Obj> {
             (x, 0.425, zf + 0.022),
             M.oak,
             bevel = 0.005,
-            bevel_segments = 2
+            bevel_segments = 1
         );
         let kx = x + if x == -0.69 || x == 0.23 { 0.18 } else { -0.18 };
         knob("knob", kx, 0.66, zf + 0.026, M.brass);
@@ -787,7 +808,8 @@ pub fn bookcase_wide() -> Vec<Obj> {
                 d - 0.012,
                 (x0 + 0.454, y, zm + 0.004),
                 M.oak,
-                bevel = 0.002
+                bevel = 0.002,
+                bevel_segments = 1
             );
             fbox!(
                 F,

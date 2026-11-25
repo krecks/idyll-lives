@@ -26,9 +26,16 @@ const STILL_REACH: f32 = 3.0;
 /// Since when each car on its way has stood still (`Taxis::still`).
 pub(super) fn note_still(w: &mut World) {
     let tick = w.tick;
-    let red: Vec<bool> = (0..w.cars.len())
-        .map(|c| {
-            w.traffic.waiting(crate::cars::car_first(c))
+    // (Only for those on their way: any other has moved, red or not.)
+    let red: Vec<bool> = w
+        .cars
+        .iter()
+        .enumerate()
+        .map(|(c, car)| {
+            matches!(
+                car.state,
+                crate::cars::CarState::Leaving | crate::cars::CarState::Arriving
+            ) && w.traffic.waiting(crate::cars::car_first(c))
                 && crate::traffic::at_red(w, crate::cars::car_first(c))
         })
         .collect();

@@ -63,6 +63,7 @@ describe('contactAtlas', () => {
     const tiles = [new Uint8Array(T * T).fill(5), new Uint8Array(T * T).fill(7), new Uint8Array(T * T).fill(9)];
     const atlas = contactAtlas(tiles);
     expect([atlas.width, atlas.height]).toEqual([2 * T, 2 * T]);
+    expect(atlas.rects.length).toBe(tiles.length);
     atlas.rects.forEach((rect, n) => {
       const [x, y] = [Math.round(rect[0] * atlas.width), Math.round(rect[1] * atlas.height)];
       expect([rect[2], rect[3]]).toEqual([0.5, 0.5]);

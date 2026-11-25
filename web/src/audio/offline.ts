@@ -8,7 +8,7 @@
 
 import { distanceCutoff, distanceGain, muffled } from './acoustics';
 import { ROOMS, type RoomSize, type Stereo } from './kinds';
-import { nodeFilter, roomResponse } from './synth';
+import { lowpass, roomResponse } from './synth';
 
 /** The DFT of `re` + i·`im`, in place (radix-2: the length a power of two); `inverse`: back again. */
 export function fft(re: Float64Array, im: Float64Array, inverse = false): void {
@@ -94,7 +94,7 @@ export interface Hearing {
  */
 export function spaced(sound: Stereo, rate: number, from: Hearing, loop: boolean): Stereo {
   const wall = muffled(from.muffle ?? 0);
-  const low = (x: Float32Array, hz: number) => (hz >= rate / 2 ? x : nodeFilter(x, rate, 'lowpass', hz, -3.01, loop));
+  const low = (x: Float32Array, hz: number) => (hz >= rate / 2 ? x : lowpass(x, rate, hz, -3.01, loop));
   let left = low(sound.left, wall.cutoff).map((v) => v * wall.gain);
   let right = low(sound.right, wall.cutoff).map((v) => v * wall.gain);
   if (from.room) {

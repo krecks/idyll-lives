@@ -105,12 +105,12 @@ const DINING_TOP: [(&str, &str); 2] = [("top_oak", "Top"), ("legs_oakd", "Legs")
 const SEAT: [(&str, &str); 2] = [("frame_oak", "Frame"), ("seat_sage", "Seat")];
 
 /// The family, as far as it is built here.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     let stool =
         json!({"uses": {"sit": "swivel", "drink": "swivel"}, "hold": 0.6, "ride": "swivel"});
     // putting clean dishes away (a `cupboard` station, cooking putAwayAt, anim fetch) opens a door
     let put_away = json!({"uses": {"fetch": "door_open"}, "hold": 1.5});
-    Some(Family::new(
+    Family::new(
         "dining",
         M.palette(),
         vec![
@@ -171,7 +171,7 @@ pub fn family() -> Option<Family> {
                 .key("model.tableBarHigh")
                 .paint(&[("top_black", "Top"), ("legs_black", "Legs")]),
             // K8: chairs and stools
-            Model::new("barStool", chairs::bar_stool, (0.39, 0.742, 0.39))
+            Model::new("barStool", chairs::bar_stool, (0.39, 0.717, 0.39))
                 .key("model.barStool")
                 .motions(stool.clone())
                 .paint(&SEAT),
@@ -201,11 +201,11 @@ pub fn family() -> Option<Family> {
             .centre(0.0, 0.032)
             .key("model.chairUpholstered")
             .paint(&[("legs_walnut", "Frame"), ("upholstery", "Upholstery")]),
-            Model::new("chairModern", shells::chair_modern, (0.44, 0.789, 0.496))
+            Model::new("chairModern", shells::chair_modern, (0.448, 0.793, 0.499))
                 .centre(0.0, 0.032)
                 .key("model.chairModern")
                 .paint(&[("legs_black", "Frame"), ("shell", "Seat")]),
-            Model::new("chairWindsor", shells::chair_windsor, (0.475, 0.975, 0.474))
+            Model::new("chairWindsor", shells::chair_windsor, (0.47, 0.968, 0.47))
                 .centre(0.0, 0.041)
                 .key("model.chairWindsor")
                 .paint(&[("frame_windsor", "Frame"), ("seat_windsor", "Seat")]),
@@ -234,7 +234,7 @@ pub fn family() -> Option<Family> {
                 .key("model.benchDining")
                 .paint(&[("legs_oakd", "Frame"), ("seat_oak", "Seat")]),
             // K9: dining storage
-            Model::new("sideboard", storage::sideboard, (1.82, 1.1, 0.668))
+            Model::new("sideboard", storage::sideboard, (1.82, 1.04, 0.668))
                 .centre(0.0, -0.096)
                 .key("model.sideboard")
                 .motions(put_away.clone())
@@ -272,5 +272,5 @@ pub fn family() -> Option<Family> {
          group. Table tops stand at the content's surface heights and seats where the game seats residents; the \
          stools' seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart's cocktail \
          shaker is taken off it while a drink is mixed (`shake`).",
-    ))
+    )
 }

@@ -9,6 +9,7 @@ use artkit::scene::Obj;
 use artkit::{
     fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, revolve, settle, soft, swing, torus,
 };
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the snoozecloud adjustable bed (2x2): two sleepers side by side, mattress top 0.49, head at the back ----
 const HINGE_Z: f64 = -0.42; // the head section's front edge (depth), where it rises from
@@ -75,7 +76,7 @@ pub fn snoozecloud_bed() -> Vec<Obj> {
                         (0.0, 0.05),
                     ],
                     M.birch,
-                    segments = 12
+                    segments = 8 // (under the base)
                 );
             }
         }
@@ -257,10 +258,20 @@ pub fn nap_pod() -> Vec<Obj> {
             prof.push((POD_R * sin(t), -POD_R * cos(t)));
         }
         let ri = POD_R - 0.035;
-        prof.push((
-            (POD_R - 0.0175) * sin(radians(102.0)),
-            -(POD_R - 0.0175) * cos(radians(102.0)),
-        ));
+        // the lip: a half round from the outside to the inside, 30° a step
+        let (n, d) = (
+            (sin(radians(100.0)), -cos(radians(100.0))),
+            (cos(radians(100.0)), sin(radians(100.0))),
+        );
+        let c = (POD_R - 0.0175) * n.0;
+        let c = (c, (POD_R - 0.0175) * n.1);
+        for k in 1..6 {
+            let a = radians(30.0 * k as f64);
+            prof.push((
+                c.0 + 0.0175 * (cos(a) * n.0 + sin(a) * d.0),
+                c.1 + 0.0175 * (cos(a) * n.1 + sin(a) * d.1),
+            ));
+        }
         for k in (0..19).rev() {
             let t = radians(100.0 * k as f64 / 18.0);
             prof.push((ri * sin(t), -ri * cos(t)));
@@ -281,14 +292,17 @@ pub fn nap_pod() -> Vec<Obj> {
             0,
             0.035,
             cz,
-            &[
-                (0.0, 0.0),
-                (0.07, 0.0),
-                (0.06, 0.04),
-                (0.045, 0.2),
-                (0.06, 0.24),
-                (0.0, 0.24),
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.07, 0.0),
+                    (0.06, 0.04),
+                    (0.045, 0.2),
+                    (0.06, 0.24),
+                    (0.0, 0.24),
+                ],
+                AUTO_WIDTH
+            ),
             M.chrome,
             segments = 20
         );

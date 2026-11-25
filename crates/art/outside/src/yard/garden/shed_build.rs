@@ -88,7 +88,7 @@ pub fn shed_small() -> Vec<Obj> {
                 .collect()
         })
         .collect();
-    loft!("window_box", &secs, material = M.box_wood);
+    artkit::bevel::eased(loft!("window_box", &secs, material = M.box_wood));
     for s in [-1.0, 1.0] {
         fextrude!(
             F,
@@ -182,7 +182,8 @@ pub fn shed_small() -> Vec<Obj> {
                 t_hinge(&numbered("hinge"), x0 + 0.02, y, dz + 0.0365, 0.32, M.iron);
             }
         }
-        board(
+        kit::board(
+            &F,
             "brace",
             (x0 + 0.08, 0.36, dz + 0.024),
             (x0 + DOOR_W - 0.08, 1.21, dz + 0.024),
@@ -193,14 +194,14 @@ pub fn shed_small() -> Vec<Obj> {
             low(0.005, 0.0),
         );
         let lx = x0 + DOOR_W - 0.08;
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "latch_plate",
             &rounded_rect(0.06, 0.15, 0.012, low(2, 1)),
             0.006,
             (lx, 0.86, dz + 0.018),
             M.iron
-        );
+        ));
         if !is_low() {
             torus!(
                 "latch_ring",
@@ -212,7 +213,7 @@ pub fn shed_small() -> Vec<Obj> {
                 major_segments = 12,
                 minor_segments = 4
             );
-            fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 "latch_boss",
                 0.012,
@@ -221,7 +222,7 @@ pub fn shed_small() -> Vec<Obj> {
                 M.iron,
                 rot = (90, 0, 0),
                 verts = 8
-            );
+            ));
             fbox!(
                 F,
                 "latch_bar",

@@ -1,6 +1,12 @@
 //! The repo's command-line tools, one binary each under `src/bin/` (run them through the cargo
 //! aliases in `.cargo/config.toml`, e.g. `cargo characters build`). Nothing here is shipped.
 
+/// The checkout's root: this crate sits two below it.
+pub fn repo_root() -> std::path::PathBuf {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    std::fs::canonicalize(&root).unwrap_or(root)
+}
+
 pub mod art;
 pub mod assets;
 pub mod characters;

@@ -4,6 +4,8 @@
  * `LOD_FAR_PX`) and its tests read the same numbers.
  */
 
+import { smoothstep } from '../../game/noise';
+
 /** The game camera's zoom and tilt limits. */
 export const RADIUS_LIMITS = [6, 95] as const;
 export const BETA_LIMITS = [0.3, 1.35] as const;
@@ -25,7 +27,6 @@ export const TOWN_MAX = 900;
 
 /** How far into the town view a camera this far out is: 0 at or below `TOWN_FROM`, 1 at `TOWN_FULL` (smoothstep). */
 export function townBlend(radius: number): number {
-  const t = Math.min(1, Math.max(0, (radius - TOWN_FROM) / (TOWN_FULL - TOWN_FROM)));
-  return t * t * (3 - 2 * t);
+  return smoothstep(TOWN_FROM, TOWN_FULL, radius);
 }
 // pin:living-town-lens end

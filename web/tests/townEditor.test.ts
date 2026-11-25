@@ -3,9 +3,10 @@
 // shown (red for a while, a line, a Problems entry); a settle that fails taking its edits back, so no
 // ghost stays; a town settled but not shown still recorded; the Problems list read
 // from a draft as the checks read a whole town file (`problems.ts` `checkedTown`), sorted into what
-// blocks the way on and what only warns; what is picked found again after an edit; the edits' ghosts.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+// blocks the way on and what only warns; what is picked found again after an edit; the edits' ghosts. (A laid city's
+// checks: `townEditor.slow.test.ts`.)
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import type { Edited } from '../src/game/edit/edited';
 import type { NeighbourhoodDraft } from '../src/game/town';
@@ -395,22 +396,8 @@ describe('the edit session', () => {
 });
 
 describe('the Problems list and picking, on a generated town', async () => {
-  const WEB = new URL('../', import.meta.url).pathname;
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { mulberry32 } = await import('../src/game/noise');
   const { townProblems } = await import('../src/game/townCheck');
@@ -421,12 +408,10 @@ describe('the Problems list and picking, on a generated town', async () => {
   const { find, keyOf, pick, spotNear } = await import('../src/ui/townedit/pick');
   const { editGhosts } = await import('../src/ui/townedit/ghosts');
   const { packUses, useGrid } = await import('../src/game/uses');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const careers = content.careerCategories.map((c) => c.id);
   const hamlet = generateWorld(content, t, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'few' });
   const made = (e: Edited): NeighbourhoodDraft => {
@@ -525,11 +510,9 @@ describe('the Problems list and picking, on a generated town', async () => {
     expect(g.roads).toEqual([]);
     // A road removed with what stands on it.
     const road = hamlet.roads.findIndex((r, i) => r.kind === 'lane' && 'draft' in removeRoad(hamlet, t, i));
-    if (road >= 0) {
-      const without = made(removeRoad(hamlet, t, road));
-      const r = editGhosts(hamlet, without, t)!;
-      expect(r.roads.some((q) => q.tone === 'bad')).toBe(true);
-    }
+    expect(road).toBeGreaterThanOrEqual(0);
+    const without = made(removeRoad(hamlet, t, road));
+    expect(editGhosts(hamlet, without, t)!.roads.some((q) => q.tone === 'bad')).toBe(true);
     expect(editGhosts(hamlet, { ...hamlet, name: 'Elsewhere' }, t)).toBeNull();
     // A road drawn shows as the road it will be at once (laid), its deck as a bridge.
     const drawn = { points: [[10, 10], [60, 10]] as [number, number][], width: 7, ends: ['join', 'dead'] as RoadPlan['ends'], kind: 'street' as const };
@@ -565,13 +548,4 @@ describe('the Problems list and picking, on a generated town', async () => {
     expect(made(addLot(hamlet, t, content, at, choice, 11)).slots.at(-1)!.template).toBe(s.template);
     expect(townIssues(town, t, content).blocking).toEqual([]);
   });
-
-  // (A city's checks take seconds, which is why they run in their own worker, `checkJob.ts`: printed here to keep an eye on.)
-  test('a laid city blocks nothing', () => {
-    const city = generateWorld(content, t, 'country', 77, undefined, undefined, { town: 'city', villages: 'many' });
-    const t0 = performance.now();
-    const found = townIssues(city, t, content);
-    console.log(`townIssues on a city with many villages (${city.slots.length} lots, ${city.open?.carParks?.length ?? 0} car parks): ${(performance.now() - t0).toFixed(0)} ms`);
-    expect(found.blocking).toEqual([]);
-  }, 60_000);
 });

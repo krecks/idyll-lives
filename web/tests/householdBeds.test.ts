@@ -1,33 +1,22 @@
 // A generated house is furnished for who lives there (`housegen.ts` `fitFor`, `household.ts` `residentsOf`):
 // a couple gets a bed for two, and a child a bed their life stage may sleep in, so a couple's
 // seventeen-year-old gets no race car bed (a child's) and no toys only a child may use; a little one may.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, usePublicFetch } from './support/content';
+import { readFileSync } from 'node:fs';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
 describe('beds for who lives there', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { generateHouse, objectInfos } = await import('../src/game/housegen');
-  const { residentsOf } = await import('../src/game/household');
+  const { householdProblems, residentsOf } = await import('../src/game/household');
   type HouseGenConfig = import('../src/game/housegen').HouseGenConfig;
   type HouseholdDraft = import('../src/game/household').HouseholdDraft;
   type Residents = import('../src/game/housegen').Residents;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const cfg = json<HouseGenConfig>('housegen.json');
   const houses = json<{ plot: { width: number; depth: number }; lotSizes: Record<string, { width: number; depth: number }> }>('houses.json');
@@ -77,6 +66,13 @@ describe('beds for who lives there', async () => {
       for (const d of defs.filter((d) => content.object(d)?.category === 'kids')) expect([d, mayUse(d, 'teen')]).toEqual([d, true]);
       expect(defs.some((d) => (content.object(d)?.slots ?? 1) >= 2 && content.object(d)?.group === 'beds')).toBe(true);
     }
+  });
+
+  test('partners made a child are a problem (they would move in as partners)', () => {
+    const grown = family(12);
+    expect(householdProblems(content, grown).filter((p) => p.includes('partners'))).toEqual([]);
+    grown.members[1].age = 12;
+    expect(householdProblems(content, grown)).toContain('jonah and elif: only grown-ups can be partners');
   });
 
   test("a little one's room may have the race car bed and toys", () => {

@@ -1,16 +1,17 @@
 //! The potting bench (2x1): a sage bench against the wall, pots and seedlings, tools on the back board.
 
-use super::common::{_flower, _m, _pot, _rosette, M, WALL};
+use super::common::{_flower, _pot, _rosette, M, WALL};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{P3, cosd, sind};
-use artkit::parts::{join, new_parts};
+use artkit::parts::{aside, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
     fbox, fcyl, fextrude, fsweep, grow, jitter, leaf, loft, revolve, ring, settle, soft, torus,
 };
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 const TOP: f64 = 0.88;
 const SEEDLING: (f64, f64) = (-0.62, -0.02); // the pot the seedling comes up in (x, depth)
@@ -108,7 +109,9 @@ fn _bench_frame(f: &GameFrame) {
         0.86,
         (0, TOP + 0.43, 0),
         M.sage,
-        plane = Facing::Top
+        plane = Facing::Top,
+        bevel = AUTO_WIDTH,
+        bevel_segments = 1
     );
     fbox!(
         f,
@@ -238,16 +241,19 @@ fn _hand_tools(f: &GameFrame) {
     }
     revolve!(
         "twine",
-        &[
-            (0.012, -0.05),
-            (0.03, -0.05),
-            (0.03, -0.04),
-            (0.024, -0.035),
-            (0.024, 0.035),
-            (0.03, 0.04),
-            (0.03, 0.05),
-            (0.012, 0.05)
-        ],
+        &eased(
+            &[
+                (0.012, -0.05),
+                (0.03, -0.05),
+                (0.03, -0.04),
+                (0.024, -0.035),
+                (0.024, 0.035),
+                (0.03, 0.04),
+                (0.03, 0.05),
+                (0.012, 0.05)
+            ],
+            AUTO_WIDTH
+        ),
         at = f.at(0.72, TOP + 0.36, WALL + 0.11),
         material = M.cedar_dark,
         segments = 14,
@@ -255,13 +261,16 @@ fn _hand_tools(f: &GameFrame) {
     );
     revolve!(
         "twine_wound",
-        &[
-            (0.024, -0.034),
-            (0.046, -0.03),
-            (0.05, 0.0),
-            (0.046, 0.03),
-            (0.024, 0.034)
-        ],
+        &eased(
+            &[
+                (0.024, -0.034),
+                (0.046, -0.03),
+                (0.05, 0.0),
+                (0.046, 0.03),
+                (0.024, 0.034)
+            ],
+            AUTO_WIDTH
+        ),
         at = f.at(0.72, TOP + 0.36, WALL + 0.11),
         material = M.green_dark,
         segments = 14,
@@ -338,46 +347,6 @@ pub fn potting_bench() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let still = new_parts(|| {
         _bench_frame(f);
-        for (i, x) in [-0.6, -0.3, 0.0, 0.3, 0.6].into_iter().enumerate() {
-            // pots of herbs on the top shelf
-            let sy = _pot(
-                f,
-                &format!("herb_pot{i}"),
-                x,
-                TOP + 0.635,
-                -0.32,
-                0.13 - (i % 2) as f64 * 0.02,
-                0.11,
-                None,
-                true,
-                None,
-            );
-            let mats: &[_] = [
-                &[M.leaf, M.leaf_light][..],
-                &[M.leaf_pale][..],
-                &[M.leaf_light, M.leaf_dark][..],
-            ][i % 3];
-            _rosette(
-                f,
-                &format!("herb{i}_"),
-                x,
-                sy,
-                -0.32,
-                8,
-                0.19 - 0.02 * (i % 2) as f64,
-                0.05,
-                mats,
-                (68.0, 82.0),
-                0.15,
-                if i % 2 != 0 { "lance" } else { "oval" },
-                0.3,
-                None,
-                3,
-                3,
-                20 + i as i128,
-                0.0,
-            );
-        }
         _hand_tools(f);
         // on the worktop: a seedling tray, a flowering pot, the watering can, the empty pot for the seedling
         fbox!(
@@ -411,7 +380,7 @@ pub fn potting_bench() -> Vec<Obj> {
                         35.0,
                         0.045,
                         0.03,
-                        [M.leaf_pale, M.leaf_light][((i + j) % 2) as usize],
+                        [M.green_pale, M.green_light][((i + j) % 2) as usize],
                         droop = 0.2,
                         rows = 2,
                         ring = 3
@@ -440,7 +409,7 @@ pub fn potting_bench() -> Vec<Obj> {
             9,
             0.14,
             0.07,
-            &[M.leaf_light, M.leaf],
+            &[M.green_light, M.green],
             (30.0, 60.0),
             0.3,
             "oval",
@@ -451,7 +420,7 @@ pub fn potting_bench() -> Vec<Obj> {
             21,
             0.0,
         );
-        for (k, m) in ["pink", "yellow", "pink", "lilac", "yellow", "lilac"]
+        for (k, m) in [M.pink, M.yellow, M.pink, M.lilac, M.yellow, M.lilac]
             .into_iter()
             .enumerate()
         {
@@ -475,8 +444,8 @@ pub fn potting_bench() -> Vec<Obj> {
                 sy + 0.17 + 0.03 * (k % 2) as f64,
                 fz,
                 0.035,
-                _m(m),
-                Some(if m != "yellow" { M.yellow } else { M.carrot }),
+                m,
+                Some(if m != M.yellow { M.yellow } else { M.carrot }),
                 5,
                 20.0,
                 -a + 90.0,
@@ -543,6 +512,49 @@ pub fn potting_bench() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
+    // pots of herbs on the top shelf: drawn with the bench, not part of its size
+    let herbs = new_parts(|| {
+        for (i, x) in [-0.6, -0.3, 0.0, 0.3, 0.6].into_iter().enumerate() {
+            let sy = _pot(
+                f,
+                &format!("herb_pot{i}"),
+                x,
+                TOP + 0.635,
+                -0.32,
+                0.13 - (i % 2) as f64 * 0.02,
+                0.11,
+                None,
+                true,
+                None,
+            );
+            let mats: &[_] = [
+                &[M.green, M.green_light][..],
+                &[M.green_pale][..],
+                &[M.green_light, M.green_dark][..],
+            ][i % 3];
+            _rosette(
+                f,
+                &format!("herb{i}_"),
+                x,
+                sy,
+                -0.32,
+                8,
+                0.19 - 0.02 * (i % 2) as f64,
+                0.05,
+                mats,
+                (68.0, 82.0),
+                0.15,
+                if i % 2 != 0 { "lance" } else { "oval" },
+                0.3,
+                None,
+                3,
+                3,
+                20 + i as i128,
+                0.0,
+            );
+        }
+    });
+    aside(&herbs, "herbs");
     // The seedling: a stem, two seed leaves and a tuft of true leaves, on the pot's soil: `seedling` grows it up. Its
     // origin is under the soil (and the pot's rolled rim), where it flattens out of sight: on the soil, its leaves
     // lay flat over it. Plain satin: a foliage part would grow as well since the renderer's fixes (see the notes).
@@ -612,10 +624,10 @@ pub fn potting_bench() -> Vec<Obj> {
             );
         }
         for (k, (dx, dy, dz, m)) in [
-            (0.12, 0.03, -0.03, "pink"),
-            (0.135, 0.045, 0.005, "yellow"),
-            (0.115, 0.032, 0.035, "lilac"),
-            (0.1, 0.05, -0.005, "pink"),
+            (0.12, 0.03, -0.03, M.pink),
+            (0.135, 0.045, 0.005, M.yellow),
+            (0.115, 0.032, 0.035, M.lilac),
+            (0.1, 0.05, -0.005, M.pink),
         ]
         .into_iter()
         .enumerate()
@@ -627,7 +639,7 @@ pub fn potting_bench() -> Vec<Obj> {
                 TOP + dy,
                 bz + dz,
                 0.03,
-                _m(m),
+                m,
                 Some(M.yellow),
                 6,
                 70.0,

@@ -1,22 +1,20 @@
 //! The things residents carry and cook with: the models of content `items` (`item.*`: a bag of shopping, a
 //! prep bowl, a pot of stew, plates of food, dirty plates and pans, the food bought in town), the props drawn on a
-//! station's top while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill) and the props
+//! station's top while a resident cooks there (`tool.*`: the chopping board, food on the grill) and the props
 //! in a resident's hands while they use a thing (`tool.*`: a book, a cup, cutlery, a phone, a cue; actions.ts
 //! `PROPS`). Notes: NOTES.md.
 //!
 //! Each is drawn as the old part was (characters.ts `writeCarried`, `writeTool`; items.ts): its origin at
 //! the middle of its base, front +Z in the game, lifted onto the palms, the top it stands on or the station.
 //! So each is built where the game places it, in the game's axes (`F`), and stood on the floor
-//! without moving it sideways (`done`); the few that stand off their middle (the pan's handle, the bag)
+//! without moving it sideways (`done`); the few that stand off their middle (the grill food, the bag)
 //! take their measured `centre`.
 //!
 //! Small and seen several at once: one draw call each (every finish a plain one), two for the wooden boards
 //! (the chopping board, the tasting board, the pizza's board: `wood`); at most 750 triangles (half the
-//! budget of a thing under 35 cm), 2,000 for the few 35-40 cm across (the pot, the pan, the boards, trays and
-//! platters). Turned things are `lathe`s (fluted, lobed or bent where the thing is); crusts, rims, handles,
+//! budget of a thing under 35 cm; a plate, its rim rolled round, up to about 1,050), 2,000 for the few 35-40 cm
+//! across (the pot, the boards, trays and platters). Turned things are `lathe`s (fluted, lobed or bent where the thing is); crusts, rims, handles,
 //! straws and piped icing are sweeps; boards, leaves, cutlery and smears are outlines extruded.
-//!
-//! `HELD_MEASURE=1 cargo art held --preview` prints where each is built and its size, to copy into its `i(...)` line.
 
 use artkit::family::{Build, Family, Model};
 
@@ -42,11 +40,6 @@ fn i(
     code: bool,
     tolerance: f64,
 ) -> Model {
-    let tolerance = if std::env::var_os("HELD_MEASURE").is_some() {
-        3.0
-    } else {
-        tolerance
-    };
     let model = Model::new(id, build, size)
         .key(key)
         .centre(centre.0, centre.1)
@@ -59,14 +52,14 @@ const O: (f64, f64) = (0.0, 0.0);
 const T: f64 = 0.02;
 
 /// The family.
-pub fn family() -> Option<Family> {
+pub fn family() -> Family {
     use dishes::*;
     use hand::*;
     use plates::*;
     use quick::*;
     use tools::*;
     use town::*;
-    Some(Family::new(
+    Family::new(
         "held",
         M.palette(),
         vec![
@@ -137,7 +130,7 @@ pub fn family() -> Option<Family> {
             i(
                 "bakingTray",
                 baking_tray,
-                (0.38, 0.07, 0.28),
+                (0.38, 0.025, 0.28),
                 "item.bakingTray",
                 O,
                 false,
@@ -360,16 +353,6 @@ pub fn family() -> Option<Family> {
                 false,
                 T,
             ),
-            // the handle reaches 2 cm further back than the old part's crossbar: the pan stays on its middle
-            i(
-                "pan",
-                pan,
-                (0.28, 0.061, 0.395),
-                "tool.pan",
-                (0.0, 0.0575),
-                false,
-                T,
-            ),
             i(
                 "grillFood",
                 grill_food,
@@ -475,7 +458,7 @@ pub fn family() -> Option<Family> {
             i(
                 "seedBag",
                 seed_bag,
-                (0.086, 0.119, 0.056),
+                (0.084, 0.119, 0.056),
                 "tool.seedBag",
                 O,
                 true,
@@ -823,5 +806,5 @@ pub fn family() -> Option<Family> {
          content `items`, the props drawn on a station while cooking and those in the hands while a thing is used. \
          Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw \
          call (the wooden boards two).",
-    ))
+    )
 }

@@ -21,6 +21,7 @@
 
 import { CHUNK, chunkCoords, chunkId, distanceToRect } from './chunks';
 import { TOWN_FROM, TOWN_FULL } from './lens';
+import { smooth } from '../../game/noise';
 
 /** Metres past the stream radius a chunk keeps streaming before it goes. */
 export const HYSTERESIS = 32;
@@ -217,8 +218,6 @@ const FAR_LONGEST = 3.4;
  */
 const FAR_LEAD = 0.7;
 const FAR_STAGGER_ZOOM = 4;
-
-const smooth = (t: number) => t * t * (3 - 2 * t);
 
 /**
  * A smooth flight of the camera's target to a point (the town map's "look here"): eased out and in,

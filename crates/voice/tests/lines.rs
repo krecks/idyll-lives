@@ -1,14 +1,16 @@
 //! Every spoken line in the content (`web/public/content/voice/en.json` and the `voice.en` of
 //! every content file `base.json` includes) phonemizes from the dictionary (for its mouth
 //! shapes), has plain text for the model to read, and every key names something that exists.
-//! Needs `node tools/voice/fetch.mjs` first for the phonemizer part.
+//! Needs `cargo fetch-voice` first for the phonemizer part.
 
 use std::collections::{BTreeSet, HashMap};
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
-use voice::{G2p, Lexicon, plain_text};
+use voice::plain_text;
+
+mod common;
+use common::g2p;
 
 const TONES: [&str; 5] = ["happy", "sad", "angry", "flirty", "question"];
 /// Short lines: each one is made into speech on its own while the game runs.
@@ -76,28 +78,6 @@ fn lines(v: &Value, at: &str, out: &mut Vec<(String, String)>) {
         }
         _ => {}
     }
-}
-
-fn g2p() -> Option<G2p> {
-    let path = content_dir().join("../voice/en-us.lexz");
-    let Ok(file) = std::fs::File::open(&path) else {
-        // CI must test the phonemizer: there a missing dictionary fails instead of skipping.
-        assert!(
-            std::env::var_os("CI").is_none(),
-            "{} missing in CI (run `node tools/voice/fetch.mjs` first)",
-            path.display()
-        );
-        eprintln!(
-            "skipped: {} missing (run `node tools/voice/fetch.mjs`)",
-            path.display()
-        );
-        return None;
-    };
-    let mut tsv = String::new();
-    flate2::read::GzDecoder::new(file)
-        .read_to_string(&mut tsv)
-        .unwrap();
-    Some(G2p::new(Lexicon::parse(&tsv)))
 }
 
 #[test]

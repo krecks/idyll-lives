@@ -509,6 +509,43 @@ macro_rules! fextrude {
     }};
 }
 
+/// A body of `outline` ((height, x out) about game x `x`, in `f`), from game depth `z0` to `z1`, its two ends chamfered
+/// `c` (lofted through its outline set in at each end, `forms::inset`): an upholstered arm whose front and back are
+/// eased. Its UVs are laid as a sweep's: round its outline, along its length.
+#[allow(clippy::too_many_arguments)]
+pub fn eased_prism(
+    f: &GameFrame,
+    name: &str,
+    outline: &[(f64, f64)],
+    x: f64,
+    z0: f64,
+    z1: f64,
+    c: f64,
+    mat: Mat,
+) -> Obj {
+    let small = forms::inset(outline, c);
+    let ring = |o: &[(f64, f64)], z: f64| -> Vec<P3> {
+        o.iter().map(|&(u, v)| f.at(x - v, u, z)).collect()
+    };
+    let depths = [z0, z0 + c, z1 - c, z1];
+    let body = forms::loft(
+        name,
+        &[
+            ring(&small, z0),
+            ring(outline, depths[1]),
+            ring(outline, depths[2]),
+            ring(&small, z1),
+        ],
+        forms::Loft {
+            material: Some(mat),
+            angle: 50.0,
+            ..forms::Loft::default()
+        },
+    );
+    let path: Vec<crate::math::V3> = depths.iter().map(|&z| f.at(x, 0, z).into()).collect();
+    crate::uv::along(body, 4, outline, &[1.0; 4], &path, false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

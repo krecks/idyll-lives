@@ -55,6 +55,66 @@ pub(super) fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
     Ok(out)
 }
 
+/// [(clip, what plays it, pose)]: each clip that opens or uses the model (a use's, `open`, `night`) at each of its
+/// keys (a door swung open, and a `BackOut`'s overshoot on the way), on top of `rest`.
+pub(super) fn opened(g: &Glb, motions: &J, rest: &Pose) -> R<Vec<(String, String, Pose)>> {
+    let empty = J::Arr(Vec::new());
+    let nodes = g.gltf.get("nodes").unwrap_or(&empty);
+    let mut out = Vec::new();
+    for (clip, by) in played(motions)? {
+        if !(by.starts_with("use ") || by == "open" || by == "night") {
+            continue;
+        }
+        let Some(a) = g
+            .gltf
+            .get("animations")
+            .and_then(J::list)
+            .unwrap_or(&[])
+            .iter()
+            .find(|a| a.get("name") == Some(&clip))
+        else {
+            continue;
+        };
+        let mut tracks = Vec::new();
+        let mut times: Vec<f64> = Vec::new();
+        for c in key(a, "channels")?.list().unwrap_or(&[]) {
+            let target = key(c, "target")?;
+            let path = match target.get("path").and_then(J::str) {
+                Some("rotation") => "rotation",
+                Some("translation") => "translation",
+                Some("scale") => "scale",
+                _ => continue,
+            };
+            let Some(node) = target.opt("node") else {
+                continue;
+            };
+            let s = sampler(a, c)?;
+            let track = super::near::Track {
+                times: values(g, key(s, "input")?)?
+                    .into_iter()
+                    .map(|t| t[0])
+                    .collect(),
+                keys: values(g, key(s, "output")?)?,
+                step: s.get("interpolation") == Some(&J::Str("STEP".into())),
+            };
+            times.extend(&track.times);
+            tracks.push((node_index(nodes, node)?, path, track));
+        }
+        times.sort_by(f64::total_cmp);
+        times.dedup();
+        for t in times {
+            let mut pose = rest.clone();
+            for (node, path, track) in &tracks {
+                if let Some(v) = track.at(t, *path == "rotation") {
+                    pose.insert((*node, path), v.into_iter().map(Num::F).collect());
+                }
+            }
+            out.push((clip.key(), by.clone(), pose));
+        }
+    }
+    Ok(out)
+}
+
 pub(super) type Bounds = ([Num; 3], [Num; 3]);
 /// Each moving part's bounds (None: the still body), in the order they're met.
 type PartBounds = Vec<(Option<usize>, Bounds)>;
@@ -122,6 +182,21 @@ pub(super) fn bounds(gltf: &J, pose: &Pose, skip: &HashSet<usize>) -> R<(Bounds,
         }
     }
     Ok(((lo, hi), parts))
+}
+
+/// The deepest point of the model (glTF z, the game's depth), its parts where `pose` puts them: its vertices, so a
+/// part built turned (a telescope's tube) reaches only as far as its mesh, not its box's corners; where the
+/// positions can't be read here (compressed), its boxes' corners.
+fn back(g: &Glb, pose: &Pose) -> R<f64> {
+    let mut back = f64::INFINITY;
+    for p in node_matrices(&g.gltf, Some(pose), None)? {
+        for prim in primitives(&g.gltf, &p.mesh)? {
+            for v in positions(g, prim)? {
+                back = back.min(applied(&p.m, &v)[2]);
+            }
+        }
+    }
+    Ok(back)
 }
 
 /// How far the model reaches from its origin across the floor (m), its parts where `pose` puts them (`grown`:
@@ -431,7 +506,7 @@ pub(super) fn flattened_in_view(
 
 /// `overrides.get(name, named_finish(name) or overrides.get('*'))`: a material's entry in `materials`
 /// (None: unmapped).
-pub(super) fn override_of(overrides: &J, name: &str) -> J {
+pub(crate) fn override_of(overrides: &J, name: &str) -> J {
     match overrides.get(name) {
         Some(ov) => ov.clone(),
         None => named_finish(name)
@@ -486,6 +561,47 @@ pub(super) fn content_warnings(
                     fixed(face, 2)
                 ),
             ));
+        }
+        // Opened or used: a door swung back or a lid tipped past upright reaches no farther (a clip's deepest key).
+        // Not where someone stands behind it (content `staff.at`: a shop counter's till opens to the shopkeeper).
+        let staffed = f
+            .object
+            .get("staff")
+            .and_then(|s| s.get("at"))
+            .and_then(|a| a.at(1))
+            .and_then(J::num)
+            .is_some_and(|z| z.f() < ((-depth) / Num::I(2)).f());
+        let motions = match entry.get("motions") {
+            Some(m) if !staffed => m,
+            _ => &J::Null,
+        };
+        let mut deepest: Vec<(String, String, f64)> = Vec::new();
+        let opened = opened(g, motions, pose)?;
+        let rest = if opened.is_empty() {
+            0.0
+        } else {
+            back(g, pose)? * scale.f()
+        };
+        for (clip, by, p) in opened {
+            let back = back(g, &p)? * scale.f();
+            match deepest.iter_mut().find(|d| d.0 == clip) {
+                Some(d) => d.2 = d.2.min(back),
+                None => deepest.push((clip, by, back)),
+            }
+        }
+        for (clip, by, back) in deepest {
+            if back < face - 0.01 && back < rest - 0.001 {
+                warnings.push(strict(
+                    "opened",
+                    format!(
+                        "opened ({}, {by}), reaches {} cm into the wall (its back at depth {}, the wall's face at {})",
+                        repr_str(&clip),
+                        fixed((face - back) * 100.0, 1),
+                        fixed(back, 3),
+                        fixed(face, 2)
+                    ),
+                ));
+            }
         }
         // (Whether it should stand against the wall, its back on the face, nothing in the content says: a
         // counter and an island have the same top, and `fillsWall` only keeps the wall over it clear.)

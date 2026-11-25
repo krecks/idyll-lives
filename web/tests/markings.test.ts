@@ -5,6 +5,7 @@
  * junctions' stop lines across every lane coming in: `junctions.test.ts`.)
  */
 import { describe, expect, test } from 'bun:test';
+import { line, points } from './support/geometry';
 import type { RoadPlan } from '../src/core/protocol';
 import { lengths, nearest, pointAt, SIDEWALK } from '../src/game/roads';
 import { Geo } from '../src/render/shared/geometry';
@@ -17,14 +18,6 @@ import { plansOf } from './fixtures/junctions';
 
 const h = F.roadHierarchy();
 const plans = plansOf(h.roads);
-const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
-
-/** The vertices of a mesh, as (x, y, z). */
-function points(g: Geo): [number, number, number][] {
-  const out: [number, number, number][] = [];
-  for (let i = 0; i < g.pos.length; i += 3) out.push([g.pos[i], g.pos[i + 1], g.pos[i + 2]]);
-  return out;
-}
 
 /** The markings `roadMarkings` paints on the fixture's road `ri` alone (the others there for its pair and its gore). */
 function marksOf(ri: number): [number, number, number][] {

@@ -201,6 +201,16 @@ export function gameMinutesPerSecond(layout: Pick<SnapshotLayout, 'ticksPerSecon
  */
 export const tickRates: Pick<SnapshotLayout, 'ticksPerSecond' | 'ticksPerMinute' | 'driveScale'> = { ticksPerSecond: 60, ticksPerMinute: 75, driveScale: 4 };
 
+/** Day 1 starts at 08:00 (sim-core `clock.rs`). */
+const START_MINUTE = 8 * 60;
+
+/** The game clock at `tick` (sim-core `clock::day`, `clock::minute_of_day`): the day from 1 and the minute of the day. */
+export function tickClock(tick: number): { day: number; minute: number } {
+  // (Divided, not times `minutesPerTick`: a whole minute of ticks comes out whole.)
+  const total = START_MINUTE + tick / tickRates.ticksPerMinute;
+  return { day: Math.floor(total / 1440) + 1, minute: total % 1440 };
+}
+
 /**
  * A layout's `sim` indices for the fields it writes: `simFields(['id', 'x'])` gives `{ id: 0, x: 1 }`. The names
  * are checked against the layout, so a field that does not exist is a compile error rather than a NaN write.

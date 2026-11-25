@@ -10,7 +10,6 @@ pub mod flowers;
 pub mod leaf;
 pub mod lump;
 mod macros;
-pub(crate) mod polyfill;
 pub mod pots;
 pub mod shrubs;
 pub mod skeleton;

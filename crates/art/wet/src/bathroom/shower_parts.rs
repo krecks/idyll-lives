@@ -2,81 +2,16 @@
 //! caddies and curtains.
 
 use super::M;
-use super::common::{LATHE, Lathe, bends, lathe, tube, wall_rose};
+use super::common::{LATHE, Lathe, bends, lathe, wall_rose};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, TAU, V3, cos, cosd, sin, sind, v3};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Coord, Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsweep, py, torus};
-
-/// The back wall (from game x0 to x1, at the back z0) and the left wall (at x0, from z0 to z1): grout backing with
-/// square tiles a little proud of it.
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn tiled_walls(
-    f: &GameFrame,
-    x0: f64,
-    x1: f64,
-    z0: f64,
-    z1: f64,
-    y0: f64,
-    y1: f64,
-    t: f64,
-    size: f64,
-    gap: f64,
-) {
-    fbox!(
-        f,
-        "grout_back",
-        x1 - x0,
-        y1 - y0,
-        t,
-        ((x0 + x1) / 2.0, (y0 + y1) / 2.0, z0 + t / 2.0),
-        M.grout
-    );
-    fbox!(
-        f,
-        "grout_left",
-        t,
-        y1 - y0,
-        z1 - z0 - t,
-        (x0 + t / 2.0, (y0 + y1) / 2.0, (z0 + t + z1) / 2.0),
-        M.grout
-    );
-    let rows = 1.max(py::round((y1 - y0) / size));
-    let th = (y1 - y0) / rows as f64;
-    let cols = 1.max(py::round((x1 - x0 - t) / size));
-    let tw = (x1 - x0 - t) / cols as f64;
-    let deep = 1.max(py::round((z1 - z0 - t) / size));
-    let td = (z1 - z0 - t) / deep as f64;
-    for j in 0..rows {
-        let y = y0 + th * (j as f64 + 0.5);
-        for i in 0..cols {
-            fbox!(
-                f,
-                format!("tile_b{i}_{j}"),
-                tw - gap,
-                th - gap,
-                0.006,
-                (x0 + t + tw * (i as f64 + 0.5), y, z0 + t + 0.003),
-                M.tile
-            );
-        }
-        for i in 0..deep {
-            fbox!(
-                f,
-                format!("tile_l{i}_{j}"),
-                0.006,
-                th - gap,
-                td - gap,
-                (x0 + t + 0.003, y, z0 + t + td * (i as f64 + 0.5)),
-                M.tile
-            );
-        }
-    }
-}
 
 /// The rain from a head at game `head` (the head's underside) down to the floor at height `bottom`: thin parallel
 /// streams across a disc of radius `r` (`rings` rings round a middle one) or a `grid` (n, spacing), joined with
@@ -319,6 +254,7 @@ pub fn head(
             (y + 0.001, r * 0.94, r * 0.94),
             (y + t * 0.2, r, r),
             (y + t * 0.75, r, r),
+            (y + t * 0.9, r * 0.97, r * 0.97), // its top's edge eased
             (y + t, r * 0.82, r * 0.82),
             (y + t * 1.25, r * 0.25, r * 0.25),
         ],
@@ -352,15 +288,14 @@ pub fn hand_shower(
     material: Mat,
     hose_from: (f64, f64, f64),
 ) {
-    tube(
+    kit::tube!(
         f,
         "riser",
         &[(x, y0, z), (x, y1, z)],
         0.011,
         material,
-        10,
-        1,
-        1.0,
+        verts = 10,
+        round = 1
     );
     for y in [y0, y1] {
         wall_rose(
@@ -387,7 +322,7 @@ pub fn hand_shower(
         bevel_segments = 1
     );
     let hy = y0 + (y1 - y0) * 0.6;
-    tube(
+    kit::tube!(
         f,
         "hand_shower",
         &[
@@ -397,9 +332,9 @@ pub fn hand_shower(
         ],
         0.013,
         material,
-        10,
-        2,
-        [0.8, 1.0, 1.1],
+        verts = 10,
+        round = 2,
+        scale = [0.8, 1.0, 1.1]
     );
     let (hx, hy0, hz) = hose_from;
     fcyl!(
@@ -414,7 +349,7 @@ pub fn hand_shower(
         bevel = 0.006,
         bevel_segments = 1
     );
-    tube(
+    kit::tube!(
         f,
         "hose",
         &[
@@ -426,9 +361,7 @@ pub fn hand_shower(
         ],
         0.006,
         material,
-        6,
-        3,
-        1.0,
+        verts = 6
     );
 }
 
@@ -448,15 +381,14 @@ pub fn bar_mixer(f: &GameFrame, x: f64, y: f64, z: f64, w: f64, material: Mat) {
             14,
         );
     }
-    tube(
+    kit::tube!(
         f,
         "mixer",
         &[(x - w / 2.0, y, z + 0.045), (x + w / 2.0, y, z + 0.045)],
         0.022,
         material,
-        14,
-        1,
-        1.0,
+        verts = 14,
+        round = 1
     );
     for s in [-1, 1] {
         fcyl!(
@@ -497,7 +429,7 @@ pub fn caddy(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64, 
         bevel = 0.003,
         bevel_segments = 1
     );
-    tube(
+    kit::tube!(
         f,
         format!("{name}_rail"),
         &[
@@ -508,12 +440,11 @@ pub fn caddy(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64, 
         ],
         0.004,
         material,
-        6,
-        2,
-        1.0,
+        verts = 6,
+        round = 2
     );
     for s in [-1, 1] {
-        tube(
+        kit::tube!(
             f,
             format!("{name}_post{s}"),
             &[
@@ -522,15 +453,14 @@ pub fn caddy(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64, 
             ],
             0.003,
             material,
-            6,
-            1,
-            1.0,
+            verts = 6,
+            round = 1
         );
     }
 }
 
 /// A curtain hanging in `waves` soft folds from game point `a` (x, z) to `b`, from `y0` up to `y1`: one wavy sheet,
-/// thick `t`.
+/// thick `t`, its hems square to it as it stands gathered to `gather` of its length along game x (1: as built).
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn curtain(
     f: &GameFrame,
@@ -543,6 +473,7 @@ pub fn curtain(
     depth: f64,
     t: f64,
     steps: usize,
+    gather: f64,
 ) -> Obj {
     let (ax, az) = a;
     let (bx, bz) = b;
@@ -560,13 +491,28 @@ pub fn curtain(
         })
         .collect();
     let (cx, cz) = ((ax + bx) / 2.0, (az + bz) / 2.0);
+    // the cloth's two faces t apart square to the wave, its hems square to it as it stands gathered (so a hem is t
+    // wide, too thin to show an edge)
+    let across: Vec<(f64, f64)> = (0..=n)
+        .map(|k| {
+            let w =
+                depth / 2.0 * cos(TAU * waves as f64 * k as f64 / n as f64) * TAU * waves as f64
+                    / l;
+            let g = if k == 0 || k == n { gather } else { 1.0 };
+            let (dx, dz) = ((ux + nx * w) * g, uz + nz * w);
+            let m = py::hypot(dx, dz);
+            (-dz / m / g, dx / m)
+        })
+        .collect();
     let front = mid
         .iter()
-        .map(|&(x, z)| (x + nx * t / 2.0 - cx, z + nz * t / 2.0 - cz));
+        .zip(&across)
+        .map(|(&(x, z), &(px, pz))| (x + px * t / 2.0 - cx, z + pz * t / 2.0 - cz));
     let back = mid
         .iter()
+        .zip(&across)
         .rev()
-        .map(|&(x, z)| (x - nx * t / 2.0 - cx, z - nz * t / 2.0 - cz));
+        .map(|(&(x, z), &(px, pz))| (x - px * t / 2.0 - cx, z - pz * t / 2.0 - cz));
     let outline: Vec<(f64, f64)> = front.chain(back).collect();
     fextrude!(
         f,
@@ -577,7 +523,7 @@ pub fn curtain(
         M.curtain,
         plane = Facing::Top,
         smooth = true,
-        angle = 60
+        angle = 45 // the folds smooth, the hems' corners sharp (as built and gathered)
     )
 }
 

@@ -153,8 +153,8 @@ pub fn raised_bed() -> Vec<Obj> {
             (-0.8, BED_TOP + 0.02, 0.34),
             M.trim
         );
-        for x in [-0.45, 0.0, 0.45] {
-            // the tomatoes' canes
+        for x in [-0.7, -0.14, 0.42] {
+            // the tomatoes' canes, one up each bush (`alt` below)
             rod(
                 &numbered("cane"),
                 (x + 0.14, BED_TOP - 0.02, 0.22),

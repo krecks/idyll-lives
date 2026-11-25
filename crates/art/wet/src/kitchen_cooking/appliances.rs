@@ -1,11 +1,13 @@
 //! The microwave counter and the small appliances: the coffee machine, the breakfast counter and two dishwashers,
 //! each on a base unit under a worktop.
 
-use super::common::{fillet, hollow, knob};
+use super::common::{hollow, knob};
 use super::{M, SECONDS};
-use crate::common::shaker;
+use crate::common::{shaker, stream};
+use artkit::forms::eased;
 use artkit::forms::rounded_rect;
 use artkit::kit;
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::Axis;
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
@@ -140,7 +142,7 @@ pub fn microwave() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    // the door, hinged on its left edge (seen from the front): a frame round its window, a grip by the controls
+    // the door, hinged on its right edge (seen from the front): a frame round its window, a grip by the controls
     let parts = new_parts(|| {
         fextrude!(
             f,
@@ -208,14 +210,17 @@ pub fn microwave() -> Vec<Obj> {
         );
         revolve!(
             "soup_bowl",
-            &[
-                (0.0, 0.0),
-                (0.035, 0.0),
-                (0.055, 0.04),
-                (0.05, 0.04),
-                (0.032, 0.008),
-                (0.0, 0.008)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.035, 0.0),
+                    (0.055, 0.04),
+                    (0.05, 0.04),
+                    (0.032, 0.008),
+                    (0.0, 0.008)
+                ],
+                0.002
+            ),
             at = f.at(-0.12, 0.978, -0.26),
             material = M.cup,
             segments = 14
@@ -336,36 +341,6 @@ fn counter(f: &GameFrame, w: f64, body: Option<Mat>, top: Option<Mat>) {
             verts = 6
         );
     }
-}
-
-/// A thin stream from (x, top_y, z) down to bottom_y, joined with its origin at the top and scaled
-/// to nothing along its length, so it is hidden until `grow` runs the clip (the `water_on` way).
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-fn stream(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    top_y: f64,
-    z: f64,
-    bottom_y: f64,
-    material: Mat,
-    r: f64,
-) -> Obj {
-    let length = artkit::py::max(0.05, top_y - bottom_y);
-    let parts = new_parts(|| {
-        fcyl!(
-            f,
-            name,
-            r,
-            length,
-            (x, (top_y + bottom_y) / 2.0, z),
-            material,
-            verts = 8
-        );
-    });
-    let obj = join(&parts, name, Some(f.at(x, top_y, z)));
-    obj.edit(|o| o.scale.z = 0.001); // hidden at rest; `grow` runs it out along its length
-    obj
 }
 
 // --- coffee machine: 1x1, a counter with an espresso machine on the worktop ----------------------------
@@ -579,14 +554,17 @@ pub fn coffee_machine() -> Vec<Obj> {
         loft!("hopper", &secs, material = M.bean);
         revolve!(
             "hopper_lid",
-            &[
-                (0.0, 0.0),
-                (0.056, 0.0),
-                (0.05, 0.016),
-                (0.012, 0.02),
-                (0.012, 0.024),
-                (0.0, 0.024)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.056, 0.0),
+                    (0.05, 0.016),
+                    (0.012, 0.02),
+                    (0.012, 0.024),
+                    (0.0, 0.024)
+                ],
+                0.002
+            ),
             at = (hx, hy, hz + 0.114),
             material = M.charcoal,
             segments = 12
@@ -601,7 +579,16 @@ pub fn coffee_machine() -> Vec<Obj> {
     // the cup, on the drip tray's front edge, sliding back under the spout for `brew`
     let parts = new_parts(|| cup(f, "cup", -0.14, 0.965, 0.0));
     let cup = join(&parts, "cup", Some(f.at(-0.14, 0.965, 0.0)));
-    let stream = stream(f, "stream", -0.14, 1.122, -0.11, 0.99, M.coffee, 0.008);
+    let stream = stream(
+        f,
+        "stream",
+        (-0.14, 1.122, -0.11),
+        0.99,
+        M.coffee,
+        0.008,
+        8,
+        0.05,
+    );
     settle_all();
     slide!(cup, "brew", (0, 0.11, 0), seconds = 0.6);
     grow(
@@ -621,13 +608,16 @@ fn cup(f: &GameFrame, name: &str, x: f64, y: f64, z: f64) {
     let (bx, by, bz) = (b.x, b.y, b.z);
     revolve!(
         format!("{name}_saucer"),
-        &[
-            (0.0, 0.0),
-            (0.03, 0.0),
-            (0.05, 0.008),
-            (0.047, 0.01),
-            (0.0, 0.004)
-        ],
+        &eased(
+            &[
+                (0.0, 0.0),
+                (0.03, 0.0),
+                (0.05, 0.008),
+                (0.047, 0.01),
+                (0.0, 0.004)
+            ],
+            0.002
+        ),
         at = (bx, by, bz),
         material = M.cup,
         segments = 14
@@ -702,15 +692,18 @@ fn canister(
     );
     revolve!(
         format!("{name}_lid"),
-        &[
-            (0.0, 0.0),
-            (r * 1.03, 0.0),
-            (r * 1.03, h * 0.1),
-            (r * 0.6, h * 0.14),
-            (r * 0.25, h * 0.14),
-            (r * 0.25, h * 0.16),
-            (0.0, h * 0.16)
-        ],
+        &eased(
+            &[
+                (0.0, 0.0),
+                (r * 1.03, 0.0),
+                (r * 1.03, h * 0.1),
+                (r * 0.6, h * 0.14),
+                (r * 0.25, h * 0.14),
+                (r * 0.25, h * 0.16),
+                (0.0, h * 0.16)
+            ],
+            0.002
+        ),
         at = (bx, by, bz + h * 0.84),
         material = lid,
         segments = 14
@@ -851,16 +844,19 @@ pub fn breakfast_counter() -> Vec<Obj> {
         let b = f.at(-0.28, 0.95, 0.05);
         revolve!(
             "bowl",
-            &[
-                (0.0, 0.0),
-                (0.06, 0.0),
-                (0.12, 0.045),
-                (0.13, 0.06),
-                (0.122, 0.06),
-                (0.11, 0.048),
-                (0.055, 0.008),
-                (0.0, 0.008)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.06, 0.0),
+                    (0.12, 0.045),
+                    (0.13, 0.06),
+                    (0.122, 0.06),
+                    (0.11, 0.048),
+                    (0.055, 0.008),
+                    (0.0, 0.008)
+                ],
+                0.002
+            ),
             at = (b.x, b.y, b.z),
             material = M.jug,
             segments = 18

@@ -547,7 +547,7 @@ pub(crate) fn progress(
             {
                 return end_activity(sim, content, objects);
             }
-            // Sold at a post: not begun until its server serves them (`staff::hold`).
+            // Sold at a post: not begun (nor paid) until its server serves them (`staff::hold`).
             if let TaskKind::Use {
                 object,
                 interaction,
@@ -556,21 +556,29 @@ pub(crate) fn progress(
                     .interactions
                     .get(interaction)
             {
-                match crate::staff::hold(
+                let hold = crate::staff::hold(
                     ctx,
                     sim.being_served,
                     &mut sim.serve_wait,
                     object,
                     inter,
                     ticks,
-                ) {
-                    None | Some(crate::staff::Hold::Serve) => {}
-                    Some(crate::staff::Hold::Wait) => return,
-                    // (Not served: the money paid on arrival back.)
-                    Some(crate::staff::Hold::GiveUp) => {
-                        sim.pending_spend -= ctx.cost_of(object, inter).max(0);
+                );
+                // Paid once, as they're served, or as the use goes on with nobody serving after
+                // all (not on arrival: someone called away while they wait has paid nothing); if
+                // the money's gone since, not at all.
+                if sim.owes > 0 && matches!(hold, None | Some(crate::staff::Hold::Serve)) {
+                    let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
+                    if !affordable(sim.owes, funds) {
+                        sim.owes = 0;
                         return end_activity(sim, content, objects);
                     }
+                    sim.pending_spend += std::mem::take(&mut sim.owes);
+                }
+                match hold {
+                    None | Some(crate::staff::Hold::Serve) => {}
+                    Some(crate::staff::Hold::Wait) => return,
+                    Some(crate::staff::Hold::GiveUp) => return end_activity(sim, content, objects),
                 }
             }
             // A game for two: not begun until the one they play with is at their place too, and

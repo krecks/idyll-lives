@@ -1,6 +1,6 @@
 //! Save games: a versioned, content-independent snapshot of the world.
 //!
-//! Objects, traits, perks, needs, interactions, feelings and careers are stored by id
+//! Objects, genders, traits, perks, needs, interactions, feelings and careers are stored by id
 //! (not index), so saves survive content changes; anything that no longer exists is
 //! dropped on load. In-progress activities restart from the beginning on load.
 //!
@@ -156,6 +156,8 @@
 //! (`meta.roads[].ends`: `merge`). A town without them saves as it did. No file older than this
 //! opens (`OLDEST_SAVE_VERSION`: the game says it is too old and removes it); none is migrated.
 //! A town holds up to 256 servers (`staff::MAX_STAFF`, 128 before); nothing of them is saved.
+//! Still 43: how long until each accident can happen to a resident again (`sims[].accidents`, game
+//! minutes by accident id), left out when none is waiting, so a file without it has none waiting.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -437,9 +439,6 @@ pub struct ObjectSave {
     /// The colours the player chose, `#rrggbb` by part (absent: as made).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub colors: BTreeMap<String, String>,
-    /// Before v26: its one colour, on the `body`.
-    #[serde(default, skip_serializing)]
-    pub color: Option<String>,
     /// Money put into it; defaults to the price.
     #[serde(default)]
     pub value: Option<i64>,
@@ -528,6 +527,10 @@ pub struct SimSave {
     pub needs: BTreeMap<String, f32>,
     #[serde(default)]
     pub feelings: Vec<FeelingSave>,
+    /// Game minutes until each accident can happen again, by accident id (`Sim::accident_at`;
+    /// absent: any time).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub accidents: BTreeMap<String, f32>,
     /// Skill levels by id (sorted). Missing in old saves: traits decide.
     #[serde(default)]
     pub skills: BTreeMap<String, f32>,
@@ -796,11 +799,6 @@ pub enum TaskSave {
         skipped: u8,
         directed: bool,
     },
-    /// Old saves only (upgrades are instant now); dropped on load.
-    Upgrade {
-        #[allow(dead_code)]
-        object: u32,
-    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -872,9 +870,6 @@ pub struct RelationshipSave {
     pub b: u32,
     #[serde(flatten)]
     pub rel: Relationship,
-    /// Before v35 (since: in `SaveFile::chemistry`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chemistry: Option<f32>,
 }
 
 #[cfg(test)]

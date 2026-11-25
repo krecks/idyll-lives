@@ -234,7 +234,7 @@ pub fn hotel_reception() -> Vec<Obj> {
         }
         fbox!(F, "kick_strip", 1.8, 0.05, 0.006, (0, 0.06, 0.393), M.brass);
         // the marble ledge, its nose rounded, on a walnut moulding
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "ledge",
             &[
@@ -250,7 +250,7 @@ pub fn hotel_reception() -> Vec<Obj> {
             (0, LEDGE, 0),
             M.marble,
             plane = Facing::Side
-        );
+        ));
         fbox!(
             F,
             "ledge_bead",
@@ -273,7 +273,7 @@ pub fn hotel_reception() -> Vec<Obj> {
         );
         bell("bell", 0.3, y, 0.3);
         // a banker's lamp: a brass base and stem, the green glass shade
-        revolve!(
+        artkit::bevel::eased(revolve!(
             "lamp_base",
             &[
                 (0.0, 0.0),
@@ -285,8 +285,8 @@ pub fn hotel_reception() -> Vec<Obj> {
             at = F.at(0.68, y, 0.2),
             material = M.brass,
             segments = 20
-        );
-        fcyl!(
+        ));
+        artkit::bevel::eased(fcyl!(
             F,
             "lamp_stem",
             0.01,
@@ -294,7 +294,7 @@ pub fn hotel_reception() -> Vec<Obj> {
             (0.68, y + 0.16, 0.15),
             M.brass,
             verts = 8
-        );
+        ));
         fbox!(
             F,
             "lamp_arm",
@@ -358,7 +358,7 @@ pub fn hotel_reception() -> Vec<Obj> {
         for r in 0..3 {
             for c in 0..4 {
                 let (hx, hy) = (kx - 0.195 + c as f64 * 0.13, WORK + 0.56 - r as f64 * 0.19);
-                fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("hook{r}{c}"),
                     0.006,
@@ -367,7 +367,7 @@ pub fn hotel_reception() -> Vec<Obj> {
                     M.brass,
                     rot = (90, 0, 0),
                     verts = 6
-                );
+                ));
                 if (r * 4 + c) % 5 != 3 {
                     // a few rooms out
                     fbox!(
@@ -379,7 +379,7 @@ pub fn hotel_reception() -> Vec<Obj> {
                         (hx, hy - 0.035, -0.345),
                         M.brass
                     );
-                    revolve!(
+                    artkit::bevel::eased(revolve!(
                         format!("fob{r}{c}"),
                         &[
                             (0.0, 0.0),
@@ -391,7 +391,7 @@ pub fn hotel_reception() -> Vec<Obj> {
                         at = F.at(hx, hy - 0.14, -0.345),
                         material = M.fob,
                         segments = 8
-                    );
+                    ));
                 }
             }
         }
@@ -494,14 +494,14 @@ pub fn duty_desk() -> Vec<Obj> {
             M.frame,
             bevel = 0.005
         );
-        revolve!(
+        artkit::bevel::eased(revolve!(
             "grille",
             &[(0.0, 0.0), (0.06, 0.0), (0.06, 0.008), (0.0, 0.008)],
             at = F.at(0, y + 0.42, zs + 0.004),
             material = M.frame,
             segments = 16,
             rot = (90, 0, 0)
-        );
+        ));
         open_book("log_book", 0.36, 0.26, (0.0, y, 0.29), M.counter, 0.0, 0.02);
         rod(
             "pen",
@@ -546,7 +546,7 @@ pub fn duty_desk() -> Vec<Obj> {
             M.radio,
             bevel = 0.01
         );
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "aerial",
             0.006,
@@ -554,7 +554,7 @@ pub fn duty_desk() -> Vec<Obj> {
             (0.265, WORK + 0.2, -0.2),
             M.radio,
             verts = 6
-        );
+        ));
         fbox!(
             F,
             "radio_screen",
@@ -649,7 +649,9 @@ pub fn teller_counter() -> Vec<Obj> {
                 format!("grille{s}"),
                 &[
                     (0.0, 0.0),
-                    (0.065, 0.0),
+                    // its back rim on the glass cut across 4 mm
+                    (0.061, 0.0),
+                    (0.065, 0.004),
                     (0.065, 0.006),
                     (0.055, 0.01),
                     (0.0, 0.01)
@@ -697,7 +699,7 @@ pub fn teller_counter() -> Vec<Obj> {
                 0.36,
                 0.05,
                 0.28,
-                (sf * 0.5, WORK + 0.025, -0.22),
+                (sf * 0.5, WORK + 0.025, -0.25),
                 M.monitor,
                 bevel = 0.004
             );
@@ -709,22 +711,23 @@ pub fn teller_counter() -> Vec<Obj> {
                     0.06,
                     0.012,
                     0.13,
-                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.054, -0.27),
+                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.054, -0.3),
                     M.note
                 );
-                fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("coins{s}{k}"),
                     0.014,
                     0.02,
-                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.06, -0.14),
+                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.06, -0.17),
                     M.coin,
                     verts = 8
-                );
+                ));
             }
         }
-        monitor("monitor", 0.5, WORK, -0.05, 0.4, 0.26, -1);
-        keyboard("keyboard", -0.35, WORK, -0.05, 0.36);
+        // in front of the cash trays (their front at -0.11), behind the inner panel (0.06)
+        monitor("monitor", 0.5, WORK, -0.03, 0.4, 0.26, -1);
+        keyboard("keyboard", -0.35, WORK, -0.03, 0.36);
         // a pen on a chain for the customers
         rod(
             "pen",

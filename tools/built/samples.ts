@@ -21,7 +21,6 @@
  */
 
 import { readFileSync } from 'node:fs';
-import type { DoorStyleDef, FenceStyleDef, FloorCoveringDef, ObjectDef, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../web/src/content/content';
 import type { BuildingUse, DiagonalWall, LotLook, FenceEdge, ObjectPlacement, Opening, PlotInfo, RoadPlan, WallEdge, WorldStructure } from '../../web/src/core/protocol';
 import type { HouseTemplate } from '../../web/src/game/town';
 import type { Geo } from '../../web/src/render/shared/geometry';
@@ -31,11 +30,12 @@ import type { DumpMesh } from './glb';
 
 // The renderer's modules read the page's address (and its frames' timing) as they load.
 Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' }, requestAnimationFrame: () => 0, window: { addEventListener: () => {}, removeEventListener: () => {} } });
+const { Content } = await import('../../web/src/content/content');
 const { Geo: GeoClass } = await import('../../web/src/render/shared/geometry');
 const { HousePlanner, houseScheme, HOUSE_MATERIALS, WALL_STUB } = await import('../../web/src/render/shared/house');
 const { WALL_HEIGHT } = await import('../../web/src/render/shared/walls');
 const { planStreet, TownStreet, Painter, NO_FOCUS } = await import('../../web/src/render/shared/street');
-const { lotBuilding, lotLookBuilding, unitMeshes } = await import('../../web/src/render/shared/townBuildings');
+const { lotBuilding, lotLookBuilding, towerOf, unitMeshes } = await import('../../web/src/render/shared/townBuildings');
 const { dressBuilding } = await import('../../web/src/render/shared/buildingDress');
 const { writeFences } = await import('../../web/src/render/shared/fences');
 const { CARS, CAR_PAINT, paintCar } = await import('../../web/src/render/shared/cars');
@@ -75,21 +75,8 @@ export const BUILT_MATERIALS = {
 
 const root = new URL('../../web/public/content/', import.meta.url);
 const json = <T>(name: string): T => JSON.parse(readFileSync(new URL(name, root), 'utf8')) as T;
-interface ContentFile {
-  objects?: ObjectDef[];
-  include?: string[];
-  wallCoverings: WallCoveringDef[];
-  floorCoverings: FloorCoveringDef[];
-  doorStyles: DoorStyleDef[];
-  windowStyles: WindowStyleDef[];
-  roofStyles: RoofStyleDef[];
-  roofColors: RoofColorDef[];
-  fenceStyles: FenceStyleDef[];
-  roomRules?: { lampTiles?: number; windowTiles?: number };
-}
-const base = json<ContentFile>('base.json');
-const objects = new Map<string, ObjectDef>();
-for (const f of [base, ...(base.include ?? []).map((name) => json<ContentFile>(name))]) for (const o of f.objects ?? []) if (!objects.has(o.id)) objects.set(o.id, o);
+// The content as the game loads it (base.json and the files it includes, merged by `mergeContent`).
+const content = await Content.load(new URL('base.json', root).href);
 const shipped = json<{ plot: { width: number; depth: number }; lotSizes: Record<string, { width: number; depth: number }>; houses: HouseTemplate[] }>('houses.json');
 
 // ---- meshes ---------------------------------------------------------------------------------------
@@ -224,9 +211,9 @@ const thing = (def: string, x: number, z: number, rot = 0) => ({ def, x, z, rot 
 /** The generator's house for a lot size (`housegen.json`, as a new town's lots get theirs): the first of its seeds (as `tools/housegen/sample.ts` counts them) whose house has as many storeys as asked. */
 function generated(name: string, about: string, size: string, storeys: 1 | 2, look: Plan['look']): Plan {
   const cfg = json<Parameters<typeof generateHouse>[0]>('housegen.json');
-  const info = objectInfos({ object: (id) => objects.get(id), radius: (d) => Math.max(0.02, Math.min(0.45, d?.radius ?? 0.12)) });
+  const info = objectInfos(content);
   for (let seed = 7919; seed < 7919 * 200; seed += 7919) {
-    const h = generateHouse(cfg, info, shipped.lotSizes[size], shipped.plot, size, seed, base.roomRules?.lampTiles, base.roomRules?.windowTiles, undefined, 'roomy');
+    const h = generateHouse(cfg, info, shipped.lotSizes[size], shipped.plot, size, seed, content.lampTiles, content.windowTiles, undefined, 'roomy');
     if (!h || !!h.upper !== (storeys === 2)) continue;
     const floor = (f: Floor): Floor => ({ walls: f.walls, doors: f.doors, windows: f.windows, objects: f.objects });
     return { name, about: `${about} (seed ${seed}: ${h.name})`, lot: h.lot ?? shipped.lotSizes[size], ...floor(h as Floor), ...(h.upper ? { upper: floor(h.upper as Floor) } : {}), look, porch: true };
@@ -359,8 +346,8 @@ const STREET = 10;
 /** The lot beside the house's, empty: the one in view when the house is a neighbour's. */
 const NEXT = 12;
 
-const coverings = base.wallCoverings;
-const floorCoverings = base.floorCoverings;
+const coverings = content.wallCoverings;
+const floorCoverings = content.floorCoverings;
 const indexOf = (list: readonly { id: string }[], id: string): number => {
   const i = list.findIndex((e) => e.id === id);
   if (i < 0) throw new Error(`no ${id} in the content`);
@@ -451,8 +438,8 @@ function worldOf(plan: Plan, ox: number): WorldStructure {
     const look: [number, number] = [cover(before), cover(after)];
     const wall: WallEdge = { axis, x, z, ...(look[0] || look[1] ? { faces: look } : {}) };
     walls.push(wall);
-    if (e === 2) openings.push({ ...wall, kind: 'door', ...(plan.each ? { style: doors++ % base.doorStyles.length } : {}) });
-    if (e === 3) openings.push({ ...wall, kind: 'window', ...(plan.each ? { style: windows++ % base.windowStyles.length } : {}) });
+    if (e === 2) openings.push({ ...wall, kind: 'door', ...(plan.each ? { style: doors++ % content.doorStyles.length } : {}) });
+    if (e === 3) openings.push({ ...wall, kind: 'window', ...(plan.each ? { style: windows++ % content.windowStyles.length } : {}) });
   };
   for (let z = 0; z <= D; z++) for (let x = 0; x < W; x++) add('h', x, z, h[z * W + x]);
   for (let z = 0; z < D; z++) for (let x = 0; x <= W; x++) add('v', x, z, v[z * (W + 1) + x]);
@@ -460,7 +447,7 @@ function worldOf(plan: Plan, ox: number): WorldStructure {
     const t = (g.z + rows(0)) * W + ox + g.x;
     const of: [number, number] = [label[t * 2], label[t * 2 + 1]];
     const look: [number, number] = [cover(of[0]), cover(of[1])];
-    return { axis: g.axis, x: ox + g.x, z: g.z + rows(0), kind: g.kind, rooms: of, ...(look[0] || look[1] ? { faces: look } : {}), ...(plan.each && g.kind !== 'wall' ? { style: (i + 3) % (g.kind === 'door' ? base.doorStyles.length : base.windowStyles.length) } : {}) };
+    return { axis: g.axis, x: ox + g.x, z: g.z + rows(0), kind: g.kind, rooms: of, ...(look[0] || look[1] ? { faces: look } : {}), ...(plan.each && g.kind !== 'wall' ? { style: (i + 3) % (g.kind === 'door' ? content.doorStyles.length : content.windowStyles.length) } : {}) };
   });
   // On a plan with `each`, every finish of floor covering: the first covering of each, in turn tile by tile
   // over the rooms (there are more finishes than rooms).
@@ -476,7 +463,7 @@ function worldOf(plan: Plan, ox: number): WorldStructure {
   }
   const placed: ObjectPlacement[] = floors.flatMap((f, k) =>
     (f.objects ?? []).map((o, i): ObjectPlacement => {
-      const [fw, fd] = objects.get(o.def)?.footprint ?? [1, 1];
+      const [fw, fd] = content.object(o.def)?.footprint ?? [1, 1];
       const [pw, pd] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
       return { id: k * 1000 + i, def: o.def, x: ox + o.x, z: o.z + rows(k), rot: o.rot, w: pw, d: pd, quality: 0, sellValue: null };
     }),
@@ -486,7 +473,7 @@ function worldOf(plan: Plan, ox: number): WorldStructure {
   for (const [ax, az, bx, bz] of plan.walls) [x0, z0, x1, z1] = [Math.min(x0, ax, bx), Math.min(z0, az, bz), Math.max(x1, ax, bx), Math.max(z1, az, bz)];
   const front = plan.doors[0];
   if (!front || front.axis !== 'x' || front.z !== z0) throw new Error(`${plan.name}: its first door is its front door, in the wall along the street`);
-  const roof = plan.roof ? ([indexOf(base.roofStyles, plan.roof[0]), indexOf(base.roofColors, plan.roof[1])] as [number, number]) : undefined;
+  const roof = plan.roof ? ([indexOf(content.roofStyles, plan.roof[0]), indexOf(content.roofColors, plan.roof[1])] as [number, number]) : undefined;
   const plots: PlotInfo[] = [
     { id: 0, name: plan.name, x: ox, z: STREET, w, d, public: false, entry: [ox + front.x + 0.5, STREET + 1], house: [ox + x0, STREET + z0, ox + x1, STREET + z1], ...(roof ? { roof } : {}), ...(plan.upper ? { storeys: 2 } : {}) },
     { id: 1, name: 'next door', x: ox + w, z: STREET, w: NEXT, d, public: false, entry: null, house: null },
@@ -522,7 +509,7 @@ const NO_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), 
 /** A planner with the content's looks, as the renderer gives them. */
 function plannerOf(): InstanceType<typeof HousePlanner> {
   const planner = new HousePlanner();
-  planner.setLooks({ coverings: base.wallCoverings, floors: base.floorCoverings, doors: base.doorStyles, windows: base.windowStyles, roofs: base.roofStyles, roofColors: base.roofColors });
+  planner.setLooks({ coverings: content.wallCoverings, floors: content.floorCoverings, doors: content.doorStyles, windows: content.windowStyles, roofs: content.roofStyles, roofColors: content.roofColors });
   return planner;
 }
 
@@ -568,7 +555,18 @@ async function houseSamples(plan: Plan): Promise<Sample[]> {
   const neighbour = seen.silhouettes.parts.map((part) => partMesh(part));
 
   // Far off: the street's far house, and the town view's box (`pc/street.ts`: `farLook` on the lot's pad, here 0).
-  const plot = { x: home.x, z: home.z, house: home.house!, roof: home.roof, storeys: home.storeys, cover: planner.exteriorCover(world, home.house!, home.storeys ?? 1) };
+  // (As the street asks for them, `Street.farPlot`: each storey's boxes, its garage.)
+  const garage = world.garages?.find((g) => g.plot === home.id);
+  const plot = {
+    x: home.x,
+    z: home.z,
+    house: home.house!,
+    roof: home.roof,
+    storeys: home.storeys,
+    cover: planner.exteriorCover(world, home.house!, home.storeys ?? 1),
+    boxes: planner.storeyBoxes(world, home.house!, home.storeys ?? 1),
+    ...(garage ? { garage: { x0: garage.x0, z0: garage.z0, x1: garage.x1, z1: garage.z1 } } : {}),
+  };
   const far = new GeoClass();
   planner.farHouse(far, plot);
   const town = lotBuilding({ id: home.id, chunk: 0, storeys: home.storeys ?? 1, pad: 0, ...planner.farLook(plot) }, () => 0);
@@ -579,7 +577,7 @@ async function houseSamples(plan: Plan): Promise<Sample[]> {
     { key, kind: 'house', about, storeys: count, meshes: near.filter((m) => m.indices.length > 0) },
     { key: `neighbour.${plan.name}`, kind: 'neighbour', of: key, about, storeys: count, meshes: merged(neighbour) },
     { key: `far.${plan.name}`, kind: 'far', of: key, about, storeys: count, meshes: [meshOf('farHouses', BUILT_MATERIALS.plain, far)] },
-    { key: `town.${plan.name}`, kind: 'town', of: key, about, storeys: count, meshes: unitMeshesOf(town) },
+    { key: `town.${plan.name}`, kind: 'town', of: key, about, storeys: count, meshes: merged(town.flatMap(unitMeshesOf)) },
   ];
 }
 
@@ -639,13 +637,13 @@ function buildingSamples([use, w, d, roof, storeys, look]: (typeof BUILDINGS)[nu
   const key = `building.${use}`;
   return [
     { key, kind: 'building', about, storeys, meshes: merged(near) },
-    { key: `buildingFar.${use}`, kind: 'buildingFar', of: key, about, storeys, meshes: unitMeshesOf(t) },
+    { key: `buildingFar.${use}`, kind: 'buildingFar', of: key, about, storeys, meshes: merged((t.church ? [t, towerOf(t)] : [t]).flatMap(unitMeshesOf)) },
   ];
 }
 
 // ---- a street ---------------------------------------------------------------------------------------
 
-const fenceStyles = base.fenceStyles;
+const fenceStyles = content.fenceStyles;
 
 /** A fence of `style` round the rectangle (x0, z0)..(x1, z1), a gate in the middle of its -z side. */
 function fenceRound(x0: number, z0: number, x1: number, z1: number, style: number): FenceEdge[] {
@@ -735,7 +733,10 @@ function fenceSample(style: number): Sample | null {
   // (A hedge is the hedge model's copies, not built here; its gate is a wooden one.)
   const p = new Painter(new GeoClass());
   writeFences(p, fenceRound(2, 2, 8, 6, style), fenceStyles, { gates: null, hedges: [] });
-  if (p.geo.empty) return null;
+  if (p.geo.empty) {
+    if (def.kind === 'hedge') return null;
+    throw new Error(`fence style ${def.id} draws nothing`);
+  }
   return { key: `fence.${def.id}`, kind: 'fence', about: `${def.label}: round 6 m by 4 m, a gate in it`, meshes: [meshOf('fences', BUILT_MATERIALS.plain, p.geo)] };
 }
 

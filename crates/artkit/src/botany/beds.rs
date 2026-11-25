@@ -12,7 +12,7 @@ use crate::noise::noise_at;
 use crate::parts::{join, join_all, measure, new_parts, settle};
 use crate::rand::Random;
 use crate::scene::{Obj, meshes};
-use crate::shapes::{Cube, Revolve, cube, options, revolve};
+use crate::shapes::{AUTO_BEVEL, Cube, Revolve, cube, options, revolve};
 
 options! {
     /// `spiral`'s options.
@@ -69,18 +69,7 @@ pub fn mound(p: &Palette, o: Mound) -> f64 {
 }
 
 /// Low leafy clumps between the flowers.
-#[allow(clippy::too_many_arguments)]
-pub fn clumps(
-    p: &Palette,
-    rng: &mut Random,
-    n: usize,
-    radius: f64,
-    size: f64,
-    h: f64,
-    z: f64,
-    cols: &[Mat],
-) {
-    let _ = p;
+pub fn clumps(rng: &mut Random, n: usize, radius: f64, size: f64, h: f64, z: f64, cols: &[Mat]) {
     for (i, (x, y, _)) in spiral(n, radius, rng, Spiral::default())
         .into_iter()
         .enumerate()
@@ -113,16 +102,7 @@ options! {
 
 /// `n` low rosettes of `leaves` leaves each (or cut into `pinnae` leaflet pairs) spread over a bed: the flowers'
 /// own leaves, where the old beds had lumps.
-pub fn rosettes(
-    p: &Palette,
-    rng: &mut Random,
-    n: usize,
-    radius: f64,
-    z: f64,
-    cols: &[Mat],
-    o: Rosettes,
-) {
-    let _ = p;
+pub fn rosettes(rng: &mut Random, n: usize, radius: f64, z: f64, cols: &[Mat], o: Rosettes) {
     let name = o.name;
     for (i, (x, y, a)) in spiral(n, radius, rng, Spiral::default())
         .into_iter()
@@ -281,8 +261,8 @@ pub fn _crop(
     vec![still, plants, fruit]
 }
 
-/// A raised bed of boards (the palette `p`'s `body`, the part the player colours), two to a side, with corner
-/// posts, full of soil mounded into rows: returns the soil's height.
+/// A raised bed of boards (the palette `p`'s `body`, the part the player colours), two to a side, their arrises
+/// chamfered (`AUTO_BEVEL`), with corner posts, full of soil mounded into rows: returns the soil's height.
 pub fn raised_bed(p: &Palette, w: f64, d: f64, h: f64) -> f64 {
     let body = p.get("body");
     for s in [-1, 1] {
@@ -297,6 +277,7 @@ pub fn raised_bed(p: &Palette, w: f64, d: f64, h: f64) -> f64 {
                         z: h / 4.0 + k as f64 * h / 2.0,
                     },
                     material: Some(body),
+                    bevel: AUTO_BEVEL,
                     ..Cube::default()
                 },
             );
@@ -310,6 +291,7 @@ pub fn raised_bed(p: &Palette, w: f64, d: f64, h: f64) -> f64 {
                         z: h / 4.0 + k as f64 * h / 2.0,
                     },
                     material: Some(body),
+                    bevel: AUTO_BEVEL,
                     ..Cube::default()
                 },
             );

@@ -26,11 +26,8 @@ pub(crate) fn usable_here<'a>(sim: &Sim, ctx: &Ctx<'a>) -> std::borrow::Cow<'a, 
                 sim.pos,
                 ctx.content.autonomy.reach,
             );
-            let closed = |o: &u32| ctx.object_plot[*o as usize].is_some_and(shut);
-            if near.iter().any(closed) {
-                near.to_mut().retain(|o| !closed(o));
-            }
-            near
+            near.retain(|o| !ctx.object_plot[*o as usize].is_some_and(shut));
+            std::borrow::Cow::Owned(near)
         }
     }
 }
@@ -363,6 +360,63 @@ pub(crate) fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], 
         &mut [None, None],
     );
     outing_fits(content, eta, ctx.hour, free_before_work(sim, ctx))
+}
+
+/// About how many minutes `sim` would take to get to `plot` from where they are now, the way
+/// they'd go (`leisure_way`: the car, a bike of theirs or the one they're on, the taxi, else on
+/// foot).
+pub(crate) fn leisure_eta(
+    sim: &Sim,
+    ctx: &Ctx,
+    objects: &[ObjectInstance],
+    plot: u32,
+) -> Option<f32> {
+    let p = ctx.plots.get(plot as usize)?;
+    let content = ctx.content;
+    let pos = ctx.nav.stairs.ground_pos(sim.pos);
+    let goer = Goer {
+        drives: crate::cars::can_drive(
+            ctx.travel,
+            ctx.households,
+            ctx.plots,
+            ctx.briefs,
+            ctx.cars,
+            sim,
+        ),
+        // (On one already, it, however short the ride: `leisure_bike` offers one at home only.)
+        bike: sim
+            .riding
+            .map(|_| (crate::ride::speed(content, sim, objects), 0.0))
+            .or_else(|| {
+                crate::ride::leisure_bike(
+                    content,
+                    ctx.index,
+                    ctx.briefs,
+                    ctx.households,
+                    objects,
+                    sim,
+                )
+                .map(|(_, speed, min)| (speed, min))
+            }),
+    };
+    let door = p.arrival_point();
+    let taxi = ctx
+        .taxis
+        .takes(sim)
+        .then(|| crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door))
+        .flatten();
+    let (_, eta) = leisure_way(
+        ctx.travel,
+        content,
+        pos,
+        sim.walk_per_minute(content),
+        plot,
+        door,
+        goer,
+        taxi,
+        &mut [None, None],
+    );
+    Some(eta)
 }
 
 /// Whether `sim`, at home, goes to `plot` (a visit or an outing) by the taxi (`leisure_way`: no

@@ -153,3 +153,12 @@ the old `shallow`). Islands stand free, centred.
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `counterSinkDouble`, `farmhouseSink`, `fridge`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeMini`, `fridgeRetro`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+No hard edge shows unbevelled any more (`cargo review edges`: 26 → 0). The sinks' bowls step 45° from the rim to the
+wall (`bowl`), the herb pots' rims are eased, the wine fridge's round bar pulls shade round (`crate::common::pull`
+takes `round_angle`), the fridges' drawer and crisper fronts are bevelled, and the retro fridge's opening has a liner
+breaker strip where the cut meets the shell's rounded front. The mini fridge's jar is 7 cm and the apple on it a small
+one, so with what stands on it it is 0.965 m, a mini fridge's height (`cargo review sizes`). The wine fridge's and the
+French-door fridge's fourth draw call is a moving part each (a glass door and a rack, three doors): left as it is.

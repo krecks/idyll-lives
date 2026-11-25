@@ -1,12 +1,13 @@
 //! L1 continued: the designer sofa, the three-seater, the sectional's modules and its chaise.
 
-use super::common::{Cushion, cushion, panel, plain, seat, settled, taper_leg, throw};
+use super::common::{Cushion, cushion, panel, plain, seat, settled, swept, taper_leg};
 use super::sofas::run;
 use super::{F, M};
-use artkit::forms::rounded_rect;
+use artkit::forms::{catmull, rounded_rect};
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::P3;
+use artkit::math::{P3, V3};
 use artkit::parts::{join, new_parts};
 use artkit::scene::Obj;
 use artkit::soft::SoftBox;
@@ -84,21 +85,25 @@ pub fn sofa_design() -> Vec<Obj> {
                 plain(0.04),
             );
             // the arm cap: a brass strip rounded over the arm, its front end rolled down
-            fsweep!(
-                F,
-                format!("arm_cap{s}"),
-                &[
-                    (sf * 0.88, 0.555, z - 0.33),
-                    (sf * 0.88, 0.556, z + 0.3),
-                    (sf * 0.88, 0.55, z + 0.36),
-                    (sf * 0.88, 0.53, z + 0.375)
-                ],
-                0.0,
+            // straight to the roll, curved over it (one span 60 cm long would overshoot the roll and fold it)
+            let given = [
+                (sf * 0.88, 0.556, z + 0.24),
+                (sf * 0.88, 0.556, z + 0.3),
+                (sf * 0.88, 0.55, z + 0.36),
+                (sf * 0.88, 0.53, z + 0.375),
+            ]
+            .map(|(x, y, z)| V3::from(F.at(x, y, z)));
+            let mut pts = vec![V3::from(F.at(sf * 0.88, 0.555, z - 0.33))];
+            pts.extend(catmull(&given, 2, false).0);
+            swept(
+                &format!("arm_cap{s}"),
+                &pts,
+                &rounded_rect(0.11, 0.022, 0.01, 2),
+                &vec![1.0; pts.len()],
+                V3::from((1, 0, 0)),
+                60.0,
+                0.003,
                 M.brass,
-                profile = rounded_rect(0.11, 0.022, 0.01, 2),
-                up = (1, 0, 0),
-                resolution = 2,
-                angle = 60
             );
             for lz in [z - 0.3, z + 0.3] {
                 let dz = if lz > z { 0.035 } else { -0.035 };
@@ -158,7 +163,7 @@ pub fn sofa_three_seat() -> Vec<Obj> {
         M.moss,
         M.moss_cushion,
         M.oak_legs,
-        2.86,
+        2.82,
         &[-1, 1],
         &["back"],
         0.88,
@@ -222,8 +227,8 @@ pub fn chaise() -> Vec<Obj> {
             "base",
             0.96,
             0.22,
-            1.9,
-            (0.0, 0.21, 0.0),
+            1.84,
+            (0.0, 0.21, -0.03),
             M.greige,
             0.035,
             0.0,
@@ -246,8 +251,8 @@ pub fn chaise() -> Vec<Obj> {
             "arm",
             0.17,
             0.52,
-            1.9,
-            (0.395, 0.36, 0.0),
+            1.84,
+            (0.395, 0.36, -0.03),
             M.greige,
             0.065,
             0.0,
@@ -268,7 +273,7 @@ pub fn chaise() -> Vec<Obj> {
             },
         );
         for lx in [-0.42, 0.42] {
-            for lz in [-0.88, 0.88] {
+            for lz in [-0.88, 0.82] {
                 taper_leg(
                     &format!("leg{}{}", float_repr(lx), float_repr(lz)),
                     lx,
@@ -287,8 +292,8 @@ pub fn chaise() -> Vec<Obj> {
             "seat",
             0.76,
             0.13,
-            1.66,
-            (-0.08, 0.385, 0.1),
+            1.6,
+            (-0.08, 0.385, 0.07),
             M.greige_cushion,
             Cushion {
                 puff: 0.02,
@@ -296,19 +301,20 @@ pub fn chaise() -> Vec<Obj> {
                 ..Cushion::default()
             },
         );
-        throw(
+        kit::throw!(
+            F,
             "throw",
             -0.06,
             0.52,
             0.469,
-            0.36,
-            0.935,
+            0.3,
+            0.875,
             M.throw_oat,
             0.1,
-            -3.0,
-            5.0,
+            turn = -3.0,
+            seed = 5.0
         );
         0.45
     };
-    settled(seat(cushions, 0.32, 0.1))
+    settled(seat(cushions, 0.32, 0.07))
 }

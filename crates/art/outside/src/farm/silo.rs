@@ -1,7 +1,7 @@
 //! The grain silo: a galvanised drum on a concrete pad under a red domed cap, its ladder, walkway, door and chute,
 //! and its far version.
 
-use super::common::{F, M};
+use super::common::{F, M, eased};
 use artkit::json::float_repr;
 use artkit::math::{TAU, cos, cosd, degrees, radians, sin, sind};
 use artkit::parts::{join_all, settle};
@@ -114,14 +114,14 @@ pub fn silo() -> Vec<Obj> {
                 SILO_TOP + 0.05 + 0.62 * sin(e) + 0.005,
             ));
         }
-        sweep!(
+        eased(sweep!(
             format!("cap_seam{i}"),
             &pts,
             0.014,
             material = M.silo_cap,
             verts = 4,
             resolution = 2
-        );
+        ));
     }
     torus!(
         "cap_eave",
@@ -298,7 +298,7 @@ pub fn silo() -> Vec<Obj> {
     settle(&[join_all("silo")])
 }
 
-/// The silo from afar: pad, plain drum, cap and vent; the ladder a flat strip.
+/// The silo from afar: pad, plain drum, cap and vent; the ladder a flat strip; the hopper.
 pub fn silo_far() -> Vec<Obj> {
     silo_drum(false);
     fbox!(
@@ -310,5 +310,7 @@ pub fn silo_far() -> Vec<Obj> {
         (0, 0.3 + (SILO_TOP - 0.3) / 2.0, SILO_R + 0.15),
         M.steel
     );
+    // the hopper, the farthest part out, so it stands where the silo does
+    fbox!(F, "hopper", 0.26, 0.2, 0.26, (1.32, 0.2, -0.72), M.steel);
     settle(&[join_all("silo_far")])
 }

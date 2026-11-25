@@ -2,8 +2,8 @@
 //! eyepiece, is its own part about the mount's axle, and tilts up 35° while a resident stargazes (`aim`).
 
 use super::M;
-use super::common::{P, axis, rr};
-use artkit::forms::smooth_outline;
+use super::common::{P, axis};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, sin, sind};
 use artkit::parts::{hinged, join, new_parts, settle};
@@ -55,7 +55,7 @@ pub fn telescope() -> Vec<Obj> {
                 &[top, mid],
                 0,
                 M.tripod,
-                profile = rr(0.034, 0.024, 0.008, 1),
+                profile = rounded_rect(0.034, 0.024, 0.008, 1),
                 up = (1, 0, 0)
             );
             kit::tube!(
@@ -73,7 +73,7 @@ pub fn telescope() -> Vec<Obj> {
                 &[along(0.53), mid],
                 0,
                 M.foot,
-                profile = rr(0.042, 0.032, 0.01, 1),
+                profile = rounded_rect(0.042, 0.032, 0.01, 1),
                 up = (1, 0, 0)
             );
             fsphere!(
@@ -247,7 +247,8 @@ pub fn telescope() -> Vec<Obj> {
             (0, TUBE_C.1, TUBE_C.2),
             M.tube,
             rot = tube_rot,
-            verts = 24
+            verts = 24,
+            bevel = 0.003
         );
         let at = |t: f64, off: f64| {
             let p = on_tube(t, off);
@@ -330,7 +331,8 @@ pub fn telescope() -> Vec<Obj> {
             on_tube(-0.445, 0.0),
             M.foot,
             rot = tube_rot,
-            verts = 18
+            verts = 18,
+            bevel = 0.003
         );
         // the focuser: a drawtube with two knobs, the diagonal and the eyepiece
         fcyl!(
@@ -399,7 +401,8 @@ pub fn telescope() -> Vec<Obj> {
             on_tube(0.05, 0.11),
             M.tube,
             rot = tube_rot,
-            verts = 12
+            verts = 12,
+            bevel = 0.002
         );
         fcyl!(
             f,

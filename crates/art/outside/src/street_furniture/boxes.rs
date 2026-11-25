@@ -20,7 +20,8 @@ fn ribbed(r: f64, y: f64, ribs: usize, out: f64, at: (f64, f64)) -> Vec<P3> {
     let mut pts = Vec::new();
     let span = TAU / ribs as f64;
     for k in 0..ribs {
-        for (f, rr) in [(0.06, r), (0.1, r + out), (0.9, r + out), (0.94, r)] {
+        // each rib's flanks slope at under 60° to its face, as a press leaves them
+        for (f, rr) in [(0.02, r), (0.16, r + out), (0.84, r + out), (0.98, r)] {
             let a = span * (k as f64 + f);
             pts.push(P3 {
                 x: at.0 + rr * cos(a),
@@ -133,14 +134,14 @@ pub fn litter_bin() -> Vec<Obj> {
             resolution = 2
         );
         // the label on its front: a white plate with a bin sign and two lines on it
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "label",
             &rounded_rect(0.16, 0.08, 0.01, 2),
             0.012,
             (0, 0.62, z + 0.216),
             m.paper
-        );
+        ));
         fextrude!(
             f,
             "sign_bin",
@@ -337,7 +338,7 @@ pub fn post_box() -> Vec<Obj> {
             m.dark
         );
         // the collection times: a framed white plate with its lines
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "times_frame",
             &rounded_rect(0.16, 0.13, 0.012, 2),
@@ -345,7 +346,7 @@ pub fn post_box() -> Vec<Obj> {
             (0, 0.82, 0.208),
             m.body,
             holes = [rounded_rect(0.136, 0.106, 0.006, 1)]
-        );
+        ));
         // (sharp: a chamfer would draw it back from the frame's inner edge)
         fbox!(
             f,

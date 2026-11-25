@@ -21,16 +21,8 @@ fn face_area(mesh: &Mesh, f: usize) -> f32 {
     if c.len() == 3 {
         return crate::math::len_v3((p(0) - p(1)).cross(p(1) - p(2))) * 0.5;
     }
-    let mut n = V3::ZERO;
-    let mut prev = p(c.len() - 1);
-    for i in 0..c.len() {
-        let cur = p(i);
-        n.x += (prev.y - cur.y) * (prev.z + cur.z);
-        n.y += (prev.z - cur.z) * (prev.x + cur.x);
-        n.z += (prev.x - cur.x) * (prev.y + cur.y);
-        prev = cur;
-    }
-    crate::math::len_v3(n) * 0.5
+    let points: Vec<V3> = c.iter().map(|&v| mesh.verts[v as usize]).collect();
+    crate::math::len_v3(crate::mesh::newell(&points)) * 0.5
 }
 
 /// Blender's WEIGHTED_NORMAL modifier (by face area, its weight and threshold as they come), applied: the corners

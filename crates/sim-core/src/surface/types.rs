@@ -178,7 +178,7 @@ impl Top {
     pub fn of(content: &Content, o: &ObjectInstance) -> Option<Self> {
         let def = &content.objects[o.def];
         let surface = def.surface?;
-        let a = angle(o);
+        let a = o.angle();
         // Resized, the top grows with the footprint (its margins stay) and rises with the height.
         let grown = [0, 1].map(|i| o.extent[i] as f32 / 100.0 - def.footprint[i] as f32);
         let scale = [0, 1].map(|i| o.extent[i] as f32 / 100.0 / def.footprint[i] as f32);

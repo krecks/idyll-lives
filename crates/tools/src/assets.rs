@@ -36,9 +36,25 @@ pub const USAGE: &str = "usage: cargo assets [--force] [--jobs N] [--verbose]   
 
 /// Bump a kind's when its encoding changes, so its cached copies are made again (and the game's own
 /// caches of what it drew from them: the index carries the hashes).
-const VERSION: [(&str, u32); 3] = [("model", 4), ("texture", 2), ("gzip", 1)];
+const VERSION: [(&str, u32); 3] = [("model", 4), ("texture", 3), ("gzip", 1)];
+/// The encoders' crates: their entries in Cargo.lock are in every cached copy's key, so a new version
+/// encodes again.
+const ENCODERS: [&str; 2] = ["basisu_c_sys", "meshopt"];
+
 /// What encodes: in every cached copy's key, so another tool's copies in the same folder are never taken.
-const ENCODER: &str = "cargo assets (basisu_c_sys 0.9, meshoptimizer 1.3)";
+fn encoder() -> String {
+    let mut encoder = String::from("cargo assets");
+    for package in include_str!("../../../Cargo.lock").split("[[package]]") {
+        if ENCODERS.iter().any(|name| {
+            package
+                .trim_start()
+                .starts_with(&format!("name = \"{name}\""))
+        }) {
+            encoder.push_str(package);
+        }
+    }
+    encoder
+}
 
 /// Left as they are: not loaded by the game, or drawn in a way KTX2 can't be (flipped on upload).
 const SKIP: [&str; 1] = ["textures/sky/clouds.png"];
@@ -222,6 +238,7 @@ fn kb(n: usize) -> String {
 fn tasks(d: &Dirs) -> Result<Vec<Task>, String> {
     let files = walk(&d.src)?;
     let foliage = foliage_models(&d.src, &files);
+    let encoder = encoder();
     let mut tasks = Vec::new();
     for rel in &files {
         let Some((kind, out)) = plan(rel) else {
@@ -230,12 +247,15 @@ fn tasks(d: &Dirs) -> Result<Vec<Task>, String> {
         let bytes = std::fs::read(d.src.join(rel)).map_err(|e| format!("{rel}: {e}"))?;
         let leaves = foliage.contains(rel);
         let mut hash = Sha256::new();
-        hash.update(ENCODER);
+        hash.update(&encoder);
         hash.update(kind.name());
         hash.update(kind.version().to_le_bytes());
         if let Kind::Texture(role) = kind {
             hash.update(role.name());
             hash.update(texture::settings(role));
+            // The JPEG decoder's source: a change to it may change the pixels the encoder gets.
+            hash.update(include_str!("tex/jpeg.rs"));
+            hash.update(include_str!("tex/jpeg/decode.rs"));
         }
         hash.update(if leaves { "foliage" } else { "" });
         hash.update(&bytes);
@@ -590,20 +610,18 @@ fn check(against: Option<&str>) -> Result<bool, String> {
     let ours = check_tree(&d, &d.out)?;
     report("this tool's", &ours);
     let mut ok = ours.faults.is_empty();
-    // Every file this tool would make a copy of has one (a model left as it is has none: said by the build).
-    let made: BTreeSet<String> = serde_json::from_slice::<J>(
+    // Every file this tool would make a copy of has one (a model left as it is has none: said by the build),
+    // made from the source and encoder there are now (its hash in the index is its key's).
+    let index: J = serde_json::from_slice(
         &std::fs::read(d.out.join("optimized.json")).map_err(|e| e.to_string())?,
     )
-    .ok()
-    .and_then(|j| {
-        j.get("files")
-            .and_then(J::as_object)
-            .map(|m| m.keys().cloned().collect())
-    })
     .unwrap_or_default();
     for t in tasks(&d)? {
-        if !made.contains(&t.rel) && t.kind != Kind::Gzip {
+        if index["files"].get(&t.rel).is_none() && t.kind != Kind::Gzip {
             println!("[assets] FAULT {}: no copy (run `cargo assets`)", t.rel);
+            ok = false;
+        } else if index["hashes"][&t.rel].as_str() != Some(&t.key[..12]) {
+            println!("[assets] FAULT {}: an old copy (run `cargo assets`)", t.rel);
             ok = false;
         }
     }
@@ -758,6 +776,17 @@ mod tests {
         assert_eq!(plan("textures/sky/clouds.png"), None);
         assert_eq!(plan("icons/app.png"), None);
         assert_eq!(plan("manifest.json"), None);
+    }
+
+    #[test]
+    fn the_encoders_versions_are_in_the_key() {
+        let encoder = encoder();
+        for name in ENCODERS {
+            assert!(
+                encoder.contains(&format!("name = \"{name}\"\nversion = ")),
+                "{name} isn't in Cargo.lock"
+            );
+        }
     }
 
     #[test]

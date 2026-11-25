@@ -2,9 +2,10 @@
 //! water (`water_on`).
 
 use super::M;
-use super::common::{LATHE, Lathe, Ring, bottle, drain, gooseneck, lathe, pull, shaker, tube};
+use super::common::{LATHE, Lathe, Ring, bottle, drain, gooseneck, lathe, pull, shaker};
 use crate::common::water;
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
@@ -267,9 +268,12 @@ pub fn sink_pedestal() -> Vec<Obj> {
                 Ring::from((0.7, 0.25, 0.195, 2.6)),
                 Ring::from((0.8, 0.274, 0.222, 2.8)),
                 Ring::from((0.865, 0.28, 0.229, 3.0, 0.233)),
-                Ring::from((rim, 0.276, 0.225, 3.0, 0.229)),
+                // the rim rolled over (eased), the bowl's lip eased into it
+                Ring::from((rim - 0.003, 0.2755, 0.2245, 3.0, 0.2285)),
+                Ring::from((rim, 0.2725, 0.2215, 3.0, 0.2255)),
                 Ring::from((rim, 0.255, 0.2, 3.0, 0.21)),
-                Ring::from((rim, 0.236, 0.16, 2.4, 0.16, bz - z)),
+                Ring::from((rim, 0.239, 0.163, 2.4, 0.163, bz - z)),
+                Ring::from((rim - 0.003, 0.2355, 0.1595, 2.4, 0.1595, bz - z)),
                 Ring::from((rim - 0.02, 0.228, 0.152, 2.2, 0.15, bz - z)),
                 Ring::from((0.8, 0.19, 0.125, 2.1, 0.12, bz - z)),
                 Ring::from((0.755, 0.12, 0.08, 2.0, 0.08, bz - z)),
@@ -354,8 +358,8 @@ pub fn sink_pedestal() -> Vec<Obj> {
             M.porcelain,
             Lathe { verts: 16, ..LATHE },
         );
-        tube(
-            &f,
+        kit::tube!(
+            f,
             "brush",
             &[
                 (-0.15, rim + 0.03, -0.41),
@@ -364,9 +368,8 @@ pub fn sink_pedestal() -> Vec<Obj> {
             ],
             0.006,
             M.teal,
-            6,
-            1,
-            1.0,
+            verts = 6,
+            round = 1
         );
         fbox!(
             f,

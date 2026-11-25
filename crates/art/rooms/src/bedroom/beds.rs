@@ -10,6 +10,7 @@ use artkit::json::float_repr;
 use artkit::math::{Axis, P3, PI, TAU, cos, radians, sin};
 use artkit::parts::{hinged, join, join_all, new_parts, turn};
 use artkit::place::N;
+use artkit::place::eased_prism;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsweep, jitter, loft, revolve, rod, soft, swing};
 
@@ -242,7 +243,7 @@ pub fn bed_single() -> Vec<Obj> {
 
 // ---------------------------------------------------------------- the bunk bed
 
-const LOWER: f64 = 0.44; // characters.ts BUNKS['bedBunk']
+const LOWER: f64 = 0.44; // furniture.json bunks.bedBunk
 const UPPER: f64 = 1.38;
 
 /// The depths of the posts and end boards: the head end's backs on the wall's face.
@@ -295,6 +296,7 @@ fn bunk(name: &str, top: f64, guard: bool) {
             Board {
                 arch: 0.03,
                 holes,
+                n: 10,
                 ..Board::default()
             },
         );
@@ -413,7 +415,7 @@ pub fn bed_bunk() -> Vec<Obj> {
             F.at(0.465, y, 0.86),
             0.016,
             material = M.frame_oak,
-            verts = 10
+            verts = 8
         );
     }
     let (z_top, z_foot) = (-0.28, 0.875);
@@ -747,7 +749,7 @@ pub fn bed_king() -> Vec<Obj> {
 
 // ---------------------------------------------------------------- the oak double
 
-const DOUBLE_TOP: f64 = 0.52; // the old part's mattress top (characters.ts BEDS['bedDouble'])
+const DOUBLE_TOP: f64 = 0.52; // the old part's mattress top (furniture.json beds.bedDouble)
 
 /// The oak double.
 pub fn bed_double() -> Vec<Obj> {
@@ -956,12 +958,11 @@ fn drape(name: &str, x: f64, z: f64, inward: i32) {
     let shift = -inward as f64 * 0.05; // Blender y: its middle a little along the side from the post
     let secs: Vec<Vec<P3>> = [
         (0.12, 0.16, 0.06),
-        (0.4, 0.15, 0.055),
         (0.75, 0.11, 0.05),
         (1.0, 0.06, 0.045),
         (1.25, 0.1, 0.045),
         (1.6, 0.14, 0.04),
-        (1.96, 0.16, 0.03),
+        (2.05, 0.16, 0.03), // its head in the top rail, where it hangs from
     ]
     .iter()
     .map(|&(y, width, depth)| {
@@ -975,7 +976,14 @@ fn drape(name: &str, x: f64, z: f64, inward: i32) {
             .collect()
     })
     .collect();
-    loft!(format!("{name}_curtain"), &secs, material = M.canopy);
+    // (gathered cloth turns round at its edges: shaded so, and laid flat on its folds, not round its middle)
+    let c = loft!(
+        format!("{name}_curtain"),
+        &secs,
+        material = M.canopy,
+        angle = 150
+    );
+    c.edit(|p| p.uv = artkit::mesh::UvWay::Box);
     let tie: Vec<(f64, f64, f64)> = (0..10)
         .map(|i| {
             (
@@ -1042,10 +1050,10 @@ fn turned_post(name: &str, x: f64, z: f64, h: f64, r: f64, material: artkit::mat
 
 /// A valance's outline `w` across and `h` deep, hanging from its top (0) in `n` scallops.
 fn scallops(w: f64, h: f64, n: usize) -> Vec<(f64, f64)> {
-    let mut bottom: Vec<(f64, f64)> = (0..=n * 6)
+    let mut bottom: Vec<(f64, f64)> = (0..=n * 4)
         .map(|i| {
-            let u = w / 2.0 - w * i as f64 / (n * 6) as f64;
-            (u, -h + 0.04 * sin(PI * i as f64 / 6.0).abs())
+            let u = w / 2.0 - w * i as f64 / (n * 4) as f64;
+            (u, -h + 0.04 * sin(PI * i as f64 / 4.0).abs())
         })
         .collect();
     bottom.reverse();
@@ -1079,7 +1087,7 @@ pub fn bed_canopy() -> Vec<Obj> {
             (sx as f64 * 0.82, 2.06, 0),
             M.frame_walnut,
             bevel = 0.012,
-            bevel_segments = 2
+            bevel_segments = 1
         );
         fbox!(
             F,
@@ -1090,7 +1098,7 @@ pub fn bed_canopy() -> Vec<Obj> {
             (0, 2.06, posts(sx)),
             M.frame_walnut,
             bevel = 0.012,
-            bevel_segments = 2
+            bevel_segments = 1
         );
     }
     fbox!(
@@ -1159,7 +1167,7 @@ pub fn bed_canopy() -> Vec<Obj> {
         Board {
             arch: 0.065,
             bevel: 0.012,
-            n: 20,
+            n: 12,
             ..Board::default()
         },
     );
@@ -1170,7 +1178,7 @@ pub fn bed_canopy() -> Vec<Obj> {
             F,
             format!("valance_side{s}"),
             &scallops(1.77, 0.2, 5),
-            0.012,
+            0.008, // lined linen, not a board
             (s as f64 * 0.85, 2.09, 0),
             M.canopy,
             plane = artkit::place::Facing::Side
@@ -1179,7 +1187,7 @@ pub fn bed_canopy() -> Vec<Obj> {
             F,
             format!("valance_end{s}"),
             &scallops(1.57, 0.2, 4),
-            0.012,
+            0.008,
             (0, 2.09, if s > 0 { 0.95 } else { WALL + 0.006 }),
             M.canopy
         );
@@ -1222,7 +1230,7 @@ pub fn bed_canopy() -> Vec<Obj> {
 
 // ---------------------------------------------------------------- the daybed
 
-const DAYBED_TOP: f64 = 0.51; // the old part's mattress top (characters.ts BEDS['bedDaybed'])
+const DAYBED_TOP: f64 = 0.51; // the old part's mattress top (furniture.json beds.bedDaybed)
 
 /// A turned spindle from y0 up to y1: a bead at each end, swelling in the middle.
 fn spindle(name: &str, x: f64, y0: f64, y1: f64, z: f64, material: artkit::materials::Mat) -> Obj {
@@ -1293,14 +1301,20 @@ pub fn bed_daybed() -> Vec<Obj> {
         bevel = 0.006
     );
     // the back along the left side: a rounded top rail over turned spindles (the headboard)
-    fsweep!(
-        F,
+    // (its ends stand above the posts' shafts: chamfered)
+    let rail: Vec<(f64, f64)> = rounded_rect(0.05, 0.06, 0.018, 2)
+        .iter()
+        .map(|&(u, v)| (u + 0.79, v))
+        .collect();
+    eased_prism(
+        &F,
         "back_rail",
-        &[(-0.45, 0.79, ends(-1) + 0.03), (-0.45, 0.79, 0.92)],
-        0,
+        &rail,
+        -0.45,
+        ends(-1) + 0.03,
+        0.92,
+        0.004,
         M.back_white,
-        profile = rounded_rect(0.05, 0.06, 0.018, 2),
-        up = (0, 0, 1)
     );
     fbox!(
         F,

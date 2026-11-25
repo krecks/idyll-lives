@@ -257,3 +257,4 @@ try {
   stop();
 }
 console.log(faults ? `townShots: ${faults} fault(s); pictures in ${out}` : `townShots: clean; pictures in ${out}`);
+process.exitCode = faults ? 1 : 0;

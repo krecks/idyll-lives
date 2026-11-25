@@ -3,7 +3,8 @@
 //! long as they do (`handwheel`, a loop).
 
 use super::M;
-use super::common::{P, chair, rr};
+use super::common::{P, chair};
+use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
@@ -44,7 +45,7 @@ pub fn sewing_table() -> Vec<Obj> {
         fextrude!(
             f,
             "top",
-            &rr(0.9, 0.46, 0.025, 2),
+            &rounded_rect(0.9, 0.46, 0.025, 2),
             0.035,
             (0, 0.735, 0.2),
             M.sew_table,
@@ -61,7 +62,7 @@ pub fn sewing_table() -> Vec<Obj> {
                     &[(x, 0.718, z), (x, 0.62, z), (x, 0.0, z)],
                     0,
                     M.sew_legs,
-                    profile = rr(0.04, 0.04, 0.006, 1),
+                    profile = rounded_rect(0.04, 0.04, 0.006, 1),
                     up = (1, 0, 0),
                     scale = [1.0, 1.0, 0.65]
                 );
@@ -150,7 +151,7 @@ pub fn sewing_table() -> Vec<Obj> {
         fextrude!(
             f,
             "bed",
-            &rr(0.38, 0.17, 0.02, 2),
+            &rounded_rect(0.38, 0.17, 0.02, 2),
             0.06,
             (0.02, 0.783, MACHINE_Z),
             M.machine,
@@ -307,7 +308,7 @@ pub fn sewing_table() -> Vec<Obj> {
         let cloth = fextrude!(
             f,
             "cloth",
-            &rr(0.4, 0.3, 0.01, 1),
+            &rounded_rect(0.4, 0.3, 0.01, 1),
             0.004,
             (-0.2, 0.7545, 0.14),
             M.fabric_pink,

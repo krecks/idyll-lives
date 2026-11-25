@@ -59,7 +59,13 @@ pub(crate) fn arrive(
             end_activity(sim, content, objects);
             return;
         }
-        sim.pending_spend += cost.max(0);
+        // (At a post with someone serving, paid once served: `world::route`.)
+        if inter.served.is_some() && ctx.served(object) {
+            sim.owes = cost.max(0);
+        } else {
+            sim.owes = 0;
+            sim.pending_spend += cost.max(0);
+        }
         // A load of washing taken up as the use starts (`life::update` settles it); given back if
         // the use doesn't get done.
         if let Some(w) = inter.work_on {

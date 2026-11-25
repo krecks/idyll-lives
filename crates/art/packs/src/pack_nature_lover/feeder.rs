@@ -1,12 +1,13 @@
 //! The bird feeder post (1x1): a cedar post, a feeder house on a tray, a seed tube, flowers round its foot.
 
-use super::common::{_flower, _m, _rosette, M};
-use artkit::forms::rect;
+use super::common::{_flower, _rosette, M};
+use artkit::forms::{rect, rounded_rect};
 use artkit::kit;
 use artkit::math::{P3, TAU, cos, cosd, sin, sind};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{fbox, fcyl, fextrude, fsweep, jitter, revolve, settle, soft, squash};
 
 const PZ: f64 = -0.05; // the post's depth
@@ -145,7 +146,14 @@ fn _feeder_house(f: &GameFrame) {
         &[(0, 1.77, PZ - 0.155), (0, 1.77, PZ + 0.155)],
         0.0,
         M.cedar_dark,
-        profile = vec![(0.0, 0.013), (0.022, -0.006), (-0.022, -0.006)],
+        // (up, across): a cap 44 mm wide astride the ridge (it stood on its side), its apex cut across 9 mm into
+        // two turns under the gate's 60°
+        profile = vec![
+            (0.0091, -0.0045),
+            (-0.006, -0.022),
+            (-0.006, 0.022),
+            (0.0091, 0.0045)
+        ],
         up = (0, 0, 1)
     );
 }
@@ -165,15 +173,19 @@ fn _sq_profile(w: f64, h: f64) -> Vec<(f64, f64)> {
 /// A seed tube hanging from the post's arm: a clear body full of seed, a domed lid, a dish with two feeding ports
 /// and a perch through them.
 fn _seed_tube(f: &GameFrame, x: f64) {
-    fsweep!(
-        f,
-        "arm",
-        &[(0.04, 1.3, PZ), (x - 0.04, 1.31, PZ), (x, 1.33, PZ)],
-        0.0,
-        M.cedar_dark,
-        profile = rect(0.03, 0.035),
-        up = (0, 0, 1),
-        resolution = 2
+    ease(
+        fsweep!(
+            f,
+            "arm",
+            &[(0.04, 1.3, PZ), (x - 0.04, 1.31, PZ), (x, 1.33, PZ)],
+            0.0,
+            M.cedar_dark,
+            profile = rounded_rect(0.03, 0.035, AUTO_WIDTH, 1),
+            up = (0, 0, 1),
+            resolution = 2
+        ),
+        60.0,
+        1,
     );
     fsweep!(
         f,
@@ -298,14 +310,18 @@ pub fn bird_feeder() -> Vec<Obj> {
             f,
             "bed_edge",
             &ring,
-            &[
-                (-0.015, 0.0),
-                (0.02, 0.0),
-                (0.02, 0.025),
-                (0.012, 0.04),
-                (-0.007, 0.04),
-                (-0.015, 0.025)
-            ],
+            // its top's corners eased into turns under 40°
+            &eased(
+                &[
+                    (-0.015, 0.0),
+                    (0.02, 0.0),
+                    (0.02, 0.025),
+                    (0.012, 0.04),
+                    (-0.007, 0.04),
+                    (-0.015, 0.025)
+                ],
+                AUTO_WIDTH
+            ),
             M.pebble,
             at = 0.0,
             plane = Facing::Top
@@ -363,7 +379,7 @@ pub fn bird_feeder() -> Vec<Obj> {
                     fy,
                     fz,
                     0.034,
-                    _m(["pink", "yellow", "lilac", "white"][(i + k) % 4]),
+                    [M.pink, M.yellow, M.lilac, M.white][(i + k) % 4],
                     Some(if (i + k) % 4 != 1 { M.yellow } else { M.carrot }),
                     5,
                     25.0,

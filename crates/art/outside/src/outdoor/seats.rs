@@ -1,14 +1,13 @@
 //! OU1's seats: the park bench, the folding bistro set, the picnic table, the garden and Adirondack chairs and
 //! the three-seat garden bench.
 
-use super::common::{
-    Bar, F, M, bar, board, bolts, cup, end_round, finish, jug, plank, rod, side_slab, v,
-};
+use super::common::{Bar, F, M, bar, bolts, cup, end_round, finish, jug, plank, rod, side_slab, v};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, V3, cos, cosd, radians, sin, sind};
+use artkit::parts::{aside, new_parts};
 use artkit::scene::Obj;
 use artkit::{cylinder, fbox, fextrude, fsweep, loft, ring, soft};
 
@@ -242,7 +241,7 @@ fn bistro_chair(c: f64, facing: i32) {
             M.bistro,
             &end_round(0.085, 0.41, Some(0.025), 2, true),
             (0, 1, 0),
-            0.0,
+            0.004,
         );
     }
     let lean = (0, cosd(10.0), -sind(10.0) * fc); // up the back, leaning 10°
@@ -253,7 +252,7 @@ fn bistro_chair(c: f64, facing: i32) {
             .map(|&x| at(x, y, lz - 0.015 * (1.0 - artkit::math::pow(x / 0.205, 2.0))))
             .collect();
         let up = v(lean);
-        fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             format!("chair{}_back{k}", float_repr(c)),
             &bow,
@@ -262,7 +261,7 @@ fn bistro_chair(c: f64, facing: i32) {
             profile = rounded_rect(0.07, 0.018, 0.007, 1),
             up = (up.x as f64, up.y as f64, up.z as f64),
             angle = 60
-        );
+        ));
     }
     let x = 0.21;
     super::common::bent(
@@ -427,7 +426,7 @@ fn basket(x: f64, y: f64, z: f64, w: f64, h: f64, d: f64) {
             )
         })
         .collect();
-    loft!("basket", &sections, material = M.wicker);
+    artkit::bevel::eased(loft!("basket", &sections, material = M.wicker));
     let rim: Vec<(f64, f64, f64)> = rounded_rect(w + 0.012, d + 0.012, 0.03, 2)
         .iter()
         .map(|&(u, v)| (x + u, y + h * 0.78, z + v))
@@ -582,7 +581,8 @@ pub fn picnic_table() -> Vec<Obj> {
                 );
             }
         }
-        board(
+        kit::board(
+            &F,
             &format!("brace{s}"),
             (sf * 0.92, seat - 0.07, 0),
             (sf * 0.04, top - 0.07, 0),
@@ -654,7 +654,9 @@ pub fn picnic_table() -> Vec<Obj> {
             }
         }
     }
-    basket(0.55, top, 0.02, 0.4, 0.2, 0.28);
+    // the basket on the table is carried, not its size (`aside`)
+    let carried = new_parts(|| basket(0.55, top, 0.02, 0.4, 0.2, 0.28));
+    aside(&carried, "basket");
     cup(
         "cup0",
         -0.45,
@@ -824,7 +826,8 @@ fn slatted_chair(prefix: &str, material: Mat, fan: f64) {
             bevel_segments = 2
         );
     }
-    board(
+    kit::board(
+        &F,
         &format!("{prefix}back_rail"),
         (-0.3, 0.56, -0.25),
         (0.3, 0.56, -0.25),

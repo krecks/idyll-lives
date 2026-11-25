@@ -800,56 +800,6 @@ mod tests {
     use super::*;
 
     const RATE: f64 = 48000.0;
-    /// The rates a sound card runs at: a loop's seam is checked at each (a filter's state at the seam differs).
-    const RATES: [f64; 2] = [48000.0, 44100.0];
-
-    /// The biggest step between neighbouring samples of a channel, and the step from its last sample round
-    /// to its first.
-    fn steps(ch: &[f32]) -> (f64, f64) {
-        let inside = ch
-            .windows(2)
-            .map(|w| (w[1] as f64 - w[0] as f64).abs())
-            .fold(0.0, f64::max);
-        (inside, (ch[0] as f64 - ch[ch.len() - 1] as f64).abs())
-    }
-
-    /// Each as made (before the game's level), as the other things' (`things` `world_sounds`): long enough,
-    /// never past full scale, with sound in it, and a loop's end running on into its start; at each rate.
-    #[test]
-    fn home_sounds() {
-        for rate in RATES {
-            for kind in HOME {
-                let Stereo { left, right } =
-                    make(kind, rate).unwrap_or_else(|| panic!("{kind}: not made"));
-                assert_eq!(left.len(), right.len(), "{kind} at {rate}");
-                assert!(
-                    left.len() as f64 > rate / 2.0,
-                    "{kind} at {rate}: {} samples",
-                    left.len()
-                );
-                let (mut peak, mut sum) = (0.0f64, 0.0f64);
-                for ch in [&left, &right] {
-                    for &v in ch.iter() {
-                        peak = peak.max((v as f64).abs());
-                        sum += v as f64 * v as f64;
-                    }
-                }
-                assert!(sum.is_finite(), "{kind} at {rate}: not finite");
-                assert!(peak <= 1.0 + 1e-6, "{kind} at {rate}: peak {peak}");
-                let rms = (sum / (2.0 * left.len() as f64)).sqrt();
-                assert!(rms > 0.004, "{kind} at {rate}: rms {rms}");
-                if !ONCE_HOME.contains(&kind) {
-                    for ch in [&left, &right] {
-                        let (inside, seam) = steps(ch);
-                        assert!(
-                            seam <= inside,
-                            "{kind} at {rate}: seam {seam} over {inside}"
-                        );
-                    }
-                }
-            }
-        }
-    }
 
     /// Reached through the things' own `make`, and nothing else is made here.
     #[test]

@@ -10,6 +10,19 @@ pub fn bevelled(
     angle: f64,
     order: &EdgeOrder,
 ) -> Result<Bevelled, String> {
+    bevel_mesh(mesh, width, segments, angle, order, false)
+}
+
+/// `bevelled`, and with `prune` the edges whose bevel would end at a vertex no other bevelled edge reaches (a
+/// moulding's mitre, a loft's end) left sharp, and so on until none does, rather than refused.
+pub(super) fn bevel_mesh(
+    mesh: &Mesh,
+    width: f64,
+    segments: usize,
+    angle: f64,
+    order: &EdgeOrder,
+    prune: bool,
+) -> Result<Bevelled, String> {
     let ns = segments.max(1);
     let normals = face_normals(mesh);
     let nf = mesh.faces.len();
@@ -63,6 +76,21 @@ pub fn bevelled(
             bev.insert((a, b));
         }
     }
+    if prune {
+        // (each pass leaves off the edges that end alone, which can leave the next ones alone)
+        loop {
+            let mut reach: BTreeMap<u32, usize> = BTreeMap::new();
+            for &(a, b) in &bev {
+                *reach.entry(a).or_default() += 1;
+                *reach.entry(b).or_default() += 1;
+            }
+            let before = bev.len();
+            bev.retain(|&(a, b)| reach[&a] > 1 && reach[&b] > 1);
+            if bev.len() == before {
+                break;
+            }
+        }
+    }
     let offset = width as f32;
     let mut work = Work {
         mesh,
@@ -80,7 +108,6 @@ pub fn bevelled(
                 .collect(),
             picks: Vec::new(),
             segments,
-            offset: 0.0,
             made_at: vec![u32::MAX; mesh.verts.len()],
             centres: BTreeMap::new(),
         });
@@ -436,7 +463,6 @@ pub fn bevelled(
         source,
         picks,
         segments: ns,
-        offset: each,
         made_at,
         centres,
     })

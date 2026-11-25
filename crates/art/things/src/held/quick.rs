@@ -11,6 +11,7 @@ use artkit::materials::Mat;
 use artkit::math::{P3, TAU, V3, cos, radians, sin};
 use artkit::mesh::{Mesh, normal_of};
 use artkit::place::Facing;
+use artkit::py;
 use artkit::scene::Obj;
 use artkit::{cylinder, fextrude, fsweep, jitter, sweep};
 
@@ -88,7 +89,7 @@ pub fn ice_cream() -> Vec<Obj> {
 fn _sauce(name: &str, at: (f64, f64, f64), s: f64, seed: f64) {
     // the scoop's height (its profile, `ice_cream`) at (`u`, `w`) from its middle, and 2.5 mm over it
     let surface = |u: f64, w: f64| {
-        let r = u.hypot(w) / s;
+        let r = py::hypot(u, w) / s;
         let h = if r < 0.02 {
             0.044 - 0.005 * r / 0.02
         } else {
@@ -182,7 +183,7 @@ fn _film(
             )
         })
         .collect();
-    let vert = |x: f64, z: f64| V3::from(F.at(x, 0.012 + 0.6038 * x.hypot(z) + lift, z));
+    let vert = |x: f64, z: f64| V3::from(F.at(x, 0.012 + 0.6038 * py::hypot(x, z) + lift, z));
     let mut verts = vec![vert(at.0, at.1)];
     verts.extend(
         ring.iter()
@@ -215,7 +216,7 @@ fn _film(
 pub fn toast() -> Vec<Obj> {
     plate0();
     let (nx, nz) = (0.05, 0.055);
-    let n = f64::hypot(nx, nz);
+    let n = py::hypot(nx, nz);
     for (half, pts, cut, sign) in _halves((0.055, 0.05), 0.012) {
         let s = sign as f64;
         _toast_half(
@@ -244,7 +245,8 @@ pub fn _toast_half(half: &str, pts: &[(f64, f64)], cut: usize, off: (f64, f64), 
         M.toast,
         M.toast_crust,
         sides = sides,
-        at = off
+        at = off,
+        bevel = 0.003
     );
     let cx = artkit::py::sum(pts.iter().map(|p| p.0)) / pts.len() as f64 + off.0;
     let cz = artkit::py::sum(pts.iter().map(|p| p.1)) / pts.len() as f64 + off.1;
@@ -910,18 +912,23 @@ pub fn cake_stand_dirty() -> Vec<Obj> {
     let top = 0.102;
     lathe!(
         "stand",
-        &[
-            (0.0, 0.0),
-            (0.078, 0.0),
-            (0.08, 0.008),
-            (0.03, 0.022),
-            (0.02, 0.06),
-            (0.026, 0.072),
-            (0.02, 0.084),
-            (0.13, 0.092),
-            (0.14, 0.1),
-            (0.0, top)
-        ],
+        // (the plate's edge rolled round)
+        &artkit::forms::round_at(
+            &[
+                (0.0, 0.0),
+                (0.078, 0.0),
+                (0.08, 0.008),
+                (0.03, 0.022),
+                (0.02, 0.06),
+                (0.026, 0.072),
+                (0.02, 0.084),
+                (0.13, 0.092),
+                (0.14, 0.1),
+                (0.0, top),
+            ],
+            8,
+            0.001
+        ),
         M.china,
         segments = 16
     );

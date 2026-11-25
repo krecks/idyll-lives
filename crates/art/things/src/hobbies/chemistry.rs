@@ -2,8 +2,7 @@
 //! liquid in the middle flask is its own part and rises while a resident experiments (`bubble`), its bubbles on top.
 
 use super::M;
-use super::common::rr;
-use artkit::forms::smooth_outline;
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -39,13 +38,18 @@ fn flask(fr: &GameFrame, name: &str, x: f64, z: f64, liquid: Option<Mat>, fill: 
     if let Some(liquid) = liquid {
         revolve!(
             format!("{name}_liquid"),
-            &[
-                (0.0, 0.003),
-                (0.054, 0.003),
-                (0.056, 0.008),
-                (0.056, fill),
-                (0.0, fill)
-            ],
+            // (its surface curving down into the glass at the edge, no sharp rim)
+            &artkit::forms::round_at(
+                &[
+                    (0.0, 0.003),
+                    (0.054, 0.003),
+                    (0.056, 0.008),
+                    (0.056, fill),
+                    (0.0, fill),
+                ],
+                3,
+                0.002
+            ),
             at = fr.at(x, BENCH_TOP, z),
             material = liquid,
             segments = 16
@@ -82,7 +86,7 @@ pub fn chemistry_set() -> Vec<Obj> {
             at = BENCH_TOP,
             plane = Facing::Top
         );
-        let frame = rr(0.04, 0.04, 0.006, 1);
+        let frame = rounded_rect(0.04, 0.04, 0.006, 1);
         for sx in [-1, 1] {
             let x = sx as f64 * 0.42;
             for z in [-0.36, 0.06] {
@@ -111,7 +115,7 @@ pub fn chemistry_set() -> Vec<Obj> {
                 &[(x, 0.835, -0.34), (x, 0.835, 0.04)],
                 0,
                 M.chem_frame,
-                profile = rr(0.04, 0.03, 0.005, 1)
+                profile = rounded_rect(0.04, 0.03, 0.005, 1)
             );
         }
         for z in [-0.36, 0.06] {
@@ -121,7 +125,7 @@ pub fn chemistry_set() -> Vec<Obj> {
                 &[(-0.4, 0.835, z), (0.4, 0.835, z)],
                 0,
                 M.chem_frame,
-                profile = rr(0.04, 0.03, 0.005, 1)
+                profile = rounded_rect(0.04, 0.03, 0.005, 1)
             );
         }
         fbox!(
@@ -222,7 +226,7 @@ pub fn chemistry_set() -> Vec<Obj> {
         fextrude!(
             f,
             "rack",
-            &rr(0.6, 0.05, 0.004, 1),
+            &rounded_rect(0.6, 0.05, 0.004, 1),
             0.012,
             (-0.06, 1.3, -0.29),
             M.chem_frame,
@@ -419,7 +423,7 @@ pub fn chemistry_set() -> Vec<Obj> {
             ],
             0,
             M.scope,
-            profile = rr(0.036, 0.04, 0.012, 1),
+            profile = rounded_rect(0.036, 0.04, 0.012, 1),
             up = (1, 0, 0),
             resolution = 2,
             scale = [1.1, 1.0, 0.9, 0.8]

@@ -11,38 +11,22 @@
 // or more on: the stub out of the port and back onto it wound, and the road was laid whole beside
 // it), Rowanhurst (a road off another that looped round and back along it) and Willow End (leaving
 // a road in a T facing the side the way crosses it from, not the side it goes on to: a hairpin).
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { sideBySide } from '../src/game/roads';
 import { CLASSIC } from './support/classicWorlds';
 
-const WEB = new URL('../', import.meta.url).pathname;
 /** How long a country road may run alongside another, a little apart, at most (m): where one joins another at a slant, or leaves a port beside a street's end. */
 const ALONGSIDE = 40;
 
 describe('country roads', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { generateFromSpec } = await import('../src/game/macro');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** The stretches longer than `ALONGSIDE` where a country road runs alongside another road a little apart. */
   const alongside = (roads: readonly RoadPlan[]) =>
