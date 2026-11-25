@@ -4,28 +4,13 @@
 // touched numbered again, the town's last home and last park kept, the same seed the same houses,
 // the pointer's check cheap, the garden, house, public place and a civic place's lot changed; and a town
 // edited so has no problem the generated town hadn't (`townCheck.ts` `townProblems`).
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('lot edits', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { mulberry32 } = await import('../src/game/noise');
   const { unrle } = await import('../src/game/landMasks');
@@ -34,16 +19,14 @@ describe('lot edits', async () => {
   const { assembleTown, boundsOf, frontageOf, generatedId, generateWorld, homesOn: homesOnLot, houseFor, LotPlacer, plotRect, useTownContent, vacantSlots } = await import('../src/game/town');
   const { entriesOf, groundOf, townGround } = await import('../src/game/edit/ground');
   const lots = await import('../src/game/edit/lots');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type Edited = import('../src/game/edit/edited').Edited;
   type RoadSpot = import('../src/game/edit/ground').RoadSpot;
   type LotChoice = import('../src/game/edit/lots').LotChoice;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** A small generated world (a hamlet, no villages). */
   const hamlet = generateWorld(content, t, 'country', 4245, undefined, undefined, { town: 'hamlet', villages: 'none' });

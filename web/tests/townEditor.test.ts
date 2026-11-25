@@ -4,8 +4,8 @@
 // ghost stays; a town settled but not shown still recorded; the Problems list read
 // from a draft as the checks read a whole town file (`problems.ts` `checkedTown`), sorted into what
 // blocks the way on and what only warns; what is picked found again after an edit; the edits' ghosts.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import type { Edited } from '../src/game/edit/edited';
 import type { NeighbourhoodDraft } from '../src/game/town';
@@ -395,22 +395,8 @@ describe('the edit session', () => {
 });
 
 describe('the Problems list and picking, on a generated town', async () => {
-  const WEB = new URL('../', import.meta.url).pathname;
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { mulberry32 } = await import('../src/game/noise');
   const { townProblems } = await import('../src/game/townCheck');
@@ -421,12 +407,10 @@ describe('the Problems list and picking, on a generated town', async () => {
   const { find, keyOf, pick, spotNear } = await import('../src/ui/townedit/pick');
   const { editGhosts } = await import('../src/ui/townedit/ghosts');
   const { packUses, useGrid } = await import('../src/game/uses');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const careers = content.careerCategories.map((c) => c.id);
   const hamlet = generateWorld(content, t, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'few' });
   const made = (e: Edited): NeighbourhoodDraft => {

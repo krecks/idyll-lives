@@ -1,36 +1,20 @@
 // The floors households lay in their homes (`game/floorings.ts`, `housegen.json` `floorings`): every
 // covering one the content has, the entrance hall never laid like the living room, the same floors for the
 // same town, every floor inside a house's walls, and the new coverings in use about the town.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('floorings', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content, FLOOR_FINISHES } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
+  const { FLOOR_FINISHES } = await import('../src/content/content');
   const { generateWorld, layoutTown, useTownContent } = await import('../src/game/town');
   const { floorPicker, laidFloors } = await import('../src/game/floorings');
   const { mulberry32 } = await import('../src/game/noise');
-  type Templates = import('../src/game/town').Templates;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const spec = t.gen!.floorings!;
   const ids = new Set(content.floorCoverings.map((c) => c.id));
   const finishOf = (id: string) => content.floorCoverings.find((c) => c.id === id)!.finish;

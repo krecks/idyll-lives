@@ -5,6 +5,7 @@
  * corners (`addRoofArea` roofs the whole area as one instead).
  */
 import { expect, test } from 'bun:test';
+import { heightOver } from './support/geometry';
 import type { WallEdge, WorldStructure } from '../src/core/protocol';
 import { HousePlanner, houseScheme, type HousePlan } from '../src/render/shared/house';
 
@@ -61,15 +62,8 @@ function tops(plan: HousePlan, x: number, z: number): number[] {
   for (let t = 0; t < idx.length; t += 3) {
     const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]];
     if (nor[a * 3 + 1] <= 0.5 || ((col[a * 4] << 16) | (col[a * 4 + 1] << 8) | col[a * 4 + 2]) !== own) continue;
-    const [p, q, r] = [at(a), at(b), at(c)];
-    // Barycentric, in plan: is (x, z) inside this triangle's footprint?
-    const d = (q[0] - p[0]) * (r[2] - p[2]) - (r[0] - p[0]) * (q[2] - p[2]);
-    if (Math.abs(d) < 1e-9) continue;
-    const u = ((q[0] - x) * (r[2] - z) - (r[0] - x) * (q[2] - z)) / d;
-    const v = ((r[0] - x) * (p[2] - z) - (p[0] - x) * (r[2] - z)) / d;
-    const w = 1 - u - v;
-    if (u < -1e-9 || v < -1e-9 || w < -1e-9) continue;
-    out.push(u * p[1] + v * q[1] + w * r[1]);
+    const h = heightOver(at(a), at(b), at(c), x, z);
+    if (h !== undefined) out.push(h);
   }
   return out;
 }

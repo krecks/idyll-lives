@@ -6,7 +6,8 @@
  * of it. Elsewhere it stands where it always did, nearer the kerb.
  */
 import { describe, expect, test } from 'bun:test';
-import type { PlotInfo, WorldStructure } from '../src/core/protocol';
+import { streetOptions as options, streetTown } from './support/streetWorld';
+import type { WorldStructure } from '../src/core/protocol';
 import type { StreetPlan } from '../src/render/shared/street';
 
 /** The street: along x, its middle at z = MID, a 6 m lane. */
@@ -15,51 +16,7 @@ const MID = 23;
 const KEEP: Record<number, number> = { 6: 0.5 };
 
 /** Two houses each side of a street `width` m wide; `pull`: the sim lists it (`pullOverStreets`). */
-function town(width: number, pull: boolean): WorldStructure {
-  const [north, south] = [MID - width / 2, MID + width / 2];
-  const lots = [
-    { x: 0, w: 20, z: 0, d: north, door: 8, facing: 2 },
-    { x: 20, w: 18, z: 0, d: north, door: 28, facing: 2 },
-    { x: 0, w: 20, z: south, d: 46 - south, door: 9, facing: 0 },
-    { x: 20, w: 18, z: south, d: 46 - south, door: 27, facing: 0 },
-  ];
-  const plots: PlotInfo[] = lots.map((l, id) => ({
-    id,
-    name: `${id}`,
-    x: l.x,
-    z: l.z,
-    w: l.w,
-    d: l.d,
-    public: false,
-    entry: [l.door + 0.5, l.facing === 2 ? north - 1 : south + 1],
-    house: l.facing === 2 ? [l.x + 3, 5, l.x + 14, 13] : [l.x + 4, south + 5, l.x + 15, south + 13],
-  }));
-  const paths = lots.map((l) => (l.facing === 2 ? { x: l.door, z: 13, w: 1, d: north - 13 } : { x: l.door, z: south, w: 1, d: 5 }));
-  return {
-    width: 38,
-    depth: 46,
-    objects: [],
-    plots,
-    rooms: new Array(38 * 46).fill(0),
-    openings: [],
-    walls: [],
-    households: [],
-    sims: [],
-    exits: [],
-    meta: {
-      kind: 'town',
-      name: 'Test',
-      streets: [],
-      roads: [{ points: [[0, MID], [38, MID]], width, ends: ['out', 'out'] }],
-      paths,
-      facing: lots.map((l) => l.facing),
-      seed: 1,
-    },
-    ...(pull ? { pullOverStreets: [{ road: 0, keep: KEEP[width] }] } : {}),
-  } as unknown as WorldStructure;
-}
-
-const options = { has: () => true, entry: () => undefined, lived: false };
+const town = (width: number, pull: boolean): WorldStructure => streetTown(MID, width, pull ? { pullOverStreets: [{ road: 0, keep: KEEP[width] }] } : {});
 
 /** How far in from the street's nearer edge (m) each point of the plan's furniture on the street stands, at most. */
 function reach(plan: StreetPlan, width: number): number {

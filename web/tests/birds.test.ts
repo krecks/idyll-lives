@@ -12,17 +12,12 @@
 // `fixtures/babylon/birds.json`, made by `fixtures/record-babylon.ts`, which needs a Babylon reference checkout
 // to run again); and no bird ever flies through a house.
 import { describe, expect, test } from 'bun:test';
+import { numbers } from './support/numbers';
 import { readFileSync, existsSync } from 'node:fs';
 import { translation } from '../src/render/shared/math';
 import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
 
 const WEB = new URL('../', import.meta.url).pathname;
-
-/** A fixed sequence of numbers in 0..1 (the same every run). */
-function numbers(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32;
-}
 
 function hash(a: ArrayLike<number>, from = 0, to = a.length): string {
   const f = new Float32Array(1);

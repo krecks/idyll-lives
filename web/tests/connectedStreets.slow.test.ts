@@ -4,13 +4,12 @@
 // wider road's width and a metre of the other's middle; sim-core `travel.rs` `Graph::build`),
 // its one-way roads cutting no place off (`oneway.ts` `stronglyConnected`; a city's too), with no more courts than its areas may keep, none reaching more than `COURT` m once its land is
 // settled under it as a new game's is (`landFollow.ts` `settleLand` cuts a longer one back).
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { stronglyConnected } from '../src/game/oneway';
 import { connect, COURT, lengths, nearest, type Pt } from '../src/game/roads';
 
-const WEB = new URL('../', import.meta.url).pathname;
 const line = (x0: number, z0: number, x1: number, z1: number): Pt[] => {
   const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0));
   return Array.from({ length: n + 1 }, (_, i): Pt => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
@@ -72,29 +71,14 @@ describe('connect', () => {
 });
 
 describe('generated worlds are one network', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { BIG_COURTS, COURTS, generateWorld, useTownContent } = await import('../src/game/town');
   const { WORLD_KINDS } = await import('../src/game/world');
   const { settleLand } = await import('../src/game/landFollow');
   const { previewWorld } = await import('../src/game/townPreview');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** A world of `kind` (its place's own options but `town`) as a new game makes it, its land settled under it, checked. */
   const check = (kind: string, seed: number, town?: 'city') => {

@@ -4,40 +4,23 @@
 // own household's lot, outdoors, off the paths and the driveway (where the car parks), clear of the
 // doorways, its front tile reached from the street (round the posts of the porch over the front
 // door, which nobody walks through) and nothing else on the lot cut off by it.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('town rides', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
   const { DRIVEWAY_MIN_WIDTH, generateWorld, houseTemplate, layoutTown, onLot, populate, turnOnto, useTownContent } = await import('../src/game/town');
   const { BIKES, RIDES } = await import('../src/game/townRides');
   const { frontTile } = await import('../src/game/surfaces');
   const { porchPostTiles } = await import('../src/game/porch');
-  type Templates = import('../src/game/town').Templates;
   type WorldOptions = import('../src/core/protocol').WorldOptions;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const bikeDefs = new Set<string>(BIKES);
   const rides = new Set<string>([...Object.values(RIDES), ...bikeDefs]);
   // (The countryside's town and its city, and farmland.)

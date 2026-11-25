@@ -1,16 +1,14 @@
 // New game's state in a debug report (`debug/newGameReport.ts`): packed and read back it is the same state (the
 // land's height field, the layout, the objects the drafts share), with the same keys, so `?debugReport=` opens New
 // game again with nothing made again; later steps open at the streets, step 1 with its land as on screen.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { blankLand, landHash, NONE } from '../src/game/land';
 import { TownHistory } from '../src/game/edit/history';
 import { newGameReport, pack, readNewGameReport, reportShownLand, unpack, type NewGameState } from '../src/debug/newGameReport';
 import { landKey, startCode, townKey, worldKeyOf } from '../src/ui/newGame';
 import type { Layout, MadeLand } from '../src/ui/app.svelte';
 import type { NeighbourhoodDraft } from '../src/game/town';
-
-const WEB = new URL('../', import.meta.url).pathname;
 
 describe('packing a graph', () => {
   test('typed arrays, shared objects, a height field and odd numbers come back as they were', () => {
@@ -52,27 +50,12 @@ describe('packing a graph', () => {
 });
 
 describe("New game's report", async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { runTownJob } = await import('../src/game/townJobs');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   // A large river land (480 × 480 samples) with a lake painted on it, and the layout proposed on it.
   const code = { ...startCode('river', 4242, { size: 'large', villages: 'few' }), townSeed: 77 };

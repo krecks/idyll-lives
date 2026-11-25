@@ -5,14 +5,13 @@
  * villages, laid for traffic on the right, one junction of two ramps, a `raised` span at every road under it and a
  * `bridge` over its water, every crossing listed on both roads, lots and woods kept off, the same world twice alike.
  */
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { Cells } from '../src/game/countryRouter';
 import { APART, BEND_RADIUS, carriageways, clearOfMotorway, crossings, finishMotorway, HAMLET_CLEAR, motorwayProblems, profileOf, RAMP_LENGTH, routeMotorway, TOWN_CLEAR, TOWN_REACH, withVillages, type MotorwayRoute } from '../src/game/motorway';
 import { deckSpans, lengths, MEET, MOTORWAY_KEEP, nearest, pointAt, sharpestTurn, type Pt } from '../src/game/roads';
 
-const WEB = new URL('../', import.meta.url).pathname;
 const offRect = (r: { x: number; z: number; w: number; d: number }, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 const len = (r: RoadPlan) => lengths(r.points).at(-1)!;
 /** Which edge a point is on (north, east, south, west), -1 none. */
@@ -198,31 +197,16 @@ describe('its crossings and its junction', () => {
 });
 
 describe('in the generated worlds', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { assembleTown, plotRect, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { randomHousehold } = await import('../src/game/household');
   const { mulberry32 } = await import('../src/game/noise');
   const { landDraft, layOn } = await import('../src/game/macro');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const make = (kind: string, size: 'small' | 'medium' | 'large', seed: number) => layOn(content, t, landDraft(content, t, kind, { size }, seed), {}, { waterKept: true });
 
   // (A farm's world and a river's, whose motorway crosses the river.)

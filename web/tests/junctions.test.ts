@@ -7,6 +7,7 @@
  * road's whole width or none, an avenue's to its median; an avenue's 14 m arms' pads and kerb returns.
  */
 import { describe, expect, test } from 'bun:test';
+import { line, points } from './support/geometry';
 import type { Junction, RoadPlan, WorldStructure } from '../src/core/protocol';
 import { SIDEWALK, trimJoins } from '../src/game/roads';
 import { Geo } from '../src/render/shared/geometry';
@@ -15,7 +16,6 @@ import { Kerb, MARK_Y, roadIndex, roadMeshes, ROAD_Y, WALK_Y, walkStops } from '
 import { deriveJunctions, plansOf } from './fixtures/junctions';
 import * as F from '../src/render/roadHierarchyFixture';
 
-const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A street along x at z = 50; a lane off it to the south (+z), begun at its kerb (`trimJoins`). */
 const street: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['out', 'out'] };
 const T = trimJoins([street, { points: line(50, 50, 50, 90, 40), width: 7, ends: ['join', 'dead'], kind: 'lane' }]);
@@ -276,8 +276,6 @@ describe('road markings', () => {
 describe("stop lines across every lane coming in; an avenue's junctions", () => {
   const h = F.roadHierarchy();
   const plans = plansOf(h.roads);
-  /** The vertices of a mesh, as (x, y, z). */
-  const points = (g: Geo) => Array.from({ length: g.pos.length / 3 }, (_, i): [number, number, number] => [g.pos[i * 3], g.pos[i * 3 + 1], g.pos[i * 3 + 2]]);
   /** The paint `roadMeshes` lays at the junction of `roads` within `dx` m across x and `dz` across z of (x, z). */
   const paintNear = (roads: RoadPlan[], x: number, z: number, dx: number, dz: number) => {
     const marks = new Geo();

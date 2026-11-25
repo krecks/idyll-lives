@@ -10,8 +10,8 @@
 // keeps 14 m of road clear, a one-way street ends on roads and leaves every road reachable, a road's kind and way
 // changed on its card (`changeKind`), the motorway not crossed and removed whole, the Problems list's one-way and
 // junction lines. `bun test`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { changeKind, CROSS_MOTORWAY, CUT_OFF, drawStreet, madeKind, Meeting, motorwayName, ONE_WAY_ENDS, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
@@ -635,27 +635,12 @@ describe('renaming', () => {
 // A street drawn with `fill` on a generated world (not the hand-made town above, which has no lot
 // mix): it gets homes from the world's lot mix (`lots.ts` `fillStreet`), along it and numbered on it.
 describe('a street drawn with homes along it, on a generated world', async () => {
-  const WEB = new URL('../', import.meta.url).pathname;
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { generateWorld, useTownContent } = await import('../src/game/town');
   const { entriesOf } = await import('../src/game/edit/ground');
-  const real = await Content.load('http://localhost/content/base.json');
+  const real = await loadContent();
   useTownContent(real);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const templates: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(real), lampTiles: real.lampTiles, windowTiles: real.windowTiles };
+  const templates = await templatesOf(real);
   const hamlet = generateWorld(real, templates, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'none' });
 
   /** The first street that may be drawn off one of the main town's streets, square off it, `long` m (what is in its way cleared), that gets homes. */

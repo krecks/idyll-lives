@@ -1,28 +1,14 @@
 // Households' wealth (`game/wealth.ts`) with the shipped content: the grade someone may have reached by
 // their age, the jobs neighbours are given, what a job pays (as sim-core works it out) and what a
 // household has saved, which says which homes it can buy.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, usePublicFetch } from './support/content';
 
 describe('wealth', async () => {
   // The loaders fetch from the page's address: here, files under web/public.
-  const realFetch = globalThis.fetch;
-  const realLocation = (globalThis as { location?: unknown }).location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { jobFor, savingsOf, topLevelAt, weeklyPay } = await import('../src/game/wealth');
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const tracks = content.careerCategories.flatMap((c) => c.tracks);
 
   test('the highest grade rises with age and is none for a child', () => {

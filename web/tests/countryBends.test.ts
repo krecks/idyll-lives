@@ -6,36 +6,19 @@
 // just before the street they came into: Elder Green (seed base 12) and Hollyshaw (seed base 15); since the
 // motorway went down before the villages (2026-11-24) their villages and roads are others, each named by its
 // country road that turns the most.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { sharpestTurn } from '../src/game/roads';
 import { CLASSIC } from './support/classicWorlds';
 
-const WEB = new URL('../', import.meta.url).pathname;
-
 describe('country road bends', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { generateFromSpec } = await import('../src/game/macro');
   const { COUNTRY_TURN } = await import('../src/game/countryRouter');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const deg = (a: number) => Math.round((a * 180) / Math.PI);
 
   for (const [kind, seed, name, road] of [

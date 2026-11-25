@@ -5,29 +5,16 @@
 // the same people from the same people seed, and `Math.random` never called when the request has one;
 // and the town file of a household in a flat (`assembleTown`), which has it at home in that flat.
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('moving in', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
+  usePublicFetch();
   const realRandom = Math.random;
   afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
     Math.random = realRandom;
   });
-  const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { EMPTY_LOT, assembleTown, generateWorld, useTownContent } = await import('../src/game/town');
   const { homesOf, keepForSale, peopleStreams, populate, FILL_CAP } = await import('../src/game/people');
@@ -35,15 +22,13 @@ describe('moving in', async () => {
   const { mulberry32 } = await import('../src/game/noise');
   const { householdsAhead, moveInRequest, townOnMoveIn } = await import('../src/ui/newGame');
   const { residentsOf } = await import('../src/game/household');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type PlotSlot = import('../src/game/town').PlotSlot;
   type HomeRef = import('../src/ui/homes').HomeRef;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   /** A main town of `size` shipped houses on a grid and a village of twelve 400 m off (nothing the generator makes). */
   const gridTown = (size: number): NeighbourhoodDraft => {

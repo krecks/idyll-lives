@@ -6,6 +6,7 @@
  * the pitch times how far in a point is from the nearest eave, square to the walls.
  */
 import { expect, test } from 'bun:test';
+import { heightOver } from './support/geometry';
 import type { RoofStyleDef } from '../src/content/content';
 import type { WallEdge, WorldStructure } from '../src/core/protocol';
 import { HousePlanner, type HousePart } from '../src/render/shared/house';
@@ -93,18 +94,7 @@ function faces(roof: HousePart['geo'], caps = false): [V3, V3, V3][] {
 
 /** The heights of the faces over (x, z): one over a roof that is one surface. */
 function tops(tris: [V3, V3, V3][], x: number, z: number): number[] {
-  const out: number[] = [];
-  for (const [p, q, r] of tris) {
-    // Barycentric, in plan: is (x, z) inside this triangle's footprint?
-    const d = (q[0] - p[0]) * (r[2] - p[2]) - (r[0] - p[0]) * (q[2] - p[2]);
-    if (Math.abs(d) < 1e-9) continue;
-    const u = ((q[0] - x) * (r[2] - z) - (r[0] - x) * (q[2] - z)) / d;
-    const v = ((r[0] - x) * (p[2] - z) - (p[0] - x) * (r[2] - z)) / d;
-    const w = 1 - u - v;
-    if (u < -1e-9 || v < -1e-9 || w < -1e-9) continue;
-    out.push(u * p[1] + v * q[1] + w * r[1]);
-  }
-  return out;
+  return tris.flatMap(([p, q, r]) => heightOver(p, q, r, x, z) ?? []);
 }
 
 /** How far (x, z) is from the nearest tile `of` says yes to, square to the walls (the greater of its distances along x and z). */
