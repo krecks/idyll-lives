@@ -153,7 +153,7 @@ The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.g
 `crates/art/packs/src/pack_romantic` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves
 while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
 onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. The candlelit table
-was rebuilt with a chair at each end, its two diners facing each other (2026-10-21).
+was rebuilt with a chair at each end, its two diners facing each other (2026-10-21). Their edges are eased to the gate's 4 mm (2026-11-25).
 
 The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
 `arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built by `crates/art/packs/src/pack_slob` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
@@ -182,7 +182,7 @@ The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `
 `bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
 by `crates/art/packs/src/pack_loner` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
-patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens.
+patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens. Their edges are eased to the gate's 4 mm (2026-11-25).
 
 The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingBench.glb`, `birdFeeder.glb`,
 `gardenHammock.glb`, `cedarShower.glb`, `mossTerrarium.glb`, `glasshouse.glb`, override pack
