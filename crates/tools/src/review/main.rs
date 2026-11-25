@@ -42,9 +42,7 @@ pub fn main(args: &[String]) -> i32 {
         let (text, files, code) = match args.first().map(String::as_str) {
             Some("sizes") => {
                 let Some(reference) = reference else {
-                    eprintln!(
-                        "no {REFERENCE} yet: `cargo review sizes` compares with it (plan/authenticity-review.md §3.4)"
-                    );
+                    eprintln!("no {REFERENCE} yet: `cargo review sizes` compares with it");
                     return Ok(2);
                 };
                 let measures = checkglb::measures(&s.paths, &tops(&objects, &reference))?;

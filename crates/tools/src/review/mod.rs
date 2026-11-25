@@ -1,5 +1,4 @@
-//! `cargo review sizes|uses [--md <dir>]`: the authenticity review's first pass over every buyable object
-//! (plan/authenticity-review.md §5.1, T3 and T4).
+//! `cargo review sizes|uses [--md <dir>]`: the authenticity review's first pass over every buyable object.
 //!
 //!   cargo review sizes [--md <dir>]   each object's W x H x D and its seat, top and mattress heights against
 //!                                     docs/review/reference.json: the outliers per category (`--md`: every
