@@ -46,7 +46,7 @@ import { rle, unrle } from '../landMasks';
 import { bridgeSites, dryPieces } from '../landPieces';
 import { AREA_APART, BRIDGE_IN, cells8, cornersOf, DECK_PAST, deckTiles, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, type AreaPlan } from '../macro';
 import { mulberry32 } from '../noise';
-import { COURT, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, tangent, type Pt } from '../roads';
+import { COURT, dist, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, tangent, type Pt } from '../roads';
 import { boundsOf, frontageOf, LotPlacer, plotRect, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames, type WorldSpec } from '../world';
 import type { Edited } from './edited';
@@ -92,7 +92,6 @@ const BRIDGE_REACH = 12;
 
 const NOTHING: { lots: number[] } = { lots: [] };
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 const middleOf = (r: Rect): Pt => [r.x + r.w / 2, r.z + r.d / 2];
 const rectOf = (a: TownArea): Rect => ({ x: a.x, z: a.z, w: a.w, d: a.d });
 const meets = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.z < b.z + b.d && b.z < a.z + a.d;

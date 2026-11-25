@@ -37,6 +37,7 @@ enum Store {
 }
 
 /// Supertonic 3's graphs: as published, and as stored (saved gzipped as `<name>.onnxz`).
+/// The browser checks the stored ones and the other files' (`web/src/voice/tts.worker.ts`): change them there too.
 const GRAPHS: [(&str, &str, &str, Store); 4] = [
     (
         "duration_predictor",
@@ -171,11 +172,6 @@ float32 weights of 1,024 values or more as float16; in duration_predictor every 
 float32 when the model loads, and the files are gzipped (.onnxz). Nothing was retrained. tts.json, unicode_indexer.json and the
 voice styles (F1-F5, M1-M5) are unchanged.
 ";
-
-/// The model's folder (`web/public/voice/supertonic-3/`).
-pub fn model_dir() -> PathBuf {
-    out().join(MODEL_DIR)
-}
 
 fn out() -> PathBuf {
     crate::characters::repo_root()

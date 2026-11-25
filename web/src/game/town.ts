@@ -28,7 +28,7 @@ import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/s
 import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
 import { defaultResidentsMost, neighbourBonds } from './people';
-import { flatName, flatsInId, flatsTemplate, placeFloors, type FlatsTemplate, type PlaceFloors } from './flats';
+import { flatName, flatsInId, flatsTemplate, kept, placeFloors, type FlatsTemplate, type PlaceFloors } from './flats';
 import { rectPoly } from './footprints';
 import { clearOf, type DriveLine } from './parking';
 import * as pmath from './pmath';
@@ -321,6 +321,12 @@ export function loadTemplates(): Promise<Templates> {
   return templates;
 }
 
+/**
+ * The generated houses made so far, each as nobody lives there and as its residents have it, kept till this many more
+ * have been asked for (`kept`). A large city world with many villages makes about 310 (2026-11-25): a whole world
+ * twice over (empty and lived in) fits with room to spare, while the towns a game makes one after another don't pile up.
+ */
+const KEEP_HOUSES = 2048;
 const generated = new Map<string, HouseTemplate | undefined>();
 
 /** A generated house's id: its size, seed and garden (the same id always gives the same house and lot). */
@@ -343,15 +349,13 @@ export function shuffled<T>(list: readonly T[], rand: Rand = Math.random): T[] {
 /** A house layout by id; a generated one furnished for `residents` (the layout is the same for anyone; undefined: nobody lives there; `'shell'`: a shell, see `housegen.ts` `Furnishing`). */
 export function houseTemplate(t: Templates, id: string, residents?: Furnishing): HouseTemplate | undefined {
   if (id.startsWith('gen:')) {
-    const at = `${id}#${residentsKey(residents)}`;
-    if (!generated.has(at)) {
+    return kept(generated, KEEP_HOUSES, `${id}#${residentsKey(residents)}`, () => {
       const [, size, seed, garden] = id.split(':');
       const t0 = performance.now();
       const house = t.gen && t.info ? generateHouse(t.gen, t.info, lotDims(t, size as LotSize), t.plot, size, Number(seed), t.lampTiles, t.windowTiles, residents, garden as GardenSize | undefined) : null;
       generateStats.houseMs += performance.now() - t0;
-      generated.set(at, house ?? undefined);
-    }
-    return generated.get(at);
+      return house ?? undefined;
+    });
   }
   return t.houses.find((h) => h.id === id);
 }
@@ -367,10 +371,7 @@ export function generatedHouses(t: Templates, ids: Iterable<string>): [string, H
 
 /** Houses another thread generated (`generatedHouses`): the same id always gives the same house. */
 export function primeHouses(houses: readonly [string, HouseTemplate | undefined][]): void {
-  for (const [id, house] of houses) {
-    const at = `${id}#${residentsKey(undefined)}`;
-    if (!generated.has(at)) generated.set(at, house);
-  }
+  for (const [id, house] of houses) kept(generated, KEEP_HOUSES, `${id}#${residentsKey(undefined)}`, () => house);
 }
 
 /** Width and depth of a lot of this size. */

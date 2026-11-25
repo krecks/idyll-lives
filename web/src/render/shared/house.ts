@@ -39,7 +39,7 @@ import type { ViewRect } from '../types';
 import { Cut, EASE, easedBox, facing, Geo, LOOK, planarUV, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
 import { tuned } from '../tune';
-import { smoothstep, valueNoise } from '../../game/noise';
+import { hash, smoothstep, valueNoise } from '../../game/noise';
 import { addHipPolygon, area, convexHull, diagonalEnds, halfAt, halfCentroid, halfTriangle, postOutline, WallFrame, type P2 } from './slanted';
 import { WALL_HALF, WALL_HEIGHT } from './walls';
 
@@ -641,12 +641,6 @@ class Edges {
       yield [(k % this.stride) - 2, Math.floor(k / this.stride) - 2, kind];
     }
   }
-}
-
-function hash(x: number, z: number, salt: number): number {
-  let h = (Math.imul(x | 0, 374761393) + Math.imul(z | 0, 668265263) + Math.imul(salt, 2147483647)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 function pick<T>(list: readonly T[], x: number, z: number, salt: number): T {

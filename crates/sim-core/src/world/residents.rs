@@ -37,8 +37,15 @@ impl World {
         if !self.lot.in_bounds(x.floor() as i32, z.floor() as i32) {
             return Err(Error::new(format!("resident '{name}' spawns off the lot")));
         }
+        // (Not a slot a car on a trip still names as its driver: it goes on while in the picture,
+        // and the newcomer would be taken for them. It ends once out of sight, `cars::update`.)
         let slot = if reuse {
-            self.sims.iter().position(|s| !s.here())
+            let driving = |i: usize| {
+                self.cars
+                    .iter()
+                    .any(|c| c.trip.as_ref().is_some_and(|t| t.driver as usize == i))
+            };
+            (0..self.sims.len()).find(|&i| !self.sims[i].here() && !driving(i))
         } else {
             None
         };
@@ -248,9 +255,10 @@ impl World {
         Ok(id as u32)
     }
 
-    /// Before someone new takes `slot`: story events naming its former occupant name them as a
-    /// former resident instead; former residents no event names any more are forgotten.
-    fn retire_slot(&mut self, slot: usize) {
+    /// Before someone new takes `slot` (or a new family their household): story events naming its
+    /// former occupant name them as a former resident instead; former residents no event names any
+    /// more are forgotten.
+    pub(crate) fn retire_slot(&mut self, slot: usize) {
         use crate::social::FORMER;
         let gone = &self.sims[slot];
         let household = self
@@ -310,6 +318,24 @@ impl World {
         sim.planner.thought = None;
         sim.gone = Some(Gone { why, day });
         crate::cars::job_lost(&mut self.cars, id);
+        // No car waits for them or counts them in it, and no taxi takes them home from work: a
+        // newcomer in their slot would be taken for them (a car away for good, waiting for its
+        // driver to be done at work).
+        for car in &mut self.cars {
+            if car.driver == Some(id) {
+                car.driver = None;
+                // (Loading for them: those in it have gone on, as for a driver called away. Not on
+                // a trip: `cars::trip_update` lets those in it out, which an emptied car can't.)
+                if car.state == crate::cars::CarState::Boarding && car.trip.is_none() {
+                    car.state = crate::cars::CarState::Parked;
+                    car.aboard.clear();
+                }
+            }
+            car.aboard.retain(|&a| a != id);
+            car.done.retain(|&a| a != id);
+            car.riders.retain(|&a| a != id);
+        }
+        self.taxis.rode.retain(|r| r.0 != id);
         // Nobody talks to them, listens in, opens the door to them or rings them any more (their
         // slot may soon be someone else's), and a visitor waits for someone else to come.
         let with_them = |t: &Task| match t.kind {

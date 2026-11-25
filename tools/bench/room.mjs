@@ -27,16 +27,11 @@
  * Needs what `render.mjs` needs (the wasm packages, Playwright) and `debug-states/review-stage.json`.
  */
 
-import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { quiet } from './quiet.mjs';
+import { benchContext, launch, ROOT, serve, WEB } from './lib/browser.mjs';
 import { tile } from './sheet.mjs';
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -101,30 +96,14 @@ if (group) {
 }
 mkdirSync(out, { recursive: true });
 
-let vite = null;
-let base = flag('url', null);
-if (!base) {
-  vite = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => vite.kill());
-  await new Promise((resolve, reject) => {
-    vite.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    vite.on('exit', (code) => reject(new Error(`vite exited (${code}): is the port free?`)));
-  });
-  base = `http://localhost:${port}`;
-}
+// (Its own Vite, always: not a server another tree may have left on the port.)
+const { url: base, stop } = flag('url', null) ? { url: flag('url', null), stop: () => {} } : await serve({ port });
 
-const require = createRequire(import.meta.url);
-const { chromium } = process.env.PLAYWRIGHT ? await import(process.env.PLAYWRIGHT) : require('playwright');
-const browser = await chromium.launch({
-  headless: true,
-  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-  args: ['--enable-unsafe-webgpu', '--enable-webgpu-developer-features', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
-});
+const { browser } = await launch();
 
 /** The room's page in one variant, preset, backend and hour: furnished, paused, nobody in it. */
 async function open(tune, preset, backend, hour, more = '') {
-  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-  await context.addInitScript(quiet);
+  const context = await benchContext(browser);
   await context.addInitScript(() => {
     const key = 'open-sims-wasm.settings';
     localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key) ?? '{}'), directorDelay: 0, autonomy: false }));
@@ -245,5 +224,5 @@ if (gpuSecs) {
   if (failed) process.exitCode = 1;
 }
 await browser.close();
-vite?.kill();
+stop();
 process.exit(process.exitCode ?? 0);

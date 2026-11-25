@@ -56,10 +56,12 @@ export function addBlueprint(name: string, data: string, thumbnail: string | nul
     thumbnail,
     data,
   };
-  // Without the picture if that's what doesn't fit.
-  return write([entry, ...blueprints.list]) || write([{ ...entry, thumbnail: null }, ...blueprints.list]);
+  // Without the picture if that's what doesn't fit. (Onto the list as stored now, not as this tab
+  // read it: one saved in another tab since is kept.)
+  const list = read();
+  return write([entry, ...list]) || write([{ ...entry, thumbnail: null }, ...list]);
 }
 
 export function removeBlueprint(id: string): void {
-  write(blueprints.list.filter((b) => b.id !== id));
+  write(read().filter((b) => b.id !== id));
 }

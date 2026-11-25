@@ -601,11 +601,6 @@ export interface Renderer {
   /** The resize arrow at canvas CSS pixel (`x`, `y`), if any. */
   handleAt(x: number, y: number): string | null;
   /**
-   * Where the ray of the last `pick` passes over lot point (`x`, `z`): its height (m) above the
-   * floor of that point's storey, on an upright plane facing the camera (dragging a height arrow).
-   */
-  pickVertical(x: number, z: number): number | null;
-  /**
    * Where the ray of the last `pick` meets the wall line `line` (lot z for `h`, x for `v`; in the
    * lot's rows for a storey above): how far along it (lot x or z) and how high above that
    * storey's floor (dragging arrows on a wall).

@@ -80,8 +80,10 @@ struct There {
     walk: f32,
 }
 
-/// A household of three in the first hamlet sent to the park in the next: one car there.
-fn ride_there(driver_first: bool) -> There {
+/// The household of three at home with a free afternoon hour, all sent to the park in the next
+/// hamlet (the driver first, or a minute after the others): the world, their car, the three,
+/// home, the park, where the car stood and how many cars their home has.
+fn sent(driver_first: bool) -> (World, usize, [usize; 3], u32, u32, [f32; 2], usize) {
     let (mut w, _, family_of) = (5..40)
         .find_map(|seed| {
             let (w, h, park) = world(seed);
@@ -138,6 +140,13 @@ fn ride_there(driver_first: bool) -> There {
         }
         send(&mut w, who[0]);
     }
+    (w, c, who, home, park, parked_at, cars_of_home)
+}
+
+/// A household of three in the first hamlet sent to the park in the next: one car there.
+fn ride_there(driver_first: bool) -> There {
+    let (mut w, c, who, home, park, parked_at, cars_of_home) = sent(driver_first);
+    let household = w.cars[c].household;
     let walk = w.travel.eta(
         w.plots[home as usize].arrival_point(),
         w.plots[park as usize].arrival_point(),
@@ -347,4 +356,36 @@ fn riders_waiting_for_a_driver_at_work_make_their_own_way_home() {
         "nobody left to ride home in it"
     );
     assert_eq!(w.cars[c].trip.map(|t| t.driver), Some(trip.driver));
+}
+
+#[test]
+fn riders_in_a_car_loading_for_a_trip_get_out_when_its_driver_dies() {
+    let (mut w, c, who, ..) = sent(true);
+    // Once the driver and someone else are in it in the driveway, the driver dies.
+    let loading = |w: &World| {
+        let car = &w.cars[c];
+        car.state == CarState::Boarding
+            && car
+                .trip
+                .is_some_and(|t| car.aboard.iter().any(|&a| a != t.driver))
+    };
+    assert!(
+        common::until(&mut w, 60, loading),
+        "the car never loaded for the trip"
+    );
+    let driver = w.cars[c].trip.unwrap().driver as usize;
+    w.depart(driver, sim_core::world::GoneWhy::Died);
+    // Those in it get out and go on: nobody is left sat in the car (`Phase::Driving`).
+    let others: Vec<usize> = who.into_iter().filter(|&i| i != driver).collect();
+    let sat = |w: &World, i: usize| {
+        w.sims[i]
+            .current()
+            .is_some_and(|a| matches!(a.phase, sim_core::world::Phase::Driving))
+    };
+    let out = common::until(&mut w, 60, |w| others.iter().all(|&i| !sat(w, i)));
+    assert!(
+        out,
+        "still sat in it: state {:?}, aboard {:?}, trip {:?}",
+        w.cars[c].state, w.cars[c].aboard, w.cars[c].trip
+    );
 }

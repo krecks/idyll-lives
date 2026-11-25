@@ -12,6 +12,7 @@
  */
 
 import type { Look } from '../look';
+import { lerp } from '../../game/noise';
 
 /** The hours the sun rises and sets (the light's arc; the top bar's day bar, `ui/town/dayBar.ts`). */
 export const SUNRISE = 6;
@@ -118,9 +119,6 @@ export function createLighting<C extends RGB = RGB, V extends XYZ = XYZ>(
   };
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
 
 function setNormalized(v: XYZ, x: number, y: number, z: number): void {
   const len = Math.hypot(x, y, z) || 1;

@@ -35,7 +35,7 @@ pub(crate) fn cribs_for_babies(w: &mut World, h: usize) {
         })
         .count();
     for _ in cribs..babies {
-        if w.deliver(h as u32, crib).is_none() {
+        if w.deliver(h as u32, crib, 0).is_none() {
             break;
         }
     }
@@ -125,7 +125,7 @@ pub(crate) fn bed_for(w: &mut World, i: usize) {
     for &o in outgrown.iter().rev() {
         let _ = w.sell(h as u32, o);
     }
-    if w.deliver(h as u32, bed).is_some() {
+    if w.deliver(h as u32, bed, price).is_some() {
         w.pay(h, price);
     }
 }

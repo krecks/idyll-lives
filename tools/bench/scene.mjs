@@ -24,16 +24,13 @@
  * headless on the real GPU like it (`--headed` for a window).
  */
 
-import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { launch, serve, WEB } from './lib/browser.mjs';
 import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
 
-const WEB = fileURLToPath(new URL('../../web/', import.meta.url));
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -45,25 +42,11 @@ const seed = flag('seed', null) === null ? null : Number(flag('seed', null));
 const homeIn = flag('home', 'first');
 const goal = Number(flag('hour', '18')) * 60 - 5;
 const port = Number(flag('port', '5221'));
-const base = flag('url', null) ?? `http://localhost:${port}`;
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  return import(createRequire(WEB + 'package.json').resolve('playwright'));
-}
+// (Its own Vite, always: not a server another tree may have left on the port.)
+const { url: base, stop } = flag('url', null) ? { url: flag('url', null), stop: () => {} } : await serve({ port });
 
-let vite = null;
-if (!flag('url', null)) {
-  vite = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => vite.kill());
-  await new Promise((resolve, reject) => {
-    vite.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    vite.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-  });
-}
-
-const { chromium } = await playwright();
-const browser = await chromium.launch({ headless: !process.argv.includes('--headed'), ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }), args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
+const { browser } = await launch({ headless: !process.argv.includes('--headed') });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   await page.addInitScript(quiet);
@@ -110,5 +93,5 @@ try {
   console.log(`scene: ${file} at minute ${(await minute()).toFixed(0)}, ${(state.length / 1024).toFixed(0)} KB of JSON; at home: ${home.join(', ')}`);
 } finally {
   await browser.close();
-  vite?.kill();
+  stop();
 }

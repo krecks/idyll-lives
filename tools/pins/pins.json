@@ -93,9 +93,9 @@
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle/mod.rs",
-      "sha256": "262e36f7ab0568938a361885b9ecee173f8204623526c632cfb61e49ff6884c4",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the glob of a part with nothing crate-visible left is private. Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+      "sha256": "e6864eb928382f530a805e6e4b0e76d39848494046720c2a1bf919c93fe7fb32",
+      "by": "audit",
+      "reason": "audit (PR #132, owner asked to merge): the last grown-up's children go to their other parent in town only if that home is under the household most, else to family out of town."
     },
     {
       "name": "sim-hosting",
@@ -207,23 +207,23 @@
     {
       "name": "sim-lifecycle-moving",
       "file": "crates/sim-core/src/lifecycle/moving.rs",
-      "sha256": "2f5c9f36151b188027207062a0ee5a61924fe1ba64ea9274258734598063bdeb",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 17 items only its sibling files use narrowed from pub(crate) to pub(super). Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+      "sha256": "f71b71cafb9722d9a2b7d882044b6e8cfe95877a4ead2978bead648c92f72e6c",
+      "by": "audit",
+      "reason": "audit follow-up (after PR #132): a baby who moves house gets a crib in the new home (move_to calls cribs_for_babies), as one moving in does; the audit's accepted changes stand."
     },
     {
       "name": "sim-lifecycle-arrival",
       "file": "crates/sim-core/src/lifecycle/arrival.rs",
-      "sha256": "9e43ea2b9fbf6b546a3775442584234be870659fbe34e7ed7f4b3e6ac127ef4c",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 4 items only its sibling files use narrowed from pub(crate) to pub(super). Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+      "sha256": "35a3efca74b71f25bc8403a7cb7d8c7c0542e9186a25d48958ce7e8348130a2e",
+      "by": "audit",
+      "reason": "audit (PR #132, owner asked to merge), behaviour unchanged: the beds test runs last in the newcomer's home search (the noon hitch in a big town)."
     },
     {
       "name": "sim-lifecycle-babies",
       "file": "crates/sim-core/src/lifecycle/babies.rs",
-      "sha256": "7dc8d0d73e4d76bfb35b86080d122707b66e441c7c91e3aafa5ad5e2bc2a1a3f",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+      "sha256": "82c9a0c531d77800e55093e45b30b6d8aaadeaa36574edbf08fbcfaabb824ab2",
+      "by": "audit",
+      "reason": "audit (PR #132, owner asked to merge): a crib given for a new baby is delivered at price 0 and can't be sold for money; a bought bed keeps its price."
     },
     {
       "name": "sim-lifecycle-children",
@@ -256,9 +256,9 @@
     {
       "name": "sim-cooking-household",
       "file": "crates/sim-core/src/cooking/household.rs",
-      "sha256": "70a429dcc2d2f3e17b669068287dc36a5db86bb2a363dbca25911537cc564be9",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 3 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+      "sha256": "786a60e6b61d8f2857f618b198fa5001e505f09be3ae541ac9ae1e241c21cc6a",
+      "by": "audit",
+      "reason": "audit (PR #132, owner asked to merge), behaviour unchanged: which households anyone lives in is worked out once, not by a look through every resident per item."
     },
     {
       "name": "sim-cooking-serve",

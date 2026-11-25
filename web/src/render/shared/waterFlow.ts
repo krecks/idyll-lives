@@ -19,6 +19,7 @@
 
 import { chamfer } from './landBake';
 import { flowOf, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
+import { clamp01, smoothstep } from '../../game/noise';
 
 /**
  * How the speed is worked out: `narrow`, the half-width (m) at and under which water with a way runs at full speed
@@ -67,11 +68,6 @@ export interface RiverCourse {
   tz: Float32Array;
 }
 
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = clamp01((x - a) / (b - a));
-  return t * t * (3 - 2 * t);
-};
 
 /** A still land's flow (every sample none). */
 export function stillFlow(cols: number, rows: number): WaterFlow {

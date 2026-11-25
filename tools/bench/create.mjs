@@ -70,16 +70,11 @@
  *
  * Needs Playwright like render.mjs (`PLAYWRIGHT=<path to playwright/index.mjs>`).
  */
-import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { quiet } from './quiet.mjs';
+import { benchContext, devServer, launch, ROOT, seeded } from './lib/browser.mjs';
 import { worldFlags } from './worldFlags.mjs';
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -109,44 +104,7 @@ const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '
 const out = flag('out', join(ROOT, 'bench-results', `create-${stamp}`));
 mkdirSync(out, { recursive: true });
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  try {
-    return await import(createRequire(WEB + 'package.json').resolve('playwright'));
-  } catch {
-    throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
-  }
-}
-
-async function running(url) {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(1500) })).ok;
-  } catch {
-    return false;
-  }
-}
-
-let server = null;
-const base = flag('url', null) ?? `http://localhost:${port}`;
-if (!flag('url', null) && !(await running(base))) {
-  server = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => server.kill());
-  await new Promise((resolve, reject) => {
-    server.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    server.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-  });
-}
-
-/** The page's Math.random, seeded (mulberry32), before any of its scripts. */
-function seeded(n) {
-  let a = (n ^ 0x9e3779b9) >>> 0;
-  Math.random = () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+const { url: base, stop } = await devServer({ url: flag('url', null), port });
 
 /** A step's world made and built: its way on (`label`, a pattern) can be pressed. */
 const enabled = (page, label) => page.waitForFunction((src) => [...document.querySelectorAll('button')].some((b) => new RegExp(src).test(b.textContent ?? '') && !b.disabled), label.source, { timeout: 120_000, polling: 100 });
@@ -1392,12 +1350,7 @@ async function anotherPlace(page, renderer, shoot) {
   if (shots.has('1')) await shoot(`${sizes[0].width}x${sizes[0].height}-place`);
 }
 
-const { chromium } = await playwright();
-const browser = await chromium.launch({
-  headless: !has('headed'),
-  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-  args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
-});
+const { browser } = await launch({ headless: !has('headed') });
 let faults = 0;
 const fault = (line) => {
   faults++;
@@ -1405,8 +1358,7 @@ const fault = (line) => {
 };
 try {
   for (const renderer of renderers) {
-    const context = await browser.newContext({ viewport: sizes[0], deviceScaleFactor: 1 });
-    await context.addInitScript(quiet);
+    const context = await benchContext(browser, { viewport: sizes[0], deviceScaleFactor: 1 });
     await context.addInitScript(seeded, seed);
     const page = await context.newPage();
     page.on('pageerror', (e) => console.error(`page error: ${e.message}`));
@@ -1622,6 +1574,6 @@ try {
   }
 } finally {
   await browser.close();
-  server?.kill();
+  stop();
 }
 console.log(faults ? `create: ${faults} fault(s); pictures in ${out}` : `create: clean; pictures in ${out}`);

@@ -61,8 +61,3 @@ fn turn_between(a: &M4, b: &M4) -> f64 {
     }
     crate::math::acos(((trace - 1.0) / 2.0).clamp(-1.0, 1.0))
 }
-
-/// Whether any of the scene's parts has a clip.
-pub fn any_clips() -> bool {
-    scene::with(|s| s.objects.iter().any(|o| o.alive_with_tracks()))
-}

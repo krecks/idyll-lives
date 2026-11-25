@@ -153,6 +153,10 @@ fn a_baby_in_a_home_with_no_money_gets_a_crib_and_is_looked_after() {
         .iter()
         .position(|o| w.content.objects[o.def].id == "crib" && o.x >= 10)
         .expect("a crib next door");
+    assert_eq!(
+        w.objects[crib].value, 0,
+        "a gift: it sells for nothing and adds nothing to the bills"
+    );
     // Two days: Cal feeds her whenever she's hungry.
     let (mut sum, mut lowest) = (0.0, 1.0f32);
     for _ in 0..48 {

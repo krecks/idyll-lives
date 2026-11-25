@@ -354,6 +354,31 @@ pub(super) fn broken_numbers_never_make_a_save_unloadable() {
     assert_eq!(loaded.sims[0].needs[0], 0.75);
     assert_eq!(loaded.relationships.get(0, 1).friendship, 0.0);
     assert!(loaded.exits.is_empty());
+
+    // A car's way and a household's laundry, and a taxi's run, as cars and laundry keep them.
+    let town = r#"{"width":40,"depth":14,"plots":[{"name":"Home","x":2,"z":0,"w":20,"d":8}],
+        "households":[{"name":"Ones","plot":0}],
+        "sims":[{"name":"Ada","gender":"female","household":0,"x":5.5,"z":3.5}],
+        "cars":[{"plot":0,"x":16.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":0,"paint":0}]}"#;
+    let mut w = World::from_json(CONTENT, town, 3).unwrap();
+    assert_eq!(w.cars.len(), 1);
+    w.cars[0].progress = f32::NAN;
+    w.cars[0].drive_spot = Some([f32::NAN, 0.0, 0.0]);
+    w.households[0].laundry[0] = f32::NAN;
+    let mut run: crate::taxi::Run =
+        serde_json::from_value(serde_json::json!({"id":0,"group":[0,0],"enter":0,"stops":[]}))
+            .unwrap();
+    run.progress = f32::INFINITY;
+    w.taxis.runs.push(run);
+    let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
+    assert_eq!(
+        loaded.cars.iter().filter(|c| !c.taxi).count(),
+        1,
+        "the car kept"
+    );
+    assert_eq!(loaded.cars[0].progress, 0.0);
+    assert_eq!(loaded.cars[0].drive_spot, None);
+    assert!(loaded.households[0].laundry.iter().all(|l| l.is_finite()));
 }
 
 /// A file older than this build opens (`OLDEST_SAVE_VERSION`) is refused, as one newer than

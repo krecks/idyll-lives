@@ -10,6 +10,7 @@
  */
 
 import { REF_HEIGHT } from './clips/street';
+import { clamp } from '../../../game/noise';
 
 /**
  * A leg in a clip (`measureLegs`; body space, scale 1, in the y-z plane): the hip's height and depth,
@@ -82,6 +83,3 @@ export function seatSize(height: number): number {
   return height / REF_HEIGHT;
 }
 
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
