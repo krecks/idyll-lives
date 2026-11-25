@@ -228,6 +228,8 @@
     } finally {
       leaving = false;
     }
+    // (Another one asked for meanwhile: not on with the one being replaced.)
+    if (making) return;
     const w = app.world;
     if (!w || editor.issues.blocking.length || app.screen !== 'town') return;
     const named = name.trim();

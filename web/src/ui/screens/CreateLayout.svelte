@@ -334,6 +334,8 @@
     } finally {
       leaving = false;
     }
+    // (Another one asked for meanwhile: not on with the one being replaced.)
+    if (making) return;
     const l = app.layout;
     if (!l || editor.issues.blocking.length || fewHomes || app.screen !== 'streets') return;
     const w = app.world;
