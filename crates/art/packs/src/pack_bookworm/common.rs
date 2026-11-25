@@ -1,12 +1,12 @@
 //! What the bookworm pack is built from: its palette, books, china and lamps shared by the six.
 
 use artkit::materials::Mat;
+use artkit::math::P3;
 use artkit::math::{cos, cosd, degrees, sin, sind};
 use artkit::parts::numbered;
 use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::math::P3;
 use artkit::{fbox, fcyl, fsweep, kit, object_of, palette, revolve, torus};
 
 palette! { M:
@@ -140,24 +140,49 @@ fn shell_book(
             P3::from((c.x + x, c.y + y, c.z + z))
         }));
         let (a, b, q) = (pts[0], pts[1], pts[2]);
-        let (u, v) = ((b.0 - a.0, b.1 - a.1, b.2 - a.2), (q.0 - a.0, q.1 - a.1, q.2 - a.2));
-        let n = (u.1 * v.2 - u.2 * v.1, u.2 * v.0 - u.0 * v.2, u.0 * v.1 - u.1 * v.0);
+        let (u, v) = (
+            (b.0 - a.0, b.1 - a.1, b.2 - a.2),
+            (q.0 - a.0, q.1 - a.1, q.2 - a.2),
+        );
+        let n = (
+            u.1 * v.2 - u.2 * v.1,
+            u.2 * v.0 - u.0 * v.2,
+            u.0 * v.1 - u.1 * v.0,
+        );
         let mut ids: Vec<u32> = (at..at + pts.len() as u32).collect();
         if n.0 * out.0 + n.1 * out.1 + n.2 * out.2 < 0.0 {
             ids.reverse();
         }
         faces.push(ids);
     };
-    face(&[(-xa, -ya, z1), (xa, -ya, z1), (xa, ya, z1), (-xa, ya, z1)], (0.0, 0.0, 1.0)); // the top
+    face(
+        &[(-xa, -ya, z1), (xa, -ya, z1), (xa, ya, z1), (-xa, ya, z1)],
+        (0.0, 0.0, 1.0),
+    ); // the top
     for s in [-1.0, 1.0] {
         let (x, xi, y, yi) = (s * x1, s * xa, s * y1, s * ya);
-        face(&[(-xa, y, -z1), (xa, y, -z1), (xa, y, za), (-xa, y, za)], (0.0, s, 0.0)); // the spine, the back
-        face(&[(x, -ya, -z1), (x, ya, -z1), (x, ya, za), (x, -ya, za)], (s, 0.0, 0.0)); // a side
-        face(&[(-xa, y, za), (xa, y, za), (xa, yi, z1), (-xa, yi, z1)], (0.0, s, 1.0)); // spine or back to top
-        face(&[(x, -ya, za), (x, ya, za), (xi, ya, z1), (xi, -ya, z1)], (s, 0.0, 1.0)); // side to top
+        face(
+            &[(-xa, y, -z1), (xa, y, -z1), (xa, y, za), (-xa, y, za)],
+            (0.0, s, 0.0),
+        ); // the spine, the back
+        face(
+            &[(x, -ya, -z1), (x, ya, -z1), (x, ya, za), (x, -ya, za)],
+            (s, 0.0, 0.0),
+        ); // a side
+        face(
+            &[(-xa, y, za), (xa, y, za), (xa, yi, z1), (-xa, yi, z1)],
+            (0.0, s, 1.0),
+        ); // spine or back to top
+        face(
+            &[(x, -ya, za), (x, ya, za), (xi, ya, z1), (xi, -ya, z1)],
+            (s, 0.0, 1.0),
+        ); // side to top
         for t in [-1.0, 1.0] {
             let (yt, yti) = (t * y1, t * ya);
-            face(&[(xi, yt, -z1), (x, yti, -z1), (x, yti, za), (xi, yt, za)], (s, t, 0.0)); // upright corner
+            face(
+                &[(xi, yt, -z1), (x, yti, -z1), (x, yti, za), (xi, yt, za)],
+                (s, t, 0.0),
+            ); // upright corner
             face(&[(xi, yt, za), (x, yti, za), (xi, yti, z1)], (s, t, 1.0)); // a top corner
         }
     }
@@ -264,7 +289,18 @@ pub fn pile(
         let bx = x + rnd.uniform(-0.01, 0.01);
         let cover = rnd.choice(&BOOKS);
         let turn = rnd.uniform(-10.0, 10.0);
-        shell_book(f, &nm, bw, h, bd, (bx, y + h / 2.0, z), cover, turn, true, true);
+        shell_book(
+            f,
+            &nm,
+            bw,
+            h,
+            bd,
+            (bx, y + h / 2.0, z),
+            cover,
+            turn,
+            true,
+            true,
+        );
         y += h;
     }
     y

@@ -1,6 +1,7 @@
 //! The fireside reading lounge and the bedside book stack.
 
 use super::common::{M, WALL, books, lamp, mug, pile};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, cosd, radians, sin, sind};
@@ -10,7 +11,6 @@ use artkit::place::{Facing, GameFrame};
 use artkit::py::norm;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::shapes::SHARP;
 use artkit::{
     fbox, fcyl, fextrude, fsweep, jitter, kit, loft, revolve, ring, settle, soft, swing, torus,
@@ -710,7 +710,12 @@ pub fn bedside_stack() -> Vec<Obj> {
                     ],
                     0,
                     M.brass,
-                    profile = [(-0.006, -0.002), (0.006, -0.002), (0.006, 0.002), (-0.006, 0.002)],
+                    profile = [
+                        (-0.006, -0.002),
+                        (0.006, -0.002),
+                        (0.006, 0.002),
+                        (-0.006, 0.002)
+                    ],
                     up = (0, 0, 1)
                 );
                 fbox!(

@@ -273,7 +273,9 @@ fn _heart(k: f64, n: usize) -> Vec<(f64, f64)> {
         (hx * 0.055, -(hy + 2.5) * 0.0552)
     };
     // even along its length (the curve's own points bunch at the point and the dip)
-    let fine: Vec<(f64, f64)> = (0..=4000).map(|i| at(2.0 * PI * i as f64 / 4000.0)).collect();
+    let fine: Vec<(f64, f64)> = (0..=4000)
+        .map(|i| at(2.0 * PI * i as f64 / 4000.0))
+        .collect();
     let mut run = vec![0.0];
     for w in fine.windows(2) {
         let (dx, dz) = (w[1].0 - w[0].0, w[1].1 - w[0].1);

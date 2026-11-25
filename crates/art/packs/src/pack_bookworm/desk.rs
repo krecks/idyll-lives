@@ -1,7 +1,7 @@
 //! The writer's bureau and the book-club tea trolley.
 
-use crate::ease::ease_ends;
 use super::common::{M, books, knob, lamp, mug, pile};
+use crate::ease::ease_ends;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, cosd, pow, sin, sind};
