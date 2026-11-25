@@ -2,6 +2,7 @@
  * Noise for laying out land: a seeded generator (and a pick and a whole number drawn from one), a
  * lattice hash, value noise and fractal noise over it, and a smooth step. The renderer's landscape uses the same
  * functions (`render/shared/nature.ts` imports them from here), so the world's generator and its drawing agree.
+ * The small sums the rest of the game shares live here too (clamps, `lerp`, a whole number's hash): nothing to import.
  */
 
 import * as pmath from './pmath';
@@ -95,3 +96,23 @@ export const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
+
+/** `v` held within `lo`..`hi`. */
+export function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** `v` held within 0..1. */
+export const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/** From `a` to `b` by `t`. */
+export function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+/** A number 0..1 for a whole number (a resident's looks and ways). */
+export function hashInt(n: number): number {
+  let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}

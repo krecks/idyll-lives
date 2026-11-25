@@ -73,7 +73,7 @@ import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
 import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, rotate, sampleClip, skin } from './pose';
-import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clamp, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, hash, lerp, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
+import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
@@ -86,6 +86,7 @@ import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
+import { clamp, hashInt, lerp } from '../../../game/noise';
 
 export { PLAYBACK_RATE, SUPER_SPEED } from '../gameSpeed';
 
@@ -746,7 +747,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         stoop,
         build,
         size,
-        seed: hash(s.id + 17),
+        seed: hashInt(s.id + 17),
         visible: false,
         x: 0,
         z: 0,
@@ -892,8 +893,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         skirt: false,
         faceState: new Float32Array(set.morphs?.expressions ?? 0),
         eyes: new Float32Array(4),
-        faceL: 1 + (hash(s.id * 7 + 3) - 0.5) * 0.2,
-        faceR: 1 + (hash(s.id * 7 + 5) - 0.5) * 0.2,
+        faceL: 1 + (hashInt(s.id * 7 + 3) - 0.5) * 0.2,
+        faceR: 1 + (hashInt(s.id * 7 + 5) - 0.5) * 0.2,
         speech: null,
         speechStart: 0,
         speechSeg: 0,
@@ -1015,7 +1016,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         x: 0,
         z: 0,
         yaw: k,
-        seed: hash(id),
+        seed: hashInt(id),
         face: { ...NEUTRAL },
         faceState: new Float32Array(set.morphs?.expressions ?? 0),
         eyes: new Float32Array(4),
@@ -2115,7 +2116,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         if (listeners) {
           faceYaw = Math.atan2(middle[leader * 2] - rig.x, middle[leader * 2 + 1] - rig.z);
           if (speaking(Math.min(i, partner), role, time)) {
-            const pick = Math.floor(hash(Math.floor(time / 1.4 + rig.seed * 3) * 7 + i) * (listeners + 1));
+            const pick = Math.floor(hashInt(Math.floor(time / 1.4 + rig.seed * 3) * 7 + i) * (listeners + 1));
             if (pick > 0) rig.audience = this.sims[groups[leader * 3 + pick]] ?? null;
           }
         } else faceYaw = Math.atan2(partnerRig.x - rig.x, partnerRig.z - rig.z);
@@ -2597,7 +2598,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         case Anim.Argue: {
           // The social's own gestures and how it's taken (`GESTURES`).
           const g = gesturesOf(social, rig.socialId);
-          const nod = hash(Math.floor(time / 3) + i) < 0.4;
+          const nod = hashInt(Math.floor(time / 3) + i) < 0.4;
           const listen = g.listen ?? (outcome === 1 && nod ? 'yes' : outcome === 2 && nod ? 'no' : 'idle');
           if (role === 1) key = outcome === 2 && g.flop ? g.flop : me ? (g.speak ?? 'talk') : outcome === 1 && g.good === 'laugh' ? 'laugh' : listen;
           else key = outcome === 2 && g.bad ? g.bad : outcome === 1 && g.good && (!me || g.good === 'laugh') ? g.good : me ? (g.answer ?? 'talk') : listen;
@@ -2735,7 +2736,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.useSeq = null;
         // Idle with occasional variations.
         const phase = Math.floor((rig.actTime + rig.seed * 20) / 9);
-        const r = hash(phase * 7 + i);
+        const r = hashInt(phase * 7 + i);
         key = rig.actTime < 6 ? 'idle' : r < 0.18 ? 'foldArms' : 'idle';
         if (!tag || tag === 'idle') hands = HANDS.rest;
       }
@@ -3608,7 +3609,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     } else if (!moving && pose !== Pose.Lie && !this.force && rig.cuddleT < 0) {
       // Idle glances.
       const g = Math.floor(time / 3.7 + rig.seed * 5);
-      wantYaw = (hash(g * 13 + i) - 0.5) * 0.9 * (hash(g * 5 + i) < 0.5 ? 1 : 0);
+      wantYaw = (hashInt(g * 13 + i) - 0.5) * 0.9 * (hashInt(g * 5 + i) < 0.5 ? 1 : 0);
     }
     const f = dir?.still ? 1 : 1 - Math.exp(-dt * 5);
     rig.lookYaw += (wantYaw - rig.lookYaw) * f;
@@ -4397,8 +4398,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // Blinks: every 1.5 - 6 s at rest, more often while talking (sometimes twice), ~0.17 s each.
     if (time >= rig.nextBlink) {
       rig.blinkAt = time;
-      const r = hash(Math.floor(time * 10) + i * 7919);
-      const gap = talking ? 1 + 2.6 * hash(Math.floor(time * 13) + i * 31) : 1.5 + 4.5 * hash(Math.floor(time * 13) + i * 31);
+      const r = hashInt(Math.floor(time * 10) + i * 7919);
+      const gap = talking ? 1 + 2.6 * hashInt(Math.floor(time * 13) + i * 31) : 1.5 + 4.5 * hashInt(Math.floor(time * 13) + i * 31);
       rig.nextBlink = time + (r < 0.15 ? 0.32 : gap);
     }
     const bt = (time - rig.blinkAt) / 0.17;
@@ -4412,14 +4413,14 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const eyeY = this.heads[i * 3 + 1] - eyesBelowTop(rig);
     const ez = this.heads[i * 3 + 2];
     if (time >= rig.gazeUntil) {
-      const r = hash(Math.floor(time * 7) + i * 131);
+      const r = hashInt(Math.floor(time * 7) + i * 131);
       const mode = social && partner ? (r < 0.82 ? 1 : 3) : moving ? 0 : r < 0.3 ? 2 : r < 0.65 ? 3 : 0;
       // A big shift of gaze often comes with a blink.
-      if (mode !== rig.gazeMode && hash(Math.floor(time * 11) + i * 3) < 0.4 && time - rig.blinkAt > 0.5) rig.nextBlink = time;
+      if (mode !== rig.gazeMode && hashInt(Math.floor(time * 11) + i * 3) < 0.4 && time - rig.blinkAt > 0.5) rig.nextBlink = time;
       rig.gazeMode = mode;
-      rig.gazeUntil = time + 1.2 + 2.8 * hash(Math.floor(time * 5) + i * 17);
-      rig.glanceYaw = (hash(Math.floor(time * 3) + i) - 0.5) * 0.7;
-      rig.glancePitch = (hash(Math.floor(time * 3) + i + 5) - 0.6) * 0.3;
+      rig.gazeUntil = time + 1.2 + 2.8 * hashInt(Math.floor(time * 5) + i * 17);
+      rig.glanceYaw = (hashInt(Math.floor(time * 3) + i) - 0.5) * 0.7;
+      rig.glancePitch = (hashInt(Math.floor(time * 3) + i + 5) - 0.6) * 0.3;
     }
     if (!asleep && closed < 0.99) {
       const look = rig.audience?.visible ? rig.audience : partner;
@@ -4520,7 +4521,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const phrase = Math.sin(time * 1.9 + rig.seed * 9);
     if (phrase < -0.55) return;
     const env = Math.sin(Math.PI * f) * (0.55 + 0.45 * Math.min(1, phrase + 0.55));
-    const v = BABBLE[Math.floor(hash(k * 7 + i * 131) * BABBLE.length)];
+    const v = BABBLE[Math.floor(hashInt(k * 7 + i * 131) * BABBLE.length)];
     this.mixer!.viseme(v, env, 0.6);
   }
 

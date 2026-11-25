@@ -18,6 +18,7 @@ import type { Placement } from './pose';
 import { type Bed, LIE_BACK, LIE_CENTRE, type PlacedObject } from './seats';
 import { EMBRACE } from './socials';
 import type { Stride } from './stride';
+import { clamp, lerp } from '../../../game/noise';
 
 /**
  * Rows in the pose texture: the town's residents, then its vendors and shopkeepers, as many as the snapshot layout holds
@@ -419,14 +420,6 @@ export function splitKey(key: string): [string, string] {
   const at = key.indexOf(':');
   return [key.slice(0, at), key.slice(at + 1)];
 }
-export function hash(n: number): number {
-  let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-export function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 /** (x, y, z) made 1 long, into `UNIT`. */
 export function unit(x: number, y: number, z: number): Float32Array {
   const l = Math.hypot(x, y, z) || 1;
@@ -450,9 +443,6 @@ export function setFrame(f: Float32Array, xx: number, xy: number, xz: number, yx
   f[9] = ox;
   f[10] = oy;
   f[11] = oz;
-}
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }
 /** Getting into bed: sitting down on its edge (until the crossfade to lying), as `choose` plays it. */
 export function gettingIn(rig: SimRig): boolean {

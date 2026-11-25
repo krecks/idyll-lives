@@ -52,7 +52,7 @@ import { angleDelta as turn } from './angles';
 import { compose, multiply, quatYawPitchRoll, rotationX, rotationZ, scaling, transformNormal, transformPoint, translation, type Quat } from './math';
 import { entrySpace, placementVariation } from './modelEntry';
 import { bareTiles, windDirection, type PlantPlacement } from './nature';
-import { hash, mulberry32, smoothstep } from '../../game/noise';
+import { hash, lerp, mulberry32, smoothstep } from '../../game/noise';
 import { WALL_HEIGHT } from './walls';
 import { frameRandom } from './frameClock';
 
@@ -457,7 +457,6 @@ export interface BirdView<L extends BirdLook> {
   dispose(): void;
 }
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const between = (r: () => number, [a, b]: readonly [number, number]) => a + r() * (b - a);
 /** `Math.random`, looked up at each call (a test fixing it after this module loaded still fixes the birds); fixed-step playback's own dice then (`frameRandom`). */
 const rnd = () => frameRandom();
