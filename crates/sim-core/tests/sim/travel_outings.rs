@@ -490,3 +490,98 @@ fn a_visit_queued_till_too_late_to_get_there_before_it_shuts_isnt_set_out_for() 
         close % 60
     );
 }
+
+/// On their bike out to the other hamlet's park, halfway there, sent back to their own hamlet's
+/// instead (the far park called off), shutting in twice the time they've ridden so far: a ride
+/// back that far gets them there in time, a walk (three times as slow) wouldn't. The way is timed
+/// by the bike they're on, as the order is taken and as they set off on it again (`leisure_eta`;
+/// `ride::leisure_bike` offers one at home only: timed walking, it was refused), and they ride
+/// there before it shuts.
+#[test]
+fn on_their_bike_sent_where_a_ride_gets_them_before_it_shuts_they_ride_there() {
+    let content = common::content();
+    let h = two_hamlets(&content, 31);
+    let mut w = World::from_json(&content, &h.town, 31).expect("the hamlets load");
+    let far = far_park(&w, &h);
+    let near = w
+        .plots
+        .iter()
+        .position(|p| p.public && h.plots[0].contains(&(p.id as usize)))
+        .expect("a park in their own hamlet") as u32;
+    let sim = w
+        .sims
+        .iter()
+        .position(|s| w.households[s.household as usize].player && s.adult(&w.content))
+        .expect("a grown-up of the player's");
+    let home = w.households[w.sims[sim].household as usize]
+        .plot
+        .expect("their home");
+    let p = w.plots[home as usize].clone();
+    let placed = (p.z..p.z + p.d).rev().any(|z| {
+        (p.x..p.x + p.w).any(|x| {
+            w.apply(sim_core::Command::Buy {
+                household: 0,
+                object: "bicycle".into(),
+                at: Some([x, z, 0]),
+                colors: Default::default(),
+                turn: None,
+                offset: None,
+                size: None,
+                tall: None,
+            })
+            .is_ok()
+        })
+    });
+    assert!(placed, "no room for the bike at home");
+    w.apply(sim_core::Command::Visit {
+        sim: sim as u32,
+        plot: far,
+    })
+    .expect("off to the far park");
+    // (Ridden halfway there: as far as from there back to their own hamlet's park.)
+    let (door, there) = (
+        w.plots[near as usize].arrival_point(),
+        w.plots[far as usize].arrival_point(),
+    );
+    let half = sim_core::travel::dist(door, there) / 2.0;
+    let mut rode = 0;
+    let out = common::until(&mut w, 3 * 60, |w| {
+        let s = &w.sims[sim];
+        rode += u64::from(s.riding.is_some());
+        s.riding.is_some() && sim_core::travel::dist(s.pos, door) >= half
+    });
+    assert!(out, "they never rode halfway to the far park");
+    let now = clock::minute_of_day(w.tick) as u16;
+    let close = now + (2 * rode / TICKS_PER_MINUTE) as u16;
+    w.plots[near as usize].hours = Some(sim_core::world::PlotHours {
+        open: 0,
+        close,
+        days: 0b1111111,
+    });
+    w.apply(sim_core::Command::Visit {
+        sim: sim as u32,
+        plot: near,
+    })
+    .expect("sent back to their own hamlet's park, a ride in time");
+    w.apply(sim_core::Command::Cancel {
+        sim: sim as u32,
+        index: 0,
+    })
+    .expect("the far park called off");
+    let mut ridden = false;
+    let got = common::until(&mut w, 3 * 60, |w| {
+        let s = &w.sims[sim];
+        let doing = s.current().map(|a| a.task.kind);
+        ridden |= s.riding.is_some()
+            && matches!(doing, Some(sim_core::world::TaskKind::Visit { plot }) if plot == near);
+        s.visiting.is_some_and(|v| v.plot == near && v.arrived > 0)
+    });
+    assert!(ridden, "they didn't ride there");
+    assert!(got, "they never got there");
+    assert!(
+        (clock::minute_of_day(w.tick) as u16) < close,
+        "they got there after it shut at {:02}:{:02}",
+        close / 60,
+        close % 60
+    );
+}

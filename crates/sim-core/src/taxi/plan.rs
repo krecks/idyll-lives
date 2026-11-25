@@ -226,7 +226,7 @@ impl Run {
     }
 
     /// Whether it's the taxi for one off on `task`: to work or school, to its place, home from it.
-    pub(super) fn serves(&self, task: &TaskKind) -> bool {
+    pub(crate) fn serves(&self, task: &TaskKind) -> bool {
         match (self.place, self.home) {
             (None, _) => matches!(task, TaskKind::Work),
             (Some(p), false) => matches!(task, TaskKind::Visit { plot } if *plot == p),

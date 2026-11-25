@@ -56,12 +56,23 @@ pub(crate) fn start_task(
     }
     // Nobody sets off for a place shut now (its hours, `Plot::open_at`), or that shuts before they
     // could get there the way they'd go (`leisure_eta`, as an order is refused), asked to or not:
-    // one shut since it was chosen, or a visit queued behind work or a long use.
+    // one shut since it was chosen, or a visit queued behind work or a long use. Not one on their
+    // way there already (`Sim::visiting`: on foot, by bike, car or taxi), whom a place shut by then
+    // turns back (`life::end_visit_if_due`). Nor is one booked on the taxi there, off out to it
+    // (`taxi::leisure_leaving`), timed walking (`Taxis::takes`: no second taxi for them): they
+    // were dropped as it came, again and again, and it went without them; with taxis coming and
+    // going for nobody (three times the runs), a big island's way in jammed, cyclists stuck in
+    // it for hours (Gannet Island).
     if let TaskKind::Visit { plot } = task.kind
         && sim.visiting.is_none_or(|v| v.plot != plot)
         && ctx.plots[plot as usize].hours.is_some()
         && (!ctx.plots[plot as usize].open_at(ctx.day, ctx.minute)
-            || leisure_eta(sim, ctx, objects, plot)
+            || !sim.taxi.is_some_and(|b| {
+                ctx.taxis
+                    .runs
+                    .iter()
+                    .any(|r| r.id == b.run && r.serves(&task.kind))
+            }) && leisure_eta(sim, ctx, objects, plot)
                 .is_some_and(|eta| ctx.plots[plot as usize].open_for(ctx.day, ctx.minute) < eta))
     {
         return;
