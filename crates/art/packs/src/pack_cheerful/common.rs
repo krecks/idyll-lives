@@ -194,13 +194,14 @@ pub fn bulb(f: &GameFrame, x: f64, y: f64, z: f64, k: usize, r: f64) {
         (x, y, z),
         BULBS[k % BULBS.len()],
         segments = 6,
-        rings = 4
+        rings = 3 // (a bead 3 cm across: 7 px at the play camera)
     );
 }
 
 /// A pleated curtain hanging from `y1` (its heading) down to `y0` (its hem), along `z0`..`z1` in the plane at
-/// `x` (or along x, `z0`..`z1` being x, in the plane at depth `x`: `along_x`). Its folds are shallow under the
-/// heading tape, deepen as it falls and drift a little; a turned-up hem thickens its foot.
+/// `x`, `per_fold` points across each fold (enough that no crest turns 60°, the gate's hard edge). Its folds are
+/// shallow under the heading tape, deepen as it falls and drift a little; a turned-up hem thickens its foot (to
+/// 11.5 mm, as the heading: thinner than a hard edge's 12 mm faces).
 #[allow(clippy::too_many_arguments)]
 pub fn pleats(
     f: &GameFrame,
@@ -214,19 +215,27 @@ pub fn pleats(
     amp: f64,
     mat: Mat,
     t: f64,
-    along_x: bool,
+    per_fold: usize,
 ) -> Obj {
     let h = y1 - y0;
     let rows = [
-        (y0, 1.0, 1.5, 0.0),
-        (y0 + 0.012, 1.0, 1.5, 0.02),
+        (y0, 1.0, 1.15, 0.0),
+        (y0 + 0.012, 1.0, 1.15, 0.02),
         (y0 + 0.04, 1.0, 1.0, 0.05),
         (y0 + h * 0.4, 0.92, 1.0, 0.25),
         (y1 - 0.07, 0.72, 1.0, 0.4),
-        (y1 - 0.06, 0.4, 1.3, 0.42),
-        (y1, 0.36, 1.3, 0.42),
+        (y1 - 0.06, 0.4, 1.15, 0.42),
+        (y1, 0.36, 1.15, 0.42),
     ];
-    let (verts, faces) = kit::pleats!(f, &rows, z0, z1, x, folds, amp, t, along_x = along_x);
+    let (verts, faces) = kit::pleats!(f, &rows, z0, z1, x, folds, amp, t, per_fold = per_fold, along_x = false);
+    // its side hems: a cord down each end, where the cloth's end is (the folds end where they start)
+    for z in [z0, z1] {
+        let down: Vec<(f64, f64, f64)> = rows
+            .iter()
+            .map(|&(y, af, _, phase)| (x + amp * af * sin(phase), y, z))
+            .collect();
+        kit::tube!(f, numbered("side_hem"), &down, 0.0065, mat, verts = 6, round = 1);
+    }
     object_of!(name, &verts, &faces, &[mat], sharp = 70)
 }
 

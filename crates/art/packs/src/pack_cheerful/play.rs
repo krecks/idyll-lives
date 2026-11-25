@@ -599,14 +599,17 @@ fn channels(
                 (x, y0, z0),
                 (x, (y0 + top) / 2.0, (z0 + z1) / 2.0 - 0.01),
                 (x, top - 0.09, z1 + 0.01),
-                (x, top - 0.02, z1 - lean)
+                (x, top - 0.034, z1 - lean + 0.014),
+                (x, top - 0.02, z1 - lean),
+                // its top's seam: a 4 mm chamfer round the end, on straight on from the two before
+                (x, top - 0.016, z1 - lean - 0.004)
             ],
             0,
             mat,
             profile = rounded_rect(cw * 1.02, 0.17, 0.06, 1),
             up = (1, 0, 0),
             resolution = 2,
-            scale = [1.0, 1.04, 0.95, 0.75]
+            scale = [1.0, 1.04, 0.95, 0.79, 0.75, 0.705]
         );
     }
 }
@@ -625,7 +628,8 @@ pub fn party_booth() -> Vec<Obj> {
             M.booth,
             round = 0.05,
             flat = 1,
-            round_segments = 1
+            round_segments = 1,
+            resting = true
         );
         soft!(
             f,
@@ -639,7 +643,8 @@ pub fn party_booth() -> Vec<Obj> {
             puff = 0.012,
             piping = 0.006,
             piping_material = M.piping,
-            flat = 2
+            flat = 2,
+            resting = true
         );
         fbox!(f, "kick", 1.26, 0.04, 0.02, (0, 0.02, 0.27), M.panel);
         // the channelled backrest, its rolled top piped in yellow
@@ -677,7 +682,8 @@ pub fn party_booth() -> Vec<Obj> {
                 piping = 0.008,
                 piping_material = M.piping,
                 flat = 1,
-                round_segments = 1
+                round_segments = 1,
+                resting = true
             );
             fbox!(
                 f,
@@ -817,7 +823,7 @@ pub fn party_booth() -> Vec<Obj> {
             0.035,
             (0.0, 0.72, tz),
             M.white,
-            verts = 32,
+            verts = 24,
             bevel = 0.01,
             bevel_segments = 1
         );
@@ -835,7 +841,7 @@ pub fn party_booth() -> Vec<Obj> {
             ],
             at = f.at(0, 0, tz),
             material = M.brass,
-            segments = 20
+            segments = 16
         );
         fbox!(
             f,
@@ -923,7 +929,7 @@ pub fn party_booth() -> Vec<Obj> {
                 ),
                 M.popcorn,
                 segments = 6,
-                rings = 4
+                rings = 3
             );
         }
         // the left curtain, gathered at the back
@@ -939,7 +945,7 @@ pub fn party_booth() -> Vec<Obj> {
             0.03,
             M.curtain,
             0.01,
-            false,
+            6,
         );
     });
     join(&still, "body", Some(P3::ZERO));
@@ -947,7 +953,7 @@ pub fn party_booth() -> Vec<Obj> {
     let cur = new_parts(|| {
         pleats(
             f,
-            "curtain",
+            "curtain_cloth",
             xr,
             0.77,
             yr - 0.02,
@@ -957,7 +963,7 @@ pub fn party_booth() -> Vec<Obj> {
             0.022,
             M.curtain,
             0.01,
-            false,
+            4,
         );
     });
     let cur = hinged(join(&cur, "curtain", None), f.at(xr, yr, WALL2 + 0.07));
