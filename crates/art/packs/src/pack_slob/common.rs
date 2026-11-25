@@ -71,7 +71,8 @@ pub fn _m(name: &str) -> Mat {
     M.palette().get(name)
 }
 
-/// A rounded-cornered box lofted upright (a case, a cabinet), its top and bottom edges eased by `ease`.
+/// A rounded-cornered box lofted upright (a case, a cabinet, the neat pack's appliances and dock), its top and
+/// bottom edges eased by `ease`.
 #[allow(clippy::too_many_arguments)]
 pub fn _box<X: Coord, Z: Coord>(
     f: &GameFrame,

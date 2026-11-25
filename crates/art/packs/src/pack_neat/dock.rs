@@ -1,6 +1,7 @@
 //! The steam mop dock and the robot vacuum with its dock.
 
-use super::common::{_bottle, _box, M, WALL};
+use super::common::{_bottle, M, WALL};
+use crate::pack_slob::common::_box;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{P3, PI, TAU, cos, cosd, degrees, pow, radians, sin, sind};
@@ -26,6 +27,7 @@ pub fn steam_mop_dock() -> Vec<Obj> {
             M.body,
             5.0,
             24,
+            0.006,
         );
         soft!(
             f,
@@ -70,6 +72,7 @@ pub fn steam_mop_dock() -> Vec<Obj> {
             M.trim,
             4.0,
             20,
+            0.006,
         );
         // a C-clip holding the pole, on a stub from the tower
         fbox!(

@@ -1,7 +1,7 @@
 //! What the kind pack is built from: its palette, fluted rings, the tea set and little shrubs.
 
 use artkit::materials::Mat;
-use artkit::math::{P3, TAU, cos, cosd, sin, sind};
+use artkit::math::{cosd, sind};
 use artkit::parts::numbered;
 use artkit::place::GameFrame;
 use artkit::rand::Random;
@@ -93,29 +93,6 @@ palette! { M:
 
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
-
-/// A ring of Blender points of radius `r` at height `y`, in and out `depth` (a fraction) `flutes` times round.
-pub fn fluted(
-    r: f64,
-    y: f64,
-    verts: usize,
-    at: (f64, f64),
-    flutes: i32,
-    depth: f64,
-    sy: f64,
-) -> Vec<P3> {
-    (0..verts)
-        .map(|k| {
-            let (k, v) = (k as f64, verts as f64);
-            let flute = 1.0 + depth * cos(flutes as f64 * TAU * k / v);
-            P3 {
-                x: at.0 + r * flute * cos(TAU * k / v),
-                y: at.1 + sy * r * flute * sin(TAU * k / v),
-                z: y,
-            }
-        })
-        .collect()
-}
 
 /// A teapot standing on `y`, spout to the right (+x game), `s` its scale: a round body with a band, a lid with a
 /// knob, a curving spout and a looped handle.

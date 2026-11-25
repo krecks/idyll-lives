@@ -1,6 +1,7 @@
 //! The stacked laundry centre and the rainfall steam shower.
 
-use super::common::{_bottle, _box, _m, _towels, M, TOWELS, WALL};
+use super::common::{_bottle, _m, _towels, M, TOWELS, WALL};
+use crate::pack_slob::common::_box;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
@@ -77,6 +78,7 @@ fn _appliance(f: &GameFrame, name: &str, y0: f64, hh: f64, zf: f64, door: bool) 
         M.appliance,
         10.0,
         24,
+        0.006,
     );
     soft!(
         f,
@@ -611,6 +613,7 @@ pub fn rain_shower_tower() -> Vec<Obj> {
             M.body,
             12.0,
             24,
+            0.006,
         );
         soft!(
             f,

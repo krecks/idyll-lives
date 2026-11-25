@@ -18,7 +18,7 @@ use artkit::json;
 
 mod bag;
 mod calm;
-mod common;
+pub(crate) mod common;
 mod drums;
 
 pub use common::M;

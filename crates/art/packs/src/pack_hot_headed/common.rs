@@ -60,7 +60,7 @@ palette! { M:
 }
 
 /// A ring of Blender points of radius `r` at height `y`, in and out `depth` (a fraction) `flutes` times round: the
-/// pleats of a zafu, the ribs of a cactus.
+/// pleats of a zafu, the ribs of a cactus, the kind pack's wicker basket and planter.
 pub fn fluted(r: f64, y: f64, verts: usize, at: (f64, f64), flutes: i32, depth: f64) -> Vec<P3> {
     (0..verts)
         .map(|k| {
