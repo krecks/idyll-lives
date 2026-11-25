@@ -596,7 +596,10 @@ impl World {
                     crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
                 ),
                 // (Gone from the content: the money back.)
-                _ => h.funds += s.paid,
+                None => h.funds += s.paid,
+                // A setup whose sim isn't in town is a corrupt save: refunding it would mint money
+                // for a household that never paid (the object is still there).
+                Some(_) => {}
             }
         }
         world.make_storeys();
