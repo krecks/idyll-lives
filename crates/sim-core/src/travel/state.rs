@@ -147,15 +147,6 @@ impl Travel {
             .any(|(off, kerb)| off <= kerb - margin)
     }
 
-    /// The area a point is in, if any.
-    pub fn area_at(&self, p: [f32; 2]) -> Option<u32> {
-        self.file
-            .areas
-            .iter()
-            .position(|a| a.contains(p))
-            .map(|i| i as u32)
-    }
-
     /// Whether a trip from `a` to `b` on foot goes by road.
     pub fn by_road(&self, a: [f32; 2], b: [f32; 2]) -> bool {
         !self.graph.is_empty() && octile(a, b) >= ROAD_TRIP_TILES

@@ -56,29 +56,6 @@ impl Graph {
         })
     }
 
-    /// `path`'s cost, and the way it sets off and the way it comes in (`PathEnds`), without the
-    /// points between: to weigh many ways and lay out only the one taken.
-    pub fn path_ends(
-        &self,
-        from: RoadPoint,
-        to: RoadPoint,
-        mode: Mode,
-        country: f32,
-    ) -> Option<(f32, PathEnds)> {
-        self.search(from, to, mode, country, |pieces| {
-            let (_, cost) = self.measure(pieces, mode, country);
-            let (mut n, mut first, mut last) = (0, [[0.0; 2]; 2], [[0.0; 2]; 2]);
-            self.each_point(pieces, |(p, ..), _| {
-                if n < 2 {
-                    first[n] = p;
-                }
-                last = [last[1], p];
-                n += 1;
-            });
-            (cost, (n >= 2).then_some((first, last)))
-        })
-    }
-
     /// The points along the stretches of road `pieces`, one after another, as `path` has them
     /// (one within 0.05 m of the one before left out), each with its road's width and kind, and
     /// the road and whether it goes along it the way its points run (`RoadPath::roads`).

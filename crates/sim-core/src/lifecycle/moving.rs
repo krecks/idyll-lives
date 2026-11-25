@@ -172,14 +172,20 @@ pub(super) fn has_room_for_partner(w: &World, h: usize) -> bool {
 /// at work doesn't matter: they come back to the new home. Out on a visit or an outing, not
 /// that day (moved, they were taken from the host's home ten minutes in), nor out on a trip by
 /// car, there or back (`cars::on_trip`: moved at the wheel, they got out where the car stood, and
-/// it waited in the road for them for good).
+/// it waited in the road for them for good). Nor the last grown-up at home with a child: the
+/// child would be left on their own (no sitter booked, the rent run up with nobody earning).
 pub(super) fn may_move(w: &World, i: usize) -> bool {
     let s = &w.sims[i];
+    let adult = |j: &usize| w.sims[*j].adult(&w.content);
     s.here()
         && s.visiting.is_none()
         && !crate::cars::on_trip(&w.cars, s)
         && s.adult(&w.content)
         && (w.player_moves || !w.households[s.household as usize].player)
+        && {
+            let home = members(w, s.household as usize);
+            home.iter().all(adult) || home.iter().any(|&j| j != i && adult(&j))
+        }
 }
 
 /// A home nobody lives in (a house or a flat; not a park, not the player's home), with beds for
@@ -198,18 +204,18 @@ pub(super) fn vacant_plot(w: &World, n: usize) -> Option<u32> {
         .map(|p| p.id)
 }
 
-/// A household for the house on `plot`: the empty one already there, else a new one.
+/// A household for the house on `plot`: the empty one already there, else a new one. Either way
+/// it starts afresh: nothing of the family who lived there before is the new one's (their baby on
+/// the way, letters, washing, parcels to set up), and the story names those of them who left as
+/// the family they were (`World::retire_slot`), not by the new family's name.
 pub(super) fn household_for(w: &mut World, plot: u32, name: &str) -> usize {
-    if let Some(h) = w.households.iter().position(|hh| hh.plot == Some(plot)) {
-        let hh = &mut w.households[h];
-        hh.name = name.to_string();
-        hh.funds = 0;
-        hh.routines.clear();
-        return h;
-    }
-    let id = w.households.len() as u32;
-    w.households.push(Household {
-        id,
+    let h = w
+        .households
+        .iter()
+        .position(|hh| hh.plot == Some(plot))
+        .unwrap_or(w.households.len());
+    let fresh = Household {
+        id: h as u32,
         name: name.to_string(),
         plot: Some(plot),
         player: false,
@@ -220,8 +226,20 @@ pub(super) fn household_for(w: &mut World, plot: u32, name: &str) -> usize {
         sitter_day: None,
         laundry: crate::world::LAUNDRY_START,
         letters: Vec::new(),
-    });
-    id as usize
+    };
+    if h == w.households.len() {
+        w.households.push(fresh);
+        return h;
+    }
+    for j in 0..w.sims.len() {
+        if !w.sims[j].here() && w.sims[j].household as usize == h {
+            w.retire_slot(j);
+        }
+    }
+    w.households[h] = fresh;
+    w.setups.retain(|s| s.household as usize != h);
+    w.items.version = w.items.version.wrapping_add(1);
+    h
 }
 
 /// Moves resident `i` into household `to`, with their share of their old household's money.
@@ -239,6 +257,14 @@ pub(super) fn move_to(w: &mut World, i: usize, to: usize) {
     }
     // (A car their job called for that the old household hasn't bought yet isn't bought.)
     crate::cars::job_lost(&mut w.cars, id);
+    // Their baby on the way comes with them, born in their new home.
+    if w.households[to].expecting.is_none()
+        && w.households[from]
+            .expecting
+            .is_some_and(|e| e.parents.contains(&id))
+    {
+        w.households[to].expecting = w.households[from].expecting.take();
+    }
     let arrive = w.households[to]
         .plot
         .map(|p| w.plots[p as usize].home_point());

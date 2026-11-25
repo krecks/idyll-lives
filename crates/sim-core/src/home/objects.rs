@@ -84,11 +84,11 @@ impl World {
         Ok(id)
     }
 
-    /// Puts `def` into the household's home at the first good free spot, free of charge (a
-    /// delivery: a crib for a new baby). None if there's no room.
-    pub(crate) fn deliver(&mut self, household: u32, def: usize) -> Option<u32> {
+    /// Puts `def` into the household's home at the first good free spot, worth `value` (what was
+    /// paid for it: nothing for a crib given for a new baby, which sells for nothing and adds
+    /// nothing to the bills). None if there's no room.
+    pub(crate) fn deliver(&mut self, household: u32, def: usize, value: i64) -> Option<u32> {
         let (_, plot) = self.home_of(household).ok()?;
-        let value = self.content.objects[def].price.unwrap_or(0);
         self.find_spot(plot, def)
             .into_iter()
             .find_map(|(x, z, rot, offset)| {
@@ -136,19 +136,6 @@ impl World {
         }
         self.households[h].funds += self.build_price(refund);
         Ok(())
-    }
-
-    /// Moves or rotates an object at home. Its look, quality and value stay. Returns its new id
-    /// (it's placed again at the end of the list, so the ids after it shift down).
-    pub fn move_object(
-        &mut self,
-        household: u32,
-        object: u32,
-        x: i32,
-        z: i32,
-        rot: u8,
-    ) -> Result<u32, Error> {
-        self.move_object_to(household, object, x, z, rot, None, None, None, None)
     }
 
     /// Moves, rotates or resizes an object at home, with a new free turn, offset, size

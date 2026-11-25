@@ -248,9 +248,10 @@ impl World {
         Ok(id as u32)
     }
 
-    /// Before someone new takes `slot`: story events naming its former occupant name them as a
-    /// former resident instead; former residents no event names any more are forgotten.
-    fn retire_slot(&mut self, slot: usize) {
+    /// Before someone new takes `slot` (or a new family their household): story events naming its
+    /// former occupant name them as a former resident instead; former residents no event names any
+    /// more are forgotten.
+    pub(crate) fn retire_slot(&mut self, slot: usize) {
         use crate::social::FORMER;
         let gone = &self.sims[slot];
         let household = self
@@ -310,6 +311,18 @@ impl World {
         sim.planner.thought = None;
         sim.gone = Some(Gone { why, day });
         crate::cars::job_lost(&mut self.cars, id);
+        // No car waits for them or counts them in it, and no taxi takes them home from work: a
+        // newcomer in their slot would be taken for them (a car away for good, waiting for its
+        // driver to be done at work).
+        for car in &mut self.cars {
+            if car.driver == Some(id) {
+                car.driver = None;
+            }
+            car.aboard.retain(|&a| a != id);
+            car.done.retain(|&a| a != id);
+            car.riders.retain(|&a| a != id);
+        }
+        self.taxis.rode.retain(|r| r.0 != id);
         // Nobody talks to them, listens in, opens the door to them or rings them any more (their
         // slot may soon be someone else's), and a visitor waits for someone else to come.
         let with_them = |t: &Task| match t.kind {

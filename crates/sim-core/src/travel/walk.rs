@@ -32,11 +32,6 @@ pub(super) fn walk_side(pts: &[([f32; 2], f32, RoadKind)]) -> Vec<[f32; 2]> {
     crate::cars::offset_right_with(&line, |i| side_offset(pts[i].1, pts[i].2))
 }
 
-/// `pts` moved `off` m to the right (looking the way they run).
-pub fn offset_right(pts: &[[f32; 2]], off: f32) -> Vec<[f32; 2]> {
-    crate::cars::offset_right_with(pts, |_| off)
-}
-
 /// A line of points about a metre apart, cut down to one every `THIN_STEP` m at most and at
 /// every bend (where a straight step would stray more than `THIN_TOLERANCE` from it).
 pub fn thin(pts: &[[f32; 2]]) -> Vec<[f32; 2]> {
