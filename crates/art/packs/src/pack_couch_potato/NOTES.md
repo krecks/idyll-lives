@@ -20,7 +20,7 @@ the console's sit 8 cm further back than before, against the loveseat's back, so
 |---|---|---|
 | `cinemaWall` | the left and right curtains over the picture, each with its origin at its outer end: `curtains` gathers both to their sides (scaled to 22 % across, 1.2 s) | `marathon`, `channelSurf` |
 | `gameConsole` | the disc tray with a disc on it: `tray` slides it 9 cm out of the console towards the players, away from the wall (0.6 s), `hold` 1.5 s, so it goes back in | `play`, `speedrun` |
-| `recliner` | the back (with its pillows), hinged at the seat's back: `recline` tips it 11° back as it slides 3 cm forward (a wall-hugger: its top stays off the wall); the footrest, folded under the seat's front, rises 80° in the same clip (1.2 s); the sitter rides the back (`ride: recline`) | `recline`, `doze` |
+| `recliner` | the back (with its pillows), hinged at the seat's back: `recline` tips it 11° back; the footrest, folded under the seat's front, rises 80° in the same clip (1.2 s); the sitter rides the back (`ride: recline`) | `recline`, `doze` |
 | `snackFridge` | the door with its takeout screen and handle, hinged on its right edge: `fridge_open` swings it 100° (0.9 s); cans, a takeout box and a pizza inside | `snack`, `takeout` |
 | `fitnessGame` | the balance board on its rocker, on the mat: `board` tilts it 10° to one side (0.8 s) | `workout` |
 | `lavaLamp` | the wax in the glass: `blobs` lifts three blobs 14 cm (2.5 s, slow); `drift` turns two more round the glass once in 8 s, all the time near the camera (`idle`). The glass and the wax glow at night with the content's `light` (2 m, at 0.85 m over the side table), switched as a lamp (M-packs-07). The side table stands at the pouf's front right and the pouf is turned 50° to face it, its sitter too (content `places`), coming from its left (2026-10-21: the lamp stood behind the sitter's shoulder, I-packs-11) | `zoneOut`; ambient |
@@ -61,8 +61,8 @@ parts, clips, motions, paint and draws as before. Triangles in the table below (
 
 Other warnings left, by design:
 - the recliner's depth (0.76 m, old part 0.89 m): the old part had its footrest out at rest; here it is
-  folded and rises in `recline`. The recliner stands 3 cm further from the wall than the old part's back, and its
-  back slides 3 cm forward as it tips, so its top stays off the wall's face;
+  folded and rises in `recline`. The recliner stands 3 cm further from the wall than the old part's back, so the
+  back tips without going into it (its top comes to about the wall's face);
 - the snack fridge's width (0.58 m, old part 0.69 m): the old part's bowl of crisps hung half off the lid;
   here it sits on it.
 
