@@ -22,7 +22,8 @@
   {"name": "err-in-needs-group", "args": ["in", "cafeTable", "--content", "content", "--plan", "plan"]},
   {"name": "err-overlap", "args": ["in", "cafeTable", "cafeTable", "--group", "x", "--content", "content", "--plan", "plan"]},
   {"name": "err-choice", "args": ["bogus", "--content", "content"]},
-  {"name": "err-unrecognized", "args": ["in", "a", "--group", "g", "b", "--content", "content"]},
+  {"name": "err-unknown-option", "args": ["in", "a", "--grou", "g", "--content", "content"]},
+  {"name": "err-needs-value", "args": ["in", "a", "--content", "content", "--group"]},
   {"name": "dry-in", "args": ["in", "pouf", "gnome", "--group", "seed", "--dry-run", "--content", "content", "--plan", "plan"]},
   {"name": "dry-out", "args": ["out", "--group", "seed", "--dry-run", "--content", "content", "--plan", "plan"]}
 ]

@@ -1,5 +1,3 @@
-use super::{py_space, py_strip};
-
 // --- A JSON parser that keeps where every value is in the text ------------------------------------
 
 /// What Python's `Node.value` held.
@@ -87,7 +85,7 @@ impl Parser<'_> {
 
     fn ws(&self, mut i: usize) -> usize {
         while let Some(c) = self.t[i..].chars().next() {
-            if !py_space(c) {
+            if !c.is_whitespace() {
                 break;
             }
             i += c.len_utf8();
@@ -271,5 +269,5 @@ pub fn parse(text: &str) -> Result<Node, String> {
 pub(super) fn indent_at(text: &str, pos: usize) -> &str {
     let line = text[..pos].rfind('\n').map_or(0, |i| i + 1);
     let s = &text[line..pos];
-    if py_strip(s).is_empty() { s } else { "" }
+    if s.trim().is_empty() { s } else { "" }
 }

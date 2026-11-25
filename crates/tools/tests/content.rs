@@ -1,7 +1,7 @@
-//! `cargo content` against what `tools/content/validate.py` did: each case in `fixtures/content/cases.json` runs
-//! the binary on a fresh copy of `fixtures/content/{content,plan}` and must print the same stdout, stderr and exit
-//! code, and leave the same files, as the Python script did (`fixtures/content/expected/<case>/`, generated once by
-//! the script; there, argparse's errors name the program `content`, and a Python traceback keeps only its message).
+//! `cargo content` against what is expected of it: each case in `fixtures/content/cases.json` runs the binary on a
+//! fresh copy of `fixtures/content/{content,plan}` and must print the same stdout, stderr and exit code, and leave
+//! the same files, as `fixtures/content/expected/<case>/` (first written by `tools/content/validate.py`, which the
+//! tool replaced; since then its own command line, and new JSON strings written as UTF-8, as the files are).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -99,8 +99,8 @@ fn same_as_the_python_script() {
     );
 }
 
-/// The Python script failed on an empty `groups` (the state docs/objects/README.md says to start from); the port
-/// puts the first group between the brackets.
+/// The Python script failed on an empty `groups` (the state a new Validate category starts from); the port puts
+/// the first group between the brackets.
 #[test]
 fn first_group_into_an_empty_validate() {
     let fx = fixtures();

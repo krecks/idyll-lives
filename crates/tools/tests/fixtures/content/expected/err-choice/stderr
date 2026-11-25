@@ -1,4 +1,3 @@
-usage: content [-h] [--group GROUP] [--label LABEL] [--to TO] [--dry-run]
-               [--content CONTENT] [--plan PLAN]
-               {list,in,out} [ids ...]
-content: error: argument what: invalid choice: 'bogus' (choose from list, in, out)
+usage: cargo content list|in|out [<id>...] [--group <group>] [--label <label>]
+                     [--to <category>/<group>] [--dry-run] [--content <dir>] [--plan <dir>]
+content: error: list, in or out, not 'bogus'
