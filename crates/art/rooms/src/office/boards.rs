@@ -68,7 +68,7 @@ pub fn whiteboard() -> Vec<Obj> {
             F,
             "frame",
             &frame,
-            &crate::common::eased_loop(
+            &artkit::forms::eased_loop(
                 &[
                     (0.0, 0.0),
                     (0.0, 0.02),
@@ -446,7 +446,7 @@ pub fn corkboard() -> Vec<Obj> {
             F,
             "frame",
             &frame,
-            &crate::common::eased_loop(
+            &artkit::forms::eased_loop(
                 &[
                     (0.0, 0.0),
                     (0.0, 0.022),

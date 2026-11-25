@@ -115,7 +115,7 @@ parts, clips and draws as before.
   `fabric`, so the spinning label is the third draw (5,792 to 6,056 triangles).
 - `karaokeMachine` (1 to 0): the spotlight's front lip chamfered (4,688 to 4,720).
 - `mocktailCart` (28 to 0): the canopy's stripes and scalloped valance 1 cm thick (were 12 mm, a hard edge's width).
-- `rainbowHammock` (2 to 0): the base beam's flat ends eased 4 mm (`ease_ends`: a 60° bevel, only the cap rims)
+- `rainbowHammock` (2 to 0): the base beam's flat ends eased 4 mm (`artkit::bevel::ease` at 60°, only the cap rims)
   (4,710 to 4,742).
 - `sunriseLamp` (2 to 0): the rolled mat's ends bevelled 4 mm. The head (case, scene, sun and its 22 cm rise) is
   drawn at 0.84 of its build about the scene's middle, 66 cm across (was 78; a mood lamp is at most 60 cm, ±10 %),

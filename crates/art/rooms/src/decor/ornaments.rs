@@ -19,7 +19,7 @@ pub fn vase_tall() -> Vec<Obj> {
         revolve!(
             "vase",
             // its lip rolled
-            &crate::common::eased(
+            &artkit::forms::eased(
                 &[
                     (0.0, 0.0),
                     (0.06, 0.0),
@@ -266,7 +266,7 @@ pub fn vase_pedestal() -> Vec<Obj> {
         revolve!(
             "vase",
             // its lip rolled
-            &crate::common::eased(
+            &artkit::forms::eased(
                 &[
                     (0.0, 0.0),
                     (0.07, 0.0),

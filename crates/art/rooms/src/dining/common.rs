@@ -170,7 +170,7 @@ pub fn slab(
 fn eased_edge(edge: &[(f64, f64)], t: f64) -> Vec<(f64, f64)> {
     let mut prof: Vec<(f64, f64)> = edge.iter().map(|&(i, f)| (-i, f * t)).collect();
     prof.push((-1.0, t)); // the top, running in
-    let eased = crate::common::eased(&prof, 0.002);
+    let eased = artkit::forms::eased(&prof, 0.002);
     eased[..eased.len() - 1]
         .iter()
         .map(|&(o, h)| (-o, h / t))

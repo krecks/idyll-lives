@@ -111,7 +111,7 @@ Every hard edge the gate found (20) is gone:
   flat); the jug's seat eased; the smoothie's top and the fruit bowl's rim rolled over (the bowl's rim a 4 mm round
   into its inside).
 - **Spin bike:** the swept beam, front leg, flywheel foot, seat post and cranks have their flat ends eased 4 mm
-  (`common::ease_ends`: a bevel of the cap rims alone); the cranks' profile rounded in two steps a corner (it made a
+  (`artkit::bevel::ease` at 60°: a bevel of the cap rims alone); the cranks' profile rounded in two steps a corner (it made a
   90° ridge); the axle's ends eased.
 - **Streetball hoop:** the wheels' and the upper pole's ends eased; the board 8 cm taller upwards (0.62 m; the rim
   stays at 2.4 m, as `clips/shot.ts` `STREET_RIM` has it), so it stands 2.92 m, a driveway hoop's height.

@@ -1,7 +1,6 @@
 //! The windowsill herb garden (1x1): a slatted cedar trough on a stand, pots on the shelf below.
 
 use super::common::{_basil, _leaf, _pot, _rosemary, _thyme, M, WALL};
-use crate::ease::{EASE, eased};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3};
@@ -9,6 +8,7 @@ use artkit::parts::{aside, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsweep, grow, jitter, revolve, settle, torus};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 pub fn herb_garden() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
@@ -245,7 +245,7 @@ pub fn herb_garden() -> Vec<Obj> {
                 // (its rim rolled over)
                 &eased(
                     &[(0.09, 0.0), (0.12, 0.09), (0.11, 0.09), (0.08, 0.012)],
-                    EASE
+                    AUTO_WIDTH
                 ),
                 &[(0.0, 0.012)],
             ]

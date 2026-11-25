@@ -1,7 +1,6 @@
 //! The light-up dance floor and the party photo wall.
 
 use super::common::{_speaker, M, PHOTOS, TILES, WALL};
-use crate::ease::{EASE, eased};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -12,6 +11,7 @@ use artkit::place::{Facing, GameFrame};
 use artkit::py;
 use artkit::scene::Obj;
 use artkit::{fbox, fcone, fcyl, fsphere, fsweep, grow, loft, revolve, ring, settle, soft};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the light-up dance floor (2x2): sixteen glowing tiles, a mirror ball on a truss gantry, two speaker towers ---
 const TILE: f64 = 0.43;
@@ -173,7 +173,7 @@ pub fn dance_floor() -> Vec<Obj> {
                         (0.06, 0.06),
                         (0.0, 0.05)
                     ],
-                    EASE
+                    AUTO_WIDTH
                 ),
                 at = f.at(sf * 0.68, 2.18, 0.0),
                 material = M.dark,

@@ -1,7 +1,7 @@
 //! The cool-down meditation cushion, the grudge-to-gratitude writing desk and the glacier cold-plunge tub.
 
 use super::common::{M, fluted};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{P3, PI, cosd, pow, sin, sind};
 use artkit::motion::{Squash, squash};
@@ -742,7 +742,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             profile = rounded_rect(0.26, 0.04, 0.016, 2),
             up = (0, 0, 1)
         );
-        ease_ends(back);
+        ease(back, 60.0, 1);
         let low: Vec<(f64, f64, f64)> = rail.iter().map(|&(x, y, z)| (x, y - 0.155, z)).collect();
         fsweep!(
             f,

@@ -145,7 +145,7 @@ pub fn pool_table() -> Vec<Obj> {
         bevel_edges(rails, 0.004, 1, SHARP, &EdgeOrder::Corners);
         // the cushions: cloth noses along the rails' inside, between the pockets
         // (its rubber nose rounded)
-        let nose = crate::common::round_at(
+        let nose = artkit::forms::round_at(
             &[
                 (0.0, 0.0),
                 (0.04, 0.0),
@@ -193,7 +193,7 @@ pub fn pool_table() -> Vec<Obj> {
                     RAIL_TOP - 0.002,
                     z,
                     // (the leather rolled round its lip)
-                    &crate::common::round_at(
+                    &artkit::forms::round_at(
                         &[
                             (0.0, 0.0),
                             (0.046, 0.0),

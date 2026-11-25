@@ -105,7 +105,7 @@ The heavy bag's body (`bag`) is leather. It goes from 2 draws to 3. The finish i
 ## Gate to zero (2026-11-25)
 
 Every hard edge the gate found (37) is gone, and the smash bin's posts no longer smear their wood:
-- **Heavy bag:** the T foot's swept ends eased, the weight plates' lathe eased all round (`crate::ease::eased`, closed
+- **Heavy bag:** the T foot's swept ends eased, the weight plates' lathe eased all round (`artkit::forms::eased`, closed
   from the middle of the back face so the hole's rim is eased too); the rubber floor mat set aside (`aside`) and the
   long foot 1 cm shorter, so the stand measures 0.72 × 2.00 × 0.77 m, a heavy bag stand's footprint.
 - **Smash bin:** the plates' rims a 4 mm band (too narrow to show hard: a lathe rim at no extra triangles); the

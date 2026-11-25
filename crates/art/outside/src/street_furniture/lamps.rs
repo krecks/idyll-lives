@@ -43,7 +43,7 @@ pub fn street_lamp() -> Vec<Obj> {
             .map(|&(r, y)| fluted(r, y, 12, 0.07, 3, 0.0))
             .collect();
         loft!("bell", &secs, material = iron);
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "collar",
             &[
                 (0.0, 0.495),
@@ -144,7 +144,7 @@ pub fn street_lamp() -> Vec<Obj> {
             rot = (0, 0, 45),
             smooth = false
         );
-        crate::eased(loft!(
+        artkit::bevel::eased(loft!(
             "lantern_floor",
             &[
                 square(0.12, 3.43),
@@ -180,7 +180,7 @@ pub fn street_lamp() -> Vec<Obj> {
             );
         }
         // the roof: a hipped canopy, its sides curving in, a vented crown and a finial
-        crate::ease(
+        artkit::bevel::ease(
             loft!(
                 "roof",
                 &[
@@ -197,7 +197,7 @@ pub fn street_lamp() -> Vec<Obj> {
             30.0,
             1,
         );
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "vent",
             &[
                 (0.0, 4.07),
@@ -352,7 +352,7 @@ pub fn traffic_light() -> Vec<Obj> {
             bevel_segments = 2
         );
         let board = (0, 2.52, 0.085);
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "rim",
             &rounded_rect(0.52, 1.1, 0.06, low(4, 1)),

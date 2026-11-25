@@ -127,7 +127,7 @@ No change to the build: its soft boxes take the shared form's new shape (the sha
 ## Edges at the play camera (2026-11-25)
 
 The gate's `edges` found 44 (climbing frame 24, slide 11, hoop 6, spring rider 2, merry-go-round 1); none now, none
-accepted. `mesh` eases what it builds flat (the crate's `eased`: a 4 mm chamfer on turns over 50°), so the slide's
+accepted. `mesh` eases what it builds flat (`artkit::bevel::eased`: a 4 mm chamfer on turns over 50°), so the slide's
 chute; the frames' boards (`board`) are eased and lay their wood's UVs on the eased board (`boxed`), as do the
 climbing frame's posts (their chamfers smeared the grain, `texels`); the hoop's board frame, the slide's porthole
 panels, the spring rider's plates and the roundabout's centre disc are eased.

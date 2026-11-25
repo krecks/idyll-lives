@@ -134,7 +134,7 @@ pub fn teacher_desk() -> Vec<Obj> {
             segments = 14,
             rings = 10
         );
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "apple_stalk",
             0.003,
@@ -143,7 +143,7 @@ pub fn teacher_desk() -> Vec<Obj> {
             M.soil,
             verts = 5
         ));
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "pencil_pot",
             &[
                 (0.0, 0.0),
@@ -170,7 +170,7 @@ pub fn teacher_desk() -> Vec<Obj> {
         }
         let (gx, gz) = (-0.5, -0.12);
         // (box UVs on the turned base: round about its axis, the grain stretched over its slopes near the middle)
-        crate::boxed(crate::eased(revolve!(
+        crate::boxed(artkit::bevel::eased(revolve!(
             "globe_base",
             &[
                 (0.0, 0.0),
@@ -190,7 +190,7 @@ pub fn teacher_desk() -> Vec<Obj> {
             .map(|d| radians(d as f64))
             .map(|a| (gx + 0.13 * sin(a), t + 0.23 + 0.13 * cos(a), gz))
             .collect();
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             "globe_arc",
             &arc,
@@ -261,7 +261,7 @@ pub fn lectern() -> Vec<Obj> {
             M.pew_oak,
             bevel = 0.01
         );
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "column",
             &[
                 (0.0, 0.11),
@@ -345,7 +345,7 @@ pub fn lectern() -> Vec<Obj> {
             M.pew_oak,
             bevel = 0.006
         );
-        crate::eased(kit_moulding!(
+        artkit::bevel::eased(kit_moulding!(
             F,
             "front_frame",
             &[(-0.25, 0.94), (0.25, 0.94), (0.25, 1.17), (-0.25, 1.17)],
@@ -450,7 +450,7 @@ pub fn bar_counter() -> Vec<Obj> {
         }
         for k in 0..6 {
             let x = -0.78 + k as f64 * 0.3;
-            crate::eased(revolve!(
+            artkit::bevel::eased(revolve!(
                 format!("bottle{k}"),
                 &[
                     (0.0, 0.0),
@@ -479,7 +479,7 @@ pub fn bar_counter() -> Vec<Obj> {
             );
         }
         // the top: a thick slab with a rounded nose to the drinkers, a bead under it
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "top",
             &[
@@ -497,7 +497,7 @@ pub fn bar_counter() -> Vec<Obj> {
             M.mahogany,
             plane = Facing::Side
         ));
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             "cove",
             &[(-0.95, top - 0.068, 0.236), (0.95, top - 0.068, 0.236)],
@@ -557,7 +557,7 @@ pub fn bar_counter() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            crate::eased(revolve!(
+            artkit::bevel::eased(revolve!(
                 format!("pump{i}"),
                 &[
                     (0.0, 0.0),
@@ -573,7 +573,7 @@ pub fn bar_counter() -> Vec<Obj> {
                 material = M.bell,
                 segments = 16
             ));
-            crate::eased(fsweep!(
+            artkit::bevel::eased(fsweep!(
                 F,
                 format!("spout{i}"),
                 &[
@@ -586,7 +586,7 @@ pub fn bar_counter() -> Vec<Obj> {
                 resolution = 3,
                 verts = 8
             ));
-            crate::eased(revolve!(
+            artkit::bevel::eased(revolve!(
                 format!("handle{i}"),
                 &[
                     (0.0, 0.0),
@@ -623,7 +623,7 @@ pub fn bar_counter() -> Vec<Obj> {
             M.towel
         );
         for (k, x) in [-0.45, 0.5].into_iter().enumerate() {
-            crate::eased(revolve!(
+            artkit::bevel::eased(revolve!(
                 format!("pint{k}"),
                 &[
                     (0.0, 0.0),
@@ -637,7 +637,7 @@ pub fn bar_counter() -> Vec<Obj> {
                 material = M.beer,
                 segments = 16
             ));
-            crate::eased(revolve!(
+            artkit::bevel::eased(revolve!(
                 format!("head{k}"),
                 &[
                     (0.0, 0.0),

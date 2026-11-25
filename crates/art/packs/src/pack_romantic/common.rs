@@ -1,13 +1,13 @@
 //! What the romantic pack is built from: its palette, candles and their flames, roses and their leaves, a wine glass
 //! and the velvet slipper chair.
 
-use crate::ease::{EASE, eased};
 use artkit::forms::smooth_outline;
 use artkit::materials::{Mat, Mirror};
 use artkit::math::{Axis, M4, V3, radians};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::{fcyl, fextrude, fsweep, leaf, palette, revolve, soft};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 palette! { M:
     body = ("#C9A54A", metal),       // gold: the table's and chairs' legs; the main part of the table
@@ -253,7 +253,7 @@ pub fn _wine_glass(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, wine: bool
                 (0.031, 0.17),
                 (0.0, 0.09)
             ],
-            EASE
+            AUTO_WIDTH
         ),
         at = f.at(x, y, z),
         material = M.glassy,

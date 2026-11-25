@@ -214,7 +214,7 @@ pub fn swept(
     let (mut pts, mut scales) = (pts.to_vec(), scales.to_vec());
     let mut outlines = vec![profile.to_vec(); pts.len()];
     if ends > 0.0 {
-        let (n, small) = (pts.len(), crate::common::inset(profile, ends));
+        let (n, small) = (pts.len(), artkit::forms::inset(profile, ends));
         let first = pts[0] + (pts[1] - pts[0]).normalized() * ends;
         let last = pts[n - 1] + (pts[n - 2] - pts[n - 1]).normalized() * ends;
         pts.insert(1, first);

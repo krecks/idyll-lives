@@ -104,7 +104,7 @@ The quiet pod's seat and back cushion are `resting`. Besides, its soft boxes tak
 ## Gate to zero (2026-11-25)
 
 Every hard edge the gate's `edges` found is eased (13 → 0): the chairs' crest rails' ends and the pod's wing edges'
-ends (`ease_ends`), the bonsai pot's rim (`eased`), the hatch frame's inner arris. The bonsai's leaf pads have their
+ends (`artkit::bevel::ease` at 60°), the bonsai pot's rim (`eased`), the hatch frame's inner arris. The bonsai's leaf pads have their
 scale baked into their meshes before their UVs are made, so the foliage is laid at its own size (it was 3,578 px a
 metre and stretched on 18 %: `texels`). The hatch's mat is `aside` (drawn, not the hatch's own size): it measures
 0.84 × 1.95 × 0.50 m. The sauna keeps 4 draw calls (the door's glass is its own); the bonsai bench (its trimmed twig

@@ -60,9 +60,9 @@ pub fn rain_barrel() -> Vec<Obj> {
             })
             .collect();
     }
-    crate::eased(loft!("barrel", &secs, material = M.barrel, angle = 35));
+    artkit::bevel::eased(loft!("barrel", &secs, material = M.barrel, angle = 35));
     // the lid: a domed disc with a raised rim, a mesh inlet at the back and its ring
-    crate::eased(revolve!(
+    artkit::bevel::eased(revolve!(
         "lid",
         &[
             (0.0, 0.0),
@@ -77,7 +77,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         material = M.barrel_dark,
         segments = low(24, 10)
     ));
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "lid_inlet",
         0.065,
@@ -87,7 +87,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         verts = low(12, 6)
     ));
     if !is_low() {
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "inlet_mesh",
             0.05,
@@ -113,7 +113,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         }
     }
     // the brass tap at the front: a flange, a body, a spout curving down, a lever on top
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "tap_flange",
         0.032,
@@ -140,7 +140,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         verts = low(10, 6),
         round = 1
     );
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "tap_body",
         0.024,
@@ -149,7 +149,7 @@ pub fn rain_barrel() -> Vec<Obj> {
         M.brass,
         verts = low(10, 6)
     ));
-    crate::eased(fsweep!(
+    artkit::bevel::eased(fsweep!(
         F,
         "tap_lever",
         &[(0, 0.23, RB_Z + 0.33), (0, 0.235, RB_Z + 0.37)],

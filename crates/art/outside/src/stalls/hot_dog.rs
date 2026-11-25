@@ -187,7 +187,7 @@ pub fn hot_dog_stand() -> Vec<Obj> {
             }
         }
         // the sign on the front: a framed plate, a hot dog in its bun with a mustard zigzag
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "sign_frame",
             &rounded_rect(0.66, 0.26, 0.02, 2),

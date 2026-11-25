@@ -1,7 +1,6 @@
 //! The karaoke stage and the video-call corner.
 
 use super::common::{_speaker, M, WALL};
-use crate::ease::{EASE, eased};
 use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -10,6 +9,7 @@ use artkit::parts::{hinged, join, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fsphere, fsweep, leaf, loft, revolve, settle, slide, soft, swing, torus};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the karaoke stage (2x1): a low stage, a lyrics screen, two speakers and two mic stands -----------------
 const MICS: [f64; 2] = [-0.36, 0.36];
@@ -180,7 +180,7 @@ pub fn karaoke_stage() -> Vec<Obj> {
                         (0.058, 0.05),
                         (0.0, 0.04)
                     ],
-                    EASE
+                    AUTO_WIDTH
                 ),
                 at = f.at(sf * 0.83, 0.23, 0.33),
                 material = M.dark,

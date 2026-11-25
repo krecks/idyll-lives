@@ -463,7 +463,7 @@ pub fn slab(
                 .collect::<Vec<P3>>(),
         );
     }
-    crate::eased(loft!(name, &sections, material = material, angle = 50))
+    artkit::bevel::eased(loft!(name, &sections, material = material, angle = 50))
 }
 
 /// A bottle standing at game (x, y, z): a body, a rounded shoulder, a neck, a lip; `cap`: its cap's material.

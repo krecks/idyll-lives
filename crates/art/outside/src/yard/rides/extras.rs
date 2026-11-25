@@ -52,7 +52,7 @@ pub(super) fn city_extras(s: &Bike) {
     let p = F.at(cx, 0, z);
     let (px, pz) = (p.x, p.y);
     let n: usize = low(24, 8);
-    crate::eased(loft!(
+    artkit::bevel::eased(loft!(
         "basket",
         &[
             ring!(
@@ -626,7 +626,7 @@ pub(super) fn cargo_extras(s: &Bike) {
 pub(super) fn ebike_extras(s: &Bike) {
     let z = s.z;
     bb_shell(s, 0.08);
-    crate::eased(fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "motor",
         0.06,

@@ -1,7 +1,6 @@
 //! The jigsaw puzzle table and the bonsai potting bench.
 
 use super::common::{_chair, _desk, _mug, BANDS, M, WALL};
-use crate::ease::{EASE, eased};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -13,6 +12,7 @@ use artkit::scene::Obj;
 use artkit::{
     boulder, fbox, fcyl, fextrude, fsphere, fsweep, grow, jitter, rock, settle, soft, squash, torus,
 };
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the jigsaw puzzle table (1x1): seated in the middle, a puzzle half done on the table before them ---------
 const COLS: usize = 7;
@@ -433,7 +433,7 @@ pub fn bonsai_bench() -> Vec<Obj> {
                     (0.18, 0.08),
                     (0.175, 0.07),
                 ],
-                EASE
+                AUTO_WIDTH
             ),
             M.glaze,
             verts = 24,

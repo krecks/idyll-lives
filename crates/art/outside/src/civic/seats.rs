@@ -179,7 +179,7 @@ pub fn school_desk() -> Vec<Obj> {
             (-0.08, 0.7225, 0.43),
             M.soil
         );
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "inkwell",
             &[
                 (0.0, 0.0),
@@ -193,7 +193,7 @@ pub fn school_desk() -> Vec<Obj> {
             material = M.pot,
             segments = 12
         ));
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "ink",
             0.009,
@@ -428,7 +428,7 @@ pub fn waiting_bench() -> Vec<Obj> {
                 bevel = 0.006
             );
             for z in [-0.28, 0.2] {
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("glide{xs}{}", float_repr(z)),
                     0.022,
@@ -522,7 +522,7 @@ pub fn exam_couch() -> Vec<Obj> {
                     M.white,
                     10,
                 );
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("foot{xs}{zs}"),
                     0.026,
@@ -620,7 +620,7 @@ pub fn exam_couch() -> Vec<Obj> {
                 M.white
             );
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "roll",
             0.045,

@@ -48,7 +48,7 @@ pub fn drinking_fountain() -> Vec<Obj> {
             .map(|&(r, y)| fluted(r, y, 16, 0.06, 3, 0.0))
             .collect();
         loft!("pillar", &secs, material = m.body);
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "capital",
             &[
                 (0.0, 0.775),
@@ -355,7 +355,7 @@ pub fn fountain_town() -> Vec<Obj> {
         );
         // the fountain: a moulded foot, a fluted column, the wide lower bowl gadrooned underneath with a rolled lip, a
         // stem, the small top bowl and a knob
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "foot",
             &[
                 (0.0, 0.3),
@@ -451,7 +451,7 @@ pub fn fountain_town() -> Vec<Obj> {
             material = stone,
             segments = 14
         );
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "top_bowl",
             &[
                 (0.0, 1.84),
@@ -551,7 +551,7 @@ pub fn fountain_town() -> Vec<Obj> {
             let a = 22.5 + (45 * k) as f64;
             let (x, z) = (0.73 * cosd(a), 0.73 * sind(a));
             // a crown of spray: a low ring flaring up round where the stream lands
-            crate::eased(revolve!(
+            artkit::bevel::eased(revolve!(
                 format!("splash{k}"),
                 &[
                     (0.0, -0.02),

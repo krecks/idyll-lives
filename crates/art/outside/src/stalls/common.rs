@@ -92,7 +92,7 @@ pub fn wheel(f: &GameFrame, name: &str, x: f64, z: f64, r: f64, spokes: usize) {
         (r * 0.5, w * 0.3),
     ];
     let closed: Vec<(f64, f64)> = rim.iter().copied().chain([rim[0]]).collect();
-    crate::eased(revolve!(
+    artkit::bevel::eased(revolve!(
         format!("{name}_rim"),
         &closed,
         at = f.at(x, r, z),

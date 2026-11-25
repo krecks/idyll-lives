@@ -170,7 +170,7 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
 pub fn clothesline() -> Vec<Obj> {
     for x in [-1.32, 1.32] {
         // the post, a cap on its top; the arm across, capped; two braces bent up into it; a flange at its foot
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             numbered("post"),
             &[(x, 0.0, 0), (x, LINE_Y + 0.045, 0)],
@@ -189,7 +189,7 @@ pub fn clothesline() -> Vec<Obj> {
             bevel = low(0.004, 0.0),
             bevel_segments = 1
         );
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             numbered("arm"),
             &[(x, LINE_Y + 0.02, -0.343), (x, LINE_Y + 0.02, 0.343)],
@@ -198,7 +198,7 @@ pub fn clothesline() -> Vec<Obj> {
             verts = low(10, 5)
         ));
         for s in [-1.0, 1.0] {
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 numbered("arm_cap"),
                 0.025,
@@ -223,7 +223,7 @@ pub fn clothesline() -> Vec<Obj> {
                 1.0,
             );
         }
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             numbered("foot"),
             &[
                 (0.0, 0.0),
@@ -239,7 +239,7 @@ pub fn clothesline() -> Vec<Obj> {
         ));
     }
     for z in LINES {
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             numbered("line"),
             &[(-1.34, LINE_Y, z), (1.34, LINE_Y, z)],
@@ -271,12 +271,12 @@ pub fn clothesline() -> Vec<Obj> {
         .iter()
         .map(|&(y, rx, rz)| ring!(rx, rz, z = y, verts = low(20, 8), square = 4, at = (px, pz)))
         .collect();
-    crate::eased(loft!("basket", &secs, material = M.basket));
+    artkit::bevel::eased(loft!("basket", &secs, material = M.basket));
     let rim: Vec<(f64, f64, f64)> = rounded_rect(0.52, 0.322, 0.08, low(3, 1))
         .iter()
         .map(|&(u, v)| (bx + u, 0.235, bz + v))
         .collect();
-    crate::eased(fsweep!(
+    artkit::bevel::eased(fsweep!(
         F,
         "basket_rim",
         &rim,

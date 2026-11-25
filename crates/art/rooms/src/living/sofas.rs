@@ -6,13 +6,13 @@ use super::common::{
     Cushion, cabriole, cushion, leg, listed, panel, pillow, plain, seat, settled, swept, taper_leg,
 };
 use super::{F, M};
-use crate::common::eased_prism;
 use artkit::forms::{catmull, rounded_rect};
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, cos, exp, pow, radians, sin};
 use artkit::parts::{join, new_parts};
+use artkit::place::eased_prism;
 use artkit::py;
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsweep, soft};

@@ -1,7 +1,7 @@
 //! The love-letter bureau and the rose-arbour swing.
 
 use super::common::{_candle, _rose, _velvet_chair, M, WALL};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::{rect, rounded_rect};
 use artkit::kit;
 use artkit::math::{P3, PI, cos, cosd, pow, sin, sind};
@@ -482,7 +482,7 @@ pub fn rose_arbour_swing() -> Vec<Obj> {
                 up = (0, 0, 1),
                 resolution = 2
             );
-            ease_ends(rafter);
+            ease(rafter, 60.0, 1);
         }
         for &(x, y) in &arch[1..arch.len() - 1] {
             fbox!(

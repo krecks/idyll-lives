@@ -2,7 +2,7 @@
 //! built with the seats at the back and the screen at the front edge facing them, then turned round.
 
 use super::common::{M, cup, driver, pleats, popcorn, screen};
-use crate::ease::ease_ends;
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit::turn_round;
 use artkit::math::{P3, cos, radians, sin};
@@ -446,7 +446,7 @@ pub fn game_console() -> Vec<Obj> {
                 profile = profile,
                 angle = 50
             );
-            ease_ends(arm);
+            ease(arm, 60.0, 1);
             for lz in [-0.37, 0.13] {
                 let pts = [
                     (s * 0.37, 0.06, lz),

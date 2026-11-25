@@ -39,7 +39,7 @@ fn flask(fr: &GameFrame, name: &str, x: f64, z: f64, liquid: Option<Mat>, fill: 
         revolve!(
             format!("{name}_liquid"),
             // (its surface curving down into the glass at the edge, no sharp rim)
-            &crate::common::round_at(
+            &artkit::forms::round_at(
                 &[
                     (0.0, 0.003),
                     (0.054, 0.003),

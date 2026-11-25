@@ -584,7 +584,7 @@ pub fn bar_cart() -> Vec<Obj> {
         // a lemon dish on the top tier; an ice bucket with tongs and a woven basket on the lower one
         turned(
             "dish",
-            &crate::common::eased(
+            &artkit::forms::eased(
                 &[
                     (0.0, 0.0),
                     (0.035, 0.0),

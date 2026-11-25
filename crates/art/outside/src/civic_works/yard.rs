@@ -129,7 +129,7 @@ pub fn timber_stack() -> Vec<Obj> {
                 (x - 0.02, top - drape + 0.02, -0.458),
                 (x, 0.06, -0.44),
             ];
-            crate::eased(kit_tube!(
+            artkit::bevel::eased(kit_tube!(
                 F,
                 format!("rope{k}"),
                 &kit_fillet!(&pts, 0.03, steps = low(2, 1)),
@@ -140,7 +140,7 @@ pub fn timber_stack() -> Vec<Obj> {
             ));
         }
         // an old tyre on top, keeping the tarp down
-        crate::eased(tyre(
+        artkit::bevel::eased(tyre(
             "old_tyre",
             0.32,
             top + 0.045 + 0.08,
@@ -171,7 +171,7 @@ pub fn cement_mixer() -> Vec<Obj> {
     let drum = new_parts(|| {
         // the drum: a cone up from its gear end to the belly, a shoulder in to the mouth, the inside dark and crusted
         let n = low(32, 12);
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "drum",
             &[
                 (0.0, -0.32),
@@ -193,7 +193,7 @@ pub fn cement_mixer() -> Vec<Obj> {
             segments = n
         ));
         // the cement dried on its inside: a thin shell just within it
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "drum_crust",
             &[
                 (0.0, 0.064),
@@ -279,7 +279,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 bevel = low(0.006, 0.0),
                 bevel_segments = 1
             );
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("pivot{s}"),
                 0.035,
@@ -301,7 +301,7 @@ pub fn cement_mixer() -> Vec<Obj> {
             bevel = low(0.006, 0.0),
             bevel_segments = 1
         );
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "post",
             0.04,
@@ -333,7 +333,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 rot = (degrees(a), 0, 0)
             );
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "wheel_knob",
             0.016,
@@ -385,7 +385,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 (0.12, 0.49, -0.135),
                 m.red_lens
             );
-            crate::eased(kit_tube!(
+            artkit::bevel::eased(kit_tube!(
                 F,
                 "lead",
                 &[
@@ -403,7 +403,7 @@ pub fn cement_mixer() -> Vec<Obj> {
         // the stand: a tube frame, two wheels at the back, two legs at the front, a handle to wheel it by
         for s in [-1, 1] {
             let sf = s as f64;
-            crate::eased(kit_tube!(
+            artkit::bevel::eased(kit_tube!(
                 F,
                 format!("frame{s}"),
                 &[
@@ -445,7 +445,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 Some(low(20, 10)),
                 Axis::X,
             );
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("hub{s}"),
                 0.095,
@@ -456,7 +456,7 @@ pub fn cement_mixer() -> Vec<Obj> {
                 verts = low(14, 6)
             ));
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "axle",
             0.016,
@@ -524,7 +524,7 @@ pub fn flag_pole() -> Vec<Obj> {
             bevel = low(0.01, 0.0),
             bevel_segments = 1
         );
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "flange",
             &[
                 (0.0, 0.06),
@@ -541,7 +541,7 @@ pub fn flag_pole() -> Vec<Obj> {
         if !is_low() {
             for k in 0..4 {
                 let a = TAU * (k as f64 + 0.5) / 4.0;
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("bolt{k}"),
                     0.012,
@@ -552,7 +552,7 @@ pub fn flag_pole() -> Vec<Obj> {
                 ));
             }
         }
-        crate::eased(fcone!(
+        artkit::bevel::eased(fcone!(
             F,
             "pole",
             0.055,
@@ -562,7 +562,7 @@ pub fn flag_pole() -> Vec<Obj> {
             m.body,
             verts = low(16, 8)
         ));
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "truck",
             0.045,
@@ -593,7 +593,7 @@ pub fn flag_pole() -> Vec<Obj> {
             bevel_segments = 1
         );
         for (k, x) in [-0.012, 0.012].into_iter().enumerate() {
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("halyard{k}"),
                 0.0035,
@@ -628,7 +628,7 @@ pub fn flag_pole() -> Vec<Obj> {
         let n = low(24, 8);
         let path = flag_path(n);
         let (hh, t) = (FP_FLAG.1 / 2.0, 0.006);
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             "flag",
             &path,
@@ -642,7 +642,7 @@ pub fn flag_pole() -> Vec<Obj> {
             ],
             up = (0, 0, 1)
         ));
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             "flag_band",
             &path,
@@ -657,7 +657,7 @@ pub fn flag_pole() -> Vec<Obj> {
             up = (0, 0, 1)
         ));
         let k = n * 4 / 10;
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             "flag_canton",
             &path[..k + 1],

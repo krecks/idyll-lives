@@ -265,7 +265,7 @@ pub fn market_stall() -> Vec<Obj> {
             );
         }
         fbox!(f, "board", 0.34, 0.18, 0.016, (0.5, 1.62, 0.4), M.slate);
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             f,
             "board_frame",
             &rounded_rect(0.38, 0.22, 0.006, 1),
@@ -313,7 +313,7 @@ pub fn market_stall() -> Vec<Obj> {
             material = M.steel,
             segments = 10
         );
-        crate::ease(
+        artkit::bevel::ease(
             revolve!(
                 "scale_pan",
                 &[

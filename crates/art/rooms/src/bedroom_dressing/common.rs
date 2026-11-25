@@ -89,7 +89,7 @@ pub fn moulding(w: f64, d: f64) -> Vec<(f64, f64)> {
         (-hw, hd * 0.75),
     ];
     // its back's and the lip's square corners eased (the gate's `edges`)
-    crate::common::eased_loop(&section, 0.003)
+    artkit::forms::eased_loop(&section, 0.003)
 }
 
 /// A frame swept round `outline` (in the mirror's plane, about game `centre`), its cross-section `section` [(o, d)]:

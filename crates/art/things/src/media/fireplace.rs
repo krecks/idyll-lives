@@ -330,7 +330,7 @@ pub fn fireplace_electric() -> Vec<Obj> {
         }
         let at = F.at(-0.6, 0, -0.32);
         // (r, h): its lip rolled round to the top
-        let mut lip = crate::common::round_at(
+        let mut lip = artkit::forms::round_at(
             &[
                 (0.05, 0.0),
                 (0.058, 0.01),

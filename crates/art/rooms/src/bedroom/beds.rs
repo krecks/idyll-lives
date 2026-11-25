@@ -5,12 +5,12 @@ use super::common::{
     flap, legs_round, legs_square, mattress, pillow, pillow_at, post, runner, settle_bed, tufts,
     turn_down,
 };
-use crate::common::eased_prism;
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, PI, TAU, cos, radians, sin};
 use artkit::parts::{hinged, join, join_all, new_parts, turn};
 use artkit::place::N;
+use artkit::place::eased_prism;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsweep, jitter, loft, revolve, rod, soft, swing};
 

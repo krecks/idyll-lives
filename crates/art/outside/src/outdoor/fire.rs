@@ -23,7 +23,7 @@ fn across(name: &str, outline: &[(f64, f64)], x0: f64, x1: f64, material: Mat) -
     let mut faces = vec![(0..n).collect::<Vec<u32>>(), (n..2 * n).rev().collect()];
     faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
     // (flat, as a mesh made from points is)
-    crate::eased(artkit::forms::object(
+    artkit::bevel::eased(artkit::forms::object(
         name,
         verts,
         &faces,
@@ -112,7 +112,7 @@ pub fn grill() -> Vec<Obj> {
         for (k, a) in [90.0, 210.0, 330.0].into_iter().enumerate() {
             // the bowl's dampers, under it
             let (c, s_) = (cosd(a + 60.0), sind(a + 60.0));
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("damper{k}"),
                 0.035,
@@ -142,7 +142,7 @@ pub fn grill() -> Vec<Obj> {
             );
         }
         // the coals, glowing, under the cooking grate (a ring and its bars) with food
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "coal_bed",
             0.24,
@@ -161,7 +161,7 @@ pub fn grill() -> Vec<Obj> {
                 )
             })
             .collect();
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             "grate_ring",
             &ring,
@@ -266,7 +266,7 @@ pub fn grill() -> Vec<Obj> {
                 s_ * (0.31 + (0.13 - 0.31) * t),
             ));
         }
-        crate::eased(fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             "rack",
             &feet,
@@ -290,7 +290,7 @@ pub fn grill() -> Vec<Obj> {
             material = M.grate,
             segments = 16
         );
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "foot_cap",
             0.02,
@@ -326,7 +326,7 @@ pub fn grill() -> Vec<Obj> {
                 segments = 16,
                 rot = (0, -90 * s, 0)
             );
-            crate::eased(fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("hub{s}"),
                 0.025,
@@ -359,7 +359,7 @@ pub fn grill() -> Vec<Obj> {
             segments = 32
         );
         // the vent on top with its damper's tab; the thermometer on the front; the handle on two brackets under a shield
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "vent",
             0.045,
@@ -377,7 +377,7 @@ pub fn grill() -> Vec<Obj> {
             (0.05, h(1.236), 0),
             M.grate
         );
-        crate::eased(cylinder!(
+        artkit::bevel::eased(cylinder!(
             "gauge_bezel",
             0.024,
             0.01,
@@ -386,7 +386,7 @@ pub fn grill() -> Vec<Obj> {
             rot = (50, 0, 0),
             verts = 12
         ));
-        crate::eased(cylinder!(
+        artkit::bevel::eased(cylinder!(
             "gauge",
             0.019,
             0.004,
@@ -497,7 +497,7 @@ pub fn grill_station() -> Vec<Obj> {
                 segments = 10
             );
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "igniter",
             0.012,
@@ -533,7 +533,7 @@ pub fn grill_station() -> Vec<Obj> {
                 out = 0.026
             );
             for y in [0.17, 0.63] {
-                crate::eased(fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("knuckle{s}{}", float_repr(y)),
                     0.006,
@@ -701,7 +701,7 @@ pub fn grill_station() -> Vec<Obj> {
             r = 0.012,
             out = 0.055
         );
-        crate::eased(cylinder!(
+        artkit::bevel::eased(cylinder!(
             "gauge_bezel",
             0.038,
             0.016,
@@ -710,7 +710,7 @@ pub fn grill_station() -> Vec<Obj> {
             rot = (70, 0, 0),
             verts = 16
         ));
-        crate::eased(cylinder!(
+        artkit::bevel::eased(cylinder!(
             "gauge",
             0.03,
             0.004,
@@ -774,7 +774,7 @@ fn log(
     let d = (v(b) - v(a)).normalized();
     for (k, (p, rr)) in [(a, r), (b, r * 0.9)].into_iter().enumerate() {
         let at = v(p) + d * (if k == 1 { 0.001 } else { -0.001 });
-        let cap = crate::eased(cylinder!(
+        let cap = artkit::bevel::eased(cylinder!(
             format!("{name}_end{k}"),
             rr * 0.85,
             0.004,
@@ -789,7 +789,7 @@ fn log(
 pub fn fire_pit() -> Vec<Obj> {
     let still = new_parts(|| {
         // the bowl: two courses of stones round a dark wall, the ash bed inside
-        crate::eased(revolve!(
+        artkit::bevel::eased(revolve!(
             "bowl",
             &[
                 (0.0, 0.0),
@@ -826,7 +826,7 @@ pub fn fire_pit() -> Vec<Obj> {
                 jitter(st, 0.008, 0.07, (row * 11 + k) as f64, 1.0);
             }
         }
-        crate::eased(fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "ash",
             0.315,

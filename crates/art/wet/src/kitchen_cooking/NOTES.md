@@ -199,7 +199,7 @@ No change to the build: its soft boxes take the shared form's new shape (the kit
 
 No hard edge shows unbevelled any more (60 → 0): the pulls shade round, the pan supports are six-sided bars shaded
 round, the range cooker's tea towel folds over its rail in more steps and has round edges, the bowls', saucers' and lids'
-rims are rounded (`crate::common::eased`), and the wall oven's cornice has its top edges eased. The gas range's stock pot
+rims are rounded (`artkit::forms::eased`), and the wall oven's cornice has its top edges eased. The gas range's stock pot
 is 16 cm, so the range is 1.09 m high with it; the cooker kind takes a cooker drawn to its 1 m counter tile (0.92 m),
 the dishwasher kind the dishwashers drawn with the cupboard beside them (docs/review/reference.json). The fourth draw
 call of the stoves, the microwave and the breakfast counter is a moving part each (door, knob, flame, turntable, lid):

@@ -45,7 +45,7 @@ pub fn town_statue() -> Vec<Obj> {
             bevel = 0.02
         );
         let sq = [(0.6, 0.6), (-0.6, 0.6), (-0.6, -0.6), (0.6, -0.6)];
-        crate::ease(
+        artkit::bevel::ease(
             kit_moulding!(
                 f,
                 "base_moulding",
@@ -65,7 +65,7 @@ pub fn town_statue() -> Vec<Obj> {
             30.0,
             1,
         );
-        crate::eased(kit_moulding!(
+        artkit::bevel::eased(kit_moulding!(
             f,
             "cornice",
             &sq,

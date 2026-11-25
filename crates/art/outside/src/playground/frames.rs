@@ -163,7 +163,7 @@ pub fn slide() -> Vec<Obj> {
                 )
             })
             .collect();
-        crate::eased(fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             format!("panel{}", float_repr(x)),
             &rounded_rect(0.28, 0.21, 0.03, 2),
@@ -358,7 +358,7 @@ pub fn slide() -> Vec<Obj> {
 /// A sawn board from game point `a` to `b`, `w` wide (across, as near level as it goes) and `t` thick.
 fn board(name: &str, a: impl Spot, b: impl Spot, w: f64, t: f64, material: Mat) -> Obj {
     // eased, its UVs laid on the eased board (`boxed`)
-    crate::boxed(crate::eased(sweep!(
+    crate::boxed(artkit::bevel::eased(sweep!(
         name,
         &[a.through(&F), b.through(&F)],
         0.0,
