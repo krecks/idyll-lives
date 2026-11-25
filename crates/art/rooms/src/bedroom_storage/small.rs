@@ -1034,9 +1034,11 @@ pub fn laundry_hamper() -> Vec<Obj> {
             resolution = 2
         );
     });
-    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.56, z - 0.236));
+    // hinged 4 cm in from its back edge, near the loop's height: the back lifts off the rim and comes forward as it
+    // opens (turned about the rim's bottom edge, its back went into the wall)
+    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.624, z - 0.197));
     let objs = settle!(centre = false);
-    swing!(lid, "lid_open", -70.0, seconds = 0.7, axis = Axis::X); // not past upright: it stands at the wall
+    swing!(lid, "lid_open", -80.0, seconds = 0.7, axis = Axis::X); // not past upright: it stands at the wall
     objs
 }
 

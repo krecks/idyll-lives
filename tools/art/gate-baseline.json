@@ -364,11 +364,6 @@
     "model.wineFridge": 5,
     "model.workbench": 14
   },
-  "opened": {
-    "model.laundryHamper": 1,
-    "model.recyclingBins": 3,
-    "model.trashCan": 1
-  },
   "reference": {
     "barStool": 1,
     "bathtubClawfoot": 1,

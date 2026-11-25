@@ -61,8 +61,9 @@ The three-drawer nightstand's top drawer (`drawer`, origin on the carcass face, 
 chocolate bars and a paperback in it) slides out 30 cm (`drawer_open`, as the dressers') for the content's "Grab a
 snack from the drawer" (`snack`, `snack_drawer`), held 2.5 s: a second draw call. It was keyed to "Pick an outfit"
 with clothes in it until 2026-10-21, when the content gave the drawer the snack (I-bedroom-05). The hamper's lid
-(`lid`, hinged at its back; the basket is hollow with washing in it) lifts 70° (`lid_open`, 0.7 s; any further and
-it goes into the wall the hamper stands at) for the whole of the content's "Sort the washing" (`sortWashing`,
+(`lid`, hinged 4 cm in from its back, near the loop's height, so its back lifts off the rim and comes forward; about
+the rim's bottom edge it went 7.7 cm into the wall; the basket is hollow with washing in it) lifts 80° (`lid_open`,
+0.7 s) for the whole of the content's "Sort the washing" (`sortWashing`,
 `clean`, 5 minutes, comfort, chores; not autonomous): a third draw call. (Washing that goes from the hamper to the
 washer would need a laundry loop in the sim.)
 
