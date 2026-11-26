@@ -2314,8 +2314,8 @@ const WALK_FINISH = encodeFinish(1, 0);
 /**
  * The sidewalks and kerbs by chunk (`RoutedGeo`), but for what stands up (a kerb's faces, a walk's edge): the
  * sidewalk's texture is laid from above (its `projection: xz`) and was smeared down such a face, so those go into the
- * chunk's props (`upright`) in the plain finish, in the colour the sidewalk's texture shows them in (`asDrawn`).
- * shortcut: a face's own tints (the slabs', all level) aren't carried over; carry them if an upright face gets some.
+ * chunk's props (`upright`) in the plain finish, in the colour the sidewalk's texture shows them in (`asDrawn`), with
+ * the face's own alphas and tints.
  */
 class WalkGeo extends RoutedGeo {
   constructor(
@@ -2327,7 +2327,7 @@ class WalkGeo extends RoutedGeo {
   override poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[], tints?: readonly V3[]): this {
     if (Math.abs(n[1]) >= UPRIGHT) return super.poly(points, n, uvs, alphas, tints);
     const hex = `#${[this.r, this.g, this.b].map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('')}`;
-    this.upright.color(asDrawn(hex, SIDEWALK_MATERIAL), WALK_FINISH).poly(points, n);
+    this.upright.color(asDrawn(hex, SIDEWALK_MATERIAL), WALK_FINISH).poly(points, n, undefined, alphas, tints);
     return this;
   }
 }
