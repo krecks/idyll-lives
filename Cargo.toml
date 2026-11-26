@@ -31,6 +31,8 @@ inherits = "release"
 lto = false
 codegen-units = 16
 incremental = true
+# (a length read from a file is not trusted: a product that wraps is a slice to the wrong place, not a small number)
+overflow-checks = true
 # (`cargo art` builds a thread a model and says which one failed: a panic unwinds to it.)
 panic = "unwind"
 

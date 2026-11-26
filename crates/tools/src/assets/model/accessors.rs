@@ -113,9 +113,12 @@ pub(super) fn views(g: &Glb) -> Result<Views, String> {
             }
             let at = uint(view, "byteOffset").unwrap_or(0);
             let len = uint(view, "byteLength").ok_or("a buffer view without a length")?;
+            let end = at
+                .checked_add(len)
+                .ok_or("a buffer view past the end of the file")?;
             bytes.push(Some(
                 g.bin
-                    .get(at..at + len)
+                    .get(at..end)
                     .ok_or("a buffer view past the end of the file")?
                     .to_vec(),
             ));
@@ -135,11 +138,18 @@ pub(super) fn views(g: &Glb) -> Result<Views, String> {
         let len = uint(ext, "byteLength").ok_or("a compressed view without a length")?;
         let stride = uint(ext, "byteStride").ok_or("a compressed view without a stride")?;
         let count = uint(ext, "count").ok_or("a compressed view without a count")?;
+        let end = at
+            .checked_add(len)
+            .ok_or("a compressed view past the end of the file")?;
         let source = g
             .bin
-            .get(at..at + len)
+            .get(at..end)
             .ok_or("a compressed view past the end of the file")?;
-        let mut out = vec![0u8; count * stride];
+        // (the decoder writes `count * stride` bytes into it: a product that wraps would write past the end)
+        let size = count
+            .checked_mul(stride)
+            .ok_or("a compressed view bigger than any model")?;
+        let mut out = vec![0u8; size];
         let code = match ext.get("mode").and_then(J::as_str) {
             Some("ATTRIBUTES") => unsafe {
                 meshopt::ffi::meshopt_decodeVertexBuffer(

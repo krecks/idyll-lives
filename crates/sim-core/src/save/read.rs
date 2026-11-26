@@ -384,15 +384,9 @@ impl World {
                 })
             });
             sim.night_woken = s.night_woken;
-            // At work, or a pupil at school.
-            let pupil = content
-                .life
-                .stage_at(s.age.unwrap_or(30.0))
-                .is_some_and(|st| st.school);
-            sim.away_until = s
-                .away_minutes
-                .filter(|_| sim.job.is_some() || pupil)
-                .map(after);
+            // Away until then -- at work or school, or out on a ride, which a sim without a job can be on too. The
+            // time is absolute, so it clears itself; filtering it by job or school lost a rider's ride on load.
+            sim.away_until = s.away_minutes.map(after);
             sim.visiting = s.visiting.and_then(|(plot, left)| {
                 ((plot as usize) < plot_count).then(|| Visit {
                     plot,

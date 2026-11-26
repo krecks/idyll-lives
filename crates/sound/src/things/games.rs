@@ -537,10 +537,7 @@ pub(super) fn chip(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, dut
     for j in 0..len {
         let i = (start + j) % d.len();
         let t = j as f64 / rate;
-        let mut v = 0.0;
-        for (h, kh) in k.iter().enumerate() {
-            v += kh * sin(2.0 * PI * hz * (h + 1) as f64 * t);
-        }
+        let v = harmonics((hz * t) % 1.0, &k);
         add(
             d,
             i,

@@ -42,13 +42,20 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
         let normals = corner_normals(&mesh);
         let tris = mesh.triangles();
         let mut primitives = Vec::new();
-        for (slot, mat) in mesh.mats.iter().enumerate() {
+        // every material, then one pass for the faces no material takes: a part with no material at all, or a
+        // face on a slot past `mats`. Those are written without a material, not dropped -- a glTF mesh needs a
+        // primitive, and a part that vanishes from the file is a model missing a piece with no error anywhere.
+        for slot in (0..mesh.mats.len()).map(Some).chain([None]) {
             // this material's corners, each (vertex, normal, uv) once, in the order of its vertices
             let mut corners: BTreeMap<(u32, [i64; 3], [i64; 2]), u32> = BTreeMap::new();
             let mut wanted = Vec::new();
             for (f, t) in &tris {
                 let face = mesh.faces[*f as usize];
-                if face.mat as usize != slot {
+                let mine = match slot {
+                    Some(slot) => face.mat as usize == slot,
+                    None => face.mat as usize >= mesh.mats.len(),
+                };
+                if !mine {
                     continue;
                 }
                 for &c in t {
@@ -84,37 +91,40 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
                 let a = mesh.ao.as_ref().map(|ao| ao[v]).unwrap_or(1.0);
                 colours.push([a, a, a, 1.0]);
             }
-            let material = match model.materials.iter().position(|m| m.name == mat.name) {
-                Some(m) => m,
-                None => {
-                    let finish = finishes.get(mat.finish);
-                    let [r, g, b] = mat.linear().map(|c| c as f32);
-                    model.materials.push(Material {
-                        name: mat.name.to_string(),
-                        base: [r, g, b, 1.0],
-                        metallic: mat
-                            .extra
-                            .metallic
-                            .or(finish.map(|f| f.metallic))
-                            .unwrap_or(0.0) as f32,
-                        roughness: mat
-                            .extra
-                            .roughness
-                            .or(finish.map(|f| f.roughness))
-                            .unwrap_or(0.6) as f32,
-                        double_sided: false,
-                        cutoff: None,
-                    });
-                    model.materials.len() - 1
+            let material = slot.map(|slot| {
+                let mat = &mesh.mats[slot];
+                match model.materials.iter().position(|m| m.name == mat.name) {
+                    Some(m) => m,
+                    None => {
+                        let finish = finishes.get(mat.finish);
+                        let [r, g, b] = mat.linear().map(|c| c as f32);
+                        model.materials.push(Material {
+                            name: mat.name.to_string(),
+                            base: [r, g, b, 1.0],
+                            metallic: mat
+                                .extra
+                                .metallic
+                                .or(finish.map(|f| f.metallic))
+                                .unwrap_or(0.0) as f32,
+                            roughness: mat
+                                .extra
+                                .roughness
+                                .or(finish.map(|f| f.roughness))
+                                .unwrap_or(0.6) as f32,
+                            double_sided: false,
+                            cutoff: None,
+                        });
+                        model.materials.len() - 1
+                    }
                 }
-            };
+            });
             primitives.push(Primitive {
                 positions,
                 normals: normal,
                 uvs: texcoords.then_some(uvs),
                 colours: Some(colours),
                 indices: wanted.iter().map(|k| order[k]).collect(),
-                material: Some(material),
+                material,
             });
         }
         model.meshes.push(Mesh {

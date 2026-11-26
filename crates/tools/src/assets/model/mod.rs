@@ -230,4 +230,27 @@ mod tests {
             "a skin"
         );
     }
+
+    /// A file is not trusted: the numbers in it are the file's, not ours, so a child past its nodes, a
+    /// node that is its own parent and a view that wraps are answers (an error, a walk that ends), not a
+    /// panic, a hang or a write past the end.
+    #[test]
+    fn a_broken_file_is_refused() {
+        let mut g = parse(&sample("paint")).unwrap();
+        g.json["nodes"] = json!([{ "children": [7] }]);
+        assert!(read(&write(&g.json, &g.bin)).is_err());
+
+        g.json["nodes"] = json!([{ "mesh": 0, "children": [1] }, { "children": [0] }]);
+        g.json["meshes"] = json!([{ "primitives": [] }]);
+        let _ = read(&write(&g.json, &g.bin));
+
+        g.json["bufferViews"] = json!([{
+            "buffer": 0, "byteLength": 8,
+            "extensions": { "EXT_meshopt_compression": {
+                "buffer": 0, "byteOffset": 0, "byteLength": 8,
+                "byteStride": 4294967296u64, "count": 4294967296u64, "mode": "ATTRIBUTES",
+            } },
+        }]);
+        assert!(read(&write(&g.json, &g.bin)).is_err());
+    }
 }
