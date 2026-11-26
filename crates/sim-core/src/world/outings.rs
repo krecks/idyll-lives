@@ -202,7 +202,7 @@ pub(crate) fn leisure_way(
     door: [f32; 2],
     goer: Goer,
     taxi: Option<f32>,
-    on: &mut [Option<Option<crate::travel::RoadPoint>>; 2],
+    here: &mut crate::travel::FromHere,
 ) -> (Way, f32) {
     let distance = (door[0] - pos[0]).hypot(door[1] - pos[1]);
     let car =
@@ -217,15 +217,7 @@ pub(crate) fn leisure_way(
         (false, None, Some(minutes)) => return (Way::Taxi, minutes),
         (false, None, None) => (Way::Foot, crate::travel::Mode::Foot, walk),
     };
-    let from = &mut on[mode as usize];
-    let eta = travel.eta_via(
-        pos,
-        door,
-        mode,
-        pace,
-        || *from.get_or_insert_with(|| travel.entry(pos, mode)),
-        || travel.door_entry(plot, door, mode),
-    );
+    let eta = here.eta(travel, pos, (Some(plot), door), mode, pace);
     let minutes = match way {
         Way::Car => trip_minutes(eta, true) + park_walk(travel, (plot, door), walk),
         _ => eta,
@@ -357,7 +349,7 @@ pub(crate) fn outing_fits_now(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], 
         taxi_from_home(sim, ctx, plot)
             .then(|| crate::taxi::leisure_eta(ctx.travel, ctx.exits, content, sim, pos, door))
             .flatten(),
-        &mut [None, None],
+        &mut crate::travel::FromHere::default(),
     );
     outing_fits(content, eta, ctx.hour, free_before_work(sim, ctx))
 }
@@ -414,7 +406,7 @@ pub(crate) fn leisure_eta(
         door,
         goer,
         taxi,
-        &mut [None, None],
+        &mut crate::travel::FromHere::default(),
     );
     Some(eta)
 }

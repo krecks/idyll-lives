@@ -212,20 +212,28 @@ impl Travel {
     ) -> f32 {
         let walk = walk.max(1e-3);
         match mode {
-            Mode::Foot => {
-                if !self.by_road(from, to) {
-                    return octile(from, to) * DETOUR / walk;
-                }
-                self.road_estimate(on, off, Mode::Foot)
-                    .map_or(octile(from, to) * DETOUR, |(m, _)| m)
-                    / walk
-            }
+            Mode::Foot => self.foot_metres_via(from, to, on, off) / walk,
             Mode::Car => {
                 let straight = dist(from, to) / TOWN_SPEED / 60.0;
                 self.road_estimate(on, off, Mode::Car)
                     .map_or(straight, |(_, s)| s / 60.0)
             }
         }
+    }
+
+    /// The metres of `eta_via`'s trip on foot: the same at any pace.
+    fn foot_metres_via(
+        &self,
+        from: [f32; 2],
+        to: [f32; 2],
+        on: impl FnOnce() -> Option<RoadPoint>,
+        off: impl FnOnce() -> Option<RoadPoint>,
+    ) -> f32 {
+        if !self.by_road(from, to) {
+            return octile(from, to) * DETOUR;
+        }
+        self.road_estimate(on, off, Mode::Foot)
+            .map_or(octile(from, to) * DETOUR, |(m, _)| m)
     }
 
     /// At least as many minutes as `eta` says the trip takes (in its units): the straight line at
@@ -270,5 +278,61 @@ impl Travel {
     pub fn walk_between(&self, on: RoadPoint, off: RoadPoint) -> Option<(Vec<[f32; 2]>, f32)> {
         let path = self.graph.path(on, off, Mode::Foot, self.country_speed)?;
         Some((thin(&walk_side(&path.pts)), path.len))
+    }
+}
+
+/// Trips from one place to many (a choice of what to do times the way to every place from where
+/// they stand: `world::pick_autonomous`): where they get on the roads, by mode (`Travel::entry`,
+/// found as first asked for), the taxi's way in to them (`taxi::leisure_eta_via`), and the last
+/// door's way by mode, as `taxi::leisure_eta_via` and then `world::leisure_way` both ask for it.
+/// Only ever what the roads give, so a fresh one comes to the same.
+#[derive(Default)]
+pub struct FromHere {
+    on: [Option<Option<RoadPoint>>; 2],
+    pub(crate) come: Option<f32>,
+    /// By mode: the plot and door (bits) last asked for, and its metres on foot or minutes by car.
+    last: [Option<(DoorKey, f32)>; 2],
+}
+
+/// A door to go to, as `FromHere` keeps it: its plot and its point's bits.
+type DoorKey = (Option<u32>, [u32; 2]);
+
+impl FromHere {
+    /// Where a trip from `from` by `mode` gets on the roads (`Travel::entry`).
+    pub fn on(&mut self, travel: &Travel, from: [f32; 2], mode: Mode) -> Option<RoadPoint> {
+        *self.on[mode as usize].get_or_insert_with(|| travel.entry(from, mode))
+    }
+
+    /// `Travel::eta_via` from `from` to `door` (of `plot`, where it gets off as noted for it,
+    /// `Travel::door_entry`; else `Travel::entry`) at `walk` m a minute.
+    pub fn eta(
+        &mut self,
+        travel: &Travel,
+        from: [f32; 2],
+        (plot, door): (Option<u32>, [f32; 2]),
+        mode: Mode,
+        walk: f32,
+    ) -> f32 {
+        let key = (plot, door.map(f32::to_bits));
+        let way = match self.last[mode as usize] {
+            Some((k, way)) if k == key => way,
+            _ => {
+                let on = || self.on(travel, from, mode);
+                let off = || match plot {
+                    Some(plot) => travel.door_entry(plot, door, mode),
+                    None => travel.entry(door, mode),
+                };
+                let way = match mode {
+                    Mode::Foot => travel.foot_metres_via(from, door, on, off),
+                    Mode::Car => travel.eta_via(from, door, mode, walk, on, off),
+                };
+                self.last[mode as usize] = Some((key, way));
+                way
+            }
+        };
+        match mode {
+            Mode::Foot => way / walk.max(1e-3),
+            Mode::Car => way,
+        }
     }
 }

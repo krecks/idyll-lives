@@ -729,10 +729,11 @@ pub(crate) fn pick_autonomous(
             .map(|(_, speed, min)| (speed, min)),
         };
         // (From over the ground, upstairs too. Where they'd get on the roads from here, on foot
-        // and by car, found once for all the places, and each place's door's as noted,
-        // `Travel::door_entry`.)
+        // and by car, and the taxi's way in, found once for all the places, and each place's
+        // door's as noted, `Travel::door_entry`; a place's way timed for the taxi kept for
+        // `leisure_way`: `FromHere`.)
         let pos = ctx.nav.stairs.ground_pos(sim.pos);
-        let mut on: [Option<Option<crate::travel::RoadPoint>>; 2] = [None, None];
+        let mut here = crate::travel::FromHere::default();
         let soon = crate::planner::plans_soon(
             content,
             sim,
@@ -789,7 +790,7 @@ pub(crate) fn pick_autonomous(
                             sim,
                             pos,
                             (Some(plot), door),
-                            &mut on,
+                            &mut here,
                         )
                     })
                     .flatten();
@@ -802,7 +803,7 @@ pub(crate) fn pick_autonomous(
                     door,
                     goer,
                     taxi,
-                    &mut on,
+                    &mut here,
                 );
                 // (Nor with a need that would be low by the time they could leave, that the
                 // hosts' home has nothing a guest may use for: `lasts`. Nor to hosts all off to
@@ -869,7 +870,7 @@ pub(crate) fn pick_autonomous(
                         sim,
                         pos,
                         (Some(p.id), door),
-                        &mut on,
+                        &mut here,
                     )
                 })
                 .flatten();
@@ -882,7 +883,7 @@ pub(crate) fn pick_autonomous(
                 door,
                 goer,
                 taxi,
-                &mut on,
+                &mut here,
             );
             if !outing_fits(content, eta, ctx.hour, free) {
                 continue;
