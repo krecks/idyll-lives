@@ -48,6 +48,8 @@ step() {
     # tickbench, which `cargo test` only compiles, run once (the tests' build, so its timings are rough).
     sim)
       cargo test -p sim-core --locked ${SLOW_TESTS:+--features slow-tests}
+      # (The wasm layer's own tests: what the menu is told about a save decides whether it deletes it.)
+      cargo test -p sim-wasm --locked
       cargo run -p sim-core --example tickbench --locked ${SLOW_TESTS:+--features slow-tests}
       ;;
     # The ignored generated_* tests need sample files made first. In the simulation tests' own build

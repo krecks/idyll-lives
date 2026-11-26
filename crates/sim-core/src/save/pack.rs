@@ -43,7 +43,7 @@ pub(super) fn expand(s: &str) -> Result<std::borrow::Cow<'_, str>, Error> {
     let Some(runs) = s.strip_prefix('~') else {
         return Ok(std::borrow::Cow::Borrowed(s));
     };
-    let corrupt = || Error::new("corrupt lot edges in save");
+    let corrupt = || Error::damaged("corrupt lot edges in save");
     let mut out = String::new();
     for run in runs.split(',').filter(|r| !r.is_empty()) {
         let mut chars = run.chars();
@@ -127,7 +127,7 @@ pub(super) fn pack_chemistry(n: usize, chemistry: impl Fn(usize, usize) -> f32) 
 }
 
 pub(super) fn unpack_chemistry(s: &str, n: usize) -> Result<Vec<f32>, Error> {
-    let corrupt = || Error::new("corrupt chemistry in save");
+    let corrupt = || Error::damaged("corrupt chemistry in save");
     let bytes = unbase64(s).ok_or_else(corrupt)?;
     if bytes.len() != n * n.saturating_sub(1) / 2 * 4 {
         return Err(corrupt());
@@ -352,7 +352,7 @@ pub(super) fn decode_diagonals(s: &str) -> Result<Vec<Option<Diagonal>>, Error> 
             let n = c
                 .to_digit(10)
                 .filter(|&n| n <= 6)
-                .ok_or_else(|| Error::new("corrupt diagonal walls in save"))?;
+                .ok_or_else(|| Error::damaged("corrupt diagonal walls in save"))?;
             if n == 0 {
                 return Ok(None);
             }
@@ -376,7 +376,7 @@ pub(super) fn decode(s: &str) -> Result<Vec<Edge>, Error> {
             '3' => Ok(Edge::Window),
             '4' => Ok(Edge::Fence),
             '5' => Ok(Edge::Gate),
-            _ => Err(Error::new("corrupt lot edges in save")),
+            _ => Err(Error::damaged("corrupt lot edges in save")),
         })
         .collect()
 }

@@ -66,7 +66,7 @@ fn run() -> Result<bool, String> {
         .iter()
         .map(|(n, t)| (n.as_str(), t.as_str()))
         .collect();
-    let merged = merge_named(&refs).map_err(|e| e.0)?;
+    let merged = merge_named(&refs).map_err(|e| e.message)?;
     let content = Content::from_json(&merged).map_err(|e| format!("content: {e}"))?;
     let pack: Value = serde_json::from_str(&pack_text).map_err(|e| e.to_string())?;
     let ids: Vec<String> = pack["objects"]

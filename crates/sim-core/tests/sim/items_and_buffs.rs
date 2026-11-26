@@ -84,7 +84,7 @@ fn directed_use_is_refused_without_money() {
     let mut w = world();
     w.households[0].funds = 10;
     let err = use_object(&mut w, TUB).unwrap_err();
-    assert!(err.0.contains("not enough money"), "{}", err.0);
+    assert!(err.message.contains("not enough money"), "{}", err.message);
     // Free things work even in debt.
     w.households[0].funds = -5;
     use_object(&mut w, BED).unwrap();
