@@ -166,7 +166,11 @@ pub fn slim(graph: &[u8], data: &[u8], positions: u64) -> Result<Slim, String> {
             let [rows, width] = dims[..] else {
                 return Err(format!("ONNX: {} is not a table ({:?})", t.name, t.dims));
             };
-            if t.ty != FLOAT || bytes.len() as u64 != rows * width * 4 {
+            let whole = rows
+                .checked_mul(width)
+                .and_then(|n| n.checked_mul(4))
+                .ok_or_else(|| format!("ONNX: {} is bigger than any table", t.name))?;
+            if t.ty != FLOAT || bytes.len() as u64 != whole {
                 return Err(format!("ONNX: {} is not a float32 table", t.name));
             }
             if rows < positions {
@@ -175,6 +179,8 @@ pub fn slim(graph: &[u8], data: &[u8], positions: u64) -> Result<Slim, String> {
                     t.name
                 ));
             }
+            // (Whole is the file's own length, and a table has at least `positions` rows, so this
+            // can't go past it.)
             let keep = (positions * width * 4) as usize;
             cut_bytes += bytes.len() - keep;
             bytes = &bytes[..keep];

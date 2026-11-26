@@ -151,18 +151,26 @@ fn clip_width(acc: &J) -> R<usize> {
 }
 
 fn bytes(bin: &[u8], at: i64, len: usize) -> R<&[u8]> {
-    if at < 0 || at as usize + len > bin.len() {
-        return Err(format!(
+    // (Checked, not added and compared: a `byteOffset` near i64::MAX wraps to a small number and
+    // passes `at + len <= bin.len()` before the slice panics.)
+    let range = usize::try_from(at)
+        .ok()
+        .and_then(|at| Some(at..at.checked_add(len)?));
+    match range.and_then(|r| bin.get(r)) {
+        Some(slice) => Ok(slice),
+        None => Err(format!(
             "unpack_from requires a buffer of at least {} bytes for unpacking {len} bytes at offset {at} (actual buffer size is {})",
-            at + len as i64,
+            at.saturating_add(len as i64),
             bin.len()
-        ));
+        )),
     }
-    Ok(&bin[at as usize..at as usize + len])
 }
 
 fn floats(bin: &[u8], at: i64, n: usize) -> R<Vec<f64>> {
-    Ok(bytes(bin, at, 4 * n)?
+    let len = n
+        .checked_mul(4)
+        .ok_or("an accessor too long for any buffer")?;
+    Ok(bytes(bin, at, len)?
         .chunks(4)
         .map(|b| f32::from_le_bytes(b.try_into().unwrap()) as f64)
         .collect())
@@ -232,7 +240,9 @@ pub fn accessor(g: &Glb, index: &J) -> R<Option<Vec<Vec<Num>>>> {
     let at = int(view, "byteOffset", 0)? + int(acc, "byteOffset", 0)?;
     let normalized = acc.get("normalized").is_some_and(J::truthy) && top.is_some();
     let n_items = count(acc)?.max(0);
-    let mut out = Vec::with_capacity(n_items as usize);
+    // (A count from the file is a claim, not a size: reserving it would abort on a big number
+    // before the first read's own bound check could report the file.)
+    let mut out = Vec::with_capacity((n_items as usize).min(g.bin.len()));
     for k in 0..n_items {
         let b = bytes(&g.bin, at + k * stride, size * n)?;
         let e: Vec<Num> = b
@@ -261,6 +271,19 @@ pub fn accessor(g: &Glb, index: &J) -> R<Option<Vec<Vec<Num>>>> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// A `byteOffset` near `i64::MAX` used to wrap the guard's sum and panic on the slice.
+    #[test]
+    fn an_offset_past_the_end_is_reported_not_a_panic() {
+        for (at, len) in [(i64::MAX, 4), (8, usize::MAX)] {
+            let err = bytes(&[0u8; 8], at, len).unwrap_err();
+            assert!(
+                err.starts_with("unpack_from requires a buffer of at least"),
+                "{at}/{len}: {err}"
+            );
+        }
+        assert!(floats(&[0u8; 8], 8, usize::MAX).is_err());
+    }
 
     /// A .glb of `json` and `bin`, each chunk padded to 4 bytes as the format wants.
     pub fn glb(json: &str, bin: &[u8]) -> Vec<u8> {

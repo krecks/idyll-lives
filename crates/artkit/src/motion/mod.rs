@@ -58,6 +58,31 @@ mod tests {
     }
 
     #[test]
+    fn a_key_list_with_nothing_in_it_changes_nothing() {
+        let obj = part();
+        assert_eq!(
+            key_channel(obj, "sway", Path::Location, 0, &[], Ease::Linear, 0.0),
+            obj
+        );
+        assert!(clips(&[obj]).is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "not a channel of a 3-axis part")]
+    fn a_channel_of_a_fourth_axis_names_the_clip_it_is_in() {
+        let obj = part();
+        key_channel(
+            obj,
+            "sway",
+            Path::Location,
+            3,
+            &[(0, 0.0)],
+            Ease::Linear,
+            0.0,
+        );
+    }
+
+    #[test]
     fn a_squash_eases_as_blenders_keys_do() {
         // the apple's `pick` (0.8 s to a thousandth), as Blender sampled it into models/trees/apple.glb
         let obj = squash(

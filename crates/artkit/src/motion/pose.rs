@@ -46,6 +46,10 @@ pub fn key_eased(
     keys: &[(i32, f64, Ease)],
     overshoot: f64,
 ) -> Obj {
+    assert!(
+        index < 3,
+        "{clip}: {path:?}[{index}] is not a channel of a 3-axis part"
+    );
     let keys: Vec<Key> = keys
         .iter()
         .map(|&(frame, value, ease)| Key {
@@ -54,7 +58,11 @@ pub fn key_eased(
             ease,
         })
         .collect();
-    let end = keys[keys.len() - 1].frame;
+    let Some(last) = keys.last() else {
+        return obj;
+    };
+    // (A clip of no length would be written as an accessor of count 0, which glTF doesn't allow.)
+    let end = last.frame.max(1);
     obj.edit(|o| {
         let channel = Channel {
             path,

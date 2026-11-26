@@ -25,9 +25,6 @@ pub struct Listed {
     pub of: Option<String>,
     #[serde(default)]
     pub storeys: Option<u32>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub about: String,
 }
 
 /// `built.json`: the samples, a storey's height and the height walls drop to in the cutaway (m).

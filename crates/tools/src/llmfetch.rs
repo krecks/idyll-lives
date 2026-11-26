@@ -24,12 +24,14 @@ const LIQUID: &str =
     "https://huggingface.co/LiquidAI/LFM2.5-350M/resolve/9e6c6ccf47cd318696e137d381a7ded8fe4df09f";
 
 /// A file of the model: its path in the repository, the name it's saved as, where it comes from,
-/// and its SHA-256.
+/// its SHA-256, and how many bytes it is (refused past that: a wrong or HTML answer must not fill
+/// the disk before the hash check reads it).
 struct File {
     path: &'static str,
     out: &'static str,
     from: &'static str,
     sha256: &'static str,
+    bytes: u64,
 }
 
 /// Files kept as they are.
@@ -39,12 +41,14 @@ const FILES: [File; 3] = [
         out: "tokenizer.json",
         from: LFM,
         sha256: "29d43b4be8e8a896fefd7cd836ca6d6b4eedd249f823866ce0453b368e646f49",
+        bytes: 3_297_793,
     },
     File {
         path: "tokenizer_config.json",
         out: "tokenizer_config.json",
         from: LFM,
         sha256: "e70cd070c2696bf1b0f1ad303c34502753670cca6f844637821cb1c37e6bea8d",
+        bytes: 3_825,
     },
     // A .txt so a static host serves it as text and Credits' link shows it instead of downloading it.
     File {
@@ -52,6 +56,7 @@ const FILES: [File; 3] = [
         out: "LICENSE.txt",
         from: LIQUID,
         sha256: "4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c",
+        bytes: 10_574,
     },
 ];
 
@@ -62,12 +67,14 @@ const EXPORT: [File; 2] = [
         out: "export-model_q4.onnx",
         from: LFM,
         sha256: "d1a705712e93aafaba1346b32245fa59e7857a46e2272003c0e8c524977e0de8",
+        bytes: 183_442,
     },
     File {
         path: "onnx/model_q4.onnx_data",
         out: "export-model_q4.onnx_data",
         from: LFM,
         sha256: "71ec6ad38a4c463dcb3dba671d06a1d9861be3a23e51290d818b95c0b7d2a5db",
+        bytes: 293_629_952,
     },
 ];
 
@@ -143,7 +150,7 @@ fn run() -> Result<(), String> {
             &format!("{}/{}", file.from, file.path),
             &out.join(file.out),
             file.sha256,
-            None,
+            Some(file.bytes),
         )
     };
     for file in &FILES {
