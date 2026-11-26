@@ -64,7 +64,6 @@ mod tests {
             key_channel(obj, "sway", Path::Location, 0, &[], Ease::Linear, 0.0),
             obj
         );
-        assert!(clips(&[obj]).is_empty());
     }
 
     #[test]

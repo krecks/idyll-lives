@@ -185,13 +185,17 @@ pub fn first_value(g: &Glb, accessor: &J, last: bool) -> R<Option<Vec<f64>>> {
     let view = item(&g.gltf, "bufferViews", key(acc, "bufferView")?)?;
     let n = clip_width(acc)?;
     let at = if last {
-        (count(acc)? - 1) * stride(view, 4 * n as i64)?
+        count(acc)?
+            .saturating_sub(1)
+            .saturating_mul(stride(view, 4 * n as i64)?)
     } else {
         0
     };
     Ok(Some(floats(
         &g.bin,
-        int(view, "byteOffset", 0)? + int(acc, "byteOffset", 0)? + at,
+        int(view, "byteOffset", 0)?
+            .saturating_add(int(acc, "byteOffset", 0)?)
+            .saturating_add(at),
         n,
     )?))
 }
@@ -237,14 +241,19 @@ pub fn accessor(g: &Glb, index: &J) -> R<Option<Vec<Vec<Num>>>> {
     };
     let kind = ct.num().map(|n| n.f() as i64).unwrap_or(0);
     let stride = stride(view, (size * n) as i64)?;
-    let at = int(view, "byteOffset", 0)? + int(acc, "byteOffset", 0)?;
+    // (Saturating: a sum too big for an i64 is past the end, which `bytes` reports.)
+    let at = int(view, "byteOffset", 0)?.saturating_add(int(acc, "byteOffset", 0)?);
     let normalized = acc.get("normalized").is_some_and(J::truthy) && top.is_some();
     let n_items = count(acc)?.max(0);
     // (A count from the file is a claim, not a size: reserving it would abort on a big number
     // before the first read's own bound check could report the file.)
     let mut out = Vec::with_capacity((n_items as usize).min(g.bin.len()));
     for k in 0..n_items {
-        let b = bytes(&g.bin, at + k * stride, size * n)?;
+        let b = bytes(
+            &g.bin,
+            at.saturating_add(k.saturating_mul(stride)),
+            size * n,
+        )?;
         let e: Vec<Num> = b
             .chunks(size)
             .map(|c| match kind {
@@ -283,6 +292,15 @@ pub(crate) mod tests {
             );
         }
         assert!(floats(&[0u8; 8], 8, usize::MAX).is_err());
+        // An accessor's offsets and stride from the file: sums past an i64 are reported too.
+        let json = r#"{"bufferViews": [{"byteLength": 8, "byteOffset": 9223372036854775807},
+            {"byteLength": 8, "byteStride": 4611686018427387904}],
+            "accessors": [{"bufferView": 0, "byteOffset": 1, "componentType": 5126, "type": "SCALAR", "count": 1},
+            {"bufferView": 1, "componentType": 5126, "type": "SCALAR", "count": 1099511627776}]}"#;
+        let g = parse_glb(&glb(json, &[0u8; 8])).unwrap();
+        assert!(accessor(&g, &J::Int(0)).is_err());
+        assert!(first_value(&g, &J::Int(0), false).is_err());
+        assert!(first_value(&g, &J::Int(1), true).is_err());
     }
 
     /// A .glb of `json` and `bin`, each chunk padded to 4 bytes as the format wants.

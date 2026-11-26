@@ -414,13 +414,10 @@ mod tests {
     #[test]
     fn a_truncated_bytes_field_is_refused() {
         let float = varint_field(2, FLOAT);
-        for mut tensor in [
+        for tensor in [
             bytes_field(4, &[0u8; 6]),
             [float.clone(), bytes_field(9, &[0u8; 6])].concat(),
         ] {
-            if tensor.len() == 6 {
-                tensor = [float.clone(), tensor].concat();
-            }
             assert!(
                 read_tensor(&tensor).is_err(),
                 "{:?} read as short data",

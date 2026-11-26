@@ -209,10 +209,10 @@ pub(super) fn accessor(g: &Glb, views: &Views, index: usize) -> Result<Accessor,
     // (A count from the file is a claim, not a size: see `checkglb`'s `accessor`.)
     let mut data = Vec::with_capacity(count.saturating_mul(size).min(bytes.len()));
     for i in 0..count {
-        let at = start + i * stride;
+        let at = start.saturating_add(i.saturating_mul(stride));
         data.extend_from_slice(
             bytes
-                .get(at..at + size)
+                .get(at..at.saturating_add(size))
                 .ok_or("an accessor past the end of its buffer view")?,
         );
     }

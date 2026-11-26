@@ -252,5 +252,13 @@ mod tests {
             } },
         }]);
         assert!(read(&write(&g.json, &g.bin)).is_err());
+
+        // An offset at the top of a usize: the read is past the end, not an overflow panic.
+        g.json["bufferViews"] = json!([{ "buffer": 0, "byteLength": 8 }]);
+        g.json["accessors"] = json!([{
+            "bufferView": 0, "byteOffset": u64::MAX, "componentType": 5126, "type": "SCALAR", "count": 1,
+        }]);
+        let g = parse(&write(&g.json, &g.bin)).unwrap();
+        assert!(accessor(&g, &views(&g).unwrap(), 0).is_err());
     }
 }
