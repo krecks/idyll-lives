@@ -233,7 +233,7 @@ pub fn make(name: &str, rate: f64) -> Option<Vec<f32>> {
                 // (The node's own resonance: 1 dB.)
                 let n = last.saturating_sub(first).min(white.len());
                 let low = node_filter(&white[..n], rate, Filter::Lowpass, cutoff, 1.0, false);
-                for i in first..last {
+                for i in first..first + n {
                     let env = sweep(&[gain, 0.0001], &[0.0, length], i as f64 / rate - at);
                     add(&mut d, i, low[i - first] as f64 * env);
                 }

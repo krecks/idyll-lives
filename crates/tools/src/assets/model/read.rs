@@ -12,13 +12,20 @@ pub fn read(data: &[u8]) -> Result<Model, String> {
     for (i, node) in nodes.iter().enumerate() {
         for child in list(node, "children") {
             if let Some(c) = child.as_u64() {
-                parent[c as usize] = i;
+                let slot = parent
+                    .get_mut(c as usize)
+                    .ok_or_else(|| format!("a child ({c}) past the {} nodes", nodes.len()))?;
+                *slot = i;
             }
         }
     }
     let world = |mut i: usize| -> Mat {
         let mut m = local(&nodes[i]);
-        while parent[i] != usize::MAX {
+        // a node names its parent, and a file may name a cycle: the walk stops after every node once
+        for _ in 0..nodes.len() {
+            if parent[i] == usize::MAX {
+                break;
+            }
             i = parent[i];
             m = artkit::glb::compose(&local(&nodes[i]), &m);
         }

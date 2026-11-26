@@ -48,17 +48,45 @@ export const layerName = (prefix: string, n: string): string => (prefix ? `${pre
 /**
  * Garden paths and drives as ground layers, one for each material they are laid in: its name (`paths` for the
  * hexagonal pavers, as ever, `paths.<look>` for the others, after `prefix`: `layerName`), its rectangles, its material
- * and its height.
+ * and its height. Where two cross (a lot's way across the verge over its neighbour's), the first laid keeps the
+ * crossing and the later is cut around it (`unpaved`): both at one height, they flickered through each other.
  */
 export function pathLayers<R extends Rect>(rects: readonly R[], prefix: string): [string, R[], string, number][] {
   const by = new Map<PathLook, R[]>();
-  for (const r of rects) {
+  for (const r of unpaved(rects)) {
     const look = pathLook(r.look);
     const list = by.get(look);
     if (list) list.push(r);
     else by.set(look, [r]);
   }
   return [...by].map(([look, list]) => [layerName(prefix, look === 'hex' ? 'paths' : `paths.${look}`), list, PATH_LOOK[look].material, PATH_Y]);
+}
+
+/** `rects`, each less what the ones before it cover: the rest of it as up to four rectangles (none: all covered). */
+export function unpaved<R extends Rect>(rects: readonly R[]): R[] {
+  // (Each pair weighed: about 11 ms for a town's 1,500 paths, which the street, the lot's view and the town view all ask for.)
+  const known = cut.get(rects) as R[] | undefined;
+  if (known) return known;
+  const out: R[] = [];
+  rects.forEach((r, i) => {
+    let parts = [r];
+    for (let j = 0; j < i && parts.length; j++) if (overlap(r, rects[j])) parts = parts.flatMap((p) => minus(p, rects[j]));
+    out.push(...parts);
+  });
+  cut.set(rects, out);
+  return out;
+}
+const cut = new WeakMap<readonly Rect[], Rect[]>();
+
+/** Whether `a` and `b` share more than an edge. */
+const overlap = (a: Rect, b: Rect) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1e-6 && Math.min(a.z + a.d, b.z + b.d) - Math.max(a.z, b.z) > 1e-6;
+
+/** `r` less `o`: the strips of it beside `o` (its whole length) and before and after it (`o`'s width), or `r` if they don't overlap. */
+function minus<R extends Rect>(r: R, o: Rect): R[] {
+  if (!overlap(r, o)) return [r];
+  const [x0, x1, z0, z1] = [Math.max(r.x, o.x), Math.min(r.x + r.w, o.x + o.w), Math.max(r.z, o.z), Math.min(r.z + r.d, o.z + o.d)];
+  const part = (x: number, z: number, w: number, d: number): R[] => (w > 1e-6 && d > 1e-6 ? [{ ...r, x, z, w, d }] : []);
+  return [...part(r.x, r.z, x0 - r.x, r.d), ...part(x1, r.z, r.x + r.w - x1, r.d), ...part(x0, r.z, x1 - x0, z0 - r.z), ...part(x0, z1, x1 - x0, r.z + r.d - z1)];
 }
 
 /** Whether ground layer `name` is garden paths (`pathLayers`, after `prefix`). */

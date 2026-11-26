@@ -292,12 +292,12 @@ mod tests {
             ("packs/x.json", r#"{"objects":[{"id":"bed"}]}"#),
         ])
         .unwrap_err();
-        assert!(err.0.contains("'bed'") && err.0.contains("base.json"));
-        assert!(err.0.contains("packs/x.json"), "{}", err.0);
+        assert!(err.message.contains("'bed'") && err.message.contains("base.json"));
+        assert!(err.message.contains("packs/x.json"), "{}", err.message);
         let err = merge_named(&[("base.json", BASE), ("b.json", r#"{"objects":{}}"#)]);
-        assert!(err.unwrap_err().0.contains("different type"));
+        assert!(err.unwrap_err().message.contains("different type"));
         let err = merge_named(&[("base.json", BASE), ("c.json", "{oops")]);
-        assert!(err.unwrap_err().0.starts_with("c.json: invalid JSON"));
+        assert!(err.unwrap_err().message.starts_with("c.json: invalid JSON"));
     }
 
     #[test]
@@ -318,7 +318,11 @@ mod tests {
 
         let unknown = r#"{"traitPatches":{"grumpy":{"effects":{"mood":0.1}}}}"#;
         let err = merge_named(&[("base.json", BASE), ("p.json", unknown)]).unwrap_err();
-        assert!(err.0.contains("unknown trait 'grumpy'"), "{}", err.0);
+        assert!(
+            err.message.contains("unknown trait 'grumpy'"),
+            "{}",
+            err.message
+        );
         let bad_key = r#"{"traitPatches":{"lazy":{"effects":{"speed":2}}}}"#;
         assert!(merge_named(&[("base.json", BASE), ("p.json", bad_key)]).is_err());
     }
@@ -326,7 +330,7 @@ mod tests {
     #[test]
     fn merge_content_names_parts_after_the_include_list() {
         let err = merge_content(BASE, &[r#"{"objects":[{"id":"bed"}]}"#]).unwrap_err();
-        assert!(err.0.contains("a.json"), "{}", err.0);
+        assert!(err.message.contains("a.json"), "{}", err.message);
     }
 
     #[test]
@@ -342,6 +346,10 @@ mod tests {
         assert_eq!(soak["feeling"], "b");
         assert_eq!(soak["feelingMinSkill"], 2);
         let err = merge_named(&[("base.json", base), ("dup.json", old), ("dup2.json", old)]);
-        assert!(err.unwrap_err().0.contains("duplicate feelings id 'b'"));
+        assert!(
+            err.unwrap_err()
+                .message
+                .contains("duplicate feelings id 'b'")
+        );
     }
 }

@@ -184,7 +184,7 @@ fn flats_out_of_place_are_refused() {
         change(&mut t);
         World::from_json(&content, &t.to_string(), 1)
             .err()
-            .map(|e| e.0)
+            .map(|e| e.message)
     };
     let out = refused(&|t| t["plots"][1]["x"] = json!(0)).unwrap();
     assert!(out.contains("reaches out"), "{out}");

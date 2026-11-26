@@ -113,9 +113,12 @@ pub(super) fn views(g: &Glb) -> Result<Views, String> {
             }
             let at = uint(view, "byteOffset").unwrap_or(0);
             let len = uint(view, "byteLength").ok_or("a buffer view without a length")?;
+            let end = at
+                .checked_add(len)
+                .ok_or("a buffer view past the end of the file")?;
             bytes.push(Some(
                 g.bin
-                    .get(at..at + len)
+                    .get(at..end)
                     .ok_or("a buffer view past the end of the file")?
                     .to_vec(),
             ));
@@ -135,11 +138,18 @@ pub(super) fn views(g: &Glb) -> Result<Views, String> {
         let len = uint(ext, "byteLength").ok_or("a compressed view without a length")?;
         let stride = uint(ext, "byteStride").ok_or("a compressed view without a stride")?;
         let count = uint(ext, "count").ok_or("a compressed view without a count")?;
+        let end = at
+            .checked_add(len)
+            .ok_or("a compressed view past the end of the file")?;
         let source = g
             .bin
-            .get(at..at + len)
+            .get(at..end)
             .ok_or("a compressed view past the end of the file")?;
-        let mut out = vec![0u8; count * stride];
+        // (the decoder writes `count * stride` bytes into it: a product that wraps would write past the end)
+        let size = count
+            .checked_mul(stride)
+            .ok_or("a compressed view bigger than any model")?;
+        let mut out = vec![0u8; size];
         let code = match ext.get("mode").and_then(J::as_str) {
             Some("ATTRIBUTES") => unsafe {
                 meshopt::ffi::meshopt_decodeVertexBuffer(
@@ -196,12 +206,13 @@ pub(super) fn accessor(g: &Glb, views: &Views, index: usize) -> Result<Accessor,
         .ok_or("an accessor's buffer view isn't in the file")?;
     let stride = views.strides[view].unwrap_or(size).max(size);
     let start = uint(a, "byteOffset").unwrap_or(0);
-    let mut data = Vec::with_capacity(count * size);
+    // (A count from the file is a claim, not a size: see `checkglb`'s `accessor`.)
+    let mut data = Vec::with_capacity(count.saturating_mul(size).min(bytes.len()));
     for i in 0..count {
-        let at = start + i * stride;
+        let at = start.saturating_add(i.saturating_mul(stride));
         data.extend_from_slice(
             bytes
-                .get(at..at + size)
+                .get(at..at.saturating_add(size))
                 .ok_or("an accessor past the end of its buffer view")?,
         );
     }

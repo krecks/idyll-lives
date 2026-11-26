@@ -198,16 +198,16 @@ impl Lot {
     ) -> Result<Self, Error> {
         // Deeper than a town file may be: the storeys above the ground are rows too.
         if width == 0 || depth == 0 || width > MAX_SIDE || depth > MAX_ROWS {
-            return Err(Error::new("saved lot size is out of range"));
+            return Err(Error::damaged("saved lot size is out of range"));
         }
         if h.len() != width * (depth + 1) || v.len() != (width + 1) * depth {
-            return Err(Error::new("saved lot edges have the wrong size"));
+            return Err(Error::damaged("saved lot edges have the wrong size"));
         }
         if !diags.is_empty() && diags.len() != width * depth {
-            return Err(Error::new("saved diagonal walls have the wrong size"));
+            return Err(Error::damaged("saved diagonal walls have the wrong size"));
         }
         if diags.iter().flatten().any(|d| d.edge == Edge::Open) {
-            return Err(Error::new("corrupt diagonal walls in save"));
+            return Err(Error::damaged("corrupt diagonal walls in save"));
         }
         let mut lot = Self::with_ground(width, depth, ground.clamp(1, depth));
         for (i, &e) in h.iter().enumerate().filter(|(_, e)| **e != Edge::Open) {

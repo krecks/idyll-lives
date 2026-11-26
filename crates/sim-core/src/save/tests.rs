@@ -443,3 +443,19 @@ pub(super) fn the_starting_seed_is_saved() {
     let json = w.save_json();
     assert_eq!(World::from_save_json(CONTENT, &json).unwrap().seed, 1234);
 }
+
+/// Away is away whatever the reason: a sim without a job can be out on a ride, and a reload must not
+/// bring them home while the ride still runs (`taxi/runs.rs`).
+#[test]
+pub(super) fn away_without_a_job_survives_saving() {
+    let mut w = World::from_json(CONTENT, LOT, 3).unwrap();
+    assert!(w.sims[0].job.is_none(), "the point of the test");
+    w.sims[0].away_until = Some(w.tick + 600);
+    let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
+    let away = loaded.sims[0].away_until.expect("still away");
+    assert!(
+        away.abs_diff(loaded.tick + 600) <= 1,
+        "away for the ride, not home: {away} against {}",
+        loaded.tick + 600
+    );
+}

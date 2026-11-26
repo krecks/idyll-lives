@@ -56,7 +56,13 @@ pub fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
     let part = with_suffix(path, ".part");
-    std::fs::write(&part, bytes).map_err(|e| format!("{}: {e}", part.display()))?;
+    // (On the disk before the rename: a machine that stops after it leaves the file whole, not a
+    // renamed `.part` that never reached the platter.)
+    let mut file = std::fs::File::create(&part).map_err(|e| format!("{}: {e}", part.display()))?;
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|e| format!("{}: {e}", part.display()))?;
+    drop(file);
     std::fs::rename(&part, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 

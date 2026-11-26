@@ -98,7 +98,7 @@ impl World {
             })
             .collect();
         crate::world::check_flats(&world.plots, i32::from(world.storeys.max(1)), &world.stairs)
-            .map_err(|e| Error::new(format!("saved plots: {}", e.0)))?;
+            .map_err(|e| Error::damaged(format!("saved plots: {}", e.message)))?;
         world.map_plots();
         let starting_funds = world.content.starting_funds;
         world.households = if save.households.is_empty() {
@@ -147,7 +147,7 @@ impl World {
             .iter()
             .find(|h| h.plot.is_some_and(|p| p as usize >= world.plots.len()))
         {
-            return Err(Error::new(format!(
+            return Err(Error::damaged(format!(
                 "corrupt save: household '{}' lives on an unknown plot",
                 h.name
             )));
@@ -164,7 +164,7 @@ impl World {
             .filter_map(|o| o.id)
             .max()
             .map_or(Some(0), |m| m.checked_add(1))
-            .ok_or_else(|| Error::new("corrupt save: an object id is out of range"))?;
+            .ok_or_else(|| Error::damaged("corrupt save: an object id is out of range"))?;
         let mut used = HashSet::new();
         let on_top = |o: &ObjectSave| {
             world
@@ -302,7 +302,7 @@ impl World {
             h.expecting
                 .is_some_and(|e| e.parents.iter().any(|&p| p as usize >= n))
         }) {
-            return Err(Error::new(format!(
+            return Err(Error::damaged(format!(
                 "corrupt save: household '{}' expects a baby by someone who isn't in town",
                 h.name
             )));
@@ -384,15 +384,9 @@ impl World {
                 })
             });
             sim.night_woken = s.night_woken;
-            // At work, or a pupil at school.
-            let pupil = content
-                .life
-                .stage_at(s.age.unwrap_or(30.0))
-                .is_some_and(|st| st.school);
-            sim.away_until = s
-                .away_minutes
-                .filter(|_| sim.job.is_some() || pupil)
-                .map(after);
+            // Away until then -- at work or school, or out on a ride, which a sim without a job can be on too. The
+            // time is absolute, so it clears itself; filtering it by job or school lost a rider's ride on load.
+            sim.away_until = s.away_minutes.map(after);
             sim.visiting = s.visiting.and_then(|(plot, left)| {
                 ((plot as usize) < plot_count).then(|| Visit {
                     plot,
@@ -630,20 +624,22 @@ impl World {
         // (Two with one id would lose one here without a word: a save from elsewhere may have
         // them.)
         if world.items.list.windows(2).any(|w| w[0].id == w[1].id) {
-            return Err(Error::new("corrupt save: two items share an id"));
+            return Err(Error::damaged("corrupt save: two items share an id"));
         }
         let after_last = match world.items.list.last() {
             Some(it) => it
                 .id
                 .checked_add(1)
-                .ok_or_else(|| Error::new("corrupt save: an item id is out of range"))?,
+                .ok_or_else(|| Error::damaged("corrupt save: an item id is out of range"))?,
             None => 0,
         };
         // (`Items::add` counts up from this, and ids from `PARCEL_IDS` up are the view's parcels:
         // a real item there would be drawn as one, and the top of the range would overflow.)
         let next_id = save.next_item.max(after_last);
         if next_id >= crate::setup::PARCEL_IDS {
-            return Err(Error::new("corrupt save: the next item id is out of range"));
+            return Err(Error::damaged(
+                "corrupt save: the next item id is out of range",
+            ));
         }
         world.items.next_id = next_id;
         for s in &save.setups {

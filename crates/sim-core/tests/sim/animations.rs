@@ -228,9 +228,9 @@ fn unknown_anim_tags_are_rejected() {
     let bad = CONTENT.replace(r#""anim":"eat""#, r#""anim":"juggle""#);
     let err = Content::from_json(&bad).unwrap_err();
     assert!(
-        err.0.contains("fridge.snack") && err.0.contains("unknown anim 'juggle'"),
+        err.message.contains("fridge.snack") && err.message.contains("unknown anim 'juggle'"),
         "{}",
-        err.0
+        err.message
     );
     // Without an `animations` list, any `anim` is unknown.
     let undeclared = CONTENT.replace(r#""animations":["eat","cook","sleep","talk"],"#, "");

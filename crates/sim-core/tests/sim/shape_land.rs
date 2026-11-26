@@ -68,7 +68,7 @@ fn shape(w: &mut World, cost: i64, meta: Value, water: Option<Vec<u32>>) -> Resu
     if let Some(water) = water {
         cmd["water"] = json!(water);
     }
-    common::apply(w, cmd).map_err(|e| e.0)
+    common::apply(w, cmd).map_err(|e| e.message)
 }
 
 fn funds(w: &World) -> i64 {

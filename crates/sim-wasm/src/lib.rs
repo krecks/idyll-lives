@@ -10,7 +10,7 @@ compile_error!(
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use sim_core::save::{OLDEST_SAVE_VERSION, SAVE_VERSION};
-use sim_core::{Command, Content, World, mesh, snapshot, view};
+use sim_core::{Command, Content, Error, World, mesh, snapshot, view};
 use wasm_bindgen::prelude::*;
 
 /// A panic happened: the instance is broken (the build aborts on panic, leaving whatever the
@@ -81,20 +81,18 @@ impl LoadError {
 /// Loads a save; when that fails, works out whether (and how) the save is to blame.
 fn load_save(content_json: &str, save_json: &str) -> Result<World, LoadError> {
     World::from_save_json(content_json, save_json).map_err(|e| LoadError {
-        problem: save_problem(content_json, save_json, &e.0),
-        message: e.0,
+        problem: save_problem(content_json, save_json, &e),
+        message: e.message,
     })
 }
 
 /// What's wrong with a save the simulation refused (`error`): its version (newer than this
 /// game, or older than it reads); damaged (its text isn't JSON at all, or the loader's own checks
-/// found it so: "corrupt …", "saved lot …"); else this version failed to load something in it,
-/// which is no reason to remove it. A value of the wrong type (a number saved as `null`, a field
-/// this version doesn't know) is such a failure, not damage, though serde words both as "invalid
-/// JSON". `None` when the game's own data is what failed. (The loader's checks are told apart by
-/// their words: parsing the save again as a save here would put a second copy of its whole reader
-/// into the wasm.)
-fn save_problem(content_json: &str, save_json: &str, error: &str) -> Option<SaveProblem> {
+/// found it so, which it says itself: `Error::is_damaged`); else this version failed to load
+/// something in it, which is no reason to remove it. A value of the wrong type (a number saved as
+/// `null`, a field this version doesn't know) is such a failure, not damage, though serde words
+/// both as "invalid JSON". `None` when the game's own data is what failed.
+fn save_problem(content_json: &str, save_json: &str, error: &Error) -> Option<SaveProblem> {
     if Content::from_json(content_json).is_err() {
         return None;
     }
@@ -102,14 +100,10 @@ fn save_problem(content_json: &str, save_json: &str, error: &str) -> Option<Save
     let version = json
         .as_ref()
         .and_then(|v| v.get("version").and_then(serde_json::Value::as_u64));
-    let damaged = json.is_none()
-        || ["corrupt", "saved "]
-            .iter()
-            .any(|start| error.starts_with(start));
     Some(match version {
         Some(v) if v > u64::from(SAVE_VERSION) => SaveProblem::TooNew,
         Some(v) if v < u64::from(OLDEST_SAVE_VERSION) => SaveProblem::TooOld,
-        _ if damaged => SaveProblem::Corrupt,
+        _ if json.is_none() || error.is_damaged() => SaveProblem::Corrupt,
         _ => SaveProblem::Failed,
     })
 }
@@ -138,7 +132,7 @@ impl Game {
     #[wasm_bindgen(constructor)]
     pub fn new(content_json: &str, lot_json: &str, seed: u32) -> Result<Game, JsError> {
         let world =
-            World::from_json(content_json, lot_json, seed).map_err(|e| JsError::new(&e.0))?;
+            World::from_json(content_json, lot_json, seed).map_err(|e| JsError::new(&e.message))?;
         Ok(Game::with_world(world))
     }
 
@@ -207,8 +201,10 @@ impl Game {
 
     /// Applies a JSON-encoded `Command`.
     pub fn command(&mut self, json: &str) -> Result<(), JsError> {
-        let cmd = Command::from_json(json).map_err(|e| JsError::new(&e.0))?;
-        self.world.apply(cmd).map_err(|e| JsError::new(&e.0))?;
+        let cmd = Command::from_json(json).map_err(|e| JsError::new(&e.message))?;
+        self.world
+            .apply(cmd)
+            .map_err(|e| JsError::new(&e.message))?;
         snapshot::write_with(&self.world, &mut self.snapshot, &mut self.hidden);
         Ok(())
     }
@@ -478,7 +474,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../sim-core/tests/saves/live_day5.json");
         World::from_save_json(content, &std::fs::read_to_string(path).unwrap())
-            .unwrap_or_else(|e| panic!("live_day5.json: {}", e.0))
+            .unwrap_or_else(|e| panic!("live_day5.json: {}", e.message))
             .save_json()
     }
 
@@ -540,9 +536,10 @@ mod tests {
             problem(&content, &odd.to_string()),
             Some(SaveProblem::Failed)
         );
-        // A whole save this version fails to load (here a trait it doesn't know) isn't damaged: kept.
+        // A save that is whole but has a value of the wrong type isn't damaged: kept (a later
+        // version may read it). (A trait this version doesn't know is dropped, not an error.)
         let mut odd: serde_json::Value = serde_json::from_str(&good).unwrap();
-        odd["sims"][0]["traits"] = serde_json::json!(["noSuchTrait"]);
+        odd["tick"] = serde_json::json!("left");
         assert_eq!(
             problem(&content, &odd.to_string()),
             Some(SaveProblem::Failed)

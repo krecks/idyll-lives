@@ -119,7 +119,7 @@ fn rejects_unknown_references() {
     assert!(
         Content::from_json(&bad_need)
             .unwrap_err()
-            .0
+            .message
             .contains("unknown need")
     );
     let bad_tag = CONTENT.replace(
@@ -129,14 +129,14 @@ fn rejects_unknown_references() {
     assert!(
         Content::from_json(&bad_tag)
             .unwrap_err()
-            .0
+            .message
             .contains("unknown tag")
     );
     let bad_feeling = CONTENT.replace(r#""feeling":"goodChat""#, r#""feeling":"nope""#);
     assert!(
         Content::from_json(&bad_feeling)
             .unwrap_err()
-            .0
+            .message
             .contains("unknown feeling")
     );
 }

@@ -107,18 +107,34 @@ describe('paving', () => {
   });
 
   test("paths are drawn by their look's material; one without a look (or an unknown one) as the pavers", () => {
-    const layers = pathLayers([{ x: 0, z: 0, w: 1, d: 3 }, { x: 0, z: 0, w: 1, d: 3, look: 'brick' }, { x: 0, z: 0, w: 3, d: 6, look: 'asphalt' }, { x: 0, z: 0, w: 1, d: 3, look: 'marble' }], '');
+    const layers = pathLayers([{ x: 0, z: 0, w: 1, d: 3 }, { x: 2, z: 0, w: 1, d: 3, look: 'brick' }, { x: 4, z: 0, w: 3, d: 6, look: 'asphalt' }, { x: 8, z: 0, w: 1, d: 3, look: 'marble' }], '');
     expect(layers.map(([name, rects, material]) => [name, rects.length, material])).toEqual([
       ['paths', 2, 'material.path'],
       ['paths.brick', 1, 'material.path.brick'],
       ['paths.asphalt', 1, 'material.road'],
     ]);
     // The town view's, named after its prefix as its fields are.
-    const town = pathLayers([{ x: 0, z: 0, w: 1, d: 3, look: 'constructor' }, { x: 0, z: 0, w: 1, d: 3, look: 'brick' }], 'town');
+    const town = pathLayers([{ x: 0, z: 0, w: 1, d: 3, look: 'constructor' }, { x: 2, z: 0, w: 1, d: 3, look: 'brick' }], 'town');
     expect(town.map(([name]) => name)).toEqual(['townPaths', 'townPaths.brick']);
     expect(town.every(([name]) => isPaths(name, 'town'))).toBe(true);
     expect(isPaths('townFields', 'town')).toBe(false);
     expect(isPaths('paths.brick', '')).toBe(true);
+  });
+
+  test('where two paths cross, the first laid keeps the crossing and the later is cut around it', () => {
+    // (Debug report 2026-11-26: a lot's brick way across the verge over its neighbour's concrete one, both drawn there.)
+    const concrete = { x: 581, z: 531, w: 11, d: 1, look: 'concrete' };
+    const brick = { x: 583, z: 529, w: 1, d: 10, look: 'brick' };
+    const layers = pathLayers([concrete, brick], '');
+    expect(layers.find(([name]) => name === 'paths.concrete')![1]).toEqual([concrete]);
+    expect(layers.find(([name]) => name === 'paths.brick')![1]).toEqual([
+      { ...brick, d: 2 },
+      { ...brick, z: 532, d: 7 },
+    ]);
+    // A path laid wholly over one before it is gone; side by side, both as they are.
+    expect(pathLayers([concrete, { ...concrete, look: 'brick' }], '').map(([name]) => name)).toEqual(['paths.concrete']);
+    const beside = { ...brick, x: 584 };
+    expect(pathLayers([brick, beside], '')[0][1]).toEqual([brick, beside]);
   });
 
   test("each house's path and drive are drawn by its class, the drive now and then laid as the path", () => {

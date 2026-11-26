@@ -204,6 +204,12 @@ pub(crate) fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
             (2, _) => ty = f.varint as i64,
             (9, _) => raw = Some(f.payload),
             (4, 2) => {
+                if !f.payload.len().is_multiple_of(4) {
+                    return Err(format!(
+                        "protobuf: a truncated bytes field ({} bytes, not whole floats)",
+                        f.payload.len()
+                    ));
+                }
                 for c in f.payload.as_chunks::<4>().0 {
                     floats.push(f32::from_le_bytes(*c));
                 }
@@ -227,13 +233,21 @@ pub(crate) fn read_tensor(buf: &[u8]) -> Result<Tensor, String> {
     }
     let values = if ty as u64 == FLOAT {
         match raw {
-            Some(r) => Some(
-                r.as_chunks::<4>()
-                    .0
-                    .iter()
-                    .map(|c| f32::from_le_bytes(*c))
-                    .collect(),
-            ),
+            Some(r) => {
+                if !r.len().is_multiple_of(4) {
+                    return Err(format!(
+                        "protobuf: a truncated raw_data field ({} bytes, not whole floats)",
+                        r.len()
+                    ));
+                }
+                Some(
+                    r.as_chunks::<4>()
+                        .0
+                        .iter()
+                        .map(|c| f32::from_le_bytes(*c))
+                        .collect(),
+                )
+            }
             None => Some(floats),
         }
     } else {
@@ -393,6 +407,25 @@ mod tests {
         let mut out = varint_field(1, 3);
         out.extend_from_slice(&bytes_field(7, &graph));
         out
+    }
+
+    /// Six bytes of float data, packed by field 4 or by field 9 (`raw_data`), is an error, not
+    /// one and a half floats.
+    #[test]
+    fn a_truncated_bytes_field_is_refused() {
+        let float = varint_field(2, FLOAT);
+        for tensor in [
+            bytes_field(4, &[0u8; 6]),
+            [float.clone(), bytes_field(9, &[0u8; 6])].concat(),
+        ] {
+            assert!(
+                read_tensor(&tensor).is_err(),
+                "{:?} read as short data",
+                tensor
+            );
+        }
+        let whole = [float, bytes_field(4, &[0u8; 8])].concat();
+        assert_eq!(read_tensor(&whole).unwrap().values.unwrap().len(), 2);
     }
 
     #[test]
