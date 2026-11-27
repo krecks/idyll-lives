@@ -2,6 +2,32 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Lighter drawing in a big town:** the main thread's work per frame is about a third less by day (Medium, WebGPU, a 355-household town: 5.1 → 3.4 ms over the home, 7.6 → 5.9 ms over the whole town at 400 m). What changed:
+  - **Residents:**
+    - Held things are drawn once per holder, not once per resident in town.
+    - The pose texture is uploaded in small bands round the rows that changed.
+    - A paused resident is not posed again while nothing changed.
+    - Seats and footstools are looked up nearby, not across the whole town.
+    - A face's expression stops reading at its first unused pair.
+  - **Passes:**
+    - Bloom's passes are left out by day, and the contact shading's blurs are left out where it has faded to nothing.
+    - The menus' town fades its contact shading out as the game's town view does.
+  - **Shadows and mirrors:**
+    - The sun turns, and its shadow map is drawn again, only once it has moved a quarter of a degree.
+    - High's mirrors draw again only when something in them changed.
+  - **Traffic:**
+    - A swinging gate uploads its own leaf, not every gate in town.
+    - A traffic light's lamp changing doesn't look the ground up again.
+    - A car looks the ground up once for its body and its shadow.
+    - Doors and gates still ask only those near at super speed.
+  - **Building and editing:**
+    - A purchase uploads only the changed part of the grass mask, and the lawn map only when it changed.
+    - A land stroke redraws only the pads round it.
+    - The street keeps unchanged models' copies and far houses' keys between builds.
+  - **At night:** who is up is found by grid, and far lots are relit in place.
+
 ## 0.8.4 — 2026-11-26
 
 - **Curtains gather when drawn:** drawn at night, the curtains' cloth is let out as real curtains are, in narrower folds, instead of stretching its weave and its folds wide; open, they look as they did. The model gate now measures a part's texture at its most stretched as well as at rest.
