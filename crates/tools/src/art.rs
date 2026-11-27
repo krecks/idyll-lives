@@ -187,14 +187,9 @@ pub fn write_centres(paths: &Paths, centres: &J, replace: bool) -> Result<(), St
         .map_err(|e| format!("centres.json: {e}"))
 }
 
-/// What a family's build hands back (its pack, comment, entries, centres, clips and the keys drawn by code): checks each model's `motions` against its clips,
-/// then writes centres.json and (unless `no_pack`) the pack. The lines to print, or what failed.
-pub fn take_build(
-    paths: &Paths,
-    result: &J,
-    no_pack: bool,
-    known: &BTreeSet<String>,
-) -> Result<Vec<String>, String> {
+/// Whether each model of a family's build (`take_build`'s `result`) has a clip for every one its `motions` plays:
+/// run before any of its files is written, so a failed build leaves none of them half new.
+pub fn validate(result: &J) -> Result<(), String> {
     let none = J::Obj(Vec::new());
     let entries = result.get("entries").unwrap_or(&none);
     let clips = result.get("clips").unwrap_or(&none);
@@ -224,6 +219,20 @@ pub fn take_build(
             ));
         }
     }
+    Ok(())
+}
+
+/// What a family's build hands back (its pack, comment, entries, centres, clips and the keys drawn by code): checks
+/// it (`validate`), then writes centres.json and (unless `no_pack`) the pack. The lines to print, or what failed.
+pub fn take_build(
+    paths: &Paths,
+    result: &J,
+    no_pack: bool,
+    known: &BTreeSet<String>,
+) -> Result<Vec<String>, String> {
+    validate(result)?;
+    let none = J::Obj(Vec::new());
+    let entries = result.get("entries").unwrap_or(&none);
     let mut lines = Vec::new();
     if let Some(centres) = result.get("centres").filter(|c| c.truthy()) {
         write_centres(paths, centres, false)?;

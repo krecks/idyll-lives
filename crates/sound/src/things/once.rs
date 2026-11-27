@@ -643,7 +643,7 @@ pub(super) fn beep(out: &mut Ev, at: f64, seconds: f64, hz: f64, amp: f64) {
     }
 }
 
-/// A pair of tones (a telephone's), on for \`seconds\`.
+/// A pair of tones (a telephone's), on for `seconds`.
 pub(super) fn tones(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: &[f64]) {
     let start = js_round(at * rate);
     let len = min(d.len() as f64 - start, js_round(seconds * rate));

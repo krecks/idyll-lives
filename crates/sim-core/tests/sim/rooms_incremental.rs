@@ -369,7 +369,7 @@ fn rooms_kept_up_to_date_agree_with_finding_them_all_in_a_town() {
 fn rooms_kept_up_to_date_agree_with_finding_them_all_in_saved_towns() {
     let content = common::content();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves");
-    for (k, name) in ["v042_village.json", "live_day5.json"].iter().enumerate() {
+    for (k, name) in ["cedar_heights.json", "live_day5.json"].iter().enumerate() {
         let json = std::fs::read_to_string(dir.join(name)).unwrap();
         let w = World::from_save_json(&content, &json).unwrap();
         edits_agree(name, w, 20 + k as u64, 300);

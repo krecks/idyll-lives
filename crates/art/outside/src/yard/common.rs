@@ -162,6 +162,8 @@ pub fn arc_points(
 }
 
 /// A slab: the polygon `pts` [(game x, height)] between game depths `z0` and `z1` (gables, a roof's ends).
+// KIT: `kit::prism` (its far end is laid unturned, which `forms::object` turns: the same shape, but the yard's
+// gables' bytes move once it calls the kit's)
 pub fn prism(name: &str, pts: &[(N, f64)], z0: f64, z1: f64, material: Mat) -> Obj {
     let n = pts.len() as u32;
     let mut verts: Vec<V3> = pts.iter().map(|&(x, y)| V3::from(F.at(x, y, z1))).collect();

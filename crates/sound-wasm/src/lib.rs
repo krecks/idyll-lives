@@ -113,3 +113,23 @@ pub fn room(size: &str, rate: f64) -> Option<Sound> {
 pub fn lowpass(x: &[f32], rate: f64, frequency: f64, q: f64, looped: bool) -> Vec<f32> {
     sound::node_filter(x, rate, Filter::Lowpass, frequency, q, looped)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// What this layer decides: left stays left, right stays right, and a sound of one channel has no right.
+    #[test]
+    fn a_sound_keeps_its_sides_and_one_channel_has_no_right() {
+        let Some(Made::Stereo(town)) = sound::make("town", 48_000.0) else {
+            panic!("the town is two channels");
+        };
+        assert_ne!(town.left, town.right);
+        let mut s = make("town", 48_000.0).unwrap();
+        assert_eq!(s.take_left(), town.left);
+        assert_eq!(s.take_right(), Some(town.right));
+        let mut engine = make("carEngine", 48_000.0).unwrap();
+        assert!(!engine.take_left().is_empty());
+        assert_eq!(engine.take_right(), None);
+    }
+}

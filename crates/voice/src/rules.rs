@@ -1,6 +1,6 @@
-//! Letter-to-sound guesses for words the dictionary doesn't know (mostly residents' names),
-//! written straight in Misaki's phoneme alphabet. Simple on purpose: names are usually in the
-//! dictionary, and hand-written lines are checked to never reach this.
+//! Letter-to-sound guesses for words the dictionary doesn't know (mostly residents' names: most
+//! of `base.json`'s are not in it, `tests/lines.rs` lists them), written straight in Misaki's
+//! phoneme alphabet. Hand-written lines are checked to never reach this.
 
 /// Misaki's vowel symbols (A I O W Y are the diphthongs eɪ aɪ oʊ aʊ ɔɪ).
 pub const VOWELS: &str = "AIOQWYaiuæɑɒɔəɛɜɪʊʌᵻ";

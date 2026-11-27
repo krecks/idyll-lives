@@ -617,7 +617,7 @@ pub(super) fn sing(
 }
 
 /// A soft synth note: a few harmonics, slowly attacked and released (the backing's pad and bass; the
-/// TypeScript's default \`harmonics\` was 6).
+/// TypeScript's default `harmonics` was 6).
 pub(super) fn pad(
     d: &mut [f32],
     rate: f64,

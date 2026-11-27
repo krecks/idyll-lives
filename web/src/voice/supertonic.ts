@@ -37,8 +37,8 @@ export interface Session {
 interface Line {
   readonly text: string;
   finish(samples: Float32Array, rate: number): Float32Array;
-  /** After `finish`: the clip's mouth shapes, flat (`parseVisemes`). */
-  readonly visemes: Float32Array;
+  /** After `finish`: the clip's mouth shapes, flat (`parseVisemes`); taken, so empty on a second call. */
+  visemes(): Float32Array;
   free(): void;
 }
 export interface Phonemizer {
@@ -217,7 +217,7 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
       const start = performance.now();
       // New arrays of our own, so their buffers can be transferred to the main thread.
       const samples = line.finish(wav, rate);
-      const visemes = line.visemes;
+      const visemes = line.visemes();
       const finishMs = performance.now() - start;
       return { samples, visemes, finishMs, timing: { duration: durationMs, text: textMs, vector: vectorMs, vocoder: vocoderMs, finish: finishMs } };
     } finally {
