@@ -603,7 +603,7 @@ pub fn awning() -> Vec<Obj> {
         );
     }
     // no clip moves a part: all of it is the still body
-    settle(&[join_all("body")])
+    settle!(&[join_all("body")], floor = false) // on the wall over the window at its real height
 }
 
 // --- O9: the solar array: two 60-cell modules tilted at the sun on a low braced ground frame -------------

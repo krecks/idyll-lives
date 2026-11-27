@@ -181,7 +181,7 @@ pub fn family() -> Family {
                 .paint(&[("rug_ground", "Rug")]),
             Model::new("blinds", fittings::blinds, (0.90, 0.806, 0.070))
                 .key("model.blinds")
-                .centre(0.0, -0.3975)
+                .centre(0.0, -0.395)
                 .on_wall()
                 .motions(night())
                 .paint(&[("blind_slat", "Slats"), ("blind_rail", "Head rail")]),
@@ -203,7 +203,7 @@ pub fn family() -> Family {
                 .paint(&[("gadget_white", "Case"), ("gadget_dark", "Keypad")]),
             Model::new("shutters", fittings::shutters, (1.765, 0.765, 0.050))
                 .key("model.shutters")
-                .centre(0.0, -0.391)
+                .centre(0.0, -0.395)
                 .on_wall()
                 .motions(night())
                 .paint(&[("blind_rail", "Panels"), ("hook_board", "Frame")])

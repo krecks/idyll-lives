@@ -224,3 +224,8 @@ shuts over the glass, the two meeting at the middle. Two chrome knuckles a side 
 hooks under it, and a bench with two front legs and a shoe shelf at 12 cm. The bench's top is at 0.47 m and runs
 from the board (depth −0.40) to −0.08; the content's `seat` puts the hips at 0.47 m, 0.27 m behind the footprint's
 middle (0.13 m off the board). A still model of three finishes.
+
+**Wall fittings at their real height (2026-11-28).** `blinds`, `coatHooks`, `doorbell`, `burglarAlarm`, `cctvCamera`
+and `shutters` ended with `settle!()`, which stood them on the floor: in the game they hung at the foot of the wall
+(found in a headless play check). They now settle as the wall clock does (`settle!(centre = false, floor = false)`),
+built at their heights; blinds and shutters take their measured centre (0, -0.395). The awning (outdoor) the same.

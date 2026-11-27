@@ -79,7 +79,7 @@ pub fn blinds() -> Vec<Obj> {
         }
     });
     let below = hinged(join(&below, "slats_below", None), pivot);
-    settle!();
+    settle!(centre = false, floor = false); // on the wall at its real height, as the wall clock
     attach(below, first);
     // a key a frame (the file samples every frame anyway), eased in and out as `swing` is
     let (shut, frames) = (radians(80.0), 36);
@@ -158,7 +158,7 @@ pub fn coat_hooks() -> Vec<Obj> {
         );
     }
     join_all("coatHooks");
-    settle!();
+    settle!(centre = false, floor = false); // on the wall at its real height, as the wall clock
     meshes()
 }
 
@@ -198,7 +198,7 @@ pub fn doorbell() -> Vec<Obj> {
         bevel = 0.004
     );
     join_all("doorbell");
-    settle!();
+    settle!(centre = false, floor = false); // on the wall at its real height, as the wall clock
     meshes()
 }
 
@@ -252,7 +252,7 @@ pub fn burglar_alarm() -> Vec<Obj> {
         fsphere!(f, "led", 0.007, at, M.alarm_led);
     });
     let led = join(&led, "led", Some(f.at(at.0, at.1, at.2)));
-    settle!();
+    settle!(centre = false, floor = false); // on the wall at its real height, as the wall clock
     // (back 11 mm: the 7 mm bead, standing 2 mm proud of the case, all inside it)
     let rest = led.location().y as f64;
     let off = rest + 0.011;
@@ -326,7 +326,7 @@ pub fn cctv_camera() -> Vec<Obj> {
         M.cam_lens,
         bevel = 0.006
     );
-    settle!();
+    settle!(centre = false, floor = false); // on the wall at its real height, as the wall clock
     meshes()
 }
 
@@ -414,7 +414,7 @@ pub fn shutters() -> Vec<Obj> {
         );
         panels.push((turn(panel, 180.0, Axis::Z), sx));
     }
-    settle!();
+    settle!(centre = false, floor = false); // on the wall at its real height, as the wall clock
     for (panel, sx) in panels {
         swing!(panel, "close", 180.0 * sx, seconds = 1.2);
     }
