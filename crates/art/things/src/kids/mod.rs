@@ -291,7 +291,7 @@ pub fn family() -> Family {
                 .motions(json!({"uses": {"paint": "painting"}}))
                 .paint(&[("easel", "Easel")]),
 
-            Model::new("playhouse", house::playhouse, (1.32, 1.60, 1.54))
+            Model::new("playhouse", house::playhouse, (1.32, 1.622, 1.56))
                 .key("model.playhouse")
                 .paint(&[("ph_board", "Boards"), ("ph_roof", "Roof")]),
         ],
