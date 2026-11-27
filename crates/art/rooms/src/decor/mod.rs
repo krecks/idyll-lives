@@ -190,11 +190,11 @@ pub fn family() -> Family {
                 .centre(0.0, -0.3745)
                 .on_wall()
                 .paint(&[("hook_board", "Board"), ("gadget_chrome", "Hooks")]),
-            Model::new("doorbell", fittings::doorbell, (0.10, 0.16, 0.036))
+            Model::new("doorbell", fittings::doorbell, (0.084, 0.084, 0.036))
                 .key("model.doorbell")
                 .centre(0.0, -0.412)
                 .on_wall()
-                .paint(&[("gilt", "Brass"), ("gadget_chrome", "Button")]),
+                .paint(&[("bell_brass", "Brass"), ("bell_push", "Button")]),
             Model::new("burglarAlarm", fittings::burglar_alarm, (0.22, 0.28, 0.061))
                 .key("model.burglarAlarm")
                 .centre(0.0, -0.3995)

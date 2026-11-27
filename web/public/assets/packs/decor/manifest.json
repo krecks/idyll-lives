@@ -767,23 +767,21 @@
       "type": "model",
       "url": "../../models/decor/doorbell.glb",
       "materials": {
-        "cam_lens": {
-          "finish": "material.finish.gloss"
+        "bell_brass": {
+          "finish": "material.finish.metal",
+          "roughness": 0.25
         },
-        "gadget_chrome": {
-          "finish": "material.finish.chrome"
-        },
-        "gilt": {
-          "finish": "material.finish.metal"
+        "bell_push": {
+          "finish": "material.finish.ceramic"
         }
       },
       "paint": [
         {
-          "material": "gilt",
+          "material": "bell_brass",
           "label": "Brass"
         },
         {
-          "material": "gadget_chrome",
+          "material": "bell_push",
           "label": "Button"
         }
       ]

@@ -184,6 +184,11 @@ their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, u
   1.60 m (the height `coatHooks:fetch` and its `high` reach are fitted to), dipping 1 cm and turning up 4 cm to a
   ball tip, so a coat stays on; they were straight pegs. 0.90 × 0.14 × 0.111 m, `centre` (0, −0.3745) so the board's
   back stays on the wall face; one part (`join_all`), 3,420 → 2,588 triangles, 1 draw.
+- **Doorbell** (looked at again 2026-11-27): a brass bell push, an 84 mm round plate and a collar of polished brass
+  (`bell_brass`, metal) round an ivory push (`bell_push`, ceramic). It was a flat tan plate that read as wood, a
+  silver button and a camera's lens (a video doorbell). The button's face stays 1.34 m up and 0.394 m behind the
+  middle, where the renderer's `press` reaches (`clips/reach.ts`). 0.084 × 0.084 × 0.036 m, one part, 936 → 948
+  triangles, 1 draw.
 
 The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains). One part can't turn each slat about its
 own length, and a part a slat would cost a draw call each (9 in all), so the clip swaps two parts: the open slats

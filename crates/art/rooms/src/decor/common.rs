@@ -114,6 +114,8 @@ palette! { M:
     gadget_dark = ("#3A3E44", satin),
     gadget_chrome = ("#C9CDD2", chrome),
     cam_lens = ("#16202B", gloss),
+    bell_brass = ("#C9A04A", metal, roughness(0.25)), // the bell push: polished brass
+    bell_push = ("#F1E8D4", ceramic),                 // its ivory button
     alarm_led = ("#C0392B", gloss),
     hall_glass = ("#AFC0C8", gloss),
 }

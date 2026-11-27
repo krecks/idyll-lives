@@ -150,30 +150,42 @@ pub fn coat_hooks() -> Vec<Obj> {
     meshes()
 }
 
-// --- D4: the doorbell: a brass plate with its button, beside the door --------------------------------------
+// --- D4: the doorbell: a round brass bell push, its ivory button in a brass collar -------------------------
+// The button's face is 1.34 m up and 0.394 m behind the middle, where the renderer's press reaches (`clips/reach.ts`).
 pub fn doorbell() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    fbox!(
+    fcyl!(
         f,
         "plate",
-        0.10,
-        0.16,
-        0.024,
-        (0, 1.35, WALL + 0.012),
-        M.gilt,
+        0.042,
+        0.014,
+        (0, 1.34, WALL + 0.007),
+        M.bell_brass,
+        rot = (90, 0, 0),
+        verts = 32,
         bevel = 0.004
     );
-    fbox!(
+    fcyl!(
+        f,
+        "collar",
+        0.017,
+        0.012,
+        (0, 1.34, WALL + 0.020),
+        M.bell_brass,
+        rot = (90, 0, 0),
+        bevel = 0.003
+    );
+    fcyl!(
         f,
         "button",
-        0.036,
-        0.036,
-        0.012,
-        (0, 1.34, WALL + 0.030),
-        M.gadget_chrome,
+        0.011,
+        0.014,
+        (0, 1.34, WALL + 0.029),
+        M.bell_push,
+        rot = (90, 0, 0),
         bevel = 0.004
     );
-    fsphere!(f, "lens", 0.008, (0, 1.40, WALL + 0.026), M.cam_lens);
+    join_all("doorbell");
     settle!();
     meshes()
 }
