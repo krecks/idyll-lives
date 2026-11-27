@@ -7,7 +7,6 @@ use super::common::{
     ring_at, socket,
 };
 use artkit::forms::{Plane, rounded_rect, smooth_outline};
-use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, PI, V3, asin, cos, cosd, pow, sin, sind, sqrt};
 use artkit::parts::{hinged, join, join_all, new_parts};

@@ -231,3 +231,5 @@ base unit's height (reported).
 ## Measured as the piece (2026-11-25)
 
 `counterCorner`: the utensil crock on the worktop is set aside (`parts::aside`, `crock_aside`): drawn as before, not the counter's size, so `cargo review sizes` measures the counter (1.00 × 0.95 × 0.93 m; it was 1.26 m high with the crock).
+
+- 2026-11-27: bars lost the detached back ledge, the body is flush under the top, the bar end's side is walnut like the body.

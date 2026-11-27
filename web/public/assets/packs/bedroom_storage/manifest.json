@@ -94,9 +94,6 @@
         },
         "oak": {
           "finish": "material.finish.wood"
-        },
-        "plinth": {
-          "finish": "material.finish.satin"
         }
       },
       "paint": [

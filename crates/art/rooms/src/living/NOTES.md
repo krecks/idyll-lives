@@ -298,3 +298,5 @@ Every living model clear of the gate's warnings but three the gate itself gets w
   probe reads `fwd` −0.42 as a depth, where for a bed lain on `across` the renderer moves the sleeper along the sofa
   (residents.ts `bedFwd`), so it lands on the deck behind the seat (at the footprint's middle the seat is 0.437 and
   0.446 m).
+
+- 2026-11-27: the drum nightstand's drawer is a curved clay front on the band (no seams, no clip: the content gives it no use); the corner bookcase has two slim posts up its curved end.
