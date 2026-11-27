@@ -923,7 +923,11 @@ pub(crate) fn in_the_way(
         // (Nor the ground ahead of one waiting at a red light, its nose at the stop line: someone
         // on the crosswalk just in front of it waited there for it, on the walk, till the walk
         // was over and it came on at them.)
-        let ahead = if out && !car.moved || car.at_red {
+        // (Nor of one standing in a queue, waiting for the car in front: someone crossing between
+        // the cars stood waiting for it for hours, the queue into a lit junction never clearing
+        // there, Skerry Island.)
+        let queued = !car.moved && car.waits_for.is_some_and(|k| k >= 1 << 63);
+        let ahead = if out && !car.moved || car.at_red || queued {
             0.0
         } else {
             AHEAD
