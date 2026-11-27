@@ -90,7 +90,7 @@ import { closedParts, flatLids, inClosed, LID_THICK, viewedFlats, viewedLot, typ
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
 import { cutInView } from '../shared/landVeil';
-import { anyoneNear, DOOR_SWING, doorLead, doorReach, goingThrough, moverCells } from '../shared/doors';
+import { anyoneNear, DOOR_SWING, doorCell, doorLead, goingThrough, moverCells } from '../shared/doors';
 import { smooth } from '../../game/noise';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, sunTurned, type Lighting, type RGB } from '../shared/environment';
@@ -228,8 +228,6 @@ const TARGET_EASE = 0.25;
 const PIT_MARGIN = 0.3;
 /** The doors and gates opening or falling shut kept for the world's sound between its looks (`doorSounds`). */
 const DOOR_SOUNDS = 16;
-/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`), at least: wider at a speed whose lead reaches further (`doorReach`). */
-const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** A roof's height (m) over a house's top storey, at most, for a click on it (`buildingAt`). */
@@ -704,7 +702,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly awakeRooms = new Set<number>();
   private readonly occupiedRooms = new Set<number>();
   private readonly movers: number[] = [];
-  /** The cells (`GATE_CELL` or wider: `swingDoors`) someone on the move is in this frame. */
+  /** The cells (`doorCell` m: `swingDoors`) someone on the move is in this frame. */
   private readonly moverCells = new Set<number>();
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
@@ -3022,7 +3020,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const casts = (c: readonly [number, number]) => this.sunShadows.reaches(c[0], c[1] - this.rowOf(this.storeyOf(Math.floor(c[1]))));
     // (A town has a gate in most gardens, a house a door or more a room: one standing shut with
     // nobody within a cell of it isn't asked. The cells as wide as the lead reaches at this speed, at super speed tens of metres.)
-    const size = Math.max(GATE_CELL, doorReach(lead));
+    const size = doorCell(lead);
     const near = this.moverCells;
     moverCells(movers, size, near);
     for (const gate of this.gates) {
