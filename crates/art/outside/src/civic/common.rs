@@ -97,7 +97,7 @@ palette! { M:
     vault_dark = ("#5C6168", metal),
 }
 
-pub use crate::outdoor::common::rod;
+pub use crate::common::rod;
 
 pub const F: GameFrame = GameFrame::new(0.0);
 pub use artkit::kit::WALL;
