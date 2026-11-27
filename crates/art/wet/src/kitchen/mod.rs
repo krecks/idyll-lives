@@ -120,7 +120,7 @@ pub fn family() -> Family {
                     ("trim", "Plinth & badge"),
                     ("liner", "Inside"),
                 ]),
-            Model::new("fridgeMini", fridges::fridge_mini, (0.60, 0.965, 0.60))
+            Model::new("fridgeMini", fridges::fridge_mini, (0.60, 0.87, 0.60))
                 .key("model.fridgeMini")
                 .centre(0.0, -0.128)
                 .motions(json!({"uses": {"fetch": "fridge_open", "cook": "fridge_open"}, "hold": 3.0}))

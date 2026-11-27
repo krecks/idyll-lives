@@ -204,3 +204,7 @@ is 16 cm, so the range is 1.09 m high with it; the cooker kind takes a cooker dr
 the dishwasher kind the dishwashers drawn with the cupboard beside them (docs/review/reference.json). The fourth draw
 call of the stoves, the microwave and the breakfast counter is a moving part each (door, knob, flame, turntable, lid):
 left as it is.
+
+## Code layout
+
+`appliances/` is a file an appliance (`microwave.rs`, `coffee_machine.rs`, `breakfast_counter.rs`, `dishwasher.rs`) with the shared base unit (`counter`) in `mod.rs`. Its cup, canister and basket helpers stay local: the kitchen_counters ones (`turned::canister`, `storage::basket`) draw a different canister and a wicker basket, so reusing them would change the bytes.

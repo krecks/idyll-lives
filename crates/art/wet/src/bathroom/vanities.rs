@@ -12,6 +12,49 @@ use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fsweep, grow, soft};
 
+/// The stone worktop at 0.76 m, its back at depth `z`, so a basin on it has its rim at 0.88 (a basin's 0.76-0.91).
+fn worktop(f: &GameFrame, w: f64, d: f64, z: f64) {
+    soft!(
+        f,
+        "top",
+        w,
+        0.04,
+        d,
+        (0, 0.74, z),
+        M.stone,
+        round = 0.008,
+        round_segments = 2
+    );
+}
+
+/// A porcelain basin standing on the worktop at `(x, z)`, `(w, d)` across, with its drain at height `drain_y`.
+fn basin(
+    f: &GameFrame,
+    name: &str,
+    (x, z): (f64, f64),
+    (w, d): (f64, f64),
+    (wall, a, b): (f64, f64, f64),
+    (drain_y, drain_mat): (f64, Option<artkit::materials::Mat>),
+) {
+    bowl_shell(
+        f,
+        name,
+        x,
+        z,
+        0.76,
+        0.88,
+        w,
+        d,
+        M.porcelain,
+        wall,
+        a,
+        b,
+        32,
+        2.0,
+    );
+    drain(f, x, drain_y, z, 0.026, drain_mat);
+}
+
 // --- double vanity: a two-basin cabinet ----------------------------------------------------------------
 // No mirrors: the player hangs the ones they like above it (the wall mirror, the mirror cabinet).
 
@@ -41,17 +84,7 @@ pub fn vanity_double() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 1
         );
-        soft!(
-            f,
-            "top",
-            1.9,
-            0.04,
-            0.56,
-            (0, 0.74, -0.15),
-            M.stone,
-            round = 0.008,
-            round_segments = 2
-        );
+        worktop(&f, 1.9, 0.56, -0.15);
         fbox!(
             f,
             "upstand",
@@ -117,23 +150,14 @@ pub fn vanity_double() -> Vec<Obj> {
         }
         for s in [-1, 1] {
             let x = s as f64 * 0.48;
-            bowl_shell(
+            basin(
                 &f,
                 &format!("basin{s}"),
-                x,
-                -0.12,
-                0.76,
-                0.88,
-                0.5,
-                0.38,
-                M.porcelain,
-                0.016,
-                0.46,
-                0.8,
-                32,
-                2.0,
+                (x, -0.12),
+                (0.5, 0.38),
+                (0.016, 0.46, 0.8),
+                (0.776, None),
             );
-            drain(&f, x, 0.776, -0.12, 0.026, None);
             tips.push(gooseneck(
                 &f,
                 &format!("tap{s}"),
@@ -201,17 +225,7 @@ pub fn sink_vessel() -> Vec<Obj> {
             0.006,
             0.024,
         );
-        soft!(
-            f,
-            "top",
-            0.84,
-            0.04,
-            0.54,
-            (0, 0.74, -0.2),
-            M.stone,
-            round = 0.008,
-            round_segments = 2
-        );
+        worktop(&f, 0.84, 0.54, -0.2);
         // the stand: four tapered legs from the floor up to the vanity, a slatted shelf between them
         for x in [-0.38, 0.38] {
             for z in [-0.43, 0.01] {
@@ -251,23 +265,14 @@ pub fn sink_vessel() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        bowl_shell(
+        basin(
             &f,
             "bowl",
-            0,
-            -0.18,
-            0.76,
-            0.88,
-            0.44,
-            0.36,
-            M.porcelain,
-            0.014,
-            0.45,
-            1.0,
-            32,
-            2.0,
+            (0.0, -0.18),
+            (0.44, 0.36),
+            (0.014, 0.45, 1.0),
+            (0.774, Some(M.blackmetal)),
         );
-        drain(&f, 0, 0.774, -0.18, 0.026, Some(M.blackmetal));
         spout = gooseneck(
             &f,
             "tap",
