@@ -50,3 +50,6 @@ and fingerpost on one 1 m tile.
 - **The gate does not open.** No interaction or clip; it matches the static field-boundary set.
 - **Content group.** The five objects are in `web/public/content/countryside.json` under the existing `community` /
   `countryside` group, so no new group, content file or `base.json` include is needed.
+- **Stile reworked (2026-11-27).** A step stile over a low stone wall (two courses and a coping, 0.45 m): an oak post
+  at each end and an oak tread on legs against each face (0.25 m up, 0.25 m down). The through-stones are gone; the
+  model now also paints `oak` ("Wood").

@@ -139,3 +139,6 @@ header, corner posts, a window in its left side and a roof slab with its ridge, 
 past a real Wendy house's 1.10–1.35 × 1.10–1.65 m in `cargo review sizes`), inside its 2 × 2 footprint, and has no
 clip. Its doorway is 0.66 m wide and 1.05 m clear over its 0.06 m floor, its front 0.70 m from the middle: the
 resident's `housePlay` clip (clips/play.ts `HOUSE_PLAY`) crawls a child in through it, fitted to those numbers.
+
+The playhouse (2026-11-27) now has a pitched roof (two slabs, a ridge, board gables), a white-framed doorway with a
+step, and a framed, silled window in each side wall (cut out of the wall by `holes`). Size unchanged.

@@ -8,7 +8,7 @@ use artkit::math::{Axis, P3, PI, TAU, V3, atan2, cos, degrees, radians, sin, v3}
 use artkit::parts::{hinged, join, join_all, new_parts, settle_all};
 use artkit::scene::{Obj, RotationMode, meshes};
 use artkit::{
-    boulder, cone, cube, extrude, fsphere, fsweep, jitter, loft, revolve, ring, settle, sphere,
+    boulder, cone, extrude, fsphere, fsweep, jitter, loft, revolve, ring, settle, sphere,
     sweep, swing, torus,
 };
 
@@ -519,47 +519,43 @@ pub fn bust_marble() -> Vec<Obj> {
 /// ears with hollows, and its tail curling round its front paws.
 pub fn statue_cat() -> Vec<Obj> {
     new_parts(|| {
-        sphere!(
-            "rump",
-            0.5,
-            at = (0, 0.07, 0.12),
-            material = M.concrete,
-            scale = (0.22, 0.26, 0.23),
-            segments = 20,
-            rings = 12
-        );
+        // the body: one loft from the haunches up the back to the neck (rings of (half width, half depth, z, y of
+        // the middle)), the chest leaning forward
+        let body: Vec<Vec<P3>> = [
+            (0.015, 0.105, 0.13, 0.04),
+            (0.06, 0.115, 0.145, 0.045),
+            (0.14, 0.105, 0.135, 0.035),
+            (0.24, 0.088, 0.105, 0.0),
+            (0.32, 0.072, 0.08, -0.035),
+            (0.38, 0.06, 0.07, -0.055),
+            (0.42, 0.045, 0.05, -0.065),
+        ]
+        .iter()
+        .map(|&(z, rx, ry, y)| ring!(rx, ry, z = z, verts = 20, at = (0.0, y)))
+        .collect();
+        loft!("body", &body, material = M.concrete);
         for s in [-1, 1] {
             let sf = s as f64;
+            // the haunch, folded against the body, the hind foot tucked under its front
             sphere!(
                 format!("thigh{s}"),
                 0.5,
-                at = (sf * 0.085, 0.03, 0.1),
+                at = (sf * 0.09, 0.07, 0.1),
                 material = M.concrete,
-                scale = (0.11, 0.22, 0.17),
-                rot = (-20, 0, 0),
+                scale = (0.1, 0.22, 0.2),
                 segments = 16,
                 rings = 10
             );
             sphere!(
                 format!("hind_foot{s}"),
                 0.5,
-                at = (sf * 0.1, -0.08, 0.018),
+                at = (sf * 0.09, -0.04, 0.02),
                 material = M.concrete,
-                scale = (0.055, 0.1, 0.036),
+                scale = (0.065, 0.13, 0.04),
                 segments = 10,
                 rings = 6
             );
         }
-        sphere!(
-            "chest",
-            0.5,
-            at = (0, -0.04, 0.26),
-            material = M.concrete,
-            scale = (0.19, 0.18, 0.32),
-            rot = (-12, 0, 0),
-            segments = 18,
-            rings = 12
-        );
         sphere!(
             "head",
             0.5,
@@ -579,15 +575,6 @@ pub fn statue_cat() -> Vec<Obj> {
             rings = 8
         );
         sphere!(
-            "chin",
-            0.5,
-            at = (0, -0.14, 0.408),
-            material = M.concrete,
-            scale = (0.04, 0.03, 0.025),
-            segments = 8,
-            rings = 6
-        );
-        sphere!(
             "nose",
             0.5,
             at = (0, -0.168, 0.445),
@@ -599,30 +586,11 @@ pub fn statue_cat() -> Vec<Obj> {
         for s in [-1, 1] {
             let sf = s as f64;
             sphere!(
-                format!("pad{s}"),
-                0.5,
-                at = (sf * 0.018, -0.162, 0.428),
-                material = M.concrete,
-                scale = (0.034, 0.026, 0.026),
-                segments = 8,
-                rings = 6
-            );
-            sphere!(
                 format!("eye{s}"),
                 0.5,
                 at = (sf * 0.04, -0.152, 0.475),
                 material = M.concrete_dark,
                 scale = (0.026, 0.01, 0.016),
-                rot = (0, s * 12, 0),
-                segments = 8,
-                rings = 4
-            );
-            sphere!(
-                format!("lid{s}"),
-                0.5,
-                at = (sf * 0.04, -0.15, 0.481),
-                material = M.concrete,
-                scale = (0.03, 0.012, 0.008),
                 rot = (0, s * 12, 0),
                 segments = 8,
                 rings = 4
@@ -662,37 +630,30 @@ pub fn statue_cat() -> Vec<Obj> {
                 &hollow,
                 material = M.concrete_dark
             );
+            // the front leg grows out of the chest and runs straight down into its paw
             sweep!(
                 format!("leg{s}"),
                 &[
-                    (sf * 0.045, -0.12, 0.23),
-                    (sf * 0.044, -0.13, 0.14),
-                    (sf * 0.045, -0.14, 0.05),
-                    (sf * 0.045, -0.145, 0.025)
+                    (sf * 0.05, -0.04, 0.30),
+                    (sf * 0.05, -0.10, 0.20),
+                    (sf * 0.05, -0.115, 0.10),
+                    (sf * 0.05, -0.12, 0.035)
                 ],
-                0.024,
+                0.034,
                 material = M.concrete,
                 verts = 10,
                 resolution = 2,
-                scale = [1.15, 1.0, 0.9, 0.95]
+                scale = [1.1, 1.0, 0.8, 0.85]
             );
             sphere!(
                 format!("paw{s}"),
                 0.5,
-                at = (sf * 0.045, -0.15, 0.017),
+                at = (sf * 0.05, -0.135, 0.02),
                 material = M.concrete,
-                scale = (0.06, 0.07, 0.035),
+                scale = (0.07, 0.11, 0.045),
                 segments = 10,
                 rings = 6
             );
-            for t in [-1, 1] {
-                cube!(
-                    format!("toe{s}{t}"),
-                    (0.002, 0.03, 0.012),
-                    at = (sf * 0.045 + t as f64 * 0.01, -0.172, 0.02),
-                    material = M.concrete_dark
-                );
-            }
         }
         // the tail: one tapering sweep from the rump round the side to the front paws
         sweep!(

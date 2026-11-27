@@ -3,14 +3,13 @@
 use super::common::M;
 use artkit::math;
 use artkit::parts::{join_all, settle};
-use artkit::place::GameFrame;
+use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsphere, settle};
+use artkit::{fbox, fcone, fextrude, fsphere, settle};
 
-// --- O9: the carport: four posts, two beams and the rafters under its roof --------------------------------
-pub fn carport() -> Vec<Obj> {
-    let f = GameFrame::new(0.0);
-    let (w, d, h) = (2.90, 4.90, 2.35);
+/// Four square corner posts of width `t` on a `w` x `d` plan (the carport's and the gazebo's), each `hs` high so a
+/// roof can fall.
+fn corner_posts(f: &GameFrame, w: f64, d: f64, t: f64, hs: [f64; 4]) {
     for (i, (sx, sz)) in [(-1.0f64, -1.0f64), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
         .into_iter()
         .enumerate()
@@ -18,25 +17,51 @@ pub fn carport() -> Vec<Obj> {
         fbox!(
             f,
             format!("post{i}"),
-            0.14,
-            h,
-            0.14,
-            (sx * (w / 2.0 - 0.07), h / 2.0, sz * (d / 2.0 - 0.07)),
+            t,
+            hs[i],
+            t,
+            (sx * (w / 2.0 - t / 2.0), hs[i] / 2.0, sz * (d / 2.0 - t / 2.0)),
             M.struct_timber,
             bevel = 0.008
         );
     }
+}
+
+// --- O9: the carport: four posts, two beams with knee braces, the rafters and a roof that falls to one side ------
+pub fn carport() -> Vec<Obj> {
+    let f = GameFrame::new(0.0);
+    let (w, d, h) = (2.90f64, 4.90f64, 2.26f64);
+    // the roof falls 0.14 m across its width, high on the left
+    let slope = 0.14 / (w - 0.14);
+    let ang = slope.atan().to_degrees();
+    let post_h = |sx: f64| h - slope * sx * (w / 2.0 - 0.07);
+    corner_posts(&f, w, d, 0.14, [post_h(-1.0), post_h(1.0), post_h(-1.0), post_h(1.0)]);
     for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+        let top = post_h(sx);
         fbox!(
             f,
             format!("beam{i}"),
             0.12,
             0.20,
             d,
-            (sx * (w / 2.0 - 0.06), h + 0.10, 0),
+            (sx * (w / 2.0 - 0.06), top + 0.10, 0),
             M.struct_timber,
             bevel = 0.008
         );
+        // knee braces from each end post up to the beam, leaning in along the beam
+        for (k, sz) in [-1.0f64, 1.0].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("brace{i}{k}"),
+                0.08,
+                0.62,
+                0.08,
+                (sx * (w / 2.0 - 0.07), top - 0.22, sz * (d / 2.0 - 0.07 - 0.22)),
+                M.struct_timber,
+                bevel = 0.006,
+                rot = (-sz * 45.0, 0, 0)
+            );
+        }
     }
     for i in 0..5 {
         let z = -d / 2.0 + 0.20 + i as f64 * (d - 0.40) / 4.0;
@@ -48,7 +73,8 @@ pub fn carport() -> Vec<Obj> {
             0.10,
             (0, h + 0.26, z),
             M.struct_timber,
-            bevel = 0.006
+            bevel = 0.006,
+            rot = (0, ang, 0)
         );
     }
     fbox!(
@@ -59,31 +85,31 @@ pub fn carport() -> Vec<Obj> {
         d + 0.10,
         (0, h + 0.345, 0),
         M.struct_roof,
-        bevel = 0.006
+        bevel = 0.006,
+        rot = (0, ang, 0)
     );
-    settle!();
-    meshes()
+    // fascia boards along the roof's front and back edges
+    for (i, sz) in [-1.0f64, 1.0].into_iter().enumerate() {
+        fbox!(
+            f,
+            format!("fascia{i}"),
+            w + 0.10,
+            0.16,
+            0.03,
+            (0, h + 0.28, sz * (d / 2.0 + 0.04)),
+            M.struct_timber,
+            bevel = 0.004,
+            rot = (0, ang, 0)
+        );
+    }
+    settle(&[join_all("body")])
 }
 
-// --- O9: the gazebo: four posts, its ring beam, the stepped roof with its finial and a bench along the back -----------------------
+// --- O9: the gazebo: four posts, its ring beam, a hipped roof with its finial, balusters and a bench along the back ----
 pub fn gazebo() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let (w, d, h) = (2.84, 2.84, 2.30);
-    for (i, (sx, sz)) in [(-1.0f64, -1.0f64), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
-        .into_iter()
-        .enumerate()
-    {
-        fbox!(
-            f,
-            format!("post{i}"),
-            0.13,
-            h,
-            0.13,
-            (sx * (w / 2.0 - 0.065), h / 2.0, sz * (d / 2.0 - 0.065)),
-            M.struct_timber,
-            bevel = 0.008
-        );
-    }
+    corner_posts(&f, w, d, 0.13, [h; 4]);
     for (i, sz) in [-1.0f64, 1.0].into_iter().enumerate() {
         fbox!(
             f,
@@ -108,38 +134,22 @@ pub fn gazebo() -> Vec<Obj> {
             bevel = 0.006
         );
     }
-    // the roof: a broad skirt, the lantern over it and its own cap
-    fbox!(
+    // the roof: a hipped pyramid (a four-sided cone turned to the plan) on a thin eaves skirt, a finial on its peak
+    let rise = 0.47;
+    fbox!(f, "skirt", 2.96, 0.07, 2.96, (0, h + 0.195, 0), M.struct_roof, bevel = 0.006);
+    fcone!(
         f,
         "roof",
-        2.96,
-        0.10,
-        2.96,
-        (0, h + 0.21, 0),
+        2.96 / 2.0 * 2f64.sqrt(),
+        0.05,
+        rise,
+        (0, h + 0.23 + rise / 2.0, 0),
         M.struct_roof,
-        bevel = 0.008
+        verts = 4,
+        smooth = false,
+        rot = (0, 0, 45)
     );
-    fbox!(
-        f,
-        "lantern",
-        1.50,
-        0.30,
-        1.50,
-        (0, h + 0.41, 0),
-        M.struct_timber,
-        bevel = 0.006
-    );
-    fbox!(
-        f,
-        "cap",
-        1.90,
-        0.09,
-        1.90,
-        (0, h + 0.605, 0),
-        M.struct_roof,
-        bevel = 0.008
-    );
-    fsphere!(f, "finial", 0.07, (0, h + 0.72, 0), M.struct_roof);
+    fsphere!(f, "finial", 0.07, (0, h + 0.23 + rise + 0.03, 0), M.struct_roof);
     // the railing: two rails on the back and the two sides
     for (i, (sx, sz, len, along_x)) in [
         (0.0f64, -1.0f64, w, true),
@@ -160,6 +170,21 @@ pub fn gazebo() -> Vec<Obj> {
                 (sx * (w / 2.0 - 0.065), y, sz * (d / 2.0 - 0.065)),
                 M.struct_timber,
                 bevel = 0.005
+            );
+        }
+        // balusters between the two rails
+        for j in 1..7 {
+            let u = (j as f64 / 7.0 - 0.5) * (len - 0.26);
+            let (bx, bz) = if along_x { (u, 0.0) } else { (0.0, u) };
+            fbox!(
+                f,
+                format!("baluster{i}{j}"),
+                0.04,
+                0.70,
+                0.04,
+                (sx * (w / 2.0 - 0.065) + bx, 0.675, sz * (d / 2.0 - 0.065) + bz),
+                M.struct_timber,
+                bevel = 0.004
             );
         }
     }
@@ -274,7 +299,7 @@ pub fn pergola() -> Vec<Obj> {
     meshes()
 }
 
-// --- O9: the awning: a rail on the wall, its slats stepping down to the front bar and the valance ---------
+// --- O9: the awning: a rail on the wall, its striped fabric sloping down to the front bar, the arms and the valance ---------
 pub fn awning() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let back = -0.43;
@@ -288,34 +313,62 @@ pub fn awning() -> Vec<Obj> {
         M.panel_frame,
         bevel = 0.006
     );
-    for i in 0..5 {
-        let y = 2.160 - 0.035 * i as f64;
-        let z = back + 0.100 + 0.175 * i as f64;
+    // the fabric: eight stripes in one sloping sheet from the rail down to the front bar
+    let (z0, z1, y0, y1) = (back + 0.07, back + 0.88, 2.175, 1.995);
+    let (len, ang) = ((z1 - z0).hypot(y0 - y1), ((y0 - y1) / (z1 - z0)).atan().to_degrees());
+    for i in 0..8 {
         fbox!(
             f,
-            format!("slat{i}"),
-            1.88,
-            0.030,
-            0.200,
-            (0, y, z),
+            format!("fabric{i}"),
+            1.88 / 8.0,
+            0.02,
+            len,
+            (-0.94 + 1.88 / 8.0 * (i as f64 + 0.5), (y0 + y1) / 2.0, (z0 + z1) / 2.0),
             if i % 2 == 0 {
                 M.awning_stripe
             } else {
                 M.awning_stripe2
             },
-            bevel = 0.006
+            bevel = 0.004,
+            rot = (ang, 0, 0)
         );
     }
+    // a fabric cheek at each end, hanging under the sheet down to the arm
+    for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+        fextrude!(
+            f,
+            format!("cheek{i}"),
+            &[(z0, y0 - 0.02), (z1, y1 - 0.02), (z0, 2.00)],
+            0.012,
+            (sx * 0.94, 0, 0),
+            M.awning_stripe,
+            plane = Facing::Side,
+            bevel = 0.004
+        );
+    }
+    // the folding arms: from the wall bracket out to the front bar, sloping with the sheet
+    let (al, aa) = ((z1 - z0).hypot(2.00 - 1.975), ((2.00 - 1.975) / (z1 - z0)).atan().to_degrees());
     for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
         fbox!(
             f,
             format!("arm{i}"),
-            0.05,
-            0.05,
-            0.86,
-            (sx * 0.90, 2.00, back + 0.470),
+            0.04,
+            0.04,
+            al,
+            (sx * 0.90, 1.9875, (z0 + z1) / 2.0),
             M.panel_frame,
-            bevel = 0.006
+            bevel = 0.005,
+            rot = (aa, 0, 0)
+        );
+        fbox!(
+            f,
+            format!("bracket{i}"),
+            0.05,
+            0.14,
+            0.04,
+            (sx * 0.90, 2.11, back + 0.02),
+            M.panel_frame,
+            bevel = 0.005
         );
     }
     fbox!(
@@ -338,8 +391,7 @@ pub fn awning() -> Vec<Obj> {
         M.awning_stripe,
         bevel = 0.004
     );
-    settle!();
-    meshes()
+    settle(&[join_all("body")])
 }
 
 // --- O9: the solar array: two 60-cell modules tilted at the sun on a low braced ground frame -------------

@@ -236,3 +236,12 @@ The gazebo's bench (in the timber, no draw call of its own): three boards with t
 (depth −1.30) to −0.89, two back boards (0.62 and 0.79 m) on the back legs, three frames. The content seats three
 there (`slots` 3, `places` at depth −1.10 and 0.75 m apart, `seat` 0.45 m high, `forward` 0), come to from the open
 front (`approach: door`, as the sauna's): from any other side they would come through the rail.
+
+## Realism pass (2026-11-27)
+
+`gazebo` has a hipped roof (a four-sided cone on a thin skirt) and balusters between its rails; `carport` has knee
+braces, front and back fascia boards and a roof that falls 0.14 m across its width (posts and rafters follow it);
+`awning` is one sloping sheet of eight stripes with two fabric cheeks, sloped arms and wall brackets instead of five
+stepped slats. The gazebo and carport share `corner_posts`. The carport and awning now join into one `body` (their
+tilted parts would otherwise not merge), so their `unmoved` baseline entries drop to 0: lower the gate baseline.
+Carport height 2.72 -> 2.71 m; gazebo, awning sizes unchanged.
