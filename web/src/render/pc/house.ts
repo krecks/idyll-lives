@@ -228,11 +228,4 @@ export class HouseBuilder {
     return { meshes, homes, lamps };
   }
 
-  /**
-   * Neighbours' window glass (`SilhouetteBuild.homes`' panes) as one mesh: glowing at night as the
-   * street's (`lit`), or dark (everyone in asleep, or nobody home). Null when there's none.
-   */
-  neighbourWindows(panes: readonly Geo[], lit: boolean, parent: pc.Entity): HouseMesh | null {
-    return this.draw(this.planner.neighbourPanes(panes, lit), parent);
-  }
 }
