@@ -58,7 +58,7 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
   setMorphs(morphs: MorphSet): void;
   /** Uploads the whole pose texture (`build`). */
   uploadPoses(): void;
-  /** Uploads rows `from` .. `from + count - 1` of the pose texture (per frame: the band of rows that changed). */
+  /** Uploads rows `from` .. `from + count - 1` of the pose texture (per frame: each band of rows that changed, a few at most). */
   uploadPoseRows(from: number, count: number): void;
 
   /**

@@ -2,8 +2,9 @@
 // (hidden, away, out of view) is in no part's rows, the parts drawn whatever the distance and the shadow-only copies
 // included, so nothing skins them to nothing; and only residents posed inside the sun's shadow square draw its map
 // again (`posed`), and the shadow-only copies draw only those who may cast into a map (`setCastTest`). And the pose
-// texture's three texels a bone (`layout.ts` `BONE_TEXELS`) are the skinning matrices' rows, number for number; and
-// residents far off are posed in full only every few frames, carried along where they are between. `bun test`.
+// texture's three texels a bone (`layout.ts` `BONE_TEXELS`) are the skinning matrices' rows, number for number, its
+// changed rows uploaded in bands round them, not one from the first to the last; and residents far off are posed in
+// full only every few frames, carried along where they are between. `bun test`.
 //
 // (What this caught when written: the hair, the eyes and the shadow-only copies kept every resident built, drawn or
 // not, and one hidden counted as far off, so its low-detail body was drawn too; and anyone posed within the preset's
@@ -388,6 +389,29 @@ describe('residents not drawn', async () => {
       performance.now = realNow;
     }
   }, 30_000);
+
+  test("the pose texture's changed rows go up in bands, not one band from the first to the last", async () => {
+    const bands: [number, number][] = [];
+    const characters = new Characters(standInView({ uploadPoseRows: (from, count) => void bands.push([from, count]) }), assets, content, { castsShadows: true });
+    expect(await characters.init()).toBe(true);
+    const own = characters as unknown as { data: Float32Array; visible: Uint8Array; width: number; posed: boolean; upload(): void };
+    const stride = own.width * 4;
+    // Rows 0-2 and 6 (three rows between: one band), then rows 700 and 702 (hundreds on: a band of their own).
+    for (const i of [0, 1, 2, 6, 700, 702]) {
+      own.visible[i] = 1;
+      own.data[i * stride] += 1;
+    }
+    own.upload();
+    expect(bands).toEqual([
+      [0, 7],
+      [700, 3],
+    ]);
+    expect(own.posed).toBe(true);
+    // Nothing changed since: nothing uploaded.
+    bands.length = 0;
+    own.upload();
+    expect([bands, own.posed]).toEqual([[], false]);
+  });
 
   test("the pose texture's rows are the skinning matrices'", async () => {
     const characters = new Characters(view, assets, content, { castsShadows: true });

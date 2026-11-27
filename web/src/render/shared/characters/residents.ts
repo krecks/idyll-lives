@@ -157,6 +157,8 @@ function stationSide(rig: SimRig, station: PlacedObject): number {
  */
 const FAR_EVERY = [2, 4] as const;
 const FAR_LAG = 0.25;
+/** The most unchanged rows of the pose texture one upload spans between changed ones (`upload`): further apart, two uploads. */
+const UPLOAD_GAP = 8;
 /**
  * How long a resident the sim is catching up is hidden (real ms, `setDetailArea`): come into its full-detail area
  * (the camera's new area reaches the sim's worker, and its next tick catches them up on the ticks they owe, a few
@@ -4571,7 +4573,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * Uploads the pose texture's rows that changed since the last upload (Sims drawn now, or just
-   * hidden), as one band of rows: a few of the 64 most frames, none while the game is paused.
+   * hidden), in bands of rows: one per run of changed rows no more than `UPLOAD_GAP` apart (the
+   * household in the first rows and a neighbour in view hundreds after are two small uploads, not one
+   * of every row between); none while the game is paused.
    */
   private upload(): void {
     const stride = this.width * 4;
@@ -4589,6 +4593,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       while (k < end && data[k] === uploaded[k]) k++;
       if (k === end) continue;
       uploaded.set(data.subarray(k, end), k);
+      if (lo >= 0 && i - hi > UPLOAD_GAP + 1) {
+        this.view.uploadPoseRows(lo, hi - lo + 1);
+        lo = -1;
+      }
       if (lo < 0) lo = i;
       hi = i;
       if (shadowed) continue;
