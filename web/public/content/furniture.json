@@ -5970,6 +5970,9 @@
       "category": "decor",
       "group": "wall",
       "layer": "wall",
+      "sounds": {
+        "knock": "ping"
+      },
       "decor": 0.2,
       "description": "A brass bell push by the front door.",
       "interactions": [
