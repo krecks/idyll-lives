@@ -133,10 +133,7 @@ impl G2p {
         if let Some(plain) = unaccented(word) {
             return self.word(&plain, ctx);
         }
-        if !word.bytes().all(|c| c.is_ascii_alphabetic() || c == b'\'') {
-            return None;
-        }
-        // Unknown: spell short all-caps words ("CPU"), guess the rest.
+        // Unknown: spell short all-caps words ("CPU"), guess the rest (from its ASCII letters).
         if word.len() <= 4
             && word == word.to_uppercase()
             && let Some(ps) = self.nnp(word)
@@ -353,28 +350,27 @@ impl G2p {
         let (num, suffix) = word.split_at(digits_end);
         let suffix = suffix.to_lowercase();
         let plain: String = num.chars().filter(|&c| c != ',').collect();
+        let digits = |s: &str| {
+            s.bytes()
+                .filter(u8::is_ascii_digit)
+                .map(|d| numbers::ONES[(d - b'0') as usize])
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
         let words = if !plain.contains('.') {
-            let n: u64 = plain.parse().ok()?;
-            if ORDINALS.contains(&suffix.as_str()) {
-                numbers::ordinal(n)
-            } else if plain.len() == 4 && !num.contains(',') {
-                numbers::year(n)
-            } else {
-                numbers::cardinal(n)
+            match plain.parse::<u64>() {
+                // Past a u64: digit by digit, so the mouth still moves.
+                Err(_) => digits(&plain),
+                Ok(n) if ORDINALS.contains(&suffix.as_str()) => numbers::ordinal(n),
+                Ok(n) if plain.len() == 4 && !num.contains(',') => numbers::year(n),
+                Ok(n) => numbers::cardinal(n),
             }
         } else {
             let (whole, frac) = plain.split_once('.')?;
-            let whole = if whole.is_empty() {
-                String::new()
-            } else {
-                numbers::cardinal(whole.parse().ok()?)
-            };
-            let frac: Vec<&str> = frac
-                .bytes()
-                .filter(u8::is_ascii_digit)
-                .map(|d| numbers::ONES[(d - b'0') as usize])
-                .collect();
-            format!("{whole} point {}", frac.join(" "))
+            let whole = whole
+                .parse()
+                .map_or_else(|_| digits(whole), numbers::cardinal);
+            format!("{whole} point {}", digits(frac))
         };
         let mut parts = Vec::new();
         for w in words
@@ -523,9 +519,9 @@ fn restress(ps: &str) -> String {
 /// `word` with Latin accents taken off, if it has any (and nothing else outside ASCII).
 fn unaccented(word: &str) -> Option<String> {
     const FROM: &str =
-        "àáâãäåāçćčèéêëēěìíîïīñńňòóôõöøōùúûüūýÿžśšźżÀÁÂÃÄÅĀÇĆČÈÉÊËĒĚÌÍÎÏĪÑŃŇÒÓÔÕÖØŌÙÚÛÜŪÝŸŽŚŠŹŻ";
+        "àáâãäåāçćčèéêëēěìíîïīłñńňòóôõöøōùúûüūýÿžśšźżÀÁÂÃÄÅĀÇĆČÈÉÊËĒĚÌÍÎÏĪŁÑŃŇÒÓÔÕÖØŌÙÚÛÜŪÝŸŽŚŠŹŻ";
     const TO: &str =
-        "aaaaaaaccceeeeeeiiiiinnnooooooouuuuuyyzsszzAAAAAAACCCEEEEEEIIIIINNNOOOOOOOUUUUUYYZSSZZ";
+        "aaaaaaaccceeeeeeiiiiilnnnooooooouuuuuyyzsszzAAAAAAACCCEEEEEEIIIIILNNNOOOOOOOUUUUUYYZSSZZ";
     if word.is_ascii() {
         return None;
     }

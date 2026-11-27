@@ -203,7 +203,7 @@ fn finish_returns_the_clip_and_its_track() {
         text: "Hi there!".into(),
         phonemes: "hˈI ðˈɛɹ!".into(),
         voice: VoiceParams {
-            speed: 1.2,
+            pitch: 1.2,
             ..Default::default()
         },
     };
@@ -212,9 +212,9 @@ fn finish_returns_the_clip_and_its_track() {
     assert_eq!(t.energy.len(), samples.len().div_ceil(240));
     assert_monotonic(&t);
     let seconds = samples.len() as f32 / RATE;
-    // Trimmed to 50 ms before the voice, then 1/1.2 as long.
+    // Trimmed to 50 ms before the voice; a higher pitch keeps the timing.
     assert!(
-        (t.times[0] - 0.05 / 1.2).abs() <= 0.015,
+        (t.times[0] - 0.05).abs() <= 0.015,
         "starts at {}",
         t.times[0]
     );

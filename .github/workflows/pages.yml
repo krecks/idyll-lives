@@ -129,7 +129,7 @@ jobs:
           bun run voice
           bun run llm
 
-      # With CI set, a missing dictionary fails these instead of skipping them.
+      # A missing dictionary fails these (unless VOICE_TEST_SKIP=1).
       - name: Voice tests
         run: cargo test -p voice --release --locked
 
