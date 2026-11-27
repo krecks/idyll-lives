@@ -6037,7 +6037,7 @@
       "group": "wall",
       "layer": "wall",
       "decor": 0.1,
-      "description": "A keypad and a box over the door: the little light blinks all night.",
+      "description": "A keypad by the door: the little light blinks all night.",
       "interactions": []
     },
     {

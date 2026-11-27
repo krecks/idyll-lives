@@ -174,17 +174,43 @@ Triangles 3,540 → 4,052 and 4,564 → 6,100 for the extra folds; the sizes are
 ## Wall fittings (2026-11-27)
 
 Five wall pieces joined the set: the venetian blinds (`blinds`), the coat hooks (`coatHooks`), the doorbell
-(`doorbell`), the burglar alarm's keypad (`burglarAlarm`) and the security camera (`cctvCamera`). The four still ones
-are one model of one or two finishes, so 1 draw call each: the hooks' board and brass, the bell's brass and button,
-the keypad's case and keys, the camera's housing and lens. All five are built at their real height on the wall's face
+(`doorbell`), the burglar alarm's keypad (`burglarAlarm`) and the security camera (`cctvCamera`). The hooks, the bell
+and the camera are still, one part each of two finishes, so 1 draw call each: the hooks' board and metal, the bell's
+brass and button, the camera's housing and lens. All five are built at their real height on the wall's face
 (`WALL`, −0.43 m) and declared `.on_wall()`; the blinds' two cords hang 3 cm in front of the slats, which is what sets
 their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, under the eaves.
 
-The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains). One part can't turn each slat about its
-own length, and a part a slat would cost a draw call each (9 in all), so the clip swaps two parts: the open slats
-(`slats`) thin to nothing front to back, while the shut ones (`vanes`: the same eight slats turned 70° and 9.5 cm
-wide, so each overlaps the next), flat inside the head rail at rest, grow down out of it over them. It reads as the
-slats tilting shut as they come down. 3 draw calls: the rails and cords, and the two moving parts.
+- **Coat hooks** (looked at again 2026-11-27): each hook is a J (`kit::tube!` on a round rose), out from the board at
+  1.60 m (the height `coatHooks:fetch` and its `high` reach are fitted to), dipping 1 cm and turning up 4 cm to a
+  ball tip, so a coat stays on; they were straight pegs. 0.90 × 0.14 × 0.111 m, `centre` (0, −0.3745) so the board's
+  back stays on the wall face; one part (`join_all`), 3,420 → 2,588 triangles, 1 draw.
+- **Doorbell** (looked at again 2026-11-27): a brass bell push, an 84 mm round plate and a collar of polished brass
+  (`bell_brass`, metal) round an ivory push (`bell_push`, ceramic). It was a flat tan plate that read as wood, a
+  silver button and a camera's lens (a video doorbell). The button's face stays 1.34 m up and 0.394 m behind the
+  middle, where the renderer's `press` reaches (`clips/reach.ts`). 0.084 × 0.084 × 0.036 m, one part, 936 → 948
+  triangles, 1 draw.
+- **Burglar alarm** (looked at again 2026-11-27): the armed light (`alarm_led`) glows red at night (`glow`) and
+  blinks near the camera (`blink`, `idle`, 2 s a round: pushed 11 mm back into the case from 1.5 to 1.95 s, as the
+  server rack's lights blink); at rest (on Low, far off) it stays lit. 2 draw calls (the case and keys, the light),
+  1 more at night for the glow; it was 1 and never lit. No bell box: the content said "a keypad and a box over the
+  door", but a bell box belongs high on the front outside, and stacked over the keypad inside one wall tile it would
+  read as two boxes, not as an alarm; the blinking light says alarm. The description is now "A keypad by the door:
+  the little light blinks all night."
+
+The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains): sixteen 50 mm slats 45 mm apart tilt
+about their own lengths from flat to 80°, where each overlaps the next by 4 mm and they make one even surface. A
+part a slat would be 17 draw calls; instead they move as one (looked at again 2026-11-27: the clip swapped two parts,
+the open slats thinning away while tilted ones grew down out of the head rail, which looked doubled mid-clip and
+sawtoothed shut). A node's turn after its stretch along its own axes can be any linear map, and the shear that tilts
+every slat about its own middle is one: turned to 45° + θ/2 and stretched √(1 + sin θ) along its depth and
+√(1 − sin θ) along its height, a part built turned back 45° tilts each slat by θ, the slats' middles staying where
+they are (their edges stay upright, so a slat at θ is 6·cos θ mm thick: unseen). The top slat (`slats`) carries that
+turn and stretch, keyed a frame at a time; the fifteen below (`slats_below`) ride on it (`motion::attach`), their
+mesh unturned and their node turned back 45°: the gate measures a part by its mesh's box, and the column built turned
+measured 0.73 m deep. 2 draw calls, where it was 3 (the rails and cords; the slats, one moving part with all below
+it, as the renderer and the gate both count it); 432 triangles as before. Not seen in the game yet: its moving parts
+are instanced, and PlayCanvas's instanced normal matrix is the plain matrix, not its inverse transpose, so in the
+game the slats keep their open faces' light as they tilt (the shape is right; the previews light them as they face).
 
 `shutters` is the other window covering: two louvred panels, each a frame of two stiles and two rails round a core
 with six louvres tilted 20°, the same both sides (all centred on the hinge line, 3.5 cm off the wall's face), so

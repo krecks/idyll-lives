@@ -1,16 +1,20 @@
 //! D4: wall fittings — the venetian blinds, the coat hooks, and the door's gadgets: the bell, the alarm keypad and the camera.
 
 use super::common::{M, WALL};
-use artkit::math::{Axis, P3};
-use artkit::motion::{FLAT, flat};
-use artkit::parts::{hinged, join, new_parts, turn};
+use artkit::kit;
+use artkit::math::{Axis, P3, radians, sin, sqrt};
+use artkit::motion::{Ease, Path, attach, keys};
+use artkit::parts::{hinged, join, join_all, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsphere, grow, settle, squash, swing};
+use artkit::{fbox, fcyl, fsphere, settle, swing};
 
 // --- D4: the venetian blinds: a head rail on the wall, slats, a bottom rail and their cords -------------
-// At night (`close`) the slats shut: one part can't turn each slat about its own length, so the open slats thin to
-// nothing front to back while the shut ones, tilted and overlapping, come down out of the head rail over them.
+// At night (`close`) the slats tilt shut, each about its own length, though all sixteen move as one.
+// A node's turn after its stretch along its own axes can be any linear map, so the part's mesh is built turned back
+// 45° and its node turns to 45° + θ/2 while it stretches √(1 + sin θ) along its depth and √(1 − sin θ) along its
+// height: together a shear taking each slat's width to the tilt θ about its own middle, the slats' middles staying
+// where they are (their edges stay upright, so a slat is 6·cos θ mm thick at θ; nothing a player can see).
 pub fn blinds() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let z = WALL + 0.035;
@@ -48,47 +52,59 @@ pub fn blinds() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some(P3::ZERO));
-    let open = new_parts(|| {
-        for i in 0..8 {
-            fbox!(
-                f,
-                format!("slat{i}"),
-                0.86,
-                0.008,
-                0.055,
-                (0, 1.870 - 0.085 * i as f64, z),
-                M.blind_slat
-            );
+    // 50 mm slats 45 mm apart: shut at 80° each overlaps the next by 4 mm
+    let (top, step) = (1.866, 0.045);
+    let pivot = f.at(0, top, z);
+    let slat = |i: usize| {
+        fbox!(
+            f,
+            format!("slat{i}"),
+            0.86,
+            0.006,
+            0.050,
+            (0, top - step * i as f64, z),
+            M.blind_slat
+        )
+    };
+    // the top slat carries the turn and stretch; the other fifteen ride on it, unturned in their own node turned
+    // back 45° (the gate measures a part by its mesh's box: built turned, the column of slats would measure 0.73 m deep)
+    let first = new_parts(|| {
+        slat(0);
+    });
+    let first = turn(hinged(join(&first, "slats", None), pivot), -45.0, Axis::X);
+    first.set_rotation((45, 0, 0));
+    let below = new_parts(|| {
+        for i in 1..16 {
+            slat(i);
         }
     });
-    let open = hinged(join(&open, "slats", None), f.at(0, 1.870, z));
-    // shut: each slat turned 70° about its length, wide enough to overlap the next
-    let shut = new_parts(|| {
-        for i in 0..8 {
-            fbox!(
-                f,
-                format!("vane{i}"),
-                0.86,
-                0.004,
-                0.095,
-                (0, 1.870 - 0.085 * i as f64, z),
-                M.blind_slat,
-                rot = (70, 0, 0)
-            );
-        }
-    });
-    // (from inside the head rail, where it hides flat at rest)
-    let shut = hinged(join(&shut, "vanes", None), f.at(0, 1.925, z));
+    let below = hinged(join(&below, "slats_below", None), pivot);
     settle!();
-    flat(shut, Axis::Z);
-    squash!(open, "close", (1, FLAT, 1), seconds = 1.2);
-    grow!(shut, "close", seconds = 1.2, axis = Axis::Z);
+    attach(below, first);
+    // a key a frame (the file samples every frame anyway), eased in and out as `swing` is
+    let (shut, frames) = (radians(80.0), 36);
+    let mut turned = Vec::new();
+    let mut deep = Vec::new();
+    let mut high = Vec::new();
+    for k in 0..=frames {
+        let (t, u) = (k as f64 / 30.0, k as f64 / frames as f64);
+        let th = shut * u * u * (3.0 - 2.0 * u);
+        turned.push((t, radians(45.0) + th / 2.0, Ease::Linear));
+        deep.push((t, sqrt(1.0 + sin(th)), Ease::Linear));
+        high.push((t, sqrt(1.0 - sin(th)), Ease::Linear));
+    }
+    keys(first, "close", Path::Rotation, 0, &turned);
+    keys(first, "close", Path::Scale, 1, &deep);
+    keys(first, "close", Path::Scale, 2, &high);
     meshes()
 }
 
-// --- D4: the coat hooks: a painted board on the wall and four brass hooks ---------------------------------
+// --- D4: the coat hooks: a painted board on the wall and four J hooks, each on a round rose ----------------
+// A hook runs out from the board at 1.60 m (the height `coatHooks:fetch` reaches for), dips and turns up to a
+// ball tip, so a coat's loop stays on it.
 pub fn coat_hooks() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
+    let face = WALL + 0.022;
     fbox!(
         f,
         "board",
@@ -101,98 +117,159 @@ pub fn coat_hooks() -> Vec<Obj> {
     );
     for i in 0..4 {
         let x = -0.315 + 0.21 * i as f64;
-        fbox!(
+        fcyl!(
             f,
-            format!("arm{i}"),
-            0.018,
-            0.022,
-            0.075,
-            (x, 1.60, WALL + 0.022 + 0.0375),
+            format!("rose{i}"),
+            0.014,
+            0.006,
+            (x, 1.60, face + 0.003),
             M.gadget_chrome,
-            bevel = 0.004
+            rot = (90, 0, 0),
+            verts = 16,
+            bevel = 0.002
+        );
+        let pts: Vec<(f64, f64, f64)> = [
+            (1.600, 0.000),
+            (1.596, 0.030),
+            (1.590, 0.058),
+            (1.596, 0.076),
+            (1.614, 0.083),
+            (1.636, 0.080),
+        ]
+        .iter()
+        .map(|&(y, d)| (x, y, face + d))
+        .collect();
+        kit::tube!(
+            f,
+            format!("hook{i}"),
+            &pts,
+            0.0065,
+            M.gadget_chrome,
+            round = 4
         );
         fsphere!(
             f,
-            format!("ball{i}"),
-            0.016,
-            (x, 1.60, WALL + 0.104),
-            M.gadget_chrome
+            format!("tip{i}"),
+            0.0085,
+            (x, 1.638, face + 0.080),
+            M.gadget_chrome,
+            segments = 10,
+            rings = 6
         );
     }
+    join_all("coatHooks");
     settle!();
     meshes()
 }
 
-// --- D4: the doorbell: a brass plate with its button, beside the door --------------------------------------
+// --- D4: the doorbell: a round brass bell push, its ivory button in a brass collar -------------------------
+// The button's face is 1.34 m up and 0.394 m behind the middle, where the renderer's press reaches (`clips/reach.ts`).
 pub fn doorbell() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    fbox!(
+    fcyl!(
         f,
         "plate",
-        0.10,
-        0.16,
-        0.024,
-        (0, 1.35, WALL + 0.012),
-        M.gilt,
+        0.042,
+        0.014,
+        (0, 1.34, WALL + 0.007),
+        M.bell_brass,
+        rot = (90, 0, 0),
+        verts = 32,
         bevel = 0.004
     );
-    fbox!(
+    fcyl!(
+        f,
+        "collar",
+        0.017,
+        0.012,
+        (0, 1.34, WALL + 0.020),
+        M.bell_brass,
+        rot = (90, 0, 0),
+        bevel = 0.003
+    );
+    fcyl!(
         f,
         "button",
-        0.036,
-        0.036,
-        0.012,
-        (0, 1.34, WALL + 0.030),
-        M.gadget_chrome,
+        0.011,
+        0.014,
+        (0, 1.34, WALL + 0.029),
+        M.bell_push,
+        rot = (90, 0, 0),
         bevel = 0.004
     );
-    fsphere!(f, "lens", 0.008, (0, 1.40, WALL + 0.026), M.cam_lens);
+    join_all("doorbell");
     settle!();
     meshes()
 }
 
 // --- D4: the burglar alarm: the keypad by the door, its keys and its armed light ---------------------------
+// The light glows at night (`alarm_led`) and blinks all the time near the camera (`blink`, `idle`): pushed back into
+// the case for a moment every 2 s, as the server rack's lights blink. At rest (on Low, far off) it stays lit.
 pub fn burglar_alarm() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    fbox!(
-        f,
-        "case",
-        0.22,
-        0.28,
-        0.050,
-        (0, 1.70, WALL + 0.025),
-        M.gadget_white,
-        bevel = 0.008
-    );
-    fbox!(
-        f,
-        "keypad",
-        0.16,
-        0.13,
-        0.008,
-        (0, 1.66, WALL + 0.054),
-        M.gadget_dark,
-        bevel = 0.003
-    );
-    for r in 0..3 {
-        for c in 0..4 {
-            fbox!(
-                f,
-                format!("key{r}{c}"),
-                0.026,
-                0.020,
-                0.004,
-                (
-                    -0.051 + 0.034 * c as f64,
-                    1.700 - 0.036 * r as f64,
-                    WALL + 0.059
-                ),
-                M.gadget_white
-            );
+    let still = new_parts(|| {
+        fbox!(
+            f,
+            "case",
+            0.22,
+            0.28,
+            0.050,
+            (0, 1.70, WALL + 0.025),
+            M.gadget_white,
+            bevel = 0.008
+        );
+        fbox!(
+            f,
+            "keypad",
+            0.16,
+            0.13,
+            0.008,
+            (0, 1.66, WALL + 0.054),
+            M.gadget_dark,
+            bevel = 0.003
+        );
+        for r in 0..3 {
+            for c in 0..4 {
+                fbox!(
+                    f,
+                    format!("key{r}{c}"),
+                    0.026,
+                    0.020,
+                    0.004,
+                    (
+                        -0.051 + 0.034 * c as f64,
+                        1.700 - 0.036 * r as f64,
+                        WALL + 0.059
+                    ),
+                    M.gadget_white
+                );
+            }
         }
-    }
-    fsphere!(f, "led", 0.007, (0.085, 1.81, WALL + 0.052), M.alarm_led);
+    });
+    join(&still, "body", Some(P3::ZERO));
+    let at = (0.085, 1.81, WALL + 0.052);
+    let led = new_parts(|| {
+        fsphere!(f, "led", 0.007, at, M.alarm_led);
+    });
+    let led = join(&led, "led", Some(f.at(at.0, at.1, at.2)));
     settle!();
+    // (back 11 mm: the 7 mm bead, standing 2 mm proud of the case, all inside it)
+    let rest = led.location().y as f64;
+    let off = rest + 0.011;
+    let lin = Ease::Linear;
+    keys(
+        led,
+        "blink",
+        Path::Location,
+        1,
+        &[
+            (0.0, rest, lin),
+            (1.5, rest, lin),
+            (1.55, off, lin),
+            (1.95, off, lin),
+            (2.0, rest, lin),
+        ],
+    );
     meshes()
 }
 
