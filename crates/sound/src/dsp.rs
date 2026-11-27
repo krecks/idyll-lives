@@ -60,6 +60,7 @@ impl Stereo {
 /// `d[i] += v` on a `Float32Array`.
 #[inline]
 pub fn add(d: &mut [f32], i: usize, v: f64) {
+    debug_assert!(i < d.len(), "add {i} of {}", d.len());
     d[i] = (d[i] as f64 + v) as f32;
 }
 

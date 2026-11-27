@@ -49,6 +49,11 @@ pub fn node_filter(
     q: f64,
     looped: bool,
 ) -> Vec<f32> {
+    // At or over half the rate a low-pass passes everything (as the browser's node does): its poles would sit
+    // on the unit circle there.
+    if kind == Filter::Lowpass && frequency >= rate / 2.0 {
+        return x.to_vec();
+    }
     let w = (2.0 * PI * min(frequency, rate / 2.0)) / rate;
     let c = cos(w);
     let alpha = sin(w)
