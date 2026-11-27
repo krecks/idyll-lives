@@ -921,11 +921,15 @@ fn off_x(yaw: f32) -> f32 {
 }
 
 #[test]
-fn the_taxi_stands_in_its_lane_parallel_to_it_clear_of_the_kerb_and_the_riders_walk_to_its_door() {
-    // Two office workers far from the way out: the taxi stands at the kerb by each house, in its
-    // lane along the street (not turned into a driveway), its body clear of the pavement; each
-    // walks from their kerb to its door and gets in there, never jumping to it.
+fn the_taxi_parks_beside_the_road_by_each_house_parallel_to_it_and_the_riders_walk_to_its_door() {
+    // Two office workers far from the way out: the taxi stands at the kerb by each house, along
+    // the street (not turned into a driveway), and parks there up on the pavement in the house's
+    // taxi bay (`taxi::taxi_bays`, which the kerbside furniture keeps clear of), out of the way of
+    // the cars behind it; never over the kerb anywhere else. Each walks from their kerb to its
+    // door and gets in there, never jumping to it.
     let mut w = town(7, &[house(20, &[&worker("A")]), house(60, &[&worker("B")])]);
+    let bays = sim_core::taxi::taxi_bays(&w);
+    let mut parked = 0;
     let end = sim_core::clock::tick_at(3, 12.0 * 60.0).unwrap();
     let mut stood = 0;
     let mut was: Vec<Option<[f32; 2]>> = vec![None; 2];
@@ -934,7 +938,7 @@ fn the_taxi_stands_in_its_lane_parallel_to_it_clear_of_the_kerb_and_the_riders_w
     while w.tick < end && !(aboard[0] && aboard[1]) {
         w.tick_once();
         no_overlaps(&w);
-        for (_, at, yaw) in standing(&w) {
+        for (k, at, yaw) in standing(&w) {
             stood += 1;
             assert!(
                 off_x(yaw) < 0.03,
@@ -942,11 +946,18 @@ fn the_taxi_stands_in_its_lane_parallel_to_it_clear_of_the_kerb_and_the_riders_w
                 off_x(yaw).to_degrees()
             );
             // (A 7 m street's kerbs 2.15 m from its middle: its body, 0.93 m either side of its
-            // middle, inside them.)
+            // middle, inside them; or on its way out to a bay, as far off it as it's still to go
+            // (2.2 m out at most), or in it.)
+            let to_bay = |b: &[f32; 3]| (b[0] - at[0]).hypot(b[1] - at[1]);
+            let slack = (2.2 - w.cars[k].shift).max(0.0);
             assert!(
-                (at[1] - STREET).abs() + 1.85 / 2.0 < 2.15,
-                "over the kerb at {at:?}"
+                (at[1] - STREET).abs() + 1.85 / 2.0 < 2.15
+                    || bays.iter().any(|b| to_bay(b) < 1.0 + slack),
+                "over the kerb out of a taxi bay at {at:?}"
             );
+            if bays.iter().any(|b| to_bay(b) < 0.3) {
+                parked += 1;
+            }
         }
         for i in 0..2 {
             let s = &w.sims[i];
@@ -991,6 +1002,7 @@ fn the_taxi_stands_in_its_lane_parallel_to_it_clear_of_the_kerb_and_the_riders_w
     assert!(aboard[0] && aboard[1], "not both rode");
     assert!(got_in[0] && got_in[1], "not both got in by its door");
     assert!(stood > 0, "never stood");
+    assert!(parked > 0, "never parked in a taxi bay");
 }
 
 #[test]

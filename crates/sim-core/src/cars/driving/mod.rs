@@ -770,9 +770,10 @@ pub(crate) fn drive_taxi(w: &mut World, c: usize) {
     drive_on(w, c);
 }
 
-/// A work taxi standing at a stop (`taxi/`): pulled over for one coming the other way as far as
-/// it has room, as any car standing.
-pub(crate) fn stand_taxi(w: &mut World, c: usize) {
+/// A work taxi standing at a stop (`taxi/`): parked beside the road (`park_beside`); where it
+/// can't, pulled over for one coming the other way as far as it has room, as any car standing.
+/// Whether it's still pulling in to park (nobody gets in or out yet).
+pub(crate) fn stand_taxi(w: &mut World, c: usize) -> bool {
     // (Standing, it holds no claim but the one it stands in: none on ahead.)
     let t = w.cars[c].progress;
     w.traffic.stand(car_first(c), t);
@@ -795,8 +796,14 @@ pub(crate) fn stand_taxi(w: &mut World, c: usize) {
     if car.sight != Sight::Seen {
         car.unhold();
         car.shift = (car.shift - PULL_RATE).max(0.0);
-        return;
+        return false;
     }
     let others = vehicles(&w.cars, Some(c));
-    pull_over(w, c, &others, false, None);
+    match park_beside(w, c, &others) {
+        Some(pulling) => pulling,
+        None => {
+            pull_over(w, c, &others, false, None);
+            false
+        }
+    }
 }

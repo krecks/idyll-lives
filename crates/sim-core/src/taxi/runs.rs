@@ -301,7 +301,11 @@ pub(crate) fn stops_ahead(w: &World) -> Vec<f32> {
 /// their pace (and the walk round to it, `DOOR_WALK`), is left, and booked again (`release`).
 fn stand(w: &mut World, k: usize, c: usize, next: usize) {
     let tick = w.tick;
-    crate::cars::stand_taxi(w, c);
+    // (Pulling in to park beside the road, `cars::park_beside`: nobody gets in or out yet, its
+    // doors still moving.)
+    if crate::cars::stand_taxi(w, c) {
+        return;
+    }
     if w.taxis.runs[k].since == 0 {
         w.taxis.runs[k].since = tick;
     }

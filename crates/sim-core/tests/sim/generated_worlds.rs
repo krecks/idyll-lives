@@ -758,7 +758,10 @@ fn check_cars(
 /// A work taxi standing at the kerb for its riders (`taxi/`) stands parallel to its lane within
 /// this (rad: about 5°), its body clear of its lane's kerb by this at least (m: a little under, as
 /// pulled over for one coming the other way on a lane too narrow to pass, `Car::shift`, onto the
-/// pavement no further than that) and of the kerbside furniture always (`cars::kerbside`).
+/// pavement no further than that) and of the kerbside furniture always (`cars::kerbside`); or
+/// parked beside the road (`cars::park_beside`), its middle in a taxi bay (`taxi::taxi_bays`, within
+/// `AT_BAY`, and as far again as it's still to pull over), which the furniture keeps clear of.
+const AT_BAY: f32 = 1.0;
 const STAND_ANGLE: f32 = 0.09;
 /// A street's or a lane's pavements (m, each side: `roads.ts` `SIDEWALK`).
 const SIDEWALK: f32 = 1.35;
@@ -773,6 +776,8 @@ const PASS_GAP: f32 = 0.05;
 #[derive(Default)]
 struct Taxis {
     standing: std::collections::BTreeSet<usize>,
+    /// The taxi bays (`taxi::taxi_bays`), once found: a taxi parked beside the road stands in one.
+    bays: Option<Vec<[f32; 3]>>,
     passing: std::collections::BTreeSet<(usize, usize)>,
     /// Where each car was drawn a tick before.
     was: Vec<Option<[f32; 2]>>,
@@ -876,7 +881,21 @@ fn check_taxis(
                 off.to_degrees()
             ));
         }
-        if out > kerb + car.shift - STAND_KERB || out > furniture {
+        let bays = seen
+            .bays
+            .get_or_insert_with(|| sim_core::taxi::taxi_bays(w));
+        // (Pulled over further than for one coming the other way: on its way out to a bay, or in it.)
+        let parked = car.shift > 0.75;
+        let in_bay = bays
+            .iter()
+            .any(|b| (b[0] - at[0]).hypot(b[1] - at[1]) < AT_BAY + (2.2 - car.shift).max(0.0));
+        if parked && !in_bay {
+            failures.insert(format!(
+                "a taxi parked beside the road {:.2} m from the road's middle (pulled over {:.2} m) out of a taxi bay, at {at_s}",
+                out, car.shift
+            ));
+        }
+        if !parked && (out > kerb + car.shift - STAND_KERB || out > furniture) {
             failures.insert(format!(
                 "a taxi stood {:.2} m from the road's middle, its kerb {kerb:.2} m (pulled over {:.2} m), at {at_s}",
                 out, car.shift

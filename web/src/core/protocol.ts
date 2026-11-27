@@ -957,6 +957,11 @@ export interface WorldStructure {
    */
   lightPoles?: [number, number, number][];
   /**
+   * Where work taxis park beside the road for a house, up on the pavement on its side (x, z and half the bay's length along the
+   * road, m: sim-core `taxi::taxi_bays`): the kerbside furniture keeps clear of them. Absent: none.
+   */
+  taxiBays?: [number, number, number][];
+  /**
    * Every junction where three or more roads for cars meet (sim-core `traffic::Signal`), for its
    * pad and markings: the lit ones first, in the snapshot's signal head rows' order, then those
    * giving way (no heads). Absent: none.

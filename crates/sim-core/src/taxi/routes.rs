@@ -139,15 +139,19 @@ pub(crate) fn door_for(
 }
 
 /// Where a rider waits for the taxi standing at `stop`: at the back of the pavement on their
-/// house's side, by where it stands (a step to its doors, or across the road to them), not in
-/// their driveway's mouth (`WAIT_ASIDE` along from it at least).
+/// house's side, by the end of where it stands nearer their driveway (a step to its doors, or
+/// across the road to them; `WAIT_CLEAR` past its end, clear of where it parks up on the pavement,
+/// `cars::park_beside`: waiting by its middle, they were in its way as it pulled in), not in their
+/// driveway's mouth (`WAIT_ASIDE` along from it at least).
 pub(super) fn wait_spot(travel: &crate::travel::Travel, stop: &Kerb) -> [f32; 2] {
     let g = &travel.graph;
     let road = &g.roads[stop.road as usize];
     let mouth = g.point(stop.mouth);
     let off = stop.s - stop.mouth.s;
-    let s = if off.abs() >= WAIT_ASIDE {
-        stop.s
+    let way = if off < 0.0 { -1.0 } else { 1.0 };
+    let end = off - way * (TAXI_LEN / 2.0 + WAIT_CLEAR);
+    let s = if end * way >= WAIT_ASIDE {
+        stop.mouth.s + end
     } else {
         stop.mouth.s + if off < 0.0 { -WAIT_ASIDE } else { WAIT_ASIDE }
     };

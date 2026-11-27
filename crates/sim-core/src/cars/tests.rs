@@ -1917,3 +1917,41 @@ fn a_ramp_eases_out_of_the_carriageways_lane() {
         }
     }
 }
+
+#[test]
+fn a_taxi_parked_beside_the_road_is_not_turned_round() {
+    // A work taxi parked up on the pavement (`park_beside`) is in nobody's lane: `unjam` doesn't
+    // turn it round (it would back up along the pavement); in its lane it has the room to.
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[],"households":[],"objects":[],"sims":[],"cars":[]}}"#,
+        road.join(",")
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    let mut legs = Legs::default();
+    for k in 0..=80 {
+        legs.push_lane(
+            [20.0 + k as f32 * 2.0, 30.0 + TIGHT_LANE],
+            5.0,
+            0.0,
+            Some(LANE),
+        );
+    }
+    let mut k = car([20.0, 10.0], 0.0, 30.0);
+    k.route = Some((false, legs.timed(true, true)));
+    k.progress = 40.0;
+    k.state = CarState::Leaving;
+    let (p, yaw, _) = k.route.as_ref().unwrap().1.at(k.progress);
+    k.shown = Some((p, yaw, true, 0));
+    w.cars = vec![k];
+    assert_ne!(
+        turn_round(&w, 0).err(),
+        Some("no room"),
+        "in its lane it has room"
+    );
+    w.cars[0].shift = park_shift(w.cars[0].wid);
+    assert_eq!(turn_round(&w, 0).err(), Some("no room"));
+}

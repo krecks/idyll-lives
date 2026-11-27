@@ -129,6 +129,7 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         porch_pieces: &world.porch_pieces,
         pull_over_streets: pull_over_street_views(world),
         light_poles: light_pole_views(world),
+        taxi_bays: crate::taxi::taxi_bays(world),
         junctions: junction_views(world),
         parking: parking_views(world),
         car_parks: &world.travel.file.car_parks,

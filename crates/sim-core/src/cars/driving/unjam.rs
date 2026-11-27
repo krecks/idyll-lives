@@ -485,6 +485,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
     if route.on_motorway(t, t) {
         return Err("on a motorway");
     }
+    // (Nor a work taxi parked beside the road, `park_beside`, or pulling away from it: in nobody's
+    // lane, and turned round it backed up along the pavement, Oakton.)
+    if car.shift > route.room_here(t) + 1e-3 {
+        return Err("no room");
+    }
     let half = [car.len / 2.0, car.wid / 2.0];
     let body = |s: f32| {
         let (p, yaw, _) = route.at(s);
