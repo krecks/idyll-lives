@@ -353,7 +353,7 @@ pub fn solar_panels() -> Vec<Obj> {
             0.06,
             0.55,
             0.06,
-            (sx * 0.82, 0.275, sz * 0.78),
+            (sx * 0.97, 0.275, sz * 0.78),
             M.panel_frame,
             bevel = 0.006
         );
@@ -362,7 +362,7 @@ pub fn solar_panels() -> Vec<Obj> {
         fbox!(
             f,
             format!("rail{i}"),
-            1.76,
+            2.02,
             0.06,
             0.06,
             (0, 0.55, sz * 0.78),
@@ -374,20 +374,20 @@ pub fn solar_panels() -> Vec<Obj> {
         fbox!(
             f,
             format!("panel{i}"),
-            0.84,
+            0.98,
             0.05,
             1.64,
-            (sx * 0.43, 0.605, 0),
+            (sx * 0.51, 0.605, 0),
             M.panel_glass,
             bevel = 0.008
         );
         fbox!(
             f,
             format!("edge{i}"),
-            0.86,
+            1.00,
             0.02,
             1.66,
-            (sx * 0.43, 0.575, 0),
+            (sx * 0.51, 0.575, 0),
             M.panel_frame,
             bevel = 0.004
         );
@@ -398,7 +398,7 @@ pub fn solar_panels() -> Vec<Obj> {
         0.12,
         0.10,
         0.08,
-        (0.75, 0.60, 0.70),
+        (0.90, 0.60, 0.70),
         M.struct_roof,
         bevel = 0.006
     );
