@@ -8,6 +8,7 @@
   import Journal from './Journal.svelte';
   import JobBoard from './JobBoard.svelte';
   import SocialMenu from './SocialMenu.svelte';
+  import WalkView from './WalkView.svelte';
   import TopBar from './TopBar.svelte';
   import TownPanel from './TownPanel.svelte';
   import FurnishPanel from './FurnishPanel.svelte';
@@ -46,6 +47,7 @@
   <PerfOverlay />
   <PieMenu />
   <SocialMenu />
+  <WalkView />
   <TownPanel />
   <JobBoard />
 </div>

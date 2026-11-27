@@ -203,35 +203,37 @@ pub(crate) fn unjam(w: &mut World) {
     }
     // The ground each car turning round backs up over still (`Traffic::turning`): the others
     // keep out of it till it has (`drive_on`).
-    let mut turning = Vec::new();
-    for (c, car) in w.cars.iter().enumerate() {
-        let (Some(_), Some((_, r))) = (car.detour, car.route.as_ref()) else {
-            continue;
-        };
-        // (Backed up as far as it goes, driving on from the next tick: no ground left to back
-        // over, only where it stands, which the others keep out of anyway (`guard`). Kept as
-        // its, one backing up out of its way waited for it there for good while it waited for
-        // that one, Oakview.)
-        if !r.at(car.progress + 1.0).2 {
-            continue;
-        }
-        let half = [car.len / 2.0, car.wid / 2.0];
-        let mut t = car.progress;
-        let mut path = Vec::new();
-        while r.at(t).2 && t < r.ticks() {
-            let (p, yaw, _) = r.at(t);
-            path.push(Rect {
-                at: shifted(p, yaw, car.shift),
-                yaw,
-                half,
-            });
-            t += 1.0;
-        }
-        if !path.is_empty() {
-            turning.push((car_first(c), path));
-        }
-    }
+    let turning = (w.cars.iter().enumerate())
+        .filter_map(|(c, car)| backing_ground(c, car))
+        .collect();
     w.traffic.turning = turning;
+}
+
+/// The ground car `c` turning round (`Detour`) backs up over still, by its key (`Traffic::turning`).
+/// None: not turning round, or backed up as far as it goes (driving on from the next tick: no
+/// ground left to back over, only where it stands, which the others keep out of anyway, `guard`;
+/// kept as its, one backing up out of its way waited for it there for good while it waited for
+/// that one, Oakview).
+pub(crate) fn backing_ground(c: usize, car: &Car) -> Option<(u64, Vec<Rect>)> {
+    let (Some(_), Some((_, r))) = (car.detour, car.route.as_ref()) else {
+        return None;
+    };
+    if !r.at(car.progress + 1.0).2 {
+        return None;
+    }
+    let half = [car.len / 2.0, car.wid / 2.0];
+    let mut t = car.progress;
+    let mut path = Vec::new();
+    while r.at(t).2 && t < r.ticks() {
+        let (p, yaw, _) = r.at(t);
+        path.push(Rect {
+            at: shifted(p, yaw, car.shift),
+            yaw,
+            half,
+        });
+        t += 1.0;
+    }
+    (!path.is_empty()).then_some((car_first(c), path))
 }
 
 /// Car `c`, turning round (backing up along the way it came, `Detour`), gives it up where it
@@ -390,6 +392,10 @@ pub(crate) fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     car.progress = 0.01;
     car.unhold();
     car.stall = (car.progress, tick);
+    // (Its ground known at once, not at the end of `unjam`: one turned round after it this tick,
+    // backing into it unseen, waited for it for good as it waited for that one, Kelpay.)
+    traffic.turning.retain(|g| g.0 != me);
+    traffic.turning.extend(backing_ground(c, car));
     if let Some(f) = halts {
         crate::taxi::moved_halts(w, c, &*f);
     }
@@ -484,6 +490,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
     // for good out of the picture, it's put on, `unstick`.)
     if route.on_motorway(t, t) {
         return Err("on a motorway");
+    }
+    // (Nor a work taxi parked beside the road, `park_beside`, or pulling away from it: in nobody's
+    // lane, and turned round it backed up along the pavement, Oakton.)
+    if car.shift > route.room_here(t) + 1e-3 {
+        return Err("no room");
     }
     let half = [car.len / 2.0, car.wid / 2.0];
     let body = |s: f32| {

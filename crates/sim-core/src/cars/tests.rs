@@ -1917,3 +1917,135 @@ fn a_ramp_eases_out_of_the_carriageways_lane() {
         }
     }
 }
+
+#[test]
+fn two_turned_round_one_backing_up_behind_the_other_both_back_up_clear() {
+    // Two cars turned round in the same tick (`unjam`), both to back up west along the street's
+    // lane, B a body's length and a little behind A, in the ground A backs over: B backs up out of
+    // it (kept off A only by A's body, `guard`), and A after it, never nearer each other than they
+    // started. Kept off each other's ground as well, each waited for the other at the start of its
+    // way back for good (Oakton).
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[],"households":[],"objects":[],"sims":[],"cars":[]}}"#,
+        road.join(",")
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    // (Each on its way east along the street's lane, B's a little behind A's.)
+    let behind = 4.4 + GAP - 0.02;
+    let way = |x0: f32| {
+        let mut legs = Legs::default();
+        for k in 0..=80 {
+            legs.push_lane(
+                [x0 + k as f32 * 2.0, 30.0 + TIGHT_LANE],
+                5.0,
+                0.0,
+                Some(LANE),
+            );
+        }
+        legs.timed(true, true)
+    };
+    let at = |r: &Route, x: f32| r.points.iter().find(|p| p.0[0] >= x - 1e-3).unwrap().2;
+    let rp = w.travel.graph.near([100.0, 30.0], ROAD_REACH, 1, Mode::Car)[0];
+    let mut cars = Vec::new();
+    for (x0, back) in [(20.0, 70.0), (20.0 - behind, 60.0 - behind)] {
+        let had = way(x0);
+        let d = Detour {
+            home: false,
+            from: at(&had, 100.0 - (20.0 - x0)),
+            back: at(&had, back),
+            avoid: rp.edge,
+            same: false,
+            mouth: None,
+        };
+        let mut k = car([20.0, 10.0], 0.0, 30.0);
+        k.route = Some((
+            false,
+            k.detoured(&w.exits, &w.travel, false, &d, &had)
+                .expect("a way on"),
+        ));
+        k.detour = Some(d);
+        k.progress = 0.01;
+        k.state = CarState::Leaving;
+        let (p, yaw, _) = k.route.as_ref().unwrap().1.at(k.progress);
+        k.shown = Some((p, yaw, true, 0));
+        k.stall = (k.progress, 0);
+        cars.push(k);
+    }
+    w.cars = cars;
+    let gap = |w: &World| {
+        w.cars[0]
+            .shown_rect()
+            .unwrap()
+            .gap(&w.cars[1].shown_rect().unwrap())
+    };
+    let start = gap(&w);
+    assert!(start < GAP + 0.05, "B starts just behind A ({start:.2} m)");
+    let backing = |w: &World, c: usize| {
+        let k = &w.cars[c];
+        k.route.as_ref().unwrap().1.at(k.progress + 1.0).2
+    };
+    for i in 0..crate::drive_secs(120.0) {
+        if !backing(&w, 0) && !backing(&w, 1) {
+            break;
+        }
+        // (Their ground as `unjam` has it each tick.)
+        w.traffic.turning = (w.cars.iter().enumerate())
+            .filter_map(|(c, k)| backing_ground(c, k))
+            .collect();
+        drill::step(&mut w);
+        assert!(
+            gap(&w) >= start - 1e-3,
+            "nearer each other at tick {i}: {:.2} m",
+            gap(&w)
+        );
+        if i == crate::drive_secs(2.0) {
+            assert!(w.cars[1].progress >= 1.0, "B never backed up");
+        }
+    }
+    assert!(
+        !backing(&w, 0) && !backing(&w, 1),
+        "not both backed up and on their way"
+    );
+}
+
+#[test]
+fn a_taxi_parked_beside_the_road_is_not_turned_round() {
+    // A work taxi parked up on the pavement (`park_beside`) is in nobody's lane: `unjam` doesn't
+    // turn it round (it would back up along the pavement); in its lane it has the room to.
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[],"households":[],"objects":[],"sims":[],"cars":[]}}"#,
+        road.join(",")
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    let mut legs = Legs::default();
+    for k in 0..=80 {
+        legs.push_lane(
+            [20.0 + k as f32 * 2.0, 30.0 + TIGHT_LANE],
+            5.0,
+            0.0,
+            Some(LANE),
+        );
+    }
+    let mut k = car([20.0, 10.0], 0.0, 30.0);
+    k.route = Some((false, legs.timed(true, true)));
+    k.progress = 40.0;
+    k.state = CarState::Leaving;
+    let (p, yaw, _) = k.route.as_ref().unwrap().1.at(k.progress);
+    k.shown = Some((p, yaw, true, 0));
+    w.cars = vec![k];
+    assert_ne!(
+        turn_round(&w, 0).err(),
+        Some("no room"),
+        "in its lane it has room"
+    );
+    w.cars[0].shift = park_shift(w.cars[0].wid);
+    assert_eq!(turn_round(&w, 0).err(), Some("no room"));
+}

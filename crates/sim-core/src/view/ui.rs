@@ -589,6 +589,8 @@ impl StructureSync {
         parts.part("pullOverStreets", Some(&streets).filter(|s| !s.is_empty()));
         let poles = light_pole_views(world);
         parts.part("lightPoles", Some(&poles).filter(|p| !p.is_empty()));
+        let bays = crate::taxi::taxi_bays(world);
+        parts.part("taxiBays", Some(&bays).filter(|b| !b.is_empty()));
         let junctions = junction_views(world);
         parts.part("junctions", Some(&junctions).filter(|j| !j.is_empty()));
         // The lot's parts, those that changed (asked for only when the lot did; never unset).

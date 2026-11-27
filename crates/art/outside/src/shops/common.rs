@@ -1,12 +1,11 @@
 //! What the shop fittings and the café furniture are built from: the palette, and the few shapes the family makes
 //! itself.
 
-use artkit::forms;
+pub use artkit::kit::fluted;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, TAU, V3, cos, radians, sin, v3};
+use artkit::math::{P3, PI, cos, radians, sin, v3};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::shapes::SHARP;
 use artkit::{fcyl, loft, palette, revolve, ring};
 
 palette! { M:
@@ -56,24 +55,8 @@ palette! { M:
 /// A slab from game depth a0 to a1, its face the convex polygon `profile` [(x, height)], in order (a sandwich
 /// pack).
 pub fn prism(name: &str, profile: &[(f64, f64)], a0: f64, a1: f64, material: Mat) -> Obj {
-    let a: Vec<V3> = profile.iter().map(|&(x, y)| v3(-x, -a0, y)).collect();
-    let b: Vec<V3> = profile.iter().map(|&(x, y)| v3(-x, -a1, y)).collect();
-    let n = profile.len() as u32;
-    let mut faces: Vec<Vec<u32>> = vec![(0..n).collect(), (n..2 * n).rev().collect()];
-    for i in 0..n {
-        let j = (i + 1) % n;
-        faces.push(vec![i, j, n + j, n + i]);
-    }
-    let verts = a.into_iter().chain(b).collect();
-    artkit::bevel::eased(forms::object(
-        name,
-        verts,
-        &faces,
-        Some(material),
-        false,
-        SHARP,
-        false,
-    ))
+    let at = |a: f64| profile.iter().map(|&(x, y)| v3(-x, -a, y)).collect();
+    artkit::bevel::eased(artkit::kit::prism(name, at(a0), at(a1), material))
 }
 
 /// A point on a plane through (cx, cy, cz) tilted `deg` back (its back edge higher): `dz` towards the front along
@@ -146,23 +129,6 @@ pub fn arc(z0: f64, y0: f64, z1: f64, y1: f64, steps: usize, inset: f64) -> Vec<
                 z1 + (z0 - z1 - inset) * cos(PI / 2.0 * i / steps),
                 y0 + (y1 - y0 - inset) * sin(PI / 2.0 * i / steps),
             )
-        })
-        .collect()
-}
-
-/// A ring of `flutes` flutes round radius `r` at Blender height `z`, about the origin (a tart's fluted case, a
-/// cupcake's paper cup, a gondola's post).
-pub fn fluted(r: f64, z: f64, flutes: usize, depth: f64, per: usize) -> Vec<P3> {
-    let n = flutes * per;
-    let (fl, nf) = (flutes as f64, n as f64);
-    (0..n)
-        .map(|i| {
-            let i = i as f64;
-            P3 {
-                x: r * (1.0 - depth * (0.5 + 0.5 * cos(fl * TAU * i / nf))) * cos(TAU * i / nf),
-                y: r * (1.0 - depth * (0.5 + 0.5 * cos(fl * TAU * i / nf))) * sin(TAU * i / nf),
-                z,
-            }
         })
         .collect()
 }

@@ -384,6 +384,9 @@ mod tests {
         assert!((rms(&low) - FRAC_1_SQRT_2).abs() < 0.005);
         // Two poles: 12 dB an octave, three octaves up.
         assert!(db(&high) < -34.0);
+        // At or over half the rate a low-pass passes everything, as the node does.
+        let t = tone(8000.0);
+        assert_eq!(node_filter(&t, RATE, Filter::Lowpass, RATE, 0.0, true), t);
         // At its cutoff a low-pass is as far up as its Q says in dB (the node's way; 0: level with the lows); a
         // band-pass passes its centre whole.
         assert!(

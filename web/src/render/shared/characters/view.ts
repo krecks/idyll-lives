@@ -58,7 +58,7 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
   setMorphs(morphs: MorphSet): void;
   /** Uploads the whole pose texture (`build`). */
   uploadPoses(): void;
-  /** Uploads rows `from` .. `from + count - 1` of the pose texture (per frame: the band of rows that changed). */
+  /** Uploads rows `from` .. `from + count - 1` of the pose texture (per frame: each band of rows that changed, a few at most). */
   uploadPoseRows(from: number, count: number): void;
 
   /**
@@ -108,7 +108,7 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
    * its instances' from then on, nothing drawn until `showProp`.
    */
   buildProp(key: string): Promise<P | null>;
-  /** Per frame, for every built prop: draws its first `count` instances (their matrices rewritten), or, 0, none. */
+  /** Per frame, for every built prop: draws it for those of its first `count` rows that hold it (a matrix set), or, 0, none. */
   showProp(prop: P, count: number): void;
   /** Calls `listener` with each model file that comes after failing (`onModelFileArrived`); returns how to stop. */
   onModelFile(listener: (url: string) => void): () => void;

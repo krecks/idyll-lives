@@ -17,11 +17,12 @@
  * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (lamps' glass, lit
  *   windows) glows into what is round it, by PlayCanvas's bloom (its blurred bright part added before the
  *   image processing; the threshold follows the exposure, as the scene is drawn before it). Its strength
- *   follows the night (`glow`; full in the basement, which has no daylight): none by day. The
- *   passes run all day at no strength: turned off, PlayCanvas would make the frame's targets again at dusk.
+ *   follows the night (`glow`; full in the basement, which has no daylight): none by day, its passes left out then
+ *   (`idlePasses`; the frame's own bloom stays on at no strength: turned off, PlayCanvas would make the frame's
+ *   targets again at dusk).
  * - Contact shading on Medium and High (`QualitySettings.contactShading`, `CONTACT`): the scene's depth
  *   drawn once before the scene, an occlusion pass at half size from it, read by the lit shaders. The
- *   town view fades it out (`setContact`); fully out, the depth isn't drawn.
+ *   town view fades it out (`setContact`); fully out, the depth isn't drawn nor the occlusion blurred.
  * - `?diag=albedo|normals` and `?diag=linear` leave the image processing and the grade out (the
  *   colour itself, encoded for the screen); without them only Low's FXAA is left, so Medium and High
  *   draw straight onto the canvas there. `?diag=noaa`: no multisampling, no FXAA; `?diag=nonight`:
@@ -76,7 +77,7 @@ export interface PostOptions {
  */
 const BLOOM = tuned('bloom', { white: 1.6, intensity: 0.3, blurLevel: 16 });
 
-/** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
+/** The bloom's strength by day: above none, so PlayCanvas keeps the frame's bloom (its passes left out, `idlePasses`). */
 const BLOOM_IDLE = 1e-6;
 
 /**
@@ -297,6 +298,8 @@ export class PostProcessing {
   private nightNow = 0;
   private contactNow = 1;
   private glowNow = 0;
+  /** The warm-up's frame is next (`warm`): no pass left out. */
+  private warming = false;
   /** Every frame of the chain (the game camera's and `attach`'s), whose bloom follows the exposure and the night. */
   private readonly frames = new Set<pc.CameraFrame>();
   private readonly onResize = (width: number, height: number) => this.resized(width, height);
@@ -374,6 +377,13 @@ export class PostProcessing {
       this.bloomOn(frame);
       this.frames.add(frame);
     }
+    // (The frame makes its passes again, running, whenever its options change or its camera's layers are set: idle
+    // again after each.)
+    const update = frame.update.bind(frame);
+    frame.update = () => {
+      update();
+      this.idlePasses(frame);
+    };
     frame.update();
     return frame;
   }
@@ -462,9 +472,50 @@ export class PostProcessing {
   }
 
   /**
+   * The passes of `frame` that would add nothing left out of it (a pass not enabled is skipped by the frame graph,
+   * its own update too): by day the bloom's (its chain, and the scene's half-size copy only it reads, as no depth of
+   * field is on), and with the contact shading off the occlusion's two blurs (the occlusion itself still drawn, plain
+   * white at no strength: its target is made again on a resize, and left unwritten would read as all shade). The
+   * compose still adds the bloom's first target, at no strength. Coming back, the bloom makes its chain's targets
+   * again; the warm-up's frame draws them once, so their shaders are made before play (`warm`).
+   */
+  private idlePasses(frame: pc.CameraFrame): void {
+    // SAFETY: CameraFrame's (private) pass, PlayCanvas 2.23's `FramePassCameraFrame`, keeps its passes in `bloomPass`,
+    // `scenePassHalf` and `ssaoPass` (its blurs in `afterPasses`). `check:chunks` checks they're there.
+    type Passes = { bloomPass?: pc.FramePass | null; scenePassHalf?: pc.FramePass | null; ssaoPass?: pc.FramePass | null };
+    const passes = (frame as unknown as { renderPassCamera?: Passes | null }).renderPassCamera;
+    if (!passes) return;
+    const glow = this.warming || frame.bloom.intensity > BLOOM_IDLE;
+    if (passes.bloomPass) passes.bloomPass.enabled = glow;
+    if (passes.scenePassHalf) passes.scenePassHalf.enabled = glow;
+    const blur = this.warming || frame !== this.frame || this.contactNow > 0;
+    for (const pass of passes.ssaoPass?.afterPasses ?? []) pass.enabled = blur;
+  }
+
+  /**
+   * For the warm-up's frame (`PlayCanvasRenderer.warmFrame`): every pass drawn, the idle ones too (at no strength: the
+   * picture as it is; the contact shading's depth too), so their shaders are made behind the loading veil. Returns the undo, to run once it has drawn.
+   */
+  warm(): () => void {
+    this.warming = true;
+    depthIdle.delete(this.camera);
+    this.idleAll();
+    return () => {
+      this.warming = false;
+      if (this.options.contact && this.contactNow <= 0) depthIdle.add(this.camera);
+      this.idleAll();
+    };
+  }
+
+  private idleAll(): void {
+    for (const frame of this.frames) this.idlePasses(frame);
+    if (this.frame && !this.frames.has(this.frame)) this.idlePasses(this.frame);
+  }
+
+  /**
    * The contact shading's strength, of its own (0..1: the town view fades it out, where it is far too small to see). At
-   * 0 the scene's depth isn't drawn for it (about a third of a whole town's draws) and the occlusion is plain white. Its
-   * shaders stay as they are: nothing is compiled as the camera goes out or comes back.
+   * 0 the scene's depth isn't drawn for it (about a third of a whole town's draws), the occlusion is plain white and
+   * not blurred (`idlePasses`). Its shaders stay as they are: nothing is compiled as the camera goes out or comes back.
    */
   setContact(share: number): void {
     const frame = this.frame;

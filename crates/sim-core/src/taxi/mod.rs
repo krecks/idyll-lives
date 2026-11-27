@@ -77,6 +77,8 @@ const TO_KERB_LEAST: u64 = 3 * TICKS_PER_MINUTE;
 /// How far along the road from their driveway's middle a rider waits for the taxi at least (m,
 /// `wait_spot`).
 const WAIT_ASIDE: f32 = 2.0;
+/// How far past the end of the taxi's stand a rider waits for it (m, `wait_spot`).
+const WAIT_CLEAR: f32 = 0.6;
 /// A walk to the taxi's door is about this much longer than straight there; and from where a
 /// rider waits at their kerb to its far door it's this far at most (m): a rider called to its door
 /// is waited for that walk at their pace after `taxi.waitMinutes` (`stand`), else left.
@@ -159,6 +161,7 @@ mod runs;
 mod way;
 
 use jams::*;
+pub use kerbs::taxi_bays;
 pub(crate) use kerbs::*;
 pub(crate) use leisure::*;
 pub use plan::*;

@@ -119,8 +119,8 @@ pub fn cafe_table() -> Vec<Obj> {
             loft!(
                 "column",
                 &[
-                    fluted(0.024, 0.2, 8, 0.15, 3),
-                    fluted(0.022, TABLE_TOP - 0.07, 8, 0.15, 3)
+                    fluted(0.024, 0.2, 8, 0.15, 3, 0.0),
+                    fluted(0.022, TABLE_TOP - 0.07, 8, 0.15, 3, 0.0)
                 ],
                 material = M.iron
             );

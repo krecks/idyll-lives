@@ -17,7 +17,7 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
 import { colorsKey, objectCentre, type ObjectPlacement, type WorldStructure } from '../../core/protocol';
 import { chunkAt } from '../shared/chunks';
-import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
+import { compose, quatYawPitchRoll, type Mat4, type Quat } from '../shared/math';
 import { painted, placementVariation } from '../shared/modelEntry';
 import { type Away, placements } from '../shared/parked';
 
@@ -30,8 +30,8 @@ interface Parked {
   id: number;
   x: number;
   z: number;
-  /** Its placement (game space), worked out once. */
-  matrix: ArrayLike<number>;
+  /** Its placement (game space), worked out once (its height again when the ground moves: `setGround`). */
+  matrix: Mat4;
   look: Look;
   /** Off the viewed lot: drawn where it stands at home (the viewed lot's own objects draw it there otherwise). */
   home: boolean;
@@ -118,9 +118,12 @@ export class ParkedRides {
     this.write();
   }
 
-  /** The ground they stand on (game space, m: `BuiltSurface.at` on a land the town follows: a lot's pad), or 0 everywhere (null); set before `build`. */
+  /** The ground they stand on (game space, m: `BuiltSurface.at` on a land the town follows: a lot's pad), or 0 everywhere (null); again when it moved under them. */
   setGround(ground: ((x: number, z: number) => number) | null): void {
     this.ground = ground;
+    // (The matrices' height, `compose`'s y.)
+    for (const p of this.parked) p.matrix[13] = ground ? ground(p.x, p.z) : 0;
+    this.write();
   }
   private ground: ((x: number, z: number) => number) | null = null;
 

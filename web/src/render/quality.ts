@@ -86,9 +86,11 @@ export interface QualitySettings {
   /**
    * At most this many draws of a reflection a second, each only when something in it changed (the
    * camera, the mirror, a resident in it, the light, things placed); held in between, looked up
-   * through the camera it was drawn for. 0: every frame. Medium with the camera swinging before a
-   * mirror (the worst case, as a resident moving in front of it): −6 % fps, +1.0 ms CPU, +0.1 ms
-   * GPU (WebGPU, M3 Pro); camera still, or the orbit: within noise. High's two every frame: −20 %.
+   * through the camera it was drawn for. 0: no cap, drawn in every frame something changed (a glass small on
+   * screen still at most 12 times a second: `mirrors.ts` `mirrorPeriod`). Medium with
+   * the camera swinging before a mirror (the worst case, as a resident moving in front of it): −6 % fps,
+   * +1.0 ms CPU, +0.1 ms GPU (WebGPU, M3 Pro); camera still, or the orbit: within noise. High's two
+   * every frame (before 2026-11-27, drawn whether anything changed or not): −20 %.
    */
   mirrorRate: number;
   /**

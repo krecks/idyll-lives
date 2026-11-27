@@ -749,3 +749,103 @@ fn a_lot_with_flats_is_no_home_without_kinds() {
     assert!(!w.is_home(0), "Mill Court's hall and yard");
     assert!(w.flats().iter().all(|f| w.is_home(f.id)), "its flats");
 }
+
+#[test]
+fn steering_drops_what_they_were_doing_and_walks_there() {
+    let mut w = world();
+    w.apply(Command::MoveTo {
+        sim: 0,
+        x: 4.5,
+        z: 9.5,
+    })
+    .unwrap();
+    w.apply(Command::Use {
+        sim: 0,
+        object: 0,
+        interaction: 0,
+    })
+    .unwrap();
+    run_ticks(&mut w, 10);
+    // (Held as in walk mode: on arrival they'd otherwise go off to bed.)
+    w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+    w.apply(Command::Steer {
+        sim: 0,
+        x: 2.5,
+        z: 5.5,
+    })
+    .unwrap();
+    assert_eq!(w.sims[0].queue.len(), 1, "the steer replaces the queue");
+    for _ in 0..crate::mins(30.0) {
+        w.tick_once();
+    }
+    assert_eq!(w.sims[0].tile(), (2, 5));
+    assert!(
+        w.apply(Command::Steer {
+            sim: 0,
+            x: 40.5,
+            z: 2.5
+        })
+        .is_err()
+    );
+}
+
+#[test]
+fn a_steer_is_refused_while_bound_for_a_car() {
+    let mut w = world();
+    w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+    w.sims[0].bound_for_car = Some(0);
+    let steer = Command::Steer {
+        sim: 0,
+        x: 2.5,
+        z: 5.5,
+    };
+    assert!(w.apply(steer.clone()).is_err(), "steered out of a car");
+    w.sims[0].bound_for_car = None;
+    w.apply(steer).unwrap();
+}
+
+#[test]
+fn a_held_resident_chooses_nothing_until_let_go() {
+    let mut w = world();
+    w.sims[0].needs[0] = 0.05;
+    w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+    let at = w.sims[0].pos;
+    for _ in 0..crate::mins(60.0) {
+        w.tick_once();
+    }
+    assert!(
+        w.sims[0].current.is_none() && w.sims[0].pos == at,
+        "held but moved"
+    );
+    w.apply(Command::Hold { sim: 0, on: false }).unwrap();
+    for _ in 0..crate::mins(60.0) {
+        w.tick_once();
+    }
+    assert_ne!(w.sims[0].pos, at, "let go but still standing");
+}
+
+#[test]
+fn steering_into_a_wall_stops_at_it_rather_than_going_round() {
+    let mut w = world();
+    w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+    w.sims[0].pos = [5.5, 3.5];
+    // (The wall runs along x = 6 from z = 0 to 10: behind it, the long way round is past z = 10.)
+    w.apply(Command::Steer {
+        sim: 0,
+        x: 6.7,
+        z: 3.5,
+    })
+    .unwrap();
+    for _ in 0..crate::mins(10.0) {
+        w.tick_once();
+    }
+    assert_eq!(w.sims[0].tile(), (5, 3), "went round the wall");
+    assert!(
+        w.apply(Command::Steer {
+            sim: 99,
+            x: 1.5,
+            z: 1.5
+        })
+        .is_err()
+    );
+}

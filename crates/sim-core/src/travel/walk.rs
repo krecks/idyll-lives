@@ -18,9 +18,20 @@ pub struct WalkPlan {
 pub(super) const CARRIAGEWAY_LOOK: f32 = 8.0;
 
 pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
+    use crate::cars::{BESIDE, BODY, CAR_HALF};
     match kind {
         RoadKind::Trail => 0.0,
         RoadKind::Country => width / 2.0 + 0.5,
+        // A lane too narrow for two cars to pass in their lanes, where they pull over onto the
+        // pavement to pass (`cars::pull_room`): out at its edge, clear of one pulled over. Half a
+        // metre in, they were in its way, and cars held up by them, with the work taxis standing
+        // at the kerb, waited for each other for good (Gannet Island, Puffiney).
+        _ if crate::cars::lane_on(width, kind) == crate::cars::TIGHT_LANE => {
+            let pulled = crate::cars::TIGHT_LANE
+                + crate::cars::pull_room(width, kind, 2.0 * CAR_HALF)
+                + CAR_HALF;
+            (pulled + BESIDE + BODY).min(width / 2.0 - BODY).max(0.0)
+        }
         _ => (width / 2.0 - 0.5).clamp(0.0, 2.5),
     }
 }

@@ -1,4 +1,4 @@
-//! Shaping a voice by its sound: pitch, size and speed by TD-PSOLA, and the silence around a
+//! Shaping a voice by its sound: pitch and size by TD-PSOLA, and the silence around a
 //! clip trimmed.
 //!
 //! Supertonic 3 speaks in ten fixed voices at a given speed; a resident's own pitch and size
@@ -168,12 +168,12 @@ pub fn trim(samples: &[f32]) -> &[f32] {
     &samples[start..end]
 }
 
-/// Pitch × `pitch`, formants × `depth` and speed × `speed` in one pass (resample by `depth`,
-/// then PSOLA puts pitch and length where they belong).
-pub fn shape(samples: &[f32], pitch: f32, depth: f32, speed: f32) -> Vec<f32> {
-    let (pitch, depth, speed) = (pitch as f64, depth as f64, speed as f64);
+/// Pitch × `pitch` and formants × `depth` in one pass (resample by `depth`, then PSOLA puts
+/// pitch and length back where they belong; the model sets the speed).
+pub fn shape(samples: &[f32], pitch: f32, depth: f32) -> Vec<f32> {
+    let (pitch, depth) = (pitch as f64, depth as f64);
     let same = |v: f64| (v - 1.0).abs() < 1e-3;
-    if samples.is_empty() || (same(pitch) && same(depth) && same(speed)) {
+    if samples.is_empty() || (same(pitch) && same(depth)) {
         return samples.to_vec();
     }
     let resized = if same(depth) {
@@ -181,7 +181,7 @@ pub fn shape(samples: &[f32], pitch: f32, depth: f32, speed: f32) -> Vec<f32> {
     } else {
         resample(samples, depth as f32)
     };
-    psola(&resized, pitch / depth, depth / speed)
+    psola(&resized, pitch / depth, depth)
 }
 
 /// The median pitch of a clip's voiced frames, Hz (0 if none is voiced).
@@ -406,7 +406,7 @@ mod tests {
         let x = vowel(150.0, 1.0);
         let c0 = centroid(&x);
         for factor in [0.8, 1.2] {
-            let y = shape(&x, factor, 1.0, 1.0);
+            let y = shape(&x, factor, 1.0);
             let p = median_pitch(&y) as f64;
             assert!(
                 (p - 150.0 * factor as f64).abs() < 150.0 * 0.03,
@@ -431,7 +431,7 @@ mod tests {
         let x = vowel(150.0, 1.0);
         let c0 = centroid(&x);
         for depth in [0.85f32, 1.15] {
-            let y = shape(&x, 1.0, depth, 1.0);
+            let y = shape(&x, 1.0, depth);
             let p = median_pitch(&y) as f64;
             assert!((p - 150.0).abs() < 150.0 * 0.03, "depth {depth}: {p} Hz");
             assert!((y.len() as f64 - x.len() as f64).abs() < x.len() as f64 * 0.02);
@@ -444,15 +444,9 @@ mod tests {
     }
 
     #[test]
-    fn speed_changes_length_not_pitch() {
+    fn as_it_is_without_shaping() {
         let x = vowel(200.0, 1.0);
-        for speed in [0.85f32, 1.2] {
-            let y = shape(&x, 1.0, 1.0, speed);
-            assert!((y.len() as f64 - x.len() as f64 / speed as f64).abs() < 2.0);
-            let p = median_pitch(&y) as f64;
-            assert!((p - 200.0).abs() < 4.0, "speed {speed}: {p} Hz");
-        }
-        assert_eq!(shape(&x, 1.0, 1.0, 1.0), x);
+        assert_eq!(shape(&x, 1.0, 1.0), x);
     }
 
     #[test]
@@ -565,6 +559,6 @@ mod tests {
     #[test]
     fn deterministic() {
         let x = vowel(130.0, 0.6);
-        assert_eq!(shape(&x, 1.1, 0.9, 1.05), shape(&x, 1.1, 0.9, 1.05));
+        assert_eq!(shape(&x, 1.1, 0.9), shape(&x, 1.1, 0.9));
     }
 }

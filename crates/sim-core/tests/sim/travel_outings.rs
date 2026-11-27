@@ -385,7 +385,11 @@ fn nobody_sets_out_for_a_closed_place_and_those_there_go_home_as_it_shuts() {
                     && s.visiting.is_some_and(|v| v.plot == park)
                     && w.plot_at(x, z) == Some(park);
                 let when = (seed, clock::day(w.tick), minute as u32, i);
-                if at && !there.contains(&i) {
+                // (One on the way home stepping back over the edge to the car's door isn't arriving.)
+                let leaving = s
+                    .current()
+                    .is_some_and(|a| matches!(a.task.kind, sim_core::world::TaskKind::GoHome));
+                if at && !leaving && !there.contains(&i) {
                     arrivals.push(when);
                     if !w.plots[park as usize].open_at_tick(w.tick) {
                         shut_arrivals.push(when);

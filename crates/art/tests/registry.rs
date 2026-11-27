@@ -23,6 +23,33 @@ fn every_family_of_the_registry_builds_and_is_named_once() {
     assert!(seen.contains(&"trees") && seen.contains(&"kitchen"));
 }
 
+/// A family dropped from its group's list would fall out of `--all`, `--check` and `--centres` with no error: every
+/// pack on disk is some family's, and every group has families.
+#[test]
+fn every_pack_on_disk_is_a_family_s() {
+    for (group, families) in [
+        ("nature", art_nature::families()),
+        ("wet", art_wet::families()),
+        ("rooms", art_rooms::families()),
+        ("packs", art_packs::families()),
+        ("outside", art_outside::families()),
+        ("things", art_things::families()),
+    ] {
+        assert!(!families.is_empty(), "{group}: no families");
+    }
+    let registry = registry();
+    let packs = format!("{}/packs", Paths::repo().assets);
+    for e in std::fs::read_dir(&packs).unwrap().flatten() {
+        let pack = e.file_name().to_string_lossy().into_owned();
+        if e.path().join("manifest.json").exists() {
+            assert!(
+                registry.iter().any(|(_, f)| f.pack == pack),
+                "packs/{pack}/manifest.json: no family of the registry builds it"
+            );
+        }
+    }
+}
+
 #[test]
 fn the_families_asked_for_are_built_in_the_order_asked() {
     let registry = registry();

@@ -363,7 +363,7 @@ pub fn check_lookups(w: &World) -> (usize, usize) {
     for p in &w.plots {
         let door = p.arrival_point();
         for mode in [Mode::Foot, Mode::Car] {
-            let noted = w.travel.door_entry(p.id, door, mode);
+            let noted = w.travel.door_entry(Some(p.id), door, mode);
             let afresh = w.travel.entry(door, mode);
             assert_eq!(
                 noted, afresh,

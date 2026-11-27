@@ -16,6 +16,13 @@ export interface GameControls {
   inspect(id: number | null): void;
   /** The camera follows a resident, also to other lots (null: back home). */
   follow(id: number | null): void;
+  /** Walk mode: walk as resident `id` (of the player's household), seen from their eyes (`game/walk.ts`). */
+  enterWalk(id: number): void;
+  exitWalk(): void;
+  /** Walk mode's chat with resident `id` (null closes it). */
+  openTalk(id: number | null): void;
+  /** What the resident in the chat answers to `words` (`before`: the talk so far), or null. */
+  answer(words: string, before: string, signal: AbortSignal): Promise<string | null>;
   /** Frames the whole house. */
   frameHouse(): void;
   /** Opens or closes the journal (the story so far). */

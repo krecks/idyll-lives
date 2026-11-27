@@ -575,30 +575,39 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // not cutting in behind its tail (a taxi came by one backing round a junction's turn, cut in
     // behind it into its turn and stood there, each waiting for the other for good, Willowby).
     // Nor, going the way it backs, on past it (`overtakes`): crept along beside the ground it backs
-    // over, a car came out ahead of it into its way.
-    if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
-        if off_level.contains(k) {
-            return None;
-        }
-        let on = if waiting.contains(k) {
-            path.iter()
-                .position(|r| path[0].overlap(r) <= 0.0)
-                .unwrap_or(path.len())
-        } else {
-            0
-        };
-        (*k != key
-            && (overtakes(path[0], &body_now, &body_next, me.heading())
-                || path[on..].iter().any(|r| {
-                    crate::travel::dist(r.at, body_next.at) < r.half[0] + body_next.half[0] + 1.0
-                        && {
-                            // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
-                            let after = body_next.gap(r);
-                            after < GAP + TURN_KEEP && after < body_now.gap(r) - 1e-3
-                        }
-                })))
-        .then_some(*k)
-    }) {
+    // over, a car came out ahead of it into its way. One itself backing up on its turn round is
+    // kept off others' only by their bodies (`guard`): their ways back were found clear of each
+    // other as each turned round, and kept off each other's ground too, two backing up stood
+    // facing each other for good, Oakton.
+    if let Some(k) = traffic
+        .turning
+        .iter()
+        .filter(|_| !turning)
+        .find_map(|(k, path)| {
+            if off_level.contains(k) {
+                return None;
+            }
+            let on = if waiting.contains(k) {
+                path.iter()
+                    .position(|r| path[0].overlap(r) <= 0.0)
+                    .unwrap_or(path.len())
+            } else {
+                0
+            };
+            (*k != key
+                && (overtakes(path[0], &body_now, &body_next, me.heading())
+                    || path[on..].iter().any(|r| {
+                        crate::travel::dist(r.at, body_next.at)
+                            < r.half[0] + body_next.half[0] + 1.0
+                            && {
+                                // (Kept `TURN_KEEP` off it, so the one backing up comes by clear.)
+                                let after = body_next.gap(r);
+                                after < GAP + TURN_KEEP && after < body_now.gap(r) - 1e-3
+                            }
+                    })))
+            .then_some(*k)
+        })
+    {
         car.waits_for = Some(k);
         return;
     }
@@ -770,9 +779,10 @@ pub(crate) fn drive_taxi(w: &mut World, c: usize) {
     drive_on(w, c);
 }
 
-/// A work taxi standing at a stop (`taxi/`): pulled over for one coming the other way as far as
-/// it has room, as any car standing.
-pub(crate) fn stand_taxi(w: &mut World, c: usize) {
+/// A work taxi standing at a stop (`taxi/`): parked beside the road (`park_beside`); where it
+/// can't, pulled over for one coming the other way as far as it has room, as any car standing.
+/// Whether it's still pulling in to park (nobody gets in or out yet).
+pub(crate) fn stand_taxi(w: &mut World, c: usize) -> bool {
     // (Standing, it holds no claim but the one it stands in: none on ahead.)
     let t = w.cars[c].progress;
     w.traffic.stand(car_first(c), t);
@@ -795,8 +805,14 @@ pub(crate) fn stand_taxi(w: &mut World, c: usize) {
     if car.sight != Sight::Seen {
         car.unhold();
         car.shift = (car.shift - PULL_RATE).max(0.0);
-        return;
+        return false;
     }
-    let others = vehicles(&w.cars, Some(c));
-    pull_over(w, c, &others, false, None);
+    match park_beside(w, c) {
+        Some(pulling) => pulling,
+        None => {
+            let others = vehicles(&w.cars, Some(c));
+            pull_over(w, c, &others, false, None);
+            false
+        }
+    }
 }

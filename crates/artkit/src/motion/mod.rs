@@ -67,6 +67,21 @@ mod tests {
     }
 
     #[test]
+    fn a_clip_keyed_only_at_frame_0_is_a_frame_long() {
+        // (one of no length would be written as an accessor of count 0, which glTF doesn't allow)
+        let obj = key_channel(
+            part(),
+            "sway",
+            Path::Location,
+            0,
+            &[(0, 1.0)],
+            Ease::Linear,
+            0.0,
+        );
+        assert_eq!(obj.read(|o| o.tracks[0].end), 1);
+    }
+
+    #[test]
     #[should_panic(expected = "not a channel of a 3-axis part")]
     fn a_channel_of_a_fourth_axis_names_the_clip_it_is_in() {
         let obj = part();

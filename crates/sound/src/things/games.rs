@@ -197,11 +197,11 @@ pub(super) fn foosball(rate: f64) -> Stereo {
     )
 }
 
-/// A planned moment of a rally (\`pingPongSound\`'s plan).
+/// A planned moment of a rally (`pingPongSound`'s plan).
 pub(super) enum Play {
     /// The serve, by the server (-1 or 1).
     Serve { at: f64, server: f64 },
-    /// A shot: the ball bouncing, then the bat a \`gap\` later at \`loud\`, from the side \`from\`.
+    /// A shot: the ball bouncing, then the bat a `gap` later at `loud`, from the side `from`.
     Shot {
         at: f64,
         gap: f64,
@@ -526,7 +526,7 @@ pub(super) fn arcade(rate: f64) -> Stereo {
     )
 }
 
-/// A square-ish note (a pulse of \`duty\`, its harmonics added up to 8 kHz), with a short attack and release.
+/// A square-ish note (a pulse of `duty`, its harmonics added up to 8 kHz), with a short attack and release.
 pub(super) fn chip(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, duty: f64, amp: f64) {
     let start = round_usize(at * rate);
     let len = round_usize(seconds * rate);

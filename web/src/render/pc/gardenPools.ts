@@ -27,7 +27,6 @@ export class GardenPools {
   private pools: GardenPool[] = [];
   /** The pools' vertex colours (four vertices each), rewritten as they brighten and dim. */
   private colors = new Float32Array(0);
-  private lit = false;
 
   constructor(
     private readonly app: pc.AppBase,
@@ -66,7 +65,6 @@ export class GardenPools {
     this.entity?.destroy();
     this.entity = this.mesh = null;
     this.colors = new Float32Array(pools.length * 16);
-    this.lit = false;
     if (!pools.length) return;
     const n = pools.length * 4;
     const positions = new Float32Array(n * 3);
@@ -109,14 +107,17 @@ export class GardenPools {
   /**
    * How bright they are now: `level` the lamps' night level (0 by day), `on` how far each pool's light is
    * on (0..1: its lamp's switch, eased; a window's room's lights), `color` the lamps' (linear). Off altogether
-   * when none adds anything.
+   * when none adds anything. Whether a pool changed.
    */
-  update(level: number, on: (pool: GardenPool) => number, color: RGB): void {
+  update(level: number, on: (pool: GardenPool) => number, color: RGB): boolean {
     let lit = false;
+    let changed = false;
     const c = this.colors;
     for (let i = 0; i < this.pools.length; i++) {
       const p = this.pools[i];
       const f = level * on(p) * p.strength;
+      // (As stored, in float32: an unchanged pool compares equal.)
+      changed ||= c[i * 16] !== Math.fround(color.r * f) || c[i * 16 + 1] !== Math.fround(color.g * f) || c[i * 16 + 2] !== Math.fround(color.b * f) || c[i * 16 + 3] !== 1;
       for (let k = 0; k < 4; k++) {
         const o = (i * 4 + k) * 4;
         c[o] = color.r * f;
@@ -126,12 +127,12 @@ export class GardenPools {
       }
       lit ||= f > 0;
     }
-    if (this.mesh && (lit || this.lit)) {
+    if (this.mesh && changed) {
       this.mesh.setColors(c);
       this.mesh.update(pc.PRIMITIVE_TRIANGLES, false);
     }
-    this.lit = lit;
     if (this.entity && this.entity.enabled !== lit) this.entity.enabled = lit;
+    return changed;
   }
 
   destroy(): void {

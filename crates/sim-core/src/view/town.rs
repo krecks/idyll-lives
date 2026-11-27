@@ -187,6 +187,11 @@ pub(super) struct StructureView<'a> {
     /// no head, no pole): the kerbside furniture keeps clear of them; left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub light_poles: Vec<[f32; 3]>,
+    /// Where work taxis park beside the road for a house (`taxi::taxi_bays`: x, z and half its
+    /// length along the road): the kerbside furniture keeps clear of them; left out when there are
+    /// none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub taxi_bays: Vec<[f32; 3]>,
     /// Every junction where `traffic::SIGNAL_ARMS` roads for cars or more meet (`traffic::Signal`),
     /// for its pad and markings: its middle, whether it's on a roundabout, and its arms, each with
     /// its crosswalk (whether it has one) and stop line and its signal head's snapshot row; the lit

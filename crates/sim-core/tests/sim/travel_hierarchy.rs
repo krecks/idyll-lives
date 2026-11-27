@@ -535,7 +535,11 @@ fn a_classic_world_makes_the_same_graph() {
     let content = common::content();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves");
     let mut worlds = Vec::new();
-    for name in ["v042_village.json", "v035_normal.json", "v036_hamlets.json"] {
+    for name in [
+        "cedar_heights.json",
+        "linden_way.json",
+        "elm_street_hamlets.json",
+    ] {
         let json = std::fs::read_to_string(dir.join(name)).unwrap();
         worlds.push((name, World::from_save_json(&content, &json).unwrap()));
     }

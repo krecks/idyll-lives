@@ -128,6 +128,55 @@ fn out_end(
     meta["roads"][r.source as usize]["ends"][end].as_str() == Some("out")
 }
 
+/// Each plot's taxi bay: where a work taxi stands for it with nobody else about (`kerb_at`) when
+/// that's on the house's side of the road, parked beside it there up on the pavement or the verge
+/// (`cars::park_beside`): its middle (x, z) and half its length along the road (m). The kerbside
+/// furniture keeps clear of them (`view::StructureView::taxi_bays`). As last found (`warm_kerbs`)
+/// for the town as it is: found again, they were most of a structure update's time.
+pub fn taxi_bays(w: &World) -> Vec<[f32; 3]> {
+    let stamp = kerb_stamp(w);
+    if w.taxis.kerbs.stamp == stamp {
+        return w.taxis.kerbs.bays.clone();
+    }
+    Kerbs::find(w, stamp).bays
+}
+
+/// `taxi_bays`, from the plots' stands (`Kerbs::find`).
+pub(super) fn find_bays(w: &World, kerbs: impl Iterator<Item = Kerb>) -> Vec<[f32; 3]> {
+    let g = &w.travel.graph;
+    let mut out: Vec<[f32; 3]> = kerbs
+        .map(|k| {
+            let road = &g.roads[k.road as usize];
+            let (c, r) = (road.at(k.s), crate::cars::right_of(road.tangent(k.s)));
+            let m = g.point(k.mouth);
+            let house = [m[0] - k.axis[0] - c[0], m[1] - k.axis[1] - c[1]];
+            let side = if house[0] * r[0] + house[1] * r[1] < 0.0 {
+                -1.0
+            } else {
+                1.0
+            };
+            let off = side
+                * (crate::cars::lane_on(road.width, road.kind) + crate::cars::park_shift(TAXI_WID));
+            [c[0] + r[0] * off, c[1] + r[1] * off, TAXI_LEN / 2.0]
+        })
+        .collect();
+    out.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    out.dedup();
+    out
+}
+
+/// How near a taxi bay (`taxi_bays`) a taxi parks to park in it (m).
+const AT_BAY: f32 = 1.0;
+
+/// Whether a taxi parked with its middle at `at` is in a taxi bay (`taxi_bays`).
+pub(crate) fn at_bay(w: &World, at: [f32; 2]) -> bool {
+    w.taxis
+        .kerbs
+        .bays
+        .iter()
+        .any(|b| crate::travel::dist([b[0], b[1]], at) < AT_BAY)
+}
+
 /// Where the taxi stands for a house whose way to the road meets it at `mouth`, running there
 /// along `axis` (`home_way`): by it, nearest first along the road, where the road runs straight
 /// for the taxi's body and a little more (`STAND_ROOM`, `STAND_STRAIGHT`), clear of junctions'

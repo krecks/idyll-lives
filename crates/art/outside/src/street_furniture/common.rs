@@ -3,8 +3,9 @@
 
 use artkit::far::decimated;
 use artkit::forms::Scale;
+pub use artkit::kit::fluted;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, TAU, cos, sin};
+use artkit::math::{P3, PI};
 use artkit::parts::join;
 use artkit::place::{GameFrame, Spot};
 use artkit::scene::{Obj, meshes};
@@ -106,23 +107,6 @@ pub fn sweep_tube<P: Spot>(
         resolution = 3,
         scale = scale
     )
-}
-
-/// A ring of `flutes` shallow flutes round a column of radius `r` at height `y` (Blender points, about the
-/// origin): `per` points a flute, sunk `depth` of the radius at their middles.
-pub fn fluted(r: f64, y: f64, flutes: usize, depth: f64, per: usize, phase: f64) -> Vec<P3> {
-    let n = flutes * per;
-    let mut out = Vec::with_capacity(n);
-    for i in 0..n {
-        let a = TAU * i as f64 / n as f64 + phase;
-        let k = 1.0 - depth * (0.5 + 0.5 * cos(flutes as f64 * a));
-        out.push(P3 {
-            x: r * k * cos(a),
-            y: r * k * sin(a),
-            z: y,
-        });
-    }
-    out
 }
 
 /// A square loop `h` either side of the middle at height `y`, its sides square to the axes (Blender).

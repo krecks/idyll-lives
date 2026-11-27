@@ -134,6 +134,8 @@ impl World {
             Command::UseItem { sim, item, action } => self.apply_use_item(sim, item, action)?,
             // Orders to a resident: where to go, whom to talk to, what to do.
             Command::MoveTo { sim, x, z } => self.apply_move_to(sim, x, z)?,
+            Command::Steer { sim, x, z } => self.apply_steer(sim, x, z)?,
+            Command::Hold { sim, on } => self.sim_mut(sim)?.steered = on,
             Command::Social {
                 sim,
                 target,

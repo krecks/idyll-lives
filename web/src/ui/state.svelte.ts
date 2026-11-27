@@ -61,6 +61,8 @@ export interface Placing {
 }
 
 export interface SocialMenuState {
+  /** Who would do it (and, for Talk…, say the words). */
+  actor: number;
   target: number;
   x: number;
   y: number;
@@ -236,6 +238,12 @@ class GameState {
   inspected = $state<number | null>(null);
   /** Resident the camera follows (also to other lots); null: the camera stays home. */
   follow = $state<number | null>(null);
+  /** Walk mode: the resident walked as, seen from their eyes (null: the orbit camera). */
+  walking = $state<number | null>(null);
+  /** Walk mode's chat: the resident talked with (null: closed). */
+  talkWith = $state<number | null>(null);
+  /** The chat's speaker: the one the social menu was opened for. */
+  talkFrom = $state<number | null>(null);
   /** The camera is watching on its own (the director): in Live, a while after the player's last input. */
   watching = $state(false);
   /** The mouse moved lately: a quiet interface shows itself again for a moment. */
@@ -297,6 +305,9 @@ class GameState {
     this.homeArea = null;
     this.relationships = [];
     this.socialMenu = null;
+    this.walking = null;
+    this.talkWith = null;
+    this.talkFrom = null;
     this.feed = [];
     this.menu = null;
     this.pauseMenu = false;
@@ -348,8 +359,9 @@ export function nextWallMode(mode: WallMode): WallMode {
 
 let toastId = 0;
 export function toast(text: string, ms = 3500): void {
+  // (The same words already up are shown afresh, not stacked: walk mode's steers can be refused several times a second.)
   const id = ++toastId;
-  game.toasts = [...game.toasts, { id, text }];
+  game.toasts = [...game.toasts.filter((t) => t.text !== text || t.actions), { id, text }];
   setTimeout(() => dropToast(id), ms);
 }
 
