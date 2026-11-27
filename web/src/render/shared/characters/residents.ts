@@ -2449,7 +2449,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     let fade = DEFAULT_FADE;
     let upper = '';
     let rate = 1;
-    let hands: number = (typeof act?.hands === 'function' ? act.hands(useObj?.def ?? '') : act?.hands) ?? HANDS.relaxed;
+    let hands: number = act?.hands ?? HANDS.relaxed;
     // Step towards a partner (hugs, kisses, fights): eased towards `reach` at `reachRate`.
     let reach = 0;
     let reachRate = 4;
@@ -2563,7 +2563,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         // Astride a ride, the hands on its grips (`RIDES`).
         key = this.sizedClip(rig, ride.sizes);
         hands = HANDS.grip;
-      } else if (sat?.sit) key = typeof sat.sit === 'function' ? sat.sit(rig.useDef) : sat.sit;
+      } else if (sat?.sit) key = sat.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
       else key = 'sit';
       if (floor) key = SIT_CLIPS[floor].sit;
@@ -2585,7 +2585,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         reachRate = 1.5;
       }
       if (!social) {
-        const up = known ? (typeof sat?.upper === 'function' ? sat.upper(rig.useDef) : sat?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
+        const up = known ? sat?.upper : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
         if (up === 'eat' || up === 'drink') {
           // (With cutlery or a bite in the hand, the bite stops a fork's length off the mouth: `eatFork`; a drink served

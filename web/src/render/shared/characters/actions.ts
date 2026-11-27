@@ -378,20 +378,20 @@ export const HANDS = {
   open: 0.85,
 } as const;
 /**
- * Animation per action tag (`layout.actions`, from the content's `animations`):
+ * Animation per action tag (`layout.actions`, from the content's `animations`), and per manner (`MANNERS`: what
+ * differs, done that way at a thing):
  * - `stand`: clip sequence while standing at the object (looped; looping clips play ~4 s per step);
- *   a function picks one by object def (and the resident's height);
- * - `sit`: seated clip (default `sit`), or a function of the object def;
- * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then), or a function of the
- *   object def ('' for none);
- * - `hands`: finger pose, or a function of the object def.
+ *   a function picks one by the resident's height (and the object def);
+ * - `sit`: seated clip (default `sit`);
+ * - `upper`: upper-body layer while seated (`eat` and `drink` play now and then; '' for none);
+ * - `hands`: finger pose.
  * Procedural layers on top (reclining, instruments, gazes, ...) are in `activityPose`.
  */
 export interface ActionAnim {
   stand?: readonly string[] | ((def: string, height: number) => readonly string[]);
-  sit?: string | ((def: string) => string);
-  upper?: string | ((def: string) => string);
-  hands?: number | ((def: string) => number);
+  sit?: string;
+  upper?: string;
+  hands?: number;
   /** Seated, the upper layer between the now-and-then `eat` or `drink` (the cup held: `holdCup`); none, the hands in the lap. */
   between?: string;
   /**

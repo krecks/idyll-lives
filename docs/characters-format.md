@@ -751,7 +751,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitFloor, sitDownFloor, standUpFloor | yes, no, no | 1.67, 1.6, 1.47 | on a floor cushion (a seat under 0.2 m: the floor cushion, the electric fireplace's hearth cushion): cross-legged, the hands on the knees; down to it through a squat and a hand on the floor, and up again (clips/seated.ts `FLOOR_SITS`) |
 | sitGround, sitDownGround, standUpGround | yes, no, no | 1.67, 1.6, 1.47 | on the ground (a seat under 0.07 m: a tree's shade) against the trunk, leant back, the legs out long, crossed at the ankles, the hands in the lap |
 | sitHands | yes | 1.67 | seated at a desk or keys (type, write, play, music) |
-| sitHandsNear | yes | 1.67 | the same at a shallow desk with its chair built in close (`NEAR_DESKS`) |
+| sitHandsNear | yes | 1.67 | the same at a shallow desk with its chair built in close (content `how` `{"write": "near"}`) |
 | sitHandsFar | yes | 1.67 | the same reaching further out, leaning in more: at a desk or table a chair can't be pulled in to far enough (drawer pedestals where the knees go: `TUCK`) |
 | interact | no | 2.0 | reaching to use something |
 | pickUp | no | 0.87 | lifting, serving, fetching |
@@ -810,7 +810,7 @@ the runtime's `Clip`s at load (30 fps; loops sample `i / frames`, one-shots get 
 | sitHandsLow177, 147, 112 | yes | 5 | seated at a top less than `LOW_TOP` (0.2 m for the reference height) over the seat (the kids' chair at the coffee table, `tuckLow`): bent well over it, the left hand flat on it, the right drawing; `sit`'s pelvis |
 | kneelTable177, 147, 112 | yes | 6 | at the train table (`play`, `STEP_IN`, a lane each): kneeling up at its edge, leant in, the right hand pushing the engine along the track and the left on the top, now and then sitting back for a look |
 | brushHair | yes | 5 | getting ready at the dressing table (the seated upper body, `ACTIONS.wash`): four brush strokes from the crown down the right side, the head tilting into each, then the left hand smoothing the other side |
-| warmHands | yes | 7 | warming up standing at a fire (`ACTIONS.relax` at `WARM_AT`: the fire pit): leant a little to it, the hands held out over it, palms to the flames, turned now and then, then brought together and rubbed (clips/uses.ts) |
+| warmHands | yes | 7 | warming up standing at a fire (`ACTIONS.relax` in the `warm` manner: the fire pit): leant a little to it, the hands held out over it, palms to the flames, turned now and then, then brought together and rubbed (clips/uses.ts) |
 | plateHold177, 147, 112 | yes | 3 | stood on the vibration plate (`GRIPPED`): both hands on its grips (fore-and-aft bars 0.26 m either side, 0.96 m over the deck, 0.12 m ahead), the weight shifting a little; the plate's buzz on top (`activityPose`); a size per height |
 | lieCurl | yes | 2.4 | dozing on a bed too short to lie on flat (`CURLED_BEDS`: the window seat): curled up on the left side facing the room, the knees drawn up, the head on the pillow on the left forearm; turned flat like `lie` |
 | lieSide | yes | 2.4 | lying at full length on the right side (`SIDE_BEDS`: the daybed): the back to the object's back rail, the legs along the mattress, the right one straight and the left a little over it, the right forearm under the cheek on the pillow, the left hand in front of the chest; turned flat like `lie` |
@@ -858,7 +858,7 @@ middle, `recline` in radians.
 Why some entries are as they are:
 - Chairs at desks and tables (`chessTable`, `computerDesk`, `diningTable`, the 0.20 dining sets and desks) sit in the
   back half of the footprint, facing the work surface. The pack writing desks (`gloomy.journalDesk`,
-  `neat.organizerDesk`, `romantic.letterBureau`, `hotHeaded.grudgeJournal`) are their own chairs (`NEAR_DESKS`): the
+  `neat.organizerDesk`, `romantic.letterBureau`, `hotHeaded.grudgeJournal`) are their own chairs (content `how` `{"write": "near"}`): the
   hands on the top or the flap, in front of the hutch.
 - `fireplaceElectric` sits cross-legged on the floor cushion in front of the fire, facing it (`back`), the hips on its
   back half (0.36 m out) so the knees stop short of the surround.

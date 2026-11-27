@@ -1,8 +1,7 @@
 // What every content object plays for every action tag (`render/shared/characters/actions.ts` `ACTIONS`, in the
-// manner of its content `how`, `actionOf`): the
-// standing clips, the seated clip and upper layer, the hands and the prop in hand, for a child, a teen and a
-// grown-up (1.12, 1.47, 1.77 m). Each tag's row for no object, then the objects (base, catalogs and packs) whose
-// rows differ from it. A change meant to change how residents use things: `bun test --update-snapshots`.
+// manner of its content `how`, `actionOf`): the standing clips, the seated clip and upper layer, the hands and the
+// prop in hand, for a child, a teen and a grown-up (1.12, 1.47, 1.77 m). Each tag's row for no object, then the
+// objects (base, catalogs and packs) whose rows differ from it. A change meant to change how residents use things: `bun test --update-snapshots`.
 import { describe, expect, test } from 'bun:test';
 import { loadContent, usePublicFetch } from './support/content';
 
@@ -21,9 +20,7 @@ describe('action clips', async () => {
   const row = (tag: string, def: string, height: number): string => {
     const a = actionOf(tag, content.object(def)?.how?.[tag])!;
     const stand = typeof a.stand === 'function' ? a.stand(def, height) : a.stand;
-    const sit = typeof a.sit === 'function' ? a.sit(def) : a.sit;
-    const upper = typeof a.upper === 'function' ? a.upper(def) : a.upper;
-    const hands = typeof a.hands === 'function' ? a.hands(def) : a.hands;
+    const { sit, upper, hands } = a;
     const prop = typeof a.prop === 'function' ? a.prop(def, '', false, false) : a.prop;
     return `stand=${stand?.join(',') ?? '-'} sit=${sit ?? '-'} upper=${upper ?? '-'} hands=${hands ?? '-'} prop=${prop ? (propName.get(prop) ?? prop.key) : '-'}`;
   };
