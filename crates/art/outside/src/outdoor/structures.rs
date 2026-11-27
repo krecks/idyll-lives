@@ -63,7 +63,7 @@ pub fn carport() -> Vec<Obj> {
     meshes()
 }
 
-// --- O9: the gazebo: four posts, its ring beam and the stepped roof with its finial -----------------------
+// --- O9: the gazebo: four posts, its ring beam, the stepped roof with its finial and a bench along the back -----------------------
 pub fn gazebo() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let (w, d, h) = (2.84, 2.84, 2.30);
@@ -160,6 +160,65 @@ pub fn gazebo() -> Vec<Obj> {
                 bevel = 0.005
             );
         }
+    }
+    // the bench along the back, inside the rail: three boards at 0.45 m, two back boards on the back legs, three
+    // frames (content `places` sit three at depth -1.10, 0.75 m apart)
+    let (front, rear) = (-1.30 + 0.42, -1.30);
+    for (k, dz) in [0.065, 0.205, 0.345].into_iter().enumerate() {
+        fbox!(
+            f,
+            format!("bench_board{k}"),
+            2.54,
+            0.035,
+            0.125,
+            (0, 0.4325, rear + dz),
+            M.struct_timber,
+            bevel = 0.006
+        );
+    }
+    for (k, y) in [0.62, 0.79].into_iter().enumerate() {
+        fbox!(
+            f,
+            format!("bench_back{k}"),
+            2.54,
+            0.10,
+            0.025,
+            (0, y, rear + 0.0625),
+            M.struct_timber,
+            bevel = 0.006
+        );
+    }
+    for (k, x) in [-1.2f64, 0.0, 1.2].into_iter().enumerate() {
+        fbox!(
+            f,
+            format!("bench_leg{k}a"),
+            0.05,
+            0.415,
+            0.05,
+            (x, 0.2075, front - 0.04),
+            M.struct_timber,
+            bevel = 0.005
+        );
+        fbox!(
+            f,
+            format!("bench_leg{k}b"),
+            0.05,
+            0.85,
+            0.05,
+            (x, 0.425, rear + 0.025),
+            M.struct_timber,
+            bevel = 0.005
+        );
+        fbox!(
+            f,
+            format!("bench_bearer{k}"),
+            0.05,
+            0.06,
+            0.40,
+            (x, 0.385, rear + 0.21),
+            M.struct_timber,
+            bevel = 0.005
+        );
     }
     settle!();
     meshes()

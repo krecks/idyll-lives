@@ -221,9 +221,14 @@ that move apart), reported to the owner.
 
 `carport` (3.00 × 2.72 × 5.00 m: four posts, two beams, five rafters and its roof sheet), `gazebo` (2.97 × 3.09 ×
 2.96 m: four posts, a ring beam, two rails on three sides, a broad roof skirt, the lantern over it and its cap with
-a finial), `pergola` (2.92 × 2.42 × 1.90 m: posts, two beams, five rafters), `awning` (1.90 × 0.40 × 0.91 m on the
+a finial, and a bench along the back inside the rail), `pergola` (2.92 × 2.42 × 1.90 m: posts, two beams, five rafters), `awning` (1.90 × 0.40 × 0.91 m on the
 wall's face: a rail, five canvas slats stepping down to the front bar and the valance) and `solarPanels` (1.76 ×
 0.65 × 1.66 m: its frame on the ground and two panels). Timber and roof sheet, or frame and panels, map to 1–3 draw
 calls; none has a clip. Their roofs are flat: the kit has no rotated slab here, so the gazebo's is a skirt with a
 lantern rather than a pitched roof, and the awning's slope is five stepped slats. The awning is declared with its
 own centre (0.025 m) because its parts' box is not centred on the tile.
+
+The gazebo's bench (in the timber, no draw call of its own): three boards with their top at 0.45 m from the back
+(depth −1.30) to −0.89, two back boards (0.62 and 0.79 m) on the back legs, three frames. The content seats three
+there (`slots` 3, `places` at depth −1.10 and 0.75 m apart, `seat` 0.45 m high, `forward` 0), come to from the open
+front (`approach: door`, as the sauna's): from any other side they would come through the rail.
