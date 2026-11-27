@@ -106,11 +106,14 @@ export class HouseBuilder {
 
   /**
    * How much each room's windows glow (0 out, 1 full; rooms not listed glow): the windows of a
-   * room where everyone is asleep go dark with its lights. Kept for the glass of later builds.
+   * room where everyone is asleep go dark with its lights. Kept for the glass of later builds. Whether a window
+   * changed (rooms of other houses aren't drawn here).
    */
-  setWindowGlow(levels: ReadonlyMap<number, number>): void {
+  setWindowGlow(levels: ReadonlyMap<number, number>): boolean {
     this.windowGlow = levels;
-    for (const [room, mat] of this.roomGlass) this.lib.setEmissive(mat, this.roomGlowOf(room));
+    let changed = false;
+    for (const [room, mat] of this.roomGlass) changed = this.lib.setEmissive(mat, this.roomGlowOf(room)) || changed;
+    return changed;
   }
   private windowGlow: ReadonlyMap<number, number> = new Map();
   /** The viewed house's clear glass for each room it lets light out of (its own glow). */

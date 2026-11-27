@@ -22,6 +22,9 @@ export interface Fences {
   mesh: pc.Mesh;
 }
 
+/** Past this many spans of gates moved by the land at once (`regroundGates`), the whole mesh is sent up in one. */
+const MANY_SPANS = 64;
+
 /** How far a leaf's corner swinging may stand past its box shut and open (m): a leaf is thin, its arc hardly bulges. */
 const SWING_PAD = 0.05;
 
@@ -71,6 +74,59 @@ export function swingGate(fences: Fences, gate: GateLeaf, open: number, towards:
   const { pos, nor } = swungGate(gate, open, towards);
   writeLeaf(fences.mesh.vertexBuffer, pc.SEMANTIC_POSITION, gate.first, pos);
   writeLeaf(fences.mesh.vertexBuffer, pc.SEMANTIC_NORMAL, gate.first, nor);
+}
+
+/**
+ * The gates on the ground as it is now (`ground`, as they were built on; a land stroke moved it): each leaf and post
+ * that moved lifted or lowered in the mesh and those spans alone sent up, as a swing's (many of them: the span from the
+ * first to the last, at once), a leaf's rest with it (it swings on from there), the mesh's box grown to hold them.
+ * Whether any moved.
+ */
+export function regroundGates(fences: Fences, ground: (x: number, z: number) => number): boolean {
+  const vb = fences.mesh.vertexBuffer;
+  const e = vb.format.elements.find((el) => el.name === pc.SEMANTIC_POSITION)!;
+  const copy = vb.lock();
+  const floats = copy instanceof ArrayBuffer ? new Float32Array(copy) : new Float32Array(copy.buffer, copy.byteOffset, copy.byteLength >> 2);
+  const box = fences.mesh.aabb;
+  let [lo, hi] = [box.getMin().y, box.getMax().y];
+  // (The spans moved: first vertex, count.)
+  const spans: number[] = [];
+  const lift = (first: number, count: number, dy: number) => {
+    for (let v = first; v < first + count; v++) {
+      const o = (e.offset + v * e.stride) / 4 + 1;
+      floats[o] += dy;
+      lo = Math.min(lo, floats[o]);
+      hi = Math.max(hi, floats[o]);
+    }
+    spans.push(first, count);
+  };
+  for (const leaf of fences.gates) {
+    const dy = ground(leaf.centre[0], leaf.centre[1]) - leaf.y;
+    if (dy !== 0) {
+      leaf.y += dy;
+      for (let i = 1; i < leaf.rest.length; i += 3) leaf.rest[i] += dy;
+      lift(leaf.first, leaf.rest.length / 3, dy);
+    }
+    // (A post two gates share moves once: its `y` is the ground's after the first.)
+    for (const post of leaf.posts) {
+      const dp = ground(post.x, post.z) - post.y;
+      if (dp === 0) continue;
+      post.y += dp;
+      lift(post.first, post.count, dp);
+    }
+  }
+  if (!spans.length) return false;
+  // (A town's gates' mesh is some 12 MB, its posts after all the leaves: a stroke's few gates sent up span by span, a
+  // whole town's, 1 000 uploads, as one.)
+  if (spans.length <= 2 * MANY_SPANS) for (let i = 0; i < spans.length; i += 2) vb.unlock(e.offset + spans[i] * e.stride, (spans[i + 1] - 1) * e.stride + 12);
+  else vb.unlock();
+  const min = box.getMin().clone();
+  const max = box.getMax().clone();
+  [min.y, max.y] = [Math.min(min.y, lo), Math.max(max.y, hi)];
+  const grown = new pc.BoundingBox();
+  grown.setMinMax(min, max);
+  fences.mesh.aabb = grown;
+  return true;
 }
 
 /** A leaf's `values` (x, y, z a vertex, from vertex `first`) into `vb`'s copy of stream `semantic`, and that span alone sent up: not the whole town's gates. */
