@@ -1,13 +1,13 @@
 //! The garage's tyre rack and tool chest.
 
-use super::common::{F, WALL, mark, own_palette, tyre};
+use super::common::{F, WALL, mark, own_palette};
 use artkit::forms::Holes;
-use artkit::math::{Axis, TAU, atan2, cos, degrees, pow, radians, sin, sqrt};
+use artkit::math::{TAU, atan2, cos, cosd, degrees, pow, radians, sin, sind, sqrt};
 use artkit::parts::{join_all, new_parts};
 use artkit::place::Facing;
 use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, kit_tube, settle};
+use artkit::{fbox, fcyl, fextrude, kit_tube, revolve, settle};
 
 own_palette! { TYRES:
     body = ("#E07A1F", satin),        // the frames' orange uprights
@@ -23,6 +23,31 @@ own_palette! { CHEST:
 // --- the tyre rack: 2x1 against the wall, steel shelves of new tyres ---------------------------------------------
 pub const TR_D: f64 = 0.66; // the frames' depth, a tyre's height: back on the wall's face
 pub const TR_LEVELS: [f64; 3] = [0.12, 0.76, 1.4];
+
+/// A new tyre lying across the rack: an octagon of 45-degree turns for its section (no hard edge to bevel), sixteen
+/// round its axle (along game x), shaded smooth. Seen from the front it is a ring from 0.64 of r out to r.
+fn rack_tyre(name: &str, (x, y, z): (f64, f64, f64), r: f64, w: f64, m: &TYRES) {
+    const SEGMENTS: usize = 16;
+    const BEAD: f64 = 0.64; // the open hole's radius, of r
+    let (rc, a) = (r * (1.0 + BEAD) / 2.0, r * (1.0 - BEAD) / 2.0);
+    // the octagon's corners at 22.5 + 45 k degrees, scaled out so its flats reach the section's width and depth
+    let reach = 1.0 / cosd(22.5);
+    let mut section: Vec<(f64, f64)> = (0..8)
+        .map(|k| {
+            let t = 22.5 + 45.0 * k as f64;
+            (rc + a * reach * cosd(t), w / 2.0 * reach * sind(t))
+        })
+        .collect();
+    section.push(section[0]);
+    revolve!(
+        name,
+        &section,
+        at = F.at(x, y, z),
+        material = m.rubber,
+        rot = (0, 90, 0),
+        segments = SEGMENTS
+    );
+}
 
 pub fn tyre_rack() -> Vec<Obj> {
     let m = &TYRES;
@@ -131,19 +156,7 @@ pub fn tyre_rack() -> Vec<Obj> {
             for t in 0..n {
                 let x = -0.79 + t as f64 * (1.58 / (n - 1) as f64);
                 let ty = y + 0.05 - (r - sqrt(r * r - pow(TR_D / 2.0 - 0.085, 2.0))) + r; // down between the beams
-                // its open bead eased, sixteen round (eased, twenty went past the triangles' aim)
-                artkit::bevel::eased(tyre(
-                    &format!("tyre{lv}{t}"),
-                    x,
-                    ty,
-                    zc,
-                    r,
-                    w,
-                    m.rubber,
-                    None,
-                    Some(16),
-                    Axis::X,
-                ));
+                rack_tyre(&format!("tyre{lv}{t}"), (x, ty, zc), r, w, m);
                 // the tread's label, on its crown to the front
                 fbox!(
                     F,
