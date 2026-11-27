@@ -108,7 +108,7 @@ export interface ResidentView<M extends object, Q, P extends ResidentProp> {
    * its instances' from then on, nothing drawn until `showProp`.
    */
   buildProp(key: string): Promise<P | null>;
-  /** Per frame, for every built prop: draws its first `count` instances (their matrices rewritten), or, 0, none. */
+  /** Per frame, for every built prop: draws it for those of its first `count` rows that hold it (a matrix set), or, 0, none. */
   showProp(prop: P, count: number): void;
   /** Calls `listener` with each model file that comes after failing (`onModelFileArrived`); returns how to stop. */
   onModelFile(listener: (url: string) => void): () => void;
