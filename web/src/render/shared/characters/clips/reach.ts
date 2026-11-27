@@ -415,13 +415,13 @@ function boardPose(fit: BoardFit): (p: number) => PoseSpec {
 // --- the chest freezer ----------------------------------------------------------------------------
 
 /**
- * The chest freezer (`crates/art/wet/src/kitchen/freezers.rs`, 2 × 1): the box's rim 0.82 m up, its front's face
- * 0.45 m out from the middle; the lid hinged along its back (0.845 m up, 0.41 m behind the middle), its handle at
- * the front, 0.88 m from the hinge. The lid lifts 85° in 1.2 s as the use starts (`lid_open`), stays up 3.5 s and
+ * The chest freezer (`crates/art/wet/src/kitchen/freezers.rs`, 2 × 1, 0.68 m deep against the wall): the box's rim
+ * 0.82 m up, its front's face 0.25 m out from the middle; the lid hinged along its back (0.845 m up, 0.41 m behind
+ * the middle), its handle at the front, 0.68 m from the hinge. The lid lifts 85° in 1.2 s as the use starts (`lid_open`), stays up 3.5 s and
  * comes down in 1.2 s. Used from `CHEST_TO` m out (characters.ts `STAND_BACK`), the toes at the box.
  */
-const LID = { y: 0.845, z: -0.41, dy: 0.015, dz: 0.88, deg: 85, open: 1.2, held: 3.5 };
-export const CHEST_TO = 0.65;
+const LID = { y: 0.845, z: -0.41, dy: 0.015, dz: 0.68, deg: 85, open: 1.2, held: 3.5 };
+export const CHEST_TO = 0.45;
 export const CHEST: Size[] = sizes('chestFetch', SHARES_177, (s) => ({ s, to: CHEST_TO }));
 const CHEST_S = 6.4;
 /** The lid's lift (deg) `t` s into the use. */
@@ -435,7 +435,7 @@ function lidHandle(t: number, x: number): [number, number, number] {
   return [x, LID.y + LID.dz * Math.sin(a) + LID.dy * Math.cos(a), LID.z + LID.dz * Math.cos(a) - LID.dy * Math.sin(a)];
 }
 /** Where the hands go into the well (m, the object's frame: the right's; the left's mirrored), by the size: a grown-up's near its floor, a child's just under the rim. */
-const WELL = (s: number): [number, number, number] => (s > 0.9 ? [0.13, 0.4, 0.12] : s > 0.7 ? [0.13, 0.48, 0.18] : [0.12, 0.62, 0.3]);
+const WELL = (s: number): [number, number, number] => (s > 0.9 ? [0.13, 0.4, -0.08] : s > 0.7 ? [0.13, 0.48, -0.02] : [0.12, 0.62, 0.1]);
 
 /**
  * Getting something out of the chest freezer: the right hand to the lid's handle, lifting it with it as it swings
@@ -448,7 +448,7 @@ function chestPose(fit: Fit): (p: number) => PoseSpec {
   const o = (v: readonly [number, number, number]) => at(fit, v[0], v[1], v[2]);
   const w = WELL(s);
   const well = (sx: number, dx = 0, dz = 0) => o([sx * w[0] + dx, w[1], w[2] + dz]);
-  const rim = (sx: number) => o([sx * 0.15, 0.95, 0.42]);
+  const rim = (sx: number) => o([sx * 0.15, 0.95, 0.22]);
   const held = (sx: number): Vec => [sx * 0.08, 1.12, 0.3];
   const stoop = (bend: number, p: number, gaze: number) => stoopBody(bend, -0.0016 * bend, 0, p, gaze);
   // How far bent over the rim for the hands to be in the well (found while baking): the shoulders within an arm of it.

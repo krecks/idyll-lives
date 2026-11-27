@@ -2,7 +2,7 @@
 //! for `frozenTreat`.
 
 use super::M;
-use artkit::math::Axis;
+use artkit::math::{Axis, P3};
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, settle_all};
 use artkit::place::GameFrame;
@@ -12,68 +12,72 @@ use artkit::{fbox, swing};
 /// The chest freezer: a low box on the floor with its lid hinged at the back.
 pub fn chest_freezer() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    let z = 0.01;
-    // the shell: back, front, the two ends and the floor of the box, and its liner inside
-    fbox!(
-        f,
-        "back",
-        1.90,
-        0.80,
-        0.05,
-        (0, 0.42, z - 0.415),
-        M.body,
-        bevel = 0.010
-    );
-    fbox!(
-        f,
-        "front",
-        1.90,
-        0.80,
-        0.05,
-        (0, 0.42, z + 0.415),
-        M.body,
-        bevel = 0.010
-    );
-    for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+    // the box's middle (depth): its back on the wall's face, 0.68 m deep
+    let z = -0.09;
+    let still = new_parts(|| {
+        // the shell: back, front, the two ends and the floor of the box, and its liner inside
         fbox!(
             f,
-            format!("end{i}"),
-            0.05,
+            "back",
+            1.90,
             0.80,
-            0.88,
-            (sx * 0.925, 0.42, z),
+            0.05,
+            (0, 0.42, z - 0.315),
             M.body,
             bevel = 0.010
         );
-    }
-    fbox!(
-        f,
-        "floor",
-        1.90,
-        0.06,
-        0.88,
-        (0, 0.03, z),
-        M.body,
-        bevel = 0.006
-    );
-    fbox!(f, "liner", 1.78, 0.70, 0.76, (0, 0.40, z), M.liner);
-    fbox!(f, "rim", 1.88, 0.020, 0.86, (0, 0.815, z), M.trim);
-    fbox!(
-        f,
-        "badge",
-        0.10,
-        0.030,
-        0.006,
-        (0.78, 0.55, z + 0.442),
-        M.chrome
-    );
+        fbox!(
+            f,
+            "front",
+            1.90,
+            0.80,
+            0.05,
+            (0, 0.42, z + 0.315),
+            M.body,
+            bevel = 0.010
+        );
+        for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("end{i}"),
+                0.05,
+                0.80,
+                0.68,
+                (sx * 0.925, 0.42, z),
+                M.body,
+                bevel = 0.010
+            );
+        }
+        fbox!(
+            f,
+            "floor",
+            1.90,
+            0.06,
+            0.68,
+            (0, 0.03, z),
+            M.body,
+            bevel = 0.006
+        );
+        fbox!(f, "liner", 1.78, 0.70, 0.56, (0, 0.40, z), M.liner);
+        fbox!(f, "rim", 1.88, 0.020, 0.66, (0, 0.815, z), M.trim);
+        fbox!(
+            f,
+            "badge",
+            0.10,
+            0.030,
+            0.006,
+            (0.78, 0.55, z + 0.342),
+            M.chrome
+        );
+    });
+    join(&still, "body", Some(P3::ZERO));
     let parts = new_parts(|| {
         fbox!(
             f,
             "lid",
             1.86,
             0.05,
-            0.84,
+            0.64,
             (0, 0.845, z),
             M.body,
             bevel = 0.020
@@ -84,7 +88,7 @@ pub fn chest_freezer() -> Vec<Obj> {
             0.62,
             0.035,
             0.030,
-            (0, 0.860, z + 0.445),
+            (0, 0.860, z + 0.345),
             M.chrome,
             bevel = 0.010
         );
@@ -96,13 +100,13 @@ pub fn chest_freezer() -> Vec<Obj> {
                 0.08,
                 0.030,
                 0.030,
-                (sx * 0.60, 0.845, z - 0.41),
+                (sx * 0.60, 0.845, z - 0.31),
                 M.chrome,
                 bevel = 0.008
             );
         }
     });
-    let lid = hinged(join(&parts, "lid", None), f.at(0, 0.845, z - 0.41));
+    let lid = hinged(join(&parts, "lid", None), f.at(0, 0.845, z - 0.31));
     settle_all();
     swing!(lid, "lid_open", -85, axis = Axis::X, seconds = 1.2);
     Vec::new()

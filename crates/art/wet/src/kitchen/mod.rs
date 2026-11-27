@@ -196,9 +196,9 @@ pub fn family() -> Family {
                 ("trim", "Plinth"),
             ]),
 
-            Model::new("chestFreezer", freezers::chest_freezer, (1.90, 0.89, 0.90))
+            Model::new("chestFreezer", freezers::chest_freezer, (1.90, 0.89, 0.70))
                 .key("model.chestFreezer")
-                .centre(0.0, 0.01)
+                .centre(0.0, -0.08)
                 .motions(json!({"uses": {"fetch": "lid_open"}, "hold": 3.5}))
                 .paint(&[("body", "Body"), ("chrome", "Handles"), ("trim", "Plinth")]),
             Model::new("uprightFreezer", freezers::upright_freezer, (0.60, 1.82, 0.679))

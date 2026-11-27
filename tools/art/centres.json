@@ -153,7 +153,7 @@
   "model.chefStove": [0.0, -0.099],
   "model.chemistrySet": [0.0, -0.18],
   "model.chessTable": [0.0, 0.0],
-  "model.chestFreezer": [0.0, 0.01],
+  "model.chestFreezer": [0.0, -0.08],
   "model.chestOfDrawers": [0.0, -0.175],
   "model.chinaCabinet": [0.0, -0.156],
   "model.climbingFrame": [0.0, 0.015],
