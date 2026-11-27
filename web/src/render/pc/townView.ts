@@ -33,7 +33,7 @@ import './shaders/townGround';
 import { Geo } from '../shared/geometry';
 import { FINISH, litAt, ROOFS, unitMeshes, type RoofKind, type TownBuilding } from '../shared/townBuildings';
 
-export { lotBuilding, type TownLotHouse } from '../shared/townBuildings';
+export { lotBuilding, lotUp, type TownLotHouse } from '../shared/townBuildings';
 
 /** How bright a lit window glows at night (times the street's window glow). */
 const GLOW = 1.4;
@@ -127,9 +127,15 @@ export class TownBuildings {
     if (this.shown) this.upload();
   }
 
-  /** The far lots' houses (as the chunks streamed in change, and as their people get up and go to bed); a lot with a look lit by the hour (`setTime`). */
+  /** The far lots' houses (as the chunks streamed in change); a lot with a look lit by the hour (`setTime`), a house as its people get up and go to bed (`relit`). */
   setLots(list: TownBuilding[]): void {
     this.lots = list;
+    this.due = true;
+    if (this.shown) this.upload();
+  }
+
+  /** The lots' `lit` changed in place (who is up in a far lot's house, `lotUp`): written again. */
+  relit(): void {
     this.due = true;
     if (this.shown) this.upload();
   }
