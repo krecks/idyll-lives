@@ -24,9 +24,13 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
     - Doors and gates still ask only those near at super speed.
   - **Building and editing:**
     - A purchase uploads only the changed part of the grass mask, and the lawn map only when it changed.
+    - A lawn change makes the lawn again only round what changed: about 10 ms instead of 65 ms in a 960 m world.
     - A land stroke redraws only the pads round it.
     - The street keeps unchanged models' copies and far houses' keys between builds.
-  - **At night:** who is up is found by grid, and far lots are relit in place.
+  - **At night:**
+    - Who is up is found by grid, and far lots are relit in place.
+    - Neighbours' windows fading no longer count as a change on the viewed lot (it was about 50 a second, and kept High's mirrors drawing every frame).
+- **Things stand on the land as it is shaped:** after a land stroke, traffic lights, parked cars and rides, and the other lots' gates stand on the new ground at once. Before, they stayed up to a metre under it until the camera moved.
 
 ## 0.8.4 — 2026-11-26
 
