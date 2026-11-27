@@ -46,24 +46,24 @@ drink's surface), the plants' leaves and flowers the botany's. Sixteen were over
 | `cookieJar` | 0.16 × 0.25 × 0.16 m | 604 (696) | 2 | glass jar with shoulder and neck, four cookies, glazed lid with a turned knob |
 | `fruitBowl` | 0.28 × 0.19 × 0.28 m | 846 (1,088) | 1 | bowl on a foot ring; red and green apples (shaped, stalks), two oranges with navels, two bananas (five-sided, dark tips) |
 | `plateSet` | 0.38 × 0.10 × 0.32 m | 990 (988) | 1 | dinner and side plates (foot ring, well, rim) with blue bands, napkin, a four-tined fork, a knife with its blade shaped, tumbler |
-| `cakeStand` | 0.28 × 0.26 × 0.28 m | 852 (1,352) | 1 | footed stand with a knop, layer cake with filling, icing running down in drips, six piped rosettes, cherry and stalk |
+| `cakeStand` | 0.28 × 0.26 × 0.28 m | 1,460 (1,352) | 1 | footed stand with a knop, layer cake with filling, icing running down in drips, six piped rosettes, cherry and stalk |
 | `teapotSet` | 0.40 × 0.17 × 0.26 m | 1,856 (1,496) | 1 | tray with a gallery and hand holes in its ends, round teapot with a band, curving spout, loop handle, lid and knob; two cups of tea on saucers |
 | `mugs` | 0.22 × 0.09 × 0.21 m | 746 (1,092) | 1 | three mugs with thick rims and coffee, one-piece loop handles, a tea bag's string and tag |
-| `wineGlasses` | 0.21 × 0.30 × 0.19 m | 690 (960) | 2 | bottle with shoulders, label and foil capsule; two open glasses (foot, stem, bowl) with wine |
+| `wineGlasses` | 0.21 × 0.30 × 0.19 m | 1,534 (960) | 2 | bottle with shoulders, label and foil capsule; two open glasses (foot, stem, bowl) with wine |
 | `candlesticks` | 0.18 × 0.33 × 0.08 m | 608 (840) | 2 | turned brass sticks (stepped foot, knop, drip pan), candles with rounded tops, curled wicks, a run of wax; teardrop flames |
 | `bookStack` | 0.25 × 0.13 × 0.20 m | 372 (344) | 1 | four hardbacks, boards proud of the page block, rounded spines with gilt bands, a ribbon marker |
 | `booksUpright` | 0.32 × 0.21 × 0.13 m | 692 (624) | 1 | arched brass bookends with a round cut-out on their feet; eight books, boards proud of the pages, rounded spines, paper bands |
-| `vaseFlowers` | 0.18 × 0.41 × 0.17 m | 1,444 (1,428) | 1 | vase with belly and flared lip; daisies (ray petals, raised eyes), small daisies, three tulips, a cosmos, on curving stems, leaves on stems and at the neck |
-| `vaseSmall` | 0.08 × 0.28 × 0.08 m | 532 (492) | 1 | bud vase with slim neck and lip; one rose (two cupped rings round a furled bud), sepals, a leaf on the stem |
-| `vaseEmpty` | 0.13 × 0.24 × 0.13 m | 1,444 (1,428) | 2 | the vase of flowers' own body and bunch, split: the body alone at rest, the bunch a part of its own hidden at a thousandth inside it, grown up out of the mouth by `flowers_open` (0.9 s) and held up while the vase is open (`motions.open`); taken out, the same clip runs back along the use |
+| `vaseFlowers` | 0.18 × 0.41 × 0.17 m | 1,780 (1,428) | 1 | vase with belly and flared lip; daisies (ray petals, raised eyes), small daisies, three tulips, a cosmos, on curving stems, leaves on stems and at the neck |
+| `vaseSmall` | 0.08 × 0.28 × 0.08 m | 660 (492) | 1 | bud vase with slim neck and lip; one rose (two cupped rings round a furled bud), sepals, a leaf on the stem |
+| `vaseEmpty` | 0.13 × 0.24 × 0.13 m | 1,780 (1,428) | 2 | the vase of flowers' own body and bunch, split: the body alone at rest, the bunch a part of its own hidden at a thousandth inside it, grown up out of the mouth by `flowers_open` (0.9 s) and held up while the vase is open (`motions.open`); taken out, the same clip runs back along the use |
 | `potSucculent` | 0.16 × 0.14 × 0.16 m | 732 (524) | 1 | pot with a rim on grit; an echeveria: three tiers of fat upturned leaves round a heart |
 | `potCactus` | 0.18 × 0.32 × 0.13 m | 826 (896) | 1 | terracotta pot with a rolled rim on sand; a ribbed column with two ribbed arms bent up (fillet), a pink flower with its eye |
 | `potSmall` | 0.16 × 0.26 × 0.16 m | 728 (1,008) | 1 | glossy pot with a rim, soil; a peace lily: arching pointed leaves on stalks, two white spathes with spadices on tall stems |
 | `photoFrame` | 0.18 × 0.23 × 0.11 m | 296 (260) | 1 | moulded frame (`kit::moulding!`, mitred), back board, white mount, a photo of a hillside with sun and a figure, strut |
 | `tableClock` | 0.11 × 0.16 × 0.05 m | 722 (976) | 3 | drum case rolled at the back with a raised bezel, face with flat hour marks, domed bells, hammer, carrying loop, splayed legs on bun feet |
-| `globe` | 0.21 × 0.31 × 0.24 m | 728 (940) | 1 | the continents as the sphere's own faces in land colour, tilted in a brass meridian ring with pole pins, turned column and foot |
+| `globe` | 0.21 × 0.31 × 0.24 m | 1,480 (940) | 1 | the continents as the sphere's own faces in land colour, tilted in a brass meridian ring with pole pins, turned column and foot |
 | `snowGlobe` | 0.13 × 0.18 × 0.13 m | 800 (804) | 2 | turned base with a brass band and a collar round the dome's foot; inside a snowy mound, a three-tier fir, a cabin with a snowy roof, a snowman, flakes |
-| `trophy` | 0.15 × 0.23 × 0.13 m | 694 (780) | 1 | two-step plinth with plaque, turned stem with a knop, flaring cup with a rolled rim, scrolled handles |
+| `trophy` | 0.15 × 0.23 × 0.13 m | 1,254 (780) | 1 | two-step plinth with plaque, turned stem with a knop, flaring cup with a rolled rim, scrolled handles |
 | `sculptureSmall` | 0.15 × 0.22 × 0.12 m | 400 (652) | 1 | a Möbius band on edge (a flat band turning half over), brass ball, plinth with a name plate |
 | `soapSet` | 0.26 × 0.17 × 0.12 m | 742 (668) | 1 | stone tray, pump dispenser (collar, pump, spout in one piece), tumbler with two toothbrushes (bristles), soap on drainer ridges |
 | `towelStack` | 0.27 × 0.15 × 0.20 m | 684 (456) | 1 | three folded towels, each two soft layers, a woven band across the front |
@@ -148,3 +148,5 @@ No change to the models' code: their soft boxes take the shared form's new shape
 ## Measured as the piece (2026-11-25)
 
 `cuttingBoard`: the loaf, the tomatoes and the knife on the board are set aside (`parts::aside`, `food_aside`): drawn as before, not the board's size; `cargo review sizes` measures the board 0.022 m thick (was 0.10 with the loaf).
+
+- Round silhouettes (2026-11-27): the vases, trophy cup and wine-glass bowls take `common::spline` (Catmull-Rom between profile rows), the cake stand, glasses, globe and trophy more sides. These seven are over the 750 half-target (still under the 1,500 target): their triangle counts in the table above are the new ones.

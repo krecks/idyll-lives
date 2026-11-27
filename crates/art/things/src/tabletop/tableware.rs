@@ -1,7 +1,7 @@
 //! TT2 tableware.
 
 use super::M;
-use super::common::{disc, done, oval};
+use super::common::{disc, done, oval, spline};
 use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{PI, V3, atan2, cos, cosd, pow, radians, sin, sind};
@@ -314,19 +314,19 @@ pub fn cake_stand() -> Vec<Obj> {
             0.001
         ),
         M.cake_stand,
-        verts = 16
+        verts = 32
     );
     turned!(
         "sponge",
         &[(0.107, 0.101), (0.107, 0.192)],
         M.sponge,
-        verts = 16
+        verts = 32
     );
     turned!(
         "filling",
         &[(0.1076, 0.144), (0.1076, 0.152)],
         M.icing,
-        verts = 16,
+        verts = 32,
         caps = false
     );
     _drips(
@@ -340,7 +340,7 @@ pub fn cake_stand() -> Vec<Obj> {
                 (0.0, 0.219)
             ],
             M.icing,
-            verts = 16
+            verts = 32
         ),
         0.188,
         0.026,
@@ -652,21 +652,16 @@ pub fn mugs() -> Vec<Obj> {
 fn _wine_glass(name: &str, x: f64, y: f64) {
     turned!(
         name,
-        &[
-            (0.0, 0.0),
-            (0.03, 0.0),
-            (0.03, 0.003),
-            (0.006, 0.008),
-            (0.0045, 0.07),
-            (0.014, 0.086),
-            (0.028, 0.1),
-            (0.035, 0.125),
-            (0.033, 0.17),
-            (0.031, 0.169)
-        ],
+        &{
+            let mut rows = vec![(0.0, 0.0), (0.03, 0.0), (0.03, 0.003), (0.006, 0.008), (0.0045, 0.07)];
+            // (the bowl on a curve)
+            rows.extend(spline(&[(0.0045, 0.07), (0.014, 0.086), (0.028, 0.1), (0.035, 0.125), (0.033, 0.17)], 2).split_off(1));
+            rows.push((0.031, 0.169));
+            rows
+        },
         M.glass,
         at = (x, y, 0.0),
-        verts = 10,
+        verts = 20,
         caps = false
     );
     turned!(
@@ -674,7 +669,7 @@ fn _wine_glass(name: &str, x: f64, y: f64) {
         &[(0.0, 0.088), (0.02, 0.098), (0.03, 0.114), (0.0318, 0.122)],
         M.wine,
         at = (x, y, 0.0),
-        verts = 10
+        verts = 20
     );
 }
 
@@ -693,14 +688,14 @@ pub fn wine_glasses() -> Vec<Obj> {
         ],
         M.bottle,
         at = (0, 0.07, 0),
-        verts = 12
+        verts = 16
     );
     turned!(
         "label",
         &[(0.0406, 0.075), (0.0406, 0.15)],
         M.paper,
         at = (0, 0.07, 0),
-        verts = 12,
+        verts = 16,
         caps = false
     );
     turned!(

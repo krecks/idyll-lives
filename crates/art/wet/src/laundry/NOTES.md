@@ -49,7 +49,7 @@ The carried things, each one draw, base where it rests on the palms (`hold: both
 
 | Model | Size (w × h × d) | Triangles | What it is |
 |---|---|---|---|
-| `item.washingBasket` | 0.42 × 0.28 × 0.30 m | 1,688 | an oval wicker tub with bands, a rim and hand holes, washing heaped above it (all satin) |
+| `item.washingBasket` | 0.42 × 0.28 × 0.30 m | 2,608 | an oval wicker tub with bands, a rim, washing heaped above it (all satin) |
 | `item.washingArmful` | 0.34 × 0.19 × 0.24 m | 1,100 | three towels folded loosely, a crumpled shirt and a sock on top (satin) |
 | `item.washingPiece` | 0.40 × 0.17 × 0.25 m | 176 | a towel half folded, its far half lifted over towards the hands, a woven band at its end (fabric) |
 
