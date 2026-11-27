@@ -174,16 +174,27 @@ Triangles 3,540 → 4,052 and 4,564 → 6,100 for the extra folds; the sizes are
 ## Wall fittings (2026-11-27)
 
 Five wall pieces joined the set: the venetian blinds (`blinds`), the coat hooks (`coatHooks`), the doorbell
-(`doorbell`), the burglar alarm's keypad (`burglarAlarm`) and the security camera (`cctvCamera`). Each is a still
-model of one or two finishes, so each is 1 draw call: the blinds' slats and rails, the hooks' board and brass, the
-bell's brass and button, the keypad's case and keys, the camera's housing and lens. All five are built at their real
-height on the wall's face (`WALL`, −0.43 m) and declared `.on_wall()`; the blinds' two cords hang 3 cm in front of
-the slats, which is what sets their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, under
-the eaves.
+(`doorbell`), the burglar alarm's keypad (`burglarAlarm`) and the security camera (`cctvCamera`). The four still ones
+are one model of one or two finishes, so 1 draw call each: the hooks' board and brass, the bell's brass and button,
+the keypad's case and keys, the camera's housing and lens. All five are built at their real height on the wall's face
+(`WALL`, −0.43 m) and declared `.on_wall()`; the blinds' two cords hang 3 cm in front of the slats, which is what sets
+their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, under the eaves.
 
-`shutters` is the other window covering: two louvred panels that meet at the middle of the window, each a frame of
-two stiles and two rails over a back panel with six louvres proud of it, and two chrome straps where they would
-hinge. Its 5.8 cm depth is the louvres' 4.5 cm plus the straps, and it sits 1 cm off the wall's face. `hallStand` is
-the whole hall in one piece: an oak board 1.7 m tall carrying a mirror in its top half, three chrome hooks under it,
-and a bench with two front legs and a shoe shelf at 12 cm. Both are still models of three finishes.
+The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains). One part can't turn each slat about its
+own length, and a part a slat would cost a draw call each (9 in all), so the clip swaps two parts: the open slats
+(`slats`) thin to nothing front to back, while the shut ones (`vanes`: the same eight slats turned 70° and 9.5 cm
+wide, so each overlaps the next), flat inside the head rail at rest, grow down out of it over them. It reads as the
+slats tilting shut as they come down. 3 draw calls: the rails and cords, and the two moving parts.
 
+`shutters` is the other window covering: two louvred panels, each a frame of two stiles and two rails round a core
+with six louvres tilted 20°, the same both sides (all centred on the hinge line, 3.5 cm off the wall's face), so
+folded back it shows its louvres too. By day (at rest) they lie folded back flat on the wall either side of the
+window, 0.44 to 0.88 m out from its middle, past their 1 m footprint (accepted, as the curtains' rail); at night
+(`close`, 1.2 s, `motions.night`) each swings 180° into the room on its hinge at the window's edge (±0.445 m) and
+shuts over the glass, the two meeting at the middle. Two chrome knuckles a side stay on the wall at the hinge line.
+1.765 × 0.765 × 0.05 m, 3 draw calls (the knuckles and the two panels).
+
+`hallStand` is the whole hall in one piece: an oak board 1.7 m tall carrying a mirror in its top half, three chrome
+hooks under it, and a bench with two front legs and a shoe shelf at 12 cm. The bench's top is at 0.47 m and runs
+from the board (depth −0.40) to −0.08; the content's `seat` puts the hips at 0.47 m, 0.27 m behind the footprint's
+middle (0.13 m off the board). A still model of three finishes.
