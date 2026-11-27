@@ -86,6 +86,12 @@
       "type": "model",
       "url": "../../models/fields/stile.glb",
       "materials": {
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_dark": {
+          "finish": "material.finish.wood"
+        },
         "stone": {
           "finish": "material.finish.matte"
         },
@@ -100,6 +106,10 @@
         {
           "material": "stone",
           "label": "Stone"
+        },
+        {
+          "material": "oak",
+          "label": "Wood"
         }
       ]
     },

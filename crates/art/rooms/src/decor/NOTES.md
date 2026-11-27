@@ -224,3 +224,9 @@ shuts over the glass, the two meeting at the middle. Two chrome knuckles a side 
 hooks under it, and a bench with two front legs and a shoe shelf at 12 cm. The bench's top is at 0.47 m and runs
 from the board (depth −0.40) to −0.08; the content's `seat` puts the hips at 0.47 m, 0.27 m behind the footprint's
 middle (0.13 m off the board). A still model of three finishes.
+
+## Cat lofted (2026-11-27)
+
+`statueCat`: the body is one loft (haunch, back, neck) instead of rump/chest/neck spheres; the chin, whisker pads,
+lids and toes are gone; the front legs grow out of the chest and end in a paw sitting on the floor. Depth 0.41 ->
+0.40 m.

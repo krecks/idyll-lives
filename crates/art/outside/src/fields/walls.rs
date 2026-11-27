@@ -1,5 +1,5 @@
 //! The dry-stone wall and the stone stile: courses of irregular stones narrowing to the top (the batter), a coping
-//! on edge, and through-stones standing out of the stile's faces as steps.
+//! on edge, and the stile's step stones and its oak post.
 
 use super::{F, M};
 use artkit::fbox;
@@ -138,29 +138,32 @@ pub fn dry_stone_wall() -> Vec<Obj> {
     settle(&[join_all("dryStoneWall")])
 }
 
-/// A stone stile: a short length of the wall, a course lower, with two through-stones standing out of each face as
-/// steps (each step at most 0.3 m above the last, as BS 5709 asks of a stile), staggered so the climb goes up one
-/// side, over the coping and down the other.
+/// A step stile over a low stone wall: the wall (two courses and a coping), an oak post at each end of it standing
+/// to hand height, and an oak tread on short legs against each face, a step of 0.25 m up to the coping and 0.25 m
+/// down again.
 pub fn stile() -> Vec<Obj> {
-    let heights = [0.20, 0.18, 0.17, 0.16, 0.10];
-    courses("stileStone", 0.95, 0.52, 0.36, 0.0, &heights, 47);
-    coping("stileCoping", 0.95, 0.36, (0.0, 0.81), 49, (7, 0.12, 0.15));
-    // a through-stone: a slab laid in the course at its height, reaching 0.22 m out of the battered face
+    let heights = [0.22, 0.20];
+    courses("stileStone", 0.95, 0.52, 0.42, 0.0, &heights, 47);
+    coping("stileCoping", 0.95, 0.42, (0.0, 0.42), 49, (7, 0.12, 0.15));
     for (side, s) in [("front", 1.0), ("back", -1.0)] {
-        for (i, (y, x)) in [(0.30, -0.16 * s), (0.60, 0.16 * s)].iter().enumerate() {
-            let face = 0.26 - 0.08 * y / 0.81;
+        // the tread, its two legs under the outer corners
+        let zc = s * (0.225 + 0.11);
+        fbox!(F, format!("{side}Tread"), 0.50, 0.05, 0.22, (0.0, 0.25, zc), M.oak, bevel = 0.008);
+        for (i, x) in [-0.22, 0.22].iter().enumerate() {
             fbox!(
                 F,
-                format!("{side}Step{i}"),
-                0.46,
-                0.08,
-                0.30,
-                (*x, y - 0.04, s * (face + 0.07)),
-                if i == 0 { M.stone_light } else { M.stone },
-                bevel = 0.015,
-                bevel_segments = 1
+                format!("{side}Leg{i}"),
+                0.06,
+                0.225,
+                0.06,
+                (*x, 0.1125, s * (0.225 + 0.19)),
+                M.oak_dark,
+                bevel = 0.006
             );
         }
+    }
+    for (i, x) in [-0.40, 0.40].iter().enumerate() {
+        fbox!(F, format!("post{i}"), 0.10, 0.96, 0.10, (*x, 0.48, 0.0), M.oak, bevel = 0.01);
     }
     settle(&[join_all("stile")])
 }

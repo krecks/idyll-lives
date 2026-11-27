@@ -42,7 +42,7 @@ pub fn family() -> Family {
                 .paint(&[("oak", "Wood")]),
             Model::new("stile", walls::stile, (0.94, 0.96, 0.9))
                 .tolerance(0.03)
-                .paint(&[("stone", "Stone")]),
+                .paint(&[("stone", "Stone"), ("oak", "Wood")]),
             Model::new("fingerpost", gates::fingerpost, (0.99, 2.70, 0.62))
                 .centre(0.0, 0.17)
                 .tolerance(0.03)

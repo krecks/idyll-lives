@@ -116,7 +116,7 @@ pub fn family() -> Family {
             Model::new("bustMarble", statues::bust_marble, (0.44, 1.539, 0.44))
                 .key("model.bustMarble")
                 .paint(&[("marble", "Bust"), ("stone", "Plinth")]),
-            Model::new("statueCat", statues::statue_cat, (0.311, 0.598, 0.41))
+            Model::new("statueCat", statues::statue_cat, (0.311, 0.598, 0.40))
                 .key("model.statueCat")
                 .paint(&[("concrete", "Body")]),
             Model::new("statueHorse", statues::statue_horse, (0.46, 1.41, 0.44))
