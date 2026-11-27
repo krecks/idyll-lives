@@ -22,7 +22,7 @@ use artkit::family::{Family, Output, build_model};
 use artkit::json::Json;
 use artkit::materials::{Finish, Finishes};
 use artkit::scene;
-use ll_tools::art::{J, build_keys, take_build, write_centres};
+use ll_tools::art::{J, build_keys, take_build, validate, write_centres};
 use ll_tools::checkglb::{self, Paths};
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -306,8 +306,12 @@ pub fn run_families(
         .iter()
         .zip(prepared)
         .map(|(family, p)| {
+            // (taken before the `?`: `build_many` built only the families `prepare` let through, in their order)
+            let built = match p {
+                Ok(_) => built.next().unwrap_or_default(),
+                Err(_) => Vec::new(),
+            };
             let p = p?;
-            let built = built.next().unwrap_or_default();
             finish(repo, family, options, &p, built)
         })
         .collect()
@@ -446,6 +450,7 @@ fn finish(
     if options.check {
         return check(repo, family, &result, &files(&repo.assets), known).map(|()| Vec::new());
     }
+    validate(&result)?;
     let paths = match &options.out {
         Some(root) => seeded(root, repo)?,
         None => Paths::repo(),
@@ -506,12 +511,19 @@ fn check(
         if !same(&scratch.centres, &repo.centres) {
             differ.push("centres.json".into());
         }
+        // (a pack the base manifest does not list yet is added to it)
+        if !same(
+            &format!("{}/manifest.json", scratch.assets),
+            &format!("{}/manifest.json", repo.assets),
+        ) {
+            differ.push("manifest.json".into());
+        }
     }
     let _ = std::fs::remove_dir_all(&root);
     taken?;
     if differ.is_empty() {
         println!(
-            "[art] {}: {} files, its pack and its centres as committed",
+            "[art] {}: {} files, its pack, its centres and the base manifest as committed",
             family.name,
             files.len()
         );
