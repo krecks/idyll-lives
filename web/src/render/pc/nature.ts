@@ -396,13 +396,17 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    */
   refreshLawn(world: WorldStructure): void {
     this.world = world;
-    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do. Else made again
-    // only round what changed, all of it the first time.)
+    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to make again, but the
+    // lawn, its bare tiles and the grass all taken as made for this world, so the next change is from it, not from an
+    // older world kept and compared over more. Else made again only round what changed, all of it the first time.)
     const was = this.lawnWorld;
     const rects = was && perfTime('lawn: inputs', () => lawnChanges(was, world));
-    if (rects && !rects.length) return;
     const change = was && rects ? { was, rects } : null;
     this.lawnWorld = world;
+    if (change && !change.rects.length) {
+      this.grass?.refresh(world, this.lawnMask!, keepBareTiles(world, this.lawnMask!, change), change);
+      return;
+    }
     const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world, this.lawnMask, rects)));
     perfTime('lawn: flowers', () => hideLawn(this.lawn, mask, uploadLawn));
     // (Its bare tiles kept for the birds, who ask next.)
@@ -776,12 +780,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.redrawTile(t, positions, colors);
     }
     this.sheetAsNeeded();
-    // (Roads or lots the land moved: the pads and the country roads drawn again on them.)
+    // (Roads or lots the land moved: the pads and the country roads drawn again on them; all the pads on a surface
+    // `takeRoads` solved again, whose blocks come one by one and only the first draws them.)
     if (this.builtMoved) {
       this.builtMoved = false;
       await pace?.();
       if (!this.host) return null;
-      perfTime('land: pads and roads', () => this.redrawBuilt(box));
+      perfTime('land: pads and roads', () => this.redrawBuilt(solved ? null : box));
     }
     const grass = this.grass?.grassField;
     if (grass) {
@@ -811,12 +816,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /**
    * The pads and the country roads drawn again on the surface as it is now (the land moved them: `landDone`): the pads
    * in the ground tiles over `box` (m: where the ground was shaded again, so the slabs take its colours) and those
-   * round a pad that moved (`padsChanged`), the rest kept; the roads whole (one draw of them all).
+   * round a pad that moved (`padsChanged`), the rest kept (null: all of them); the roads whole (one draw of them all).
    */
-  private redrawBuilt(box: [number, number, number, number]): void {
+  private redrawBuilt(box: [number, number, number, number] | null): void {
     if (!this.host || !this.surface) return;
     const { app, parent } = this.host;
-    const dirty = this.padsChanged(null);
+    const dirty = box && this.padsChanged(null);
     if (dirty) for (const k of this.tilesIn(box)) dirty.add(k);
     const pads = this.padDraws(app, parent, this.grounds, dirty);
     const old = [...pads.gone, ...this.roadDraws];

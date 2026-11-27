@@ -2,13 +2,17 @@
 // taking the landscape down destroys the ones not drawn too (the one drawn goes with its entity), or about
 // 40 MB of vertex buffers stay behind with every new game or load. A land drawn from a height field draws again, at a
 // brush's stamp, only the tiles round the samples it changed (and past the world's edge where it reaches it), with the
-// colours they had, and of each only the level it draws (the others when next drawn). On the engine's null device: no GPU.
+// colours they had, and of each only the level it draws (the others when next drawn); the pads only round it too, all
+// of them for roads taken on. The lawn made again from the last world, one that changed nothing on it too. On the
+// engine's null device: no GPU.
 import { afterAll, describe, expect, mock, spyOn, test } from 'bun:test';
 import * as pc from '../src/render/pc/engine';
 import { disposeTiles, type GroundTile } from '../src/render/pc/groundTiles';
 import { bakeLand } from '../src/render/shared/landBake';
 import { GROUND_TILE } from '../src/render/shared/nature';
-import { plainWorld, SIDE } from './support/landFixtures';
+import type { WorldMeta, WorldStructure } from '../src/core/protocol';
+import type { LawnChange } from '../src/render/shared/nature';
+import { bigWorld, plainWorld, SIDE } from './support/landFixtures';
 
 function device() {
   const canvas = { width: 1, height: 1, style: {}, addEventListener() {}, removeEventListener() {}, getBoundingClientRect: () => ({ width: 1, height: 1 }) } as unknown as HTMLCanvasElement;
@@ -161,5 +165,56 @@ describe("a land drawn from a height field: a stamp's tiles", async () => {
     scape.reground({ i0: 0, j0: 130, i1: 1, j1: 131 });
     // (The edge's land carries 60 m past it: tile 1 (-132..-4) and tile 2 (-4..124).)
     expect(changed(edge, drawn(tiles))).toEqual([4 * count + 1, 4 * count + 2]);
+  });
+
+  test('a world that changed nothing on the lawn: the next change is made from it, as grown afresh', async () => {
+    const { townGrass, grassField } = await import('../src/render/shared/grass');
+    const { bareTiles, lawnMask } = await import('../src/render/shared/nature');
+    const { scape } = shaped();
+    // (A small town of its own, a wall on its lawn; the grass a field of it on flat land, refreshed as `Grass.refresh` does.)
+    const flat = { heightAt: () => 0, terrainColour: (_x: number, _z: number, _h: number, out: { r: number; g: number; b: number }) => ((out.r = 0.5), (out.g = 0.7), (out.b = 0.3), 1), distanceToTown: () => 0 };
+    const first = { ...bigWorld({ seed: 3 } as WorldMeta, [], 24), walls: [{ axis: 'h', x: 8, z: 8 }] } as WorldStructure;
+    const field = await grassField(first, flat);
+    const made: { was: WorldStructure | null; tiles: unknown }[] = [];
+    const inner = scape as unknown as { grass: unknown; lawnWorld: WorldStructure | null };
+    inner.grass = { refresh: (w: WorldStructure, m: never, b: Uint8Array, c: LawnChange | null) => made.push({ was: c?.was ?? null, tiles: townGrass(field, w, m, b, c).tiles }) };
+    scape.refreshLawn(first);
+    const same = { ...first, version: 2 };
+    scape.refreshLawn(same);
+    const bought = { ...same, objects: [{ id: 1, def: 'parkBench', x: 12, z: 12, rot: 0, w: 2, d: 1 }] } as WorldStructure;
+    scape.refreshLawn(bought);
+    // (Each from the world before it, the older let go; the last made only round the bench.)
+    expect(made.map((m) => [null, first, same].indexOf(m.was))).toEqual([0, 1, 2]);
+    expect(inner.lawnWorld).toBe(bought);
+    expect(made[2].tiles).not.toBeNull();
+    const fresh = await grassField(bought, flat);
+    for (const part of ['town', 'shade', 'lawn', 'patches'] as const) expect(`${part}: ${Buffer.from(field[part]).equals(Buffer.from(fresh[part]))}`).toBe(`${part}: true`);
+    expect(Buffer.from(bareTiles(bought)).equals(Buffer.from(bareTiles(bought, lawnMask(bought))))).toBe(true);
+  });
+
+  test('a road taken on draws all the pads again, for its later blocks too; a stroke only those round it', async () => {
+    const { scape } = shaped();
+    const inner = scape as unknown as { builtMoved: boolean; surface: unknown; sheetAsNeeded(): void; padsChanged(): Set<number> | null; padDraws(...a: unknown[]): unknown; redrawBuilt(box: unknown): void };
+    // (No town on the fixture's land: only the pads' choice is looked at, the pads none; nor the sea's sheet, its material.)
+    inner.sheetAsNeeded = () => {};
+    const dirties: (Set<number> | null)[] = [];
+    inner.padsChanged = () => new Set();
+    inner.padDraws = (...a: unknown[]) => (dirties.push(a[3] as Set<number> | null), { slabs: [], edges: [], made: [], gone: [] });
+    const redraw = inner.redrawBuilt.bind(scape);
+    inner.redrawBuilt = (box) => {
+      inner.surface = {};
+      redraw(box);
+      inner.surface = null;
+    };
+    // (`takeRoads`: the surface solved whole, its blocks drawn one by one, the first drawing the pads.)
+    inner.builtMoved = true;
+    await scape.landDone({ i0: 10, j0: 10, i1: 20, j1: 20 }, undefined, true);
+    await scape.landDone({ i0: 150, j0: 150, i1: 160, j1: 160 }, undefined, true);
+    expect(dirties).toEqual([null]);
+    // A stroke: the tiles round it only.
+    inner.builtMoved = true;
+    await scape.landDone({ i0: 90, j0: 90, i1: 91, j1: 91 });
+    expect(dirties.length).toBe(2);
+    expect(dirties[1]!.size).toBeGreaterThan(0);
   });
 });

@@ -299,6 +299,8 @@ export class Grass {
    */
   refresh(world: WorldStructure, mask?: LawnMask, bare?: Uint8Array, lawn?: LawnChange | null): void {
     const change = townGrass(this.field, world, mask, bare, lawn);
+    // (Nothing on the ground changed, the field only taken as made for this world: nothing to send or choose again.)
+    if (change.tiles?.length === 0 && change.shade?.length === 0) return;
     // (A lot of another shape, even of the same area, needs a texture of its own.)
     if (this.field.townW !== this.town.width || this.field.townD !== this.town.height || !this.field.town.length) {
       this.town.destroy();

@@ -7,6 +7,7 @@ import { describe, expect, test } from 'bun:test';
 import type { WorldStructure } from '../src/core/protocol';
 import { GRASS, grassAt, grassField, grassLod, grassShare, gustAt, gustNoise, sampleGust, townGrass, type GrassLand } from '../src/render/shared/grass';
 import { CountryRoads } from '../src/render/shared/countryRoads';
+import { GROUND_SHADE } from '../src/render/shared/groundShade';
 import { bareTiles, keepBareTiles, LandscapeLayout, lawnChanges, lawnMask, WIND } from '../src/render/shared/nature';
 
 /** A 12 × 10 lot: a 3 × 3 room (walls round it) at (2, 2), a sofa at (8, 2), a patio tile, a path, and a split tile. */
@@ -331,5 +332,26 @@ describe('the lawn made again only round what changed', () => {
     // Its plots or its paths changed: all of it.
     expect(lawnChanges(world, { ...world, plots: [...world.plots.slice(0, 1), { ...world.plots[1], w: 15 }] })).toBeNull();
     expect(lawnChanges(world, { ...world, meta: { ...world.meta! } })).toBeNull();
+  });
+
+  test('a wall whose shade is tuned to reach further: made again as far, as grown afresh', async () => {
+    // (`?tune=shade.wall:0.65,3.5`, as the bench's look sheets ask: no tune in a test, so set on the map itself.)
+    const was = GROUND_SHADE.wall;
+    GROUND_SHADE.wall = [0.65, 3.5];
+    try {
+      const world = town();
+      const field = await grassField(world, land);
+      const mask = lawnMask(world);
+      keepBareTiles(world, mask);
+      const next = { ...world, walls: [...world.walls, { axis: 'h', x: 25, z: 8 } as Edge] };
+      const rects = lawnChanges(world, next)!;
+      const change = { was: world, rects };
+      const now = lawnMask(next, mask, rects);
+      townGrass(field, next, now, keepBareTiles(next, now, change), change);
+      const fresh = await grassField(next, land);
+      expect(Buffer.from(field.shade).equals(Buffer.from(fresh.shade))).toBe(true);
+    } finally {
+      GROUND_SHADE.wall = was;
+    }
   });
 });
