@@ -3080,6 +3080,7 @@
     },
     {
       "id": "toyBox",
+      "how": { "play": "floor" },
       "name": "Toy box",
       "model": "model.toyBox",
       "footprint": [

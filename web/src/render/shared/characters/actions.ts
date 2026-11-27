@@ -615,8 +615,6 @@ export const LOW_CROPS = new Set(['garden.strawberries', 'garden.pumpkins', 'gar
 export const FRUIT_TREES = new Set(['garden.apple']);
 /** Flowers that bloom above about 0.7 m, smelt leaning in standing, a bloom held to the nose (`pick`), not crouched under. */
 export const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
-/** Toys played with down on the floor at the box (`kneel`, as the play mat and the doll house). */
-export const FLOOR_TOYS = new Set(['toyBox', 'toyChest']);
 export const ACTIONS: Record<string, ActionAnim> = {
   // (With a fork, a spoon or chopsticks, for what wants them, or a bite of what is eaten by hand (`biteOf`), seated at the
   // table or standing with the plate on the left palm: the bite is `eatFork` (`eatClip`), the plate held in front between
@@ -676,7 +674,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // its track; other games (the arcade's panel) the hands busy at it.
   play: {
     stand: (def) =>
-      def === 'dartboard' ? ['dartThrow'] : def === 'pingPongTable' ? ['pingPong'] : FLOOR_TOYS.has(def) ? ['kneel'] : def === 'trainTable' ? ['crouch'] : ['spell'],
+      def === 'dartboard' ? ['dartThrow'] : def === 'pingPongTable' ? ['pingPong'] : def === 'trainTable' ? ['crouch'] : ['spell'],
     sit: 'sitHands',
     hands: (def) => (def === 'dartboard' || def === 'pingPongTable' || def === 'poolTable' || def === 'foosball' ? HANDS.grip : HANDS.keys),
     prop: (def) => (def === 'dartboard' ? PROPS.dart : def === 'pingPongTable' ? PROPS.bat : def === 'poolTable' ? PROPS.cue : null),
@@ -826,6 +824,8 @@ export const MANNERS: Record<string, ActionAnim> = {
   // Up to a thing on the wall at head height, no squat to the floor (`fetch`: the wall cupboards, each with its putting
   // away, `CUPBOARD_OF`).
   high: { stand: ['interact', 'idle'] },
+  // Down on the floor at it (`play`: toys at the box, as the play mat and the doll house).
+  floor: { stand: ['kneel'] },
 };
 /** `actionOf`'s mannered entries, by tag and manner, made once. */
 const MANNERED = new Map<string, Map<string, ActionAnim>>();

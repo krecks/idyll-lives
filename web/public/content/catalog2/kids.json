@@ -136,6 +136,7 @@
     },
     {
       "id": "toyChest",
+      "how": { "play": "floor" },
       "name": "Toy chest",
       "model": "model.toyChest",
       "footprint": [
