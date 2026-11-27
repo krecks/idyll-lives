@@ -152,18 +152,15 @@ pub fn bar_on(
 
 /// A convex outline `pts` on a plane (see `lift`), extruded from `w0` to `w1` across it.
 pub fn prism(name: &str, pts: &[P2], w0: f64, w1: f64, material: Mat, axis: char) -> Obj {
-    let n = pts.len();
-    let mut verts: Vec<(N, N, N)> = pts
-        .iter()
-        .map(|&(u, v)| lift(axis, u, v, N::F(w0)))
-        .collect();
-    verts.extend(pts.iter().map(|&(u, v)| lift(axis, u, v, N::F(w1))));
-    let n32 = n as u32;
-    let mut faces: Vec<Vec<u32>> = vec![(0..n32).collect(), (n32..2 * n32).rev().collect()];
-    for i in 0..n32 {
-        faces.push(vec![i, (i + 1) % n32, n32 + (i + 1) % n32, n32 + i]);
-    }
-    eased(mesh(name, &verts, &faces, material))
+    let at = |w: f64| {
+        pts.iter()
+            .map(|&(u, v)| {
+                let (x, y, z) = lift(axis, u, v, N::F(w));
+                F.at(x, y, z).into()
+            })
+            .collect()
+    };
+    eased(artkit::kit::prism(name, at(w0), at(w1), material))
 }
 
 /// `line` (a polyline on a plane, u rising left to right) moved `t` to its left (up, for a roof), mitred.

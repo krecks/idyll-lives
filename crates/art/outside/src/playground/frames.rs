@@ -1,6 +1,6 @@
 //! The slide and the climbing frame: a tower to climb, and a way down.
 
-use super::common::{F, M, X, mesh};
+use super::common::{F, M, X};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
@@ -70,7 +70,15 @@ fn chute(name: &str, steps: usize) -> Obj {
         faces.push(vec![q[1], q[2], q[5], q[6]]);
         faces.push(vec![q[2], q[3], q[4], q[5]]);
     }
-    let obj = mesh(name, vs, &faces, M.chute, false);
+    let obj = artkit::bevel::eased(artkit::forms::object(
+        name,
+        vs,
+        &faces,
+        Some(M.chute),
+        false,
+        artkit::shapes::CLOSED,
+        false,
+    ));
     for (k, pts) in [lips.0, lips.1].iter().enumerate() {
         sweep!(
             format!("{name}_lip{k}"),

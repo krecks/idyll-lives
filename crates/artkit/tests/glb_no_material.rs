@@ -55,3 +55,24 @@ fn a_face_on_a_slot_past_its_materials_is_written_without_one() {
     assert_eq!(primitives[1].material, None);
     assert_eq!(primitives[1].indices.len(), 3);
 }
+
+#[test]
+fn a_part_with_no_material_joined_to_one_with_keeps_none() {
+    for materialless_first in [false, true] {
+        scene::reset();
+        let mut wood = square();
+        wood.set_material(Some(Mat::new("wood", "#8a7050", "matte")));
+        let (wood, bare) = (scene::add("wood", wood), scene::add("bare", square()));
+        let parts = if materialless_first {
+            [bare, wood]
+        } else {
+            [wood, bare]
+        };
+        let o = artkit::parts::join(&parts, "crate", None);
+        let model = glb::read(&glb::write(&[o], false, &Finishes::new())).unwrap();
+        let primitives = &model.meshes[0].primitives;
+        let mats: Vec<_> = primitives.iter().map(|p| p.material).collect();
+        assert_eq!(mats, [Some(0), None], "first {materialless_first}");
+        assert!(primitives.iter().all(|p| p.indices.len() == 6));
+    }
+}
