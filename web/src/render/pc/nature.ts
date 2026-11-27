@@ -396,13 +396,17 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    */
   refreshLawn(world: WorldStructure): void {
     this.world = world;
-    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do. Else made again
-    // only round what changed, all of it the first time.)
+    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to make again, but the
+    // lawn, its bare tiles and the grass all taken as made for this world, so the next change is from it, not from an
+    // older world kept and compared over more. Else made again only round what changed, all of it the first time.)
     const was = this.lawnWorld;
     const rects = was && perfTime('lawn: inputs', () => lawnChanges(was, world));
-    if (rects && !rects.length) return;
     const change = was && rects ? { was, rects } : null;
     this.lawnWorld = world;
+    if (change && !change.rects.length) {
+      this.grass?.refresh(world, this.lawnMask!, keepBareTiles(world, this.lawnMask!, change), change);
+      return;
+    }
     const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world, this.lawnMask, rects)));
     perfTime('lawn: flowers', () => hideLawn(this.lawn, mask, uploadLawn));
     // (Its bare tiles kept for the birds, who ask next.)
