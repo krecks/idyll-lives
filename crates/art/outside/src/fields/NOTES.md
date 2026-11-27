@@ -55,3 +55,8 @@ and fingerpost on one 1 m tile.
 - **Stile reworked (2026-11-27).** A step stile over a low stone wall (two courses and a coping, 0.45 m): an oak post
   at each end and an oak tread on legs against each face (0.25 m up, 0.25 m down). The through-stones are gone; the
   model now also paints `oak` ("Wood").
+
+## Hedgerow (2026-11-27)
+
+The hedgerow's block is `hedge_block` with `rough = 1`: an uneven top of swollen clumps, five bare saplings with leaf
+sprays standing out of it to 1.45 m, and nine haws (red, on `foliage`). 3,006 triangles, one draw.

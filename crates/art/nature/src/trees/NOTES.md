@@ -322,3 +322,9 @@ cargo art trees --check       # nothing written: fails on any byte that differs 
 
 A build gives the same bytes every time. Built in Rust since 2026-11-17, proved against the last Blender build
 (`cargo check-glb --against ref/blender`).
+
+## Birch and willow crowns (2026-11-27)
+
+The birch's crown starts lower (limbs from 2.7 m), with 22 tips and larger masses (still inside the size gate), so it
+no longer floats on a bare stem. The willow's crown is a higher dome (bigger, less squashed masses, three on the
+top) and its strands vary in reach, heading and length (0.3-2 m off the ground) instead of a straight skirt.

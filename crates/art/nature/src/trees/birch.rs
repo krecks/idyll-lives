@@ -22,8 +22,8 @@ const LINE: [(f64, f64, f64); 6] = [
     (0.0, -0.02, 7.6),
 ];
 const SCALE: [f64; 6] = [1.12, 1.0, 0.88, 0.7, 0.5, 0.28];
-const CENTRE: (f64, f64, f64) = (0.0, 0.0, 5.75);
-const RADII: (f64, f64, f64) = (1.28, 1.28, 2.15);
+const CENTRE: (f64, f64, f64) = (0.0, 0.0, 5.0);
+const RADII: (f64, f64, f64) = (1.1, 1.1, 2.6);
 
 pub fn species() -> Species {
     Species {
@@ -43,9 +43,9 @@ pub fn species() -> Species {
         crown: Stage::Spec(Crown {
             centre: CENTRE,
             radii: RADII,
-            tips: 16,
+            tips: 22,
             limbs: 7,
-            base_z: (3.1, 6.0),
+            base_z: (2.7, 5.6),
             material: Some("birch_bark"),
             o: Branches {
                 leader_z: Some(6.2),
@@ -62,7 +62,7 @@ pub fn species() -> Species {
                 rise: 0.05,
                 mass: Mass {
                     k: 3,
-                    size: (0.34, 0.44),
+                    size: (0.44, 0.56),
                     ring: 0.3,
                     drop: (-0.5, -0.15),
                     squash: (1.1, 1.35),
@@ -77,7 +77,7 @@ pub fn species() -> Species {
             n: 3,
             centre: CENTRE,
             radii: RADII,
-            size: 0.62,
+            size: 0.85,
             o: Heart {
                 out: 0.25,
                 ..Heart::default()
