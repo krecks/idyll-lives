@@ -906,6 +906,7 @@
     },
     {
       "id": "chinaCabinet",
+      "how": { "fetch": "high" },
       "name": "China cabinet",
       "model": "model.chinaCabinet",
       "stations": [

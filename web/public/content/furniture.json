@@ -904,6 +904,7 @@
     },
     {
       "id": "wallCabinet",
+      "how": { "fetch": "high" },
       "name": "Wall cabinets",
       "model": "model.wallCabinet",
       "stations": [

@@ -1119,6 +1119,7 @@
     },
     {
       "id": "wallCabinetGlass",
+      "how": { "fetch": "high" },
       "name": "Glazed wall cabinet",
       "model": "model.wallCabinetGlass",
       "stations": [
@@ -1139,6 +1140,7 @@
     },
     {
       "id": "wallCabinetCorner",
+      "how": { "fetch": "high" },
       "name": "Wall cabinet with end shelves",
       "model": "model.wallCabinetCorner",
       "stations": [

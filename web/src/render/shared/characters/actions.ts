@@ -617,8 +617,6 @@ export const FRUIT_TREES = new Set(['garden.apple']);
 export const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
 /** Toys played with down on the floor at the box (`kneel`, as the play mat and the doll house). */
 export const FLOOR_TOYS = new Set(['toyBox', 'toyChest']);
-/** Wall cupboards (each with its putting away, `CUPBOARD_OF`): things put away up in them (no squat to the floor). */
-export const WALL_CUPBOARDS = new Set(Object.keys(CUPBOARD_OF));
 export const ACTIONS: Record<string, ActionAnim> = {
   // (With a fork, a spoon or chopsticks, for what wants them, or a bite of what is eaten by hand (`biteOf`), seated at the
   // table or standing with the plate on the left palm: the bite is `eatFork` (`eatClip`), the plate held in front between
@@ -800,7 +798,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
   knock: { stand: ['interact', 'idle'], hands: HANDS.relaxed },
   // Cooking, step by step (content `recipes`): ingredients from the fridge, chopping on the board,
   // stirring the pan, turning things on the grill, putting a dish down.
-  fetch: { stand: (def) => (WALL_CUPBOARDS.has(def) ? ['interact', 'idle'] : ['interact', 'pickUp', 'idle']), hands: HANDS.hold },
+  fetch: { stand: ['interact', 'pickUp', 'idle'], hands: HANDS.hold },
   // (A knife on the board, a wooden spoon in the pot, a turner at the grill, a whisk in the bowl: `PROPS`.)
   chop: { stand: ['chop', 'interact', 'chop'], hands: HANDS.grip, prop: PROPS.knife },
   stir: { stand: ['stir', 'interact', 'stir'], hands: HANDS.grip, prop: PROPS.woodenSpoon },
@@ -825,6 +823,9 @@ export const ACTIONS: Record<string, ActionAnim> = {
 export const MANNERS: Record<string, ActionAnim> = {
   // Bent down to an oven under the hob (`bake`).
   low: { stand: ['pickUp', 'idle', 'foldArms', 'idle'] },
+  // Up to a thing on the wall at head height, no squat to the floor (`fetch`: the wall cupboards, each with its putting
+  // away, `CUPBOARD_OF`).
+  high: { stand: ['interact', 'idle'] },
 };
 /** `actionOf`'s mannered entries, by tag and manner, made once. */
 const MANNERED = new Map<string, Map<string, ActionAnim>>();
