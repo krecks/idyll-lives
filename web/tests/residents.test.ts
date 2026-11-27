@@ -447,10 +447,12 @@ describe('residents', async () => {
       writeSnapshot(curr, STEP);
       const frames: string[] = [];
       let pausedPosed = 0;
-      for (let f = 0; f < 300; f++) {
-        // Paused twice: a voice line starting in the first pause; in the second everyone out of view a moment (a storey
-        // looked at), then a resident moved (as Buy mode can).
-        const paused = (f >= 60 && f < 150) || (f >= 200 && f < 260);
+      for (let f = 0; f < 450; f++) {
+        // Paused three times: a voice line starting in the first pause, and the renderer taking everyone's contact
+        // shadow away a moment (the camera's target far off: `updateSims`); in the second everyone out of view a moment
+        // (a storey looked at), then a resident moved (as Buy mode can); in the third one getting up from bed, their
+        // blanket pushed back halfway.
+        const paused = (f >= 60 && f < 150) || (f >= 200 && f < 260) || (f >= 422 && f < 440);
         if (!paused) {
           game += 1 / 30;
           while ((tick + 1) * STEP <= game) {
@@ -469,6 +471,7 @@ describe('residents', async () => {
         posed = 0;
         const hidden = f >= 210 && f < 214;
         characters.update(frame, () => !hidden, shadows);
+        if (f >= 100 && f < 110) shadows.fill(0);
         if (paused) pausedPosed += posed;
         const held = props.slice(firstProp).map((p) => `${p.key} ${hash(p.matrices)}`);
         const covered = quilts.slice(firstQuilt).map((q) => `${q.name} ${q.count} ${hash(q.matrices, 0, q.count * 16)} ${hash(q.ext, 0, q.count * 2)}`);
