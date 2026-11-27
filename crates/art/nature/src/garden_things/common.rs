@@ -1,6 +1,6 @@
 //! What the garden things are built from.
 
-use crate::ground::common::_mesh;
+use crate::ground::common::mesh;
 use artkit::json::{self, Json};
 use artkit::materials::Mat;
 use artkit::math::V3;
@@ -75,7 +75,7 @@ palette! { SPEC:
 }
 
 /// Each model's `body` (the part the player colours) differs in colour and finish: stones, a wooden box, a cream
-/// birdhouse, a red kennel, a stone plinth, iron posts. `_own` makes the palette's `body` that one for the model
+/// birdhouse, a red kennel, a stone plinth, iron posts. `own` makes the palette's `body` that one for the model
 /// being built; the pack's `materials` follow.
 pub const BODIES: [(&str, &str, &str); 9] = [
     ("pond", "#B4AEA2", "matte"),
@@ -106,7 +106,7 @@ pub fn palette_of(id: &str) -> SPEC {
 }
 
 /// The palette for model `id`, made the one of the model being built (`M`).
-pub fn _own(id: &str) -> SPEC {
+pub fn own(id: &str) -> SPEC {
     let m = palette_of(id);
     CURRENT.with(|c| c.set(m));
     m
@@ -121,7 +121,7 @@ pub fn M() -> SPEC {
 pub const F: GameFrame = GameFrame::new(0.0);
 
 /// {object id: light.height} from the content: the bulbs are placed against it.
-fn _content_lights() -> Vec<(String, f64)> {
+fn content_lights() -> Vec<(String, f64)> {
     let mut out: Vec<(String, f64)> = Vec::new();
     for text in [
         include_str!(concat!(
@@ -158,10 +158,10 @@ fn _content_lights() -> Vec<(String, f64)> {
 }
 
 /// Asserts a bulb at height `y` is within 25 cm of where the content puts the lamp's light.
-pub fn _near_light(id: &str, y: f64) {
+pub fn near_light(id: &str, y: f64) {
     static LIGHTS: OnceLock<Vec<(String, f64)>> = OnceLock::new();
     let want = LIGHTS
-        .get_or_init(_content_lights)
+        .get_or_init(content_lights)
         .iter()
         .find(|(k, _)| k == id)
         .unwrap_or_else(|| panic!("{id}: the content gives it no light"))
@@ -174,7 +174,7 @@ pub fn _near_light(id: &str, y: f64) {
 
 /// A flat shape `outline` [(game x, height)], counter-clockwise seen from the front, standing from game depth
 /// `z0` back to `z1` (a gable, a gnomon).
-pub fn _prism(name: &str, outline: &[(f64, f64)], z0: f64, z1: f64, material: Mat) -> Obj {
+pub fn prism(name: &str, outline: &[(f64, f64)], z0: f64, z1: f64, material: Mat) -> Obj {
     let n = outline.len() as u32;
     let mut verts: Vec<V3> = outline
         .iter()
@@ -186,7 +186,7 @@ pub fn _prism(name: &str, outline: &[(f64, f64)], z0: f64, z1: f64, material: Ma
         let j = (i + 1) % n;
         faces.push(vec![i, j, n + j, n + i]);
     }
-    let obj = _mesh(name, verts, &faces, material, false, 0.0, false);
+    let obj = mesh(name, verts, &faces, material, false, 0.0, false);
     obj.edit(|o| o.mesh.recalc_normals());
     obj
 }
@@ -198,11 +198,11 @@ mod tests {
     #[test]
     fn each_model_has_its_own_body_and_the_lamps_their_lights() {
         for (id, hex, finish) in BODIES {
-            let m = _own(id);
+            let m = own(id);
             assert_eq!((m.body.name, m.body.finish), ("body", finish));
             assert_eq!(artkit::materials::hex_of(M().body.colour), hex);
         }
-        _near_light("lampPost", 2.3);
-        _near_light("stringLights", 2.0);
+        near_light("lampPost", 2.3);
+        near_light("stringLights", 2.0);
     }
 }
