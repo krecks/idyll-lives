@@ -14,7 +14,7 @@ model meets (sizes, budgets, finishes, moving parts, what to look at) is
 |---|---|
 | `crates/artkit` | The kernel: shapes, forms, parts, clips, the kit, botany, shading, the `.glb` writer ([src/lib.rs](../artkit/src/lib.rs) lists the modules). Its doc comments are the last word on a call (`rg 'pub fn\|macro_rules!' crates/artkit/src`) |
 | `crates/art` (`ll-art`) | `cargo art` ([src/lib.rs](src/lib.rs)): the registry, the runner, `--check`, `--preview`; [src/template.rs](src/template.rs), the family to copy |
-| `crates/art/<group>` | The families, six crates so they build side by side |
+| `crates/art/<group>` | The families, six crates so they build side by side; each has a `NOTES.md` (its families, its `src/common.rs`, its tests) |
 | `crates/tools` (`ll-tools`) | `cargo check-glb` (the gate) and the pack and centres writer (`src/art.rs`) |
 
 | Crate (folder) | Families (`cargo art <name>`) |
@@ -23,7 +23,7 @@ model meets (sizes, budgets, finishes, moving parts, what to look at) is
 | `art-wet` (`wet`) | kitchen, kitchen_cooking, kitchen_counters, bathroom, laundry |
 | `art-rooms` (`rooms`) | living, dining, office, decor, lighting, bedroom, bedroom_storage, bedroom_dressing |
 | `art-packs` (`packs`) | pack_bookworm, pack_cheerful, pack_couchPotato, pack_energetic, pack_example, pack_foodie, pack_gloomy, pack_hotHeaded, pack_kind, pack_lazy, pack_loner, pack_natureLover, pack_neat, pack_outgoing, pack_romantic, pack_slob |
-| `art-outside` (`outside`) | yard, outdoor, playground, farm, street_furniture, stalls, shops, civic, civic_works |
+| `art-outside` (`outside`) | yard, outdoor, playground, farm, fields, street_furniture, stalls, shops, civic, civic_works, water_edge |
 | `art-things` (`things`) | hobbies, kids, held, tabletop, media, fitness, birds |
 
 A family is a folder, `crates/art/<group>/src/<family>/` (snake case: `pack_couch_potato` for `pack_couchPotato`):
@@ -31,12 +31,29 @@ A family is a folder, `crates/art/<group>/src/<family>/` (snake case: `pack_couc
 | File | Holds |
 |---|---|
 | `mod.rs` | The palette, the family's constants, and `pub fn family() -> Family`: every model with its facts |
-| `common.rs` | The family's own helpers |
+| `common.rs` | The family's own helpers (what two families of a group share is the group's `src/common.rs`) |
 | `<group>.rs` | The builds, a file a group of models (`chairs.rs`, `tables.rs`), a `pub fn <model>() -> Vec<Obj>` each |
 | `NOTES.md` | What the models are, the facts they keep, the faults found |
 
 `crates/art/rooms/src/dining`, `crates/art/wet/src/kitchen_counters` and `crates/art/nature/src/trees` are good ones
 to read first.
+
+**A family is a unit.** It imports `artkit` and its own group's `src/common.rs` (`crate::common`), never another
+family (`crate::<other family>`), so a family builds, checks and changes on its own; `tests/registry.rs` fails on
+a family or group without a `NOTES.md` and on a family that imports another. Two families of a group that want the
+same helper move it into the group's `src/common.rs` (create it and add `mod common;` to the group's `lib.rs`);
+if other groups want it too, it goes in `artkit::kit` (below).
+
+## The runner
+
+`crates/art/src` is `cargo art` (the binary is `main.rs`, the rest `lib.rs`): `registry()` joins every group's
+`families()` (the family's name on the command line and the models' folder); the runner builds the models of the
+families asked for, a thread a model, writes the files, the pack and `centres.json` and runs the gate on the keys it
+built. Flags (the Commands section has examples): `--only a,b` some models, `--no-pack`, `--out <root>` write
+elsewhere, `--check` build in memory and fail on any byte unlike the committed files (`--all --check` is CI's `art`
+step), `--preview [--sheet]` draw pictures into `tools/art/previews/<family>/` and write nothing, `--centres` write
+`centres.json` from every family's models. `src/preview.rs` draws the pictures; `src/template.rs` is the family to
+copy for a new one (`cargo art template --preview`; nothing registers it).
 
 ## The loop
 
@@ -197,8 +214,8 @@ rewrites the models, the pack and centres.json in the tree.
    The options are each builder's struct (`shapes::Cube`, `Round`; `forms::Sweep`, `Loft`, `Extrude`;
    `soft::SoftBox`), set by name in the macro: `fbox!(F, "top", 1.2, 0.03, 0.8, (0, 0.735, 0), M.oak, bevel =
    0.004)`; a misspelt option does not compile. A helper of the family's own is a plain function with every
-   parameter. A part two families would make belongs in the kit: ask the kernel's keeper, do not copy it (a stopgap
-   copy is marked `// KIT: <what it stands in for>`).
+   parameter. A part two families of a group would make belongs in the group's `src/common.rs`; one that other groups
+   would make too, in the kit: ask the kernel's keeper, do not copy it (a stopgap copy is marked `// KIT: <what it stands in for>`).
 
    **Soft things.** `soft_box!` is a box with what stuffing and seams do to one, each a few centimetres at most and
    none of it past the box, so the size you give is the size it has:
