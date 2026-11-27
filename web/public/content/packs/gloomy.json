@@ -115,6 +115,7 @@
     },
     {
       "id": "gloomy.journalDesk",
+      "how": { "write": "near" },
       "name": "Candlelit writing desk",
       "model": "model.gloomy.journalDesk",
       "footprint": [2, 1],

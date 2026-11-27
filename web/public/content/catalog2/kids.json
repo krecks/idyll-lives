@@ -25,6 +25,7 @@
     },
     {
       "id": "kidsChair",
+      "how": { "write": "pencil" },
       "name": "Kids' chair",
       "model": "model.kidsChair",
       "footprint": [
@@ -208,6 +209,7 @@
     },
     {
       "id": "kidsEasel",
+      "how": { "paint": "brush" },
       "name": "Kids' easel",
       "model": "model.kidsEasel",
       "footprint": [

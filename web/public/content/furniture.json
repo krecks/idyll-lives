@@ -175,6 +175,7 @@
   "objects": [
     {
       "id": "fridgeMini",
+      "how": { "drink": "can" },
       "name": "Mini fridge",
       "model": "model.fridgeMini",
       "stations": [
@@ -245,6 +246,7 @@
     },
     {
       "id": "fridgeBuiltIn",
+      "how": { "drink": "can" },
       "name": "Counter-depth fridge",
       "model": "model.fridgeBuiltIn",
       "stations": [
@@ -1010,6 +1012,7 @@
     },
     {
       "id": "barStool",
+      "how": { "drink": "glass" },
       "name": "Bar stool",
       "model": "model.barStool",
       "footprint": [
@@ -3150,6 +3153,7 @@
     },
     {
       "id": "kidsChalkboard",
+      "how": { "paint": "chalk" },
       "name": "Chalkboard easel",
       "model": "model.kidsChalkboard",
       "footprint": [
@@ -3248,6 +3252,7 @@
     },
     {
       "id": "kidsDesk",
+      "how": { "write": "pencil" },
       "name": "Kids' desk",
       "model": "model.kidsDesk",
       "footprint": [

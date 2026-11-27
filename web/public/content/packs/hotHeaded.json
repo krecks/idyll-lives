@@ -118,6 +118,7 @@
     },
     {
       "id": "hotHeaded.grudgeJournal",
+      "how": { "write": "near" },
       "name": "Grudge-to-gratitude writing desk",
       "model": "model.hotHeaded.grudgeJournal",
       "footprint": [1, 1],

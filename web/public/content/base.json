@@ -3255,6 +3255,7 @@
   "objects": [
     {
       "id": "fridge",
+      "how": { "drink": "can" },
       "name": "Fridge",
       "model": "model.fridge",
       "stations": [
@@ -4212,6 +4213,7 @@
     },
     {
       "id": "easel",
+      "how": { "paint": "brush" },
       "name": "Easel",
       "model": "model.easel",
       "footprint": [

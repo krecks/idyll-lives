@@ -818,6 +818,7 @@
     },
     {
       "id": "letterbox",
+      "how": { "read": "post" },
       "name": "Letterbox on a post",
       "model": "model.letterbox",
       "footprint": [

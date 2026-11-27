@@ -104,6 +104,7 @@
     },
     {
       "id": "cheerful.mocktailCart",
+      "how": { "drink": "shaker" },
       "name": "Fizz & sunshine mocktail cart",
       "model": "model.cheerful.mocktailCart",
       "footprint": [1, 1],
@@ -192,6 +193,7 @@
     },
     {
       "id": "cheerful.partyBooth",
+      "how": { "phone": "screen" },
       "name": "Confetti party booth",
       "model": "model.cheerful.partyBooth",
       "footprint": [2, 2],

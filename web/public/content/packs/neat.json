@@ -111,6 +111,7 @@
     },
     {
       "id": "neat.organizerDesk",
+      "how": { "write": "near" },
       "name": "Label-and-sort organizer desk",
       "model": "model.neat.organizerDesk",
       "footprint": [2, 1],

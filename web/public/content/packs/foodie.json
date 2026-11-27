@@ -117,6 +117,7 @@
     },
     {
       "id": "foodie.cookbookLectern",
+      "how": { "read": "handsFree" },
       "name": "Cookbook lectern",
       "model": "model.foodie.cookbookLectern",
       "footprint": [1, 1],

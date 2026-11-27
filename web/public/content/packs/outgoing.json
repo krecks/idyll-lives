@@ -3,6 +3,7 @@
   "objects": [
     {
       "id": "outgoing.partyBar",
+      "how": { "drink": "glass" },
       "name": "Home party bar",
       "model": "model.outgoing.partyBar",
       "seat": { "height": 0.74, "forward": 0.28, "facing": "back" },
@@ -116,6 +117,7 @@
     },
     {
       "id": "outgoing.videoCallNook",
+      "how": { "phone": "screen" },
       "name": "Video-call corner",
       "model": "model.outgoing.videoCallNook",
       "footprint": [1, 1],

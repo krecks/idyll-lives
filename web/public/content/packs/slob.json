@@ -164,6 +164,7 @@
     },
     {
       "id": "slob.gamingRecliner",
+      "how": { "drink": "can" },
       "name": "Command-couch gaming recliner",
       "model": "model.slob.gamingRecliner",
       "seat": { "height": 0.45, "forward": -0.02, "legs": "out", "recline": 22 },

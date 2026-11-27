@@ -704,6 +704,7 @@
     },
     {
       "id": "fridgeFrenchDoor",
+      "how": { "drink": "can" },
       "name": "French-door fridge",
       "model": "model.fridgeFrenchDoor",
       "stores": true,
@@ -812,6 +813,7 @@
     },
     {
       "id": "fridgeRetro",
+      "how": { "drink": "can" },
       "name": "Retro fridge",
       "model": "model.fridgeRetro",
       "stores": true,
@@ -883,6 +885,7 @@
     },
     {
       "id": "fridgeMiniRetro",
+      "how": { "drink": "can" },
       "name": "Retro mini fridge",
       "model": "model.fridgeMiniRetro",
       "stores": true,
@@ -954,6 +957,7 @@
     },
     {
       "id": "wineFridge",
+      "how": { "drink": "wine" },
       "name": "Wine fridge",
       "model": "model.wineFridge",
       "footprint": [

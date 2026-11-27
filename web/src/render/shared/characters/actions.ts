@@ -345,12 +345,6 @@ const PICK_HIGH_SEQ = PICK_HIGH.map(({ clip, min }) => [min, [clip]] as const);
 const pickHigh = (height: number): readonly string[] => (PICK_HIGH_SEQ.find(([min]) => height >= min) ?? PICK_HIGH_SEQ[PICK_HIGH_SEQ.length - 1])[1];
 /** Crouched down (to hug the teddy, `HUGGED`). */
 export const CROUCH_ONLY: readonly string[] = ['crouch'];
-/**
- * Writing desks with their chair built in close, the top only about 0.3 m ahead of the hips (`SEATS`
- * sits the writer on that chair): written at with the hands nearer (`sitHandsNear`), on the top, not
- * through its front.
- */
-export const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
 /** Seated objects whose activity uses the hands on a desk / keys. */
 export const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -509,18 +503,6 @@ export const PROPS = {
  * (`ACTIONS[tag].prop`, by the plate), not carried: the baby's bottle, fed with the baby in the arms.
  */
 export const PROP_ITEMS = new Set(['babyBottle']);
-/** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk, the whiteboard with a marker. */
-const BRUSHED = new Set(['easel', 'kidsEasel']);
-/** Children's desks and their little table: written and drawn at with a pencil (`ACTIONS.write`). */
-const KIDS_DESKS = new Set(['kidsDesk', 'kidsChair']);
-/** What is drunk from what (`drinkProp`): wine from a glass, a cold drink from the can, at a bar a tumbler; else a mug (coffee, tea). */
-const WINE = new Set(['wineFridge', 'wineGlasses']);
-const CANS = new Set(['fridge', 'fridgeFrenchDoor', 'fridgeRetro', 'fridgeMiniRetro', 'fridgeMini', 'fridgeBuiltIn', 'vendingDrink', 'slob.gamingRecliner']);
-const GLASSES = new Set(['stoolCounter', 'stoolBarHigh', 'barStool', 'outgoing.partyBar']);
-/** Drinks mixed in a shaker (the `shake` clip). */
-export const SHAKERS = new Set(['barCart', 'cheerful.mocktailCart']);
-/** Calls made without a mobile (`ACTIONS.phone`): at the shortwave radio, and in the phone box with its receiver. */
-const NO_MOBILE = new Set(['loner.shortwaveRadio', 'phoneBooth']);
 /**
  * Props drawn on an object at rest by code, not in its model, that a resident takes in hand while using it (`HandProp.rest`):
  * the phone box's receiver on its hook (its model is at the gate's four draws, so the receiver can't be a part of its own).
@@ -529,8 +511,6 @@ const NO_MOBILE = new Set(['loner.shortwaveRadio', 'phoneBooth']);
 export const REST_PROPS: Record<string, { key: string; at: readonly [number, number, number]; turn: readonly [number, number, number] }> = {
   phoneBooth: { key: 'tool.receiver', at: [-0.1, 1.42, -0.31], turn: [-90, 0, 0] },
 };
-/** Drunk from without a cup: the drinking fountain. */
-const NO_CUP = new Set(['drinkingFountain']);
 /** What a plate is eaten with at the table (`ACTIONS.eat`; content `items`): the rest by hand. */
 const EATEN_WITH: Record<string, HandProp> = {
   mealPlate: PROPS.fork,
@@ -589,27 +569,13 @@ export function eatClip(plate: string, carried: boolean): 'eat' | 'eatFork' | 'd
   const p = biteOf(plate, carried);
   return !p ? 'eat' : p.sip ? 'drink' : 'eatFork';
 }
-/** The cup for a drink at `def` (`ACTIONS.drink`; none at the drinking fountain; the shaker where a cocktail is mixed). */
-export function drinkProp(def: string): HandProp | null {
-  if (NO_CUP.has(def)) return null;
-  if (SHAKERS.has(def)) return PROPS.shaker;
-  return WINE.has(def) ? PROPS.wine : CANS.has(def) ? PROPS.can : GLASSES.has(def) ? PROPS.glass : PROPS.mug;
-}
-/** Calls made to a screen (`phone`): talked to it, hands free, not with a phone at the ear. */
-export const VIDEO_CALLS = new Set(['outgoing.videoCallNook', 'cheerful.partyBooth']);
 export const ACTIONS: Record<string, ActionAnim> = {
   // (With a fork, a spoon or chopsticks, for what wants them, or a bite of what is eaten by hand (`biteOf`), seated at the
   // table or standing with the plate on the left palm: the bite is `eatFork` (`eatClip`), the plate held in front between
   // bites standing (`holdPlate`); a drink served as a plate sipped from its glass.)
   eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold, prop: (_, plate, _seated, carried) => biteOf(plate, carried) },
-  // Sips from a cup, spaced out (`drinkProp`); a cocktail shaken (`SHAKERS`).
-  drink: {
-    stand: (def) => (SHAKERS.has(def) ? ['shake'] : drinkProp(def) ? ['drink', 'holdCup', 'holdCup'] : ['drink', 'idle', 'idle']),
-    upper: 'drink',
-    between: 'holdCup',
-    hands: HANDS.hold,
-    prop: (def) => drinkProp(def),
-  },
+  // Sips from a mug (coffee, tea), spaced out.
+  drink: { stand: ['drink', 'holdCup', 'holdCup'], upper: 'drink', between: 'holdCup', hands: HANDS.hold, prop: PROPS.mug },
   cook: {
     // (At an appliance on a counter, the microwave, the toaster: at it, not down at the floor.)
     stand: (def) => (def === 'microwave' || def === 'breakfastCounter' ? ['spell', 'interact'] : ['spell', 'interact', 'spell', 'pickUp']),
@@ -633,22 +599,10 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // (Beside the massage table, giving the massage: the hands at work on the one lying there.)
   relax: { stand: (def) => (WARM_AT.has(def) ? WARM_HANDS : def === 'massageTable' ? ['interact', 'spell'] : RELAX_STAND), hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
-  write: {
-    stand: ['interact', 'spell'],
-    sit: (def) => (NEAR_DESKS.has(def) ? 'sitHandsNear' : 'sitHands'),
-    hands: HANDS.hold,
-    // (A card posted at the post box; at a desk a pen, a pencil at the children's.)
-    prop: (def) => (def === 'postBox' ? PROPS.postcard : KIDS_DESKS.has(def) ? PROPS.pencil : PROPS.pen),
-  },
-  // (A notice board or the taxi rank's fares are read looking at them, not at a book in the hands.)
-  // (The book in the hands; at the cookbook lectern the book is the lectern's.)
-  read: {
-    stand: (def) => (def === 'noticeBoard' || def === 'busStop' ? ['idle'] : ['lantern']),
-    upper: 'lantern',
-    hands: HANDS.hold,
-    // (The post read at the letterbox: a card in the hands.)
-    prop: (def) => (def === 'foodie.cookbookLectern' ? null : def === 'letterbox' ? PROPS.postcard : PROPS.book),
-  },
+  // (At a desk with a pen.)
+  write: { stand: ['interact', 'spell'], sit: 'sitHands', hands: HANDS.hold, prop: PROPS.pen },
+  // (The book in the hands.)
+  read: { stand: ['lantern'], upper: 'lantern', hands: HANDS.hold, prop: PROPS.book },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
   // Darts thrown and the table-tennis bat swung (mimed, closed hands: `clips/games.ts`); the pool table and the foosball
   // rods have their clips in `STEP_IN`; toys down on the floor at the box; crouched at the low train table, the hands at
@@ -662,11 +616,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
   },
   // Keys and drums on the desk-hands clip; a cello is held upright between the knees.
   music: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
-  paint: {
-    stand: ['spell', 'interact', 'spell'],
-    hands: HANDS.hold,
-    prop: (def) => (def === 'kidsChalkboard' ? PROPS.chalk : def === 'whiteboard' ? PROPS.marker : BRUSHED.has(def) ? PROPS.paintbrush : null),
-  },
+  paint: { stand: ['spell', 'interact', 'spell'], hands: HANDS.hold },
   // (The plate-smash bin, the bouldering wall and the yoga mat have their clips in `STEP_IN`.)
   exercise: { stand: ['jog'], sit: 'sitHands', hands: (def) => (def === 'yogaMat' ? HANDS.open : HANDS.grip) },
   run: { stand: ['jog'], hands: HANDS.grip },
@@ -712,15 +662,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // Down to low flowers / up into a tree's crown (`activityPose` turns the head).
   smell: { stand: ['crouch'], hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
-  phone: {
-    stand: ['phone'],
-    sit: (def) => (VIDEO_CALLS.has(def) ? 'sitTalk' : 'sit'),
-    upper: (def) => (VIDEO_CALLS.has(def) ? '' : 'phone'),
-    hands: HANDS.hold,
-    // (A mobile at the ear; not at a screen, nor at the shortwave radio's microphone, nor in the phone box, whose
-    // receiver is part of its still body: a part of its own would be a fifth draw call.)
-    prop: (def) => (def === 'phoneBooth' ? PROPS.receiver : VIDEO_CALLS.has(def) || NO_MOBILE.has(def) ? null : PROPS.phoneEar),
-  },
+  // (A mobile at the ear.)
+  phone: { stand: ['phone'], sit: 'sit', upper: 'phone', hands: HANDS.hold, prop: PROPS.phoneEar },
   // Texting and scrolling (content `phone.actions[].anim`): the phone held in front, the head bowed over it, the thumbs moving.
   phoneScreen: { stand: ['phoneText'], sit: 'sit', upper: 'phoneText', hands: HANDS.hold, prop: PROPS.phoneHeld },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
@@ -794,6 +737,32 @@ export const MANNERS: Record<string, ActionAnim> = {
   push: { stand: ['push'] },
   laundry: { stand: ['spell', 'interact', 'pickUp'] },
   iron: { stand: ['stir'], prop: PROPS.iron },
+  // What is drunk from (`drink`, else a mug): wine from a glass, a cold drink from the can, at a bar a tumbler; a
+  // cocktail mixed in a shaker (the `shake` clip); none at the drinking fountain.
+  wine: { prop: PROPS.wine },
+  can: { prop: PROPS.can },
+  glass: { prop: PROPS.glass },
+  shaker: { stand: ['shake'], prop: PROPS.shaker },
+  noCup: { stand: ['drink', 'idle', 'idle'], prop: () => null },
+  // What is written, drawn and painted with (`write`, `paint`; else a pen, or nothing): a pencil at the children's desks
+  // and their little table, a brush at an easel, chalk at the chalkboard, a marker at the whiteboard; a card posted at
+  // the post box or read at the letterbox (`read`).
+  pencil: { prop: PROPS.pencil },
+  brush: { prop: PROPS.paintbrush },
+  chalk: { prop: PROPS.chalk },
+  marker: { prop: PROPS.marker },
+  post: { prop: PROPS.postcard },
+  // Writing desks with their chair built in close, the top only about 0.3 m ahead of the hips (`SEATS` sits the writer
+  // on that chair): written at with the hands nearer (`sitHandsNear`), on the top, not through its front.
+  near: { sit: 'sitHandsNear' },
+  // A notice board or the taxi rank's fares (`read`) read looking at them, not at a book in the hands. (At the cookbook
+  // lectern the book is the lectern's: `handsFree`.)
+  board: { stand: ['idle'] },
+  // Calls (`phone`) made to a screen, talked to, hands free, not with a phone at the ear; in the phone box with its
+  // receiver (its model's, `REST_PROPS`: a part of its own would be a fifth draw call). (At the shortwave radio's
+  // microphone: `handsFree`.)
+  screen: { sit: 'sitTalk', upper: '', prop: () => null },
+  receiver: { prop: PROPS.receiver },
 };
 /** `actionOf`'s mannered entries, by tag and manner, made once. */
 const MANNERED = new Map<string, Map<string, ActionAnim>>();
