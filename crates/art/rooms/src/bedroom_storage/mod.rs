@@ -13,10 +13,12 @@
 
 use artkit::family::{Family, Model, motions};
 
+mod cedar_chest;
 mod common;
 mod large;
 mod shoe;
 mod small;
+mod wardrobes;
 
 // Open while the resident changes into another outfit (content `changesOutfit`), shut as they leave.
 const CHANGE_DRAWER: &str = r#"{"uses": {"outfit": "drawer_open"}}"#;
@@ -72,7 +74,7 @@ pub fn family() -> Family {
             .key("model.nightstandLamp")
             .centre(0.0, -0.1958)
             .paint(&[("oak", "Body"), ("shade", "Shade")]),
-            Model::new("cedarChest", small::cedar_chest, (0.974, 0.505, 0.52))
+            Model::new("cedarChest", cedar_chest::cedar_chest, (0.974, 0.505, 0.52))
                 .key("model.cedarChest")
                 .motions(motions(
                     r#"{"uses": {"takeBlanket": "lid_open"}, "hold": 2.0}"#,
@@ -97,7 +99,7 @@ pub fn family() -> Family {
                 .centre(0.0, -0.16)
                 .motions(motions(CHANGE_DRAWER))
                 .paint(&[("oak", "Body"), ("brass", "Handles")]),
-            Model::new("wardrobe", large::wardrobe, (1.84, 2.41, 0.626))
+            Model::new("wardrobe", wardrobes::wardrobe, (1.84, 2.41, 0.626))
                 .key("model.wardrobe")
                 .centre(0.0, -0.117)
                 .motions(motions(CHANGE_DOORS))
@@ -117,12 +119,16 @@ pub fn family() -> Family {
                 .centre(0.0, -0.1125)
                 .motions(motions(CHANGE_DRAWER))
                 .paint(&[("oak", "Body"), ("iron", "Handles")]),
-            Model::new("wardrobeSingle", large::wardrobe_single, (0.6, 2.28, 0.617))
-                .key("model.wardrobeSingle")
-                .centre(0.0, -0.1215)
-                .motions(motions(r#"{"uses": {"outfit": "door_open"}}"#))
-                .paint(&[("white", "Body"), ("brass", "Handles")]),
-            Model::new("armoire", large::armoire, (1.86, 2.109, 0.628))
+            Model::new(
+                "wardrobeSingle",
+                wardrobes::wardrobe_single,
+                (0.6, 2.28, 0.617),
+            )
+            .key("model.wardrobeSingle")
+            .centre(0.0, -0.1215)
+            .motions(motions(r#"{"uses": {"outfit": "door_open"}}"#))
+            .paint(&[("white", "Body"), ("brass", "Handles")]),
+            Model::new("armoire", wardrobes::armoire, (1.86, 2.109, 0.628))
                 .key("model.armoire")
                 .centre(0.0, -0.1162)
                 .motions(motions(CHANGE_DOORS))

@@ -31,6 +31,7 @@ mod bookcases;
 mod common;
 mod seats;
 mod sectionals;
+mod shelf_parts;
 mod shelves;
 mod side_tables;
 mod sofas;

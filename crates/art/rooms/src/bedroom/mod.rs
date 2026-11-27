@@ -19,7 +19,10 @@
 use artkit::family::{Family, Model, motions};
 
 mod beds;
+mod bunks;
+mod canopy;
 mod common;
+mod daybed;
 
 use common::M;
 
@@ -59,13 +62,13 @@ pub fn family() -> Family {
                 .centre(0.0, 0.02)
                 .motions(motions(TURN_DOWN))
                 .paint(&paint("frame_oak", "headboard_oak", "bedding_sage")),
-            Model::new("bedBunk", beds::bed_bunk, (0.96, 1.9, 1.89))
+            Model::new("bedBunk", bunks::bed_bunk, (0.96, 1.9, 1.89))
                 .key("model.bedBunk")
                 .centre(0.0, 0.015)
                 .motions(motions(BUNK_TURN_DOWN))
                 .paint(&paint("frame_oak", "headboard_oak", "bedding_teal")),
             // Down while the futon is open (the sim's `open`), from the moment a use that opens it starts.
-            Model::new("bedFuton", beds::bed_futon, (1.96, 0.995, 1.91))
+            Model::new("bedFuton", bunks::bed_futon, (1.96, 0.995, 1.91))
                 .key("model.bedFuton")
                 .centre(0.0, 0.025)
                 .motions(motions(r#"{"uses": {"sleep": "unfold", "nap": "unfold", "unfold": "unfold"}, "open": "unfold"}"#))
@@ -85,12 +88,12 @@ pub fn family() -> Family {
                 .centre(0.0, 0.015)
                 .motions(motions(TURN_DOWN))
                 .paint(&paint("frame_stone", "headboard_stone", "bedding_oat")),
-            Model::new("bedCanopy", beds::bed_canopy, (1.73, 2.135, 1.895))
+            Model::new("bedCanopy", canopy::bed_canopy, (1.73, 2.135, 1.895))
                 .key("model.bedCanopy")
                 .centre(0.0, 0.0175)
                 .motions(motions(TURN_DOWN))
                 .paint(&paint("frame_walnut", "headboard_walnut", "bedding_rust")),
-            Model::new("bedDaybed", beds::bed_daybed, (0.96, 0.84, 1.91))
+            Model::new("bedDaybed", daybed::bed_daybed, (0.96, 0.84, 1.91))
                 .key("model.bedDaybed")
                 .centre(0.0, 0.025)
                 .paint(&paint("frame_white", "back_white", "bedding_sage")),

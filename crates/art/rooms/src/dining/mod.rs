@@ -11,16 +11,18 @@ use artkit::json;
 use artkit::palette;
 use artkit::place::GameFrame;
 
+mod bentwood_folding;
 mod chairs;
-mod chairs_more;
 mod china;
 mod common;
 mod pedestals;
 mod sets;
 mod settings;
 mod shells;
+mod stools;
 mod storage;
 mod tables;
+mod upholstered;
 
 palette! { M:
     // table tops and legs (each its own material, so the player colours them apart)
@@ -171,16 +173,16 @@ pub fn family() -> Family {
                 .key("model.tableBarHigh")
                 .paint(&[("top_black", "Top"), ("legs_black", "Legs")]),
             // K8: chairs and stools
-            Model::new("barStool", chairs::bar_stool, (0.39, 0.717, 0.39))
+            Model::new("barStool", stools::bar_stool, (0.39, 0.717, 0.39))
                 .key("model.barStool")
                 .motions(stool.clone())
                 .paint(&SEAT),
-            Model::new("stoolCounter", chairs::stool_counter, (0.39, 0.687, 0.39))
+            Model::new("stoolCounter", stools::stool_counter, (0.39, 0.687, 0.39))
                 .centre(0.0, 0.05)
                 .key("model.stoolCounter")
                 .motions(stool.clone())
                 .paint(&SEAT),
-            Model::new("stoolBarHigh", chairs::stool_bar_high, (0.39, 1.117, 0.398))
+            Model::new("stoolBarHigh", stools::stool_bar_high, (0.39, 1.117, 0.398))
                 .centre(0.0, 0.046)
                 .key("model.stoolBarHigh")
                 .motions(stool)
@@ -195,7 +197,7 @@ pub fn family() -> Family {
                 .paint(&[("frame_honey", "Frame"), ("seat_honey", "Seat")]),
             Model::new(
                 "chairUpholstered",
-                chairs_more::chair_upholstered,
+                upholstered::chair_upholstered,
                 (0.46, 0.992, 0.496),
             )
             .centre(0.0, 0.032)
@@ -211,7 +213,7 @@ pub fn family() -> Family {
                 .paint(&[("frame_windsor", "Frame"), ("seat_windsor", "Seat")]),
             Model::new(
                 "chairBentwood",
-                chairs_more::chair_bentwood,
+                bentwood_folding::chair_bentwood,
                 (0.434, 0.968, 0.452),
             )
             .centre(0.0, 0.041)
@@ -219,17 +221,17 @@ pub fn family() -> Family {
             .paint(&[("frame_bent", "Frame"), ("seat_bent", "Seat")]),
             Model::new(
                 "chairFolding",
-                chairs_more::chair_folding,
+                bentwood_folding::chair_folding,
                 (0.46, 0.892, 0.48),
             )
             .centre(0.0, 0.06)
             .key("model.chairFolding")
             .paint(&[("frame_steel", "Frame"), ("seat_teal", "Seat")]),
-            Model::new("chairArm", chairs_more::chair_arm, (0.57, 0.922, 0.47))
+            Model::new("chairArm", upholstered::chair_arm, (0.57, 0.922, 0.47))
                 .centre(0.0, 0.035)
                 .key("model.chairArm")
                 .paint(&SEAT),
-            Model::new("benchDining", chairs_more::bench_dining, (1.6, 0.468, 0.36))
+            Model::new("benchDining", upholstered::bench_dining, (1.6, 0.468, 0.36))
                 .centre(0.0, 0.05)
                 .key("model.benchDining")
                 .paint(&[("legs_oakd", "Frame"), ("seat_oak", "Seat")]),
