@@ -37,6 +37,7 @@
   "objects": [
     {
       "id": "natureLover.veggieBed",
+      "how": { "tend": "raised" },
       "grows": {
         "days": 2
       },
@@ -204,6 +205,7 @@
     },
     {
       "id": "natureLover.mossTerrarium",
+      "how": { "garden": "mist", "water": "mist" },
       "name": "Moss terrarium",
       "model": "model.natureLover.mossTerrarium",
       "footprint": [1, 1],

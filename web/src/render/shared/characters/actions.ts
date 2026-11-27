@@ -511,8 +511,6 @@ export const PROPS = {
 export const PROP_ITEMS = new Set(['babyBottle']);
 /** The ironing board: ironed at with the iron in the hand (`ACTIONS.clean`). */
 const IRONING_BOARD = 'ironingBoard';
-/** Watered from a can (`ACTIONS.water`, the house plant's `garden`): not what is misted (the terrarium, the bonsai's leaves), nor the garden from the hose reel (its nozzle mimed). */
-const MISTED = new Set(['natureLover.mossTerrarium', 'loner.bonsaiBench', 'hoseReel']);
 /** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk, the whiteboard with a marker. */
 const BRUSHED = new Set(['easel', 'kidsEasel']);
 /** Children's desks and their little table: written and drawn at with a pencil (`ACTIONS.write`). */
@@ -603,14 +601,6 @@ export function drinkProp(def: string): HandProp | null {
 }
 /** Calls made to a screen (`phone`): talked to it, hands free, not with a phone at the ear. */
 export const VIDEO_CALLS = new Set(['outgoing.videoCallNook', 'cheerful.partyBooth']);
-/** Waist-high things tended standing, leaning in (the herb planter's `pick`): the greenhouse's staging, the herb trough, the compost bin. */
-export const WAIST_HIGH = new Set(['greenhouse', 'foodie.herbGarden', 'compostBin']);
-/** Crops picked down at the soil (strawberries, pumpkins, a meadow's flowers): the `plant` clip's crouch, not the bend over a bush. */
-export const LOW_CROPS = new Set(['garden.strawberries', 'garden.pumpkins', 'garden.meadow']);
-/** Fruit trees whose crop is picked reaching up to the low boughs (`pickHigh*`, by height): the apple tree's "Pick the apples" (G-68). */
-export const FRUIT_TREES = new Set(['garden.apple']);
-/** Flowers that bloom above about 0.7 m, smelt leaning in standing, a bloom held to the nose (`pick`), not crouched under. */
-export const TALL_FLOWERS = new Set(['garden.cosmos', 'garden.flowerBox', 'garden.lavender', 'garden.lilies', 'garden.lupins', 'garden.roses', 'garden.wheelbarrow']);
 export const ACTIONS: Record<string, ActionAnim> = {
   // (With a fork, a spoon or chopsticks, for what wants them, or a bite of what is eaten by hand (`biteOf`), seated at the
   // table or standing with the plate on the left palm: the bite is `eatFork` (`eatClip`), the plate held in front between
@@ -718,14 +708,9 @@ export const ACTIONS: Record<string, ActionAnim> = {
     prop: (def) => (def === IRONING_BOARD ? PROPS.iron : null),
   },
   // Gardening, by task (older content and packs: `garden`).
-  water: { stand: ['water'], hands: HANDS.hold, prop: (def) => (MISTED.has(def) ? null : PROPS.wateringCan) },
-  // Kneeling at the soil; a waist-high thing leant over standing, the staked tomatoes tied up standing, a
-  // raised bed's soil bent over.
-  tend: {
-    stand: (def) =>
-      WAIST_HIGH.has(def) ? ['pick'] : def === 'garden.tomatoes' ? ['harvest', 'water'] : def === 'raisedBed' || def === 'natureLover.veggieBed' ? ['harvest'] : ['kneel'],
-    hands: HANDS.relaxed,
-  },
+  water: { stand: ['water'], hands: HANDS.hold, prop: PROPS.wateringCan },
+  // Kneeling at the soil.
+  tend: { stand: ['kneel'], hands: HANDS.relaxed },
   // The baby picked up out of the crib and held (`CUDDLE`).
   // (Fed from a bottle at the crib: what the feed holds, `PROP_ITEMS`.)
   cuddle: { stand: ['idle'], hands: HANDS.relaxed, prop: (_, plate) => (plate === 'babyBottle' ? PROPS.babyBottle : null) },
@@ -740,21 +725,9 @@ export const ACTIONS: Record<string, ActionAnim> = {
   },
   // At the changing table, the baby on the pad (`CHANGE`): the hands busy over them.
   change: { stand: ['interact', 'spell'], hands: HANDS.relaxed },
-  // (From the waist-high herb planter, standing; low crops crouched down to the soil.)
-  // (Fruit picked from a tree's low boughs, `pickHigh*` for their height.)
-  harvest: {
-    stand: (def, height) => (def === 'garden.herbs' ? ['pick'] : FRUIT_TREES.has(def) ? pickHigh(height) : LOW_CROPS.has(def) ? ['plant', 'kneel'] : ['harvest', 'plant']),
-    hands: HANDS.hold,
-  },
-  // (The bonsai is shaped with wire, by hand.)
-  prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip, prop: (def) => (def === 'loner.bonsaiBench' ? null : PROPS.secateurs) },
-  garden: {
-    // (The bird feeder's box on its post: reached for standing at it.)
-    stand: (def) =>
-      def === 'plant' || def.includes('Terrarium') || def.includes('bonsai') ? ['water'] : def === 'kind.songbirdFeeder' ? ['interact', 'spell'] : ['harvest', 'plant'],
-    hands: HANDS.hold,
-    prop: (def) => (def === 'plant' ? PROPS.wateringCan : null),
-  },
+  harvest: { stand: ['harvest', 'plant'], hands: HANDS.hold },
+  prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip, prop: PROPS.secateurs },
+  garden: { stand: ['harvest', 'plant'], hands: HANDS.hold },
   tinker: {
     // (The longcase clock wound at its trunk door, its weights' chains: no stoop to the floor.)
     stand: (def) => (def === 'grandfatherClock' ? ['interact', 'spell'] : ['interact', 'spell', 'pickUp']),
@@ -767,8 +740,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
     hands: HANDS.relaxed,
     prop: (def) => (def === 'fountainTown' ? PROPS.coin : null),
   },
-  // Down to low flowers, leaning in to tall ones / up into a tree's crown (`activityPose` turns the head).
-  smell: { stand: (def) => (TALL_FLOWERS.has(def) ? ['pick'] : ['crouch']), hands: HANDS.relaxed },
+  // Down to low flowers / up into a tree's crown (`activityPose` turns the head).
+  smell: { stand: ['crouch'], hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
   phone: {
     stand: ['phone'],
@@ -822,6 +795,23 @@ export const MANNERS: Record<string, ActionAnim> = {
   // Bent down to a dishwasher's lower rack its open door slides out, not at the worktop, a thing put in or taken out
   // each time (`wash`, `clean`).
   rack: { stand: ['pickUp', 'interact', 'pickUp', 'idle'], hands: HANDS.hold },
+  // Garden (`tend`, `harvest`, `smell`, `water`, `garden`, `prune`): a waist-high thing leant over standing (the
+  // greenhouse's staging, the herb planters, the compost bin; flowers that bloom above about 0.7 m, a bloom held to the
+  // nose), not crouched under; crops picked down at the soil (strawberries, pumpkins, a meadow's flowers), the `plant`
+  // clip's crouch, not the bend over a bush; a fruit tree's crop reached up for in its low boughs (`pickHigh*`, by height:
+  // the apple tree's "Pick the apples", G-68); the staked tomatoes tied up standing; a raised bed's soil bent over; a
+  // house plant watered from a can; misted, no can (the terrarium, the bonsai's leaves, the hose reel's nozzle mimed).
+  waist: { stand: ['pick'] },
+  soil: { stand: ['plant', 'kneel'] },
+  bough: { stand: (_, height) => pickHigh(height) },
+  staked: { stand: ['harvest', 'water'] },
+  raised: { stand: ['harvest'] },
+  watering: { stand: ['water'], prop: PROPS.wateringCan },
+  mist: { stand: ['water'], prop: () => null },
+  // Standing at it, the hands at work at its height, no stoop to the floor (`garden` at the bird feeder's box on its post).
+  upright: { stand: ['interact', 'spell'] },
+  // Nothing in the hand (`prune` at the bonsai, shaped with wire by hand).
+  handsFree: { prop: () => null },
 };
 /** `actionOf`'s mannered entries, by tag and manner, made once. */
 const MANNERED = new Map<string, Map<string, ActionAnim>>();

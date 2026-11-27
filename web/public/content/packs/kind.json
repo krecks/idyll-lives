@@ -279,6 +279,7 @@
     },
     {
       "id": "kind.songbirdFeeder",
+      "how": { "garden": "upright" },
       "name": "Songbird feeding station",
       "model": "model.kind.songbirdFeeder",
       "outdoors": true,

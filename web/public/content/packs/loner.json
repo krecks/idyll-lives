@@ -109,6 +109,7 @@
     },
     {
       "id": "loner.bonsaiBench",
+      "how": { "garden": "mist", "water": "mist", "prune": "handsFree" },
       "name": "Bonsai potting bench",
       "model": "model.loner.bonsaiBench",
       "footprint": [1, 1],

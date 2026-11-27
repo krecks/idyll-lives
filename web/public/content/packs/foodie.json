@@ -3,6 +3,7 @@
   "objects": [
     {
       "id": "foodie.herbGarden",
+      "how": { "tend": "waist" },
       "name": "Windowsill herb garden",
       "model": "model.foodie.herbGarden",
       "footprint": [1, 1],

@@ -3720,6 +3720,7 @@
     },
     {
       "id": "plant",
+      "how": { "garden": "watering" },
       "name": "Potted plant",
       "model": "model.plant",
       "footprint": [
