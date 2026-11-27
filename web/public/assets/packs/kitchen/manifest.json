@@ -1,5 +1,5 @@
 {
-  "$comment": "The kitchen (crates/art/wet/src/kitchen, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes up. The fridges (K1) each hinge a door built closed and swing it open while a resident takes food or a drink (`motions`); the French-door freezer slides and the wine fridge's top shelf of bottles slides out once its glass door is open; every freezer door and the French freezer drawer open for 'Get some ice cream'.",
+  "$comment": "The kitchen (crates/art/wet/src/kitchen, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a resident washes up. The fridges (K1) each hinge a door built closed and swing it open while a resident takes food or a drink (`motions`); the French-door freezer slides and the wine fridge's top shelf of bottles and the upright freezer's middle drawer slide out once their doors are open; every freezer door and the French freezer drawer open for 'Get some ice cream'.",
   "version": 1,
   "entries": {
     "model.fridge": {
@@ -798,16 +798,35 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
-        "liner": {
-          "finish": "material.finish.matte"
+        "drawer": {
+          "finish": "material.finish.gloss"
+        },
+        "icecream": {
+          "finish": "material.finish.satin"
+        },
+        "peas": {
+          "finish": "material.finish.satin"
+        },
+        "shelf": {
+          "finish": "material.finish.gloss"
         },
         "trim": {
           "finish": "material.finish.satin"
+        },
+        "white_liner": {
+          "finish": "material.finish.matte"
         }
       },
       "motions": {
         "uses": {
-          "fetch": "door_open"
+          "fetch": [
+            "door_open",
+            {
+              "clip": "drawer_open",
+              "delay": 0.9,
+              "hold": 1.6
+            }
+          ]
         },
         "hold": 3.5
       },

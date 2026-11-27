@@ -166,7 +166,7 @@ French-door fridge's fourth draw call is a moving part each (a glass door and a 
 ## The freezers (2026-11-27)
 
 `chestFreezer` and `uprightFreezer` join the fridges, built from the same palette (`body`, `chrome`, `trim`) plus
-`liner` for the inside, so each is 4 draw calls. Both are shells rather than solid boxes: the walls, the floor and a
+a liner for the inside. Both are shells rather than solid boxes: the walls, the floor and a
 liner block inside, so that an opened lid or door shows an interior instead of a blank face. The chest freezer is a
 low box whose lid is hinged along its back edge and lifted with `swing` about the model's X axis, 85° up and no
 further (a lid that leans back past vertical would stand in the wall); the hinge line and its two chrome knuckles are
@@ -175,8 +175,16 @@ wall's face (the gate's `opened`; with the knuckles on the lid's top it reached 
 is deep). It is 1.90 × 0.88 × 0.70 m (2026-11-27: 0.90 m deep before, past the 0.50–0.78 m of real chest freezers in
 `cargo review sizes`): its 0.68 m box stands with its back on the wall's face (`centre` 0, −0.08), the handle 2 cm
 proud of its front, and its still parts are joined into one `body`. The resident's `chestFetch` clips
-(clips/reach.ts `CHEST`, `CHEST_TO` 0.45 m, the lid 0.68 m from its hinge) are fitted to that depth. The upright one is a tall cabinet whose door is hinged on its left and swung 100° about Z, with three
-baskets on the liner behind it; its still parts are joined into one `body` (2026-11-27), the door, seam and
-handles into the `door`. Each declares one motion in `mod.rs` — `lid_open` (1.2 s) and `door_open` (1.2 s,
-`BackOut`) — keyed to the `fetch` animation (`frozenTreat` and any other fetch from it) and held open 3.5 s, as the
-fridges' are; the resident's own animation is the shared `fetch`, so no new clip is added to `base.json`.
+(clips/reach.ts `CHEST`, `CHEST_TO` 0.45 m, the lid 0.68 m from its hinge) are fitted to that depth. The upright one is a tall cabinet whose door is hinged on its left and swung 100° about Z,
+with one chrome bar handle up its free edge (on two feet; 2026-11-27: three across-the-door bars before, which read as
+the fronts of drawers) and a white panel on its inside. Behind it, a white liner (`white_liner`) carries five clear
+drawer fronts (`drawer`, pale blue gloss, 0.46 × 0.27 m at a 0.324 m pitch, a grip along each top), what an upright
+freezer shows when opened (before: three thin chrome baskets on a grey liner, empty-looking). Its still parts,
+drawer fronts included, are joined into one `body` (2026-11-27), the door, its liner panel, handle and feet into the
+`door`, and the middle drawer, with a clear tub and two packs (peas, ice cream) hidden in the liner while it is
+shut, is the `drawer`: 3 nodes, 3 draw calls, 2,384 triangles (1,504 before). It is 0.60 × 1.82 × 0.69 m. Each
+freezer's door or lid clip — `lid_open` (1.2 s) and `door_open` (1.2 s, `BackOut`) — is keyed in `mod.rs` to the
+`fetch` animation (`frozenTreat` and any other fetch from it) and held open 3.5 s, as the fridges' are; the upright
+one's `drawer_open` (0.6 s, 14 cm out) starts 0.9 s in, once the door is past 90°, and is held 1.6 s, so it is back
+in before the door shuts (the opened door's liner clears the drawer's front by 2 cm). The resident's own animation
+is the shared `fetch`, so no new clip is added to `base.json`.

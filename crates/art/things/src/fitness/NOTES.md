@@ -162,10 +162,15 @@ nodes come out `roll` before `mat` (the order they are made).
 
 ## The rowing machine (2026-11-27)
 
-`rowingMachine` is the housing with its fan cage, the footplate on its stretcher, two rails raised on the housing
-and the rear foot, the seat on its carriage, the handle on its chain. It is 0.56 × 0.60 × 2.15 m in a 1 × 3
-footprint, the housing on the wall's face (`centre` 0, −0.355), with the seat's top at 0.33 m, 4 draw calls: the
-still body and three moving parts, `carriage` (the seat), `chain` and `handle`. (Before 2026-11-27 it was 1.70 m long
+`rowingMachine` is the fan in its round cage, the footplate on its stretcher, two rails from the cage (they run into it) to
+the rear foot, the seat on its carriage, the handle on its chain, and a monitor on an arm. The cage is an air
+rower's: a dark drum 0.48 m across and 0.28 m wide, its axis across the machine, its back on the wall's face, with a
+rim, a hub and six spokes on each face (2026-11-27: a plain white cube 0.52 × 0.60 × 0.40 m before, with a dark
+square on its front). A neck up off its top holds the pivot where the chain leaves (unmoved, 0.54 m high), and an
+arm up from the neck holds the monitor, 0.17 × 0.13 m, its screen facing the rower at 0.92 m, 14 cm forward of the
+handle at rest, about 0.2 m clear of an adult's head at the catch by the `row` clip's 22° lean (worked out, not yet seen in the game). It is 0.56 × 0.985 × 2.15 m (0.60 m high before the monitor) in
+a 1 × 3 footprint (`centre` 0, −0.355), with the seat's top at 0.33 m, 2,996 triangles (2,060 with the cube), 4 draw
+calls: the still body and three moving parts, `carriage` (the seat), `chain` and `handle`. (Before 2026-11-27 it was 1.70 m long
 with its seat at 0.25 m, short and low of a real rower's 2.09–2.44 m and 0.30–0.51 m in `cargo review sizes`.)
 
 It is built from the rower's hips at the catch, 1.0 m in front of the back: the content's `seat` (0.33 m up,

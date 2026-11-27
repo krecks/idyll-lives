@@ -133,9 +133,15 @@ The beds' duvets are rumpled by the form as the bedroom's are (2.5 cm folds 24 c
 
 ## The playhouse (2026-11-27)
 
-`playhouse` is a board hut: a floor, three walls, a front of two panels with a doorway between them under its
-header, corner posts, a window in its left side and a roof slab with its ridge, joined into one part. Four finishes
-(boards, roof, trim, glass) map to 1 draw call. It is 1.32 × 1.60 × 1.54 m (2026-11-27: 1.96 × 1.70 × 1.84 m before,
-past a real Wendy house's 1.10–1.35 × 1.10–1.65 m in `cargo review sizes`), inside its 2 × 2 footprint, and has no
-clip. Its doorway is 0.66 m wide and 1.05 m clear over its 0.06 m floor, its front 0.70 m from the middle: the
-resident's `housePlay` clip (clips/play.ts `HOUSE_PLAY`) crawls a child in through it, fitted to those numbers.
+`playhouse` is a board hut with a gable roof: a floor, two side walls up to the 1.06 m eaves, the front and back
+gables (extruded outlines, the front's notched for its doorway), corner posts, a window in its left side with a white
+frame and cross bar, a white casing round the doorway, and two roof slabs pitched 40° from a ridge running front to
+back (so the doorway's gable faces front), 6 cm over the eaves and 7 cm over each gable, with a bargeboard under
+each slab's gable edge and a ridge board, all joined into one part. Four finishes (boards, roof, trim, glass) map to
+1 draw call; 2,560 triangles (1,512 with the flat roof). It is 1.32 × 1.62 × 1.56 m (2026-11-27: 1.96 × 1.70 ×
+1.84 m before, past a real Wendy house's 1.10–1.35 × 1.20–1.67 × 1.10–1.65 m in `cargo review sizes`), inside its
+2 × 2 footprint, and has no clip. The flat roof with its ridge strip it had first read as a
+shed, and its corner posts' outer faces lay in the walls' faces, so the two fought (white streaks down every
+corner); the posts now stand 1.5 cm proud of both walls, and the side walls run between the gables rather than
+over their ends. The trim is the doll house's `house_trim`. Its doorway is 0.66 m wide and 1.05 m clear over its 0.06 m
+floor, its front 0.70 m from the middle: the resident's `housePlay` clip (clips/play.ts `HOUSE_PLAY`) crawls a child in through it, fitted to those numbers.

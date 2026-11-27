@@ -7,7 +7,7 @@ use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{fbox, swing};
+use artkit::{fbox, slide, swing};
 
 /// The chest freezer: a low box on the floor with its lid hinged at the back.
 pub fn chest_freezer() -> Vec<Obj> {
@@ -112,11 +112,16 @@ pub fn chest_freezer() -> Vec<Obj> {
     Vec::new()
 }
 
-/// The upright freezer: a tall cabinet whose door is hinged on its left, three baskets behind it.
+/// The upright freezer: a tall cabinet whose door, hinged on its left with one bar handle up its right, opens on a
+/// white liner and five clear drawers; once the door is open the middle drawer slides out a little.
 pub fn upright_freezer() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
+    // the drawers: five fronts up the liner's face, 0.27 m tall at a 0.324 m pitch, each 2 cm thick
+    let (drawers, pitch, tall, front_z) = (5, 0.324, 0.27, 0.175);
+    let drawer_y = |i: usize| 0.10 + tall / 2.0 + pitch * i as f64;
+    const OUT: usize = 2;
     let still = new_parts(|| {
-        // the shell: back, the two sides, its top and floor, and the liner with its baskets
+        // the shell: back, the two sides, its top and floor, and the liner with its drawers
         fbox!(
             f,
             "back",
@@ -159,18 +164,17 @@ pub fn upright_freezer() -> Vec<Obj> {
             M.body,
             bevel = 0.006
         );
-        fbox!(f, "liner", 0.50, 1.68, 0.58, (0, 0.90, -0.13), M.liner);
-        for (i, y) in [0.55, 0.95, 1.35].into_iter().enumerate() {
-            fbox!(
-                f,
-                format!("basket{i}"),
-                0.44,
-                0.12,
-                0.020,
-                (0, y, 0.17),
-                M.chrome,
-                bevel = 0.004
-            );
+        fbox!(
+            f,
+            "liner",
+            0.52,
+            1.70,
+            0.58,
+            (0, 0.91, -0.13),
+            M.white_liner
+        );
+        for i in (0..drawers).filter(|&i| i != OUT) {
+            drawer_front(&f, i, drawer_y(i), tall, front_z);
         }
         fbox!(
             f,
@@ -193,6 +197,55 @@ pub fn upright_freezer() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some(P3::ZERO));
+    // the drawer that slides out: its front, its tub behind it (inside the liner while shut) and two packs in it
+    let y = drawer_y(OUT);
+    let drawer = new_parts(|| {
+        drawer_front(&f, OUT, y, tall, front_z);
+        let back = front_z - 0.01;
+        for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("tub_side{i}"),
+                0.008,
+                tall - 0.04,
+                0.30,
+                (sx * 0.22, y - 0.02, back - 0.15),
+                M.drawer,
+                bevel = 0
+            );
+        }
+        fbox!(
+            f,
+            "tub_floor",
+            0.45,
+            0.008,
+            0.30,
+            (0, y - tall / 2.0 + 0.004, back - 0.15),
+            M.drawer,
+            bevel = 0
+        );
+        fbox!(
+            f,
+            "pack_peas",
+            0.16,
+            0.14,
+            0.10,
+            (-0.10, y - tall / 2.0 + 0.078, back - 0.07),
+            M.peas,
+            bevel = 0.01
+        );
+        fbox!(
+            f,
+            "pack_ice",
+            0.14,
+            0.12,
+            0.10,
+            (0.09, y - tall / 2.0 + 0.068, back - 0.08),
+            M.icecream,
+            bevel = 0.01
+        );
+    });
+    let drawer = join(&drawer, "drawer", None);
     let parts = new_parts(|| {
         fbox!(
             f,
@@ -204,22 +257,68 @@ pub fn upright_freezer() -> Vec<Obj> {
             M.body,
             bevel = 0.012
         );
-        fbox!(f, "seam", 0.56, 0.012, 0.028, (0, 1.30, 0.222), M.trim);
-        for i in 0..3 {
+        // its inside: a white panel inside its seal
+        fbox!(
+            f,
+            "door_liner",
+            0.48,
+            1.52,
+            0.012,
+            (0, 0.96, 0.199),
+            M.white_liner,
+            bevel = 0.004
+        );
+        // one bar handle up the free edge, on two feet
+        fbox!(
+            f,
+            "handle",
+            0.026,
+            0.50,
+            0.02,
+            (0.225, 1.20, 0.25),
+            M.chrome,
+            bevel = 0.008
+        );
+        for (i, y) in [0.99, 1.41].into_iter().enumerate() {
             fbox!(
                 f,
-                format!("handle{i}"),
-                0.40,
-                0.028,
-                0.028,
-                (0, 1.44 - 0.36 * i as f64, 0.245),
+                format!("foot{i}"),
+                0.018,
+                0.03,
+                0.01,
+                (0.225, y, 0.237),
                 M.chrome,
-                bevel = 0.008
+                bevel = 0
             );
         }
     });
     let door = hinged(join(&parts, "door", None), f.at(-0.28, 0.96, 0.235));
     settle_all();
     swing!(door, "door_open", 100, seconds = 1.2, ease = Ease::BackOut);
+    slide!(drawer, "drawer_open", (0, -0.14, 0), seconds = 0.6);
     Vec::new()
+}
+
+/// A clear drawer's front on the freezer's liner, with a grip along its top.
+fn drawer_front(f: &GameFrame, i: usize, y: f64, tall: f64, z: f64) {
+    fbox!(
+        f,
+        format!("drawer{i}"),
+        0.46,
+        tall,
+        0.02,
+        (0, y, z),
+        M.drawer,
+        bevel = 0.006
+    );
+    fbox!(
+        f,
+        format!("grip{i}"),
+        0.30,
+        0.022,
+        0.008,
+        (0, y + tall / 2.0 - 0.025, z + 0.013),
+        M.shelf,
+        bevel = 0.004
+    );
 }

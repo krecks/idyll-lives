@@ -1,4 +1,4 @@
-//! The rowing machine: a front housing with the fan, a rail on the floor, a sliding seat and a handle on its chain.
+//! The rowing machine: the fan in its round cage at the front, a monitor on an arm, a rail on the floor, a sliding seat and a handle on its chain.
 //! `stroke` (a loop, 2.7 s): the drive (0.9 s: the legs push the seat back, then the arms pull the handle to the
 //! chest), then the slower recovery (the hands away, the body over, the seat sliding back up to the catch).
 
@@ -8,7 +8,7 @@ use artkit::motion::{self, Path};
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsphere, settle};
+use artkit::{fbox, fcyl, fsphere, settle, torus};
 
 /// The machine's back edge (game depth): the housing on the wall's face in a 3-deep footprint.
 const BACK: f64 = -1.43;
@@ -125,26 +125,108 @@ pub fn rowing_machine() -> Vec<Obj> {
 
 /// The housing, the footplate, the rail and the rear foot.
 fn still(f: &GameFrame) {
-    // the front housing: the fan in its cage, on the floor, its face 0.60 m ahead of the hips at the catch
+    // the fan's cage at the front: a drum across the machine, its mesh dark, a rim, a hub and six spokes on each
+    // face; on a foot, the rail running into it
+    let (r, wide) = (0.24, 0.28);
+    let (cy, cz) = (0.06 + r, BACK + r);
+    fcyl!(
+        f,
+        "cage",
+        r - 0.01,
+        wide - 0.01,
+        (0, cy, cz),
+        M.dark,
+        rot = (0, 90, 0),
+        verts = 24
+    );
+    for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+        let x = sx * wide / 2.0;
+        torus!(
+            format!("rim{i}"),
+            r - 0.012,
+            0.012,
+            at = f.at(x, cy, cz),
+            material = M.body,
+            rot = (0, 90, 0),
+            major_segments = 24,
+            minor_segments = 4
+        );
+        fcyl!(
+            f,
+            format!("hub{i}"),
+            0.045,
+            0.02,
+            (x, cy, cz),
+            M.body,
+            rot = (0, 90, 0),
+            verts = 12
+        );
+        for k in 0..6 {
+            let a = (30.0 + 60.0 * k as f64).to_radians();
+            let mid = (r + 0.045) / 2.0;
+            fbox!(
+                f,
+                format!("spoke{i}"),
+                0.012,
+                r - 0.045,
+                0.022,
+                (x, cy + mid * cos(a), cz + mid * sin(a)),
+                M.body,
+                rot = (a.to_degrees(), 0, 0),
+                bevel = 0
+            );
+        }
+    }
     fbox!(
         f,
-        "housing",
-        0.52,
-        0.60,
-        0.40,
-        (0, 0.30, BACK + 0.20),
+        "cage_foot",
+        0.50,
+        0.06,
+        0.10,
+        (0, 0.03, cz),
+        M.dark,
+        bevel = 0.01
+    );
+    // the neck the chain leaves from, up off the cage's top, and the monitor on its arm, facing the rower
+    fbox!(
+        f,
+        "neck",
+        0.09,
+        0.20,
+        0.10,
+        (0, PIVOT.0 - 0.06, PIVOT.1 - 0.04),
         M.body,
-        bevel = 0.03
+        bevel = 0.012
     );
     fbox!(
         f,
-        "cage",
+        "arm",
+        0.03,
         0.30,
-        0.30,
-        0.02,
-        (0, 0.36, BACK + 0.41),
+        0.03,
+        (0, PIVOT.0 + 0.18, PIVOT.1 - 0.05),
+        M.dark,
+        bevel = 0.006
+    );
+    fbox!(
+        f,
+        "monitor",
+        0.17,
+        0.13,
+        0.04,
+        (0, PIVOT.0 + 0.38, PIVOT.1 - 0.03),
         M.dark,
         bevel = 0.01
+    );
+    fbox!(
+        f,
+        "screen",
+        0.13,
+        0.09,
+        0.004,
+        (0, PIVOT.0 + 0.385, PIVOT.1 - 0.008),
+        M.screen,
+        bevel = 0
     );
     // the footplate, sloped to the soles (its board behind its face), on a stretcher across the rails
     let a = PLATE_DEG.to_radians();
