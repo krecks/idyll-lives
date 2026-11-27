@@ -74,6 +74,7 @@
     },
     {
       "id": "gloomy.cello",
+      "how": { "music": "knees" },
       "name": "Nocturne cello",
       "model": "model.gloomy.cello",
       "footprint": [1, 1],
@@ -114,6 +115,7 @@
     },
     {
       "id": "gloomy.journalDesk",
+      "how": { "write": "near" },
       "name": "Candlelit writing desk",
       "model": "model.gloomy.journalDesk",
       "footprint": [2, 1],

@@ -312,6 +312,12 @@ export interface ObjectDef {
    * `shut` is what it sounds like drawn or opened (default `curtain`: blinds' `slats`, an awning's `none`).
    */
   sounds?: Record<string, string>;
+  /**
+   * How what's done at it is done, by animation tag (renderer only): a manner of `MANNERS` in
+   * render/shared/characters/actions.ts over the tag's own clips (`"how": {"bake": "low"}`: bent down to an
+   * oven under the hob), for its uses and the cooking steps at it.
+   */
+  how?: Record<string, string>;
   /** A world sound it makes by itself, used or not, while its lot is looked at (a fountain's water). */
   ambient?: string;
   /** With `ambient`: it sounds only while a use on its tiles sounds like this (a world sound key: a cooker hood's fan over a hob's `sizzle`). */

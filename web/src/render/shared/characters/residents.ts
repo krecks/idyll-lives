@@ -55,7 +55,7 @@ import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
 import { playbackRate } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
-import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GLIDE_SECONDS, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
+import { actionOf, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GLIDE_SECONDS, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
 import { LOW_TOP, SIT_LOW } from './clips/low';
 import { RIDE_BIKE, RIDE_BIKE_CHILD, RIDE_SCOOTER } from './clips/rides';
 import { FLOOR_SITS } from './clips/seated';
@@ -959,7 +959,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const stool = FOOTSTOOLS[o.def];
       const made = def?.footprint ?? [1, 1];
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
-      return { def: o.def, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, ride, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
+      return { def: o.def, how: def?.how, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, ride, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
     this.restful = objects.filter((o) => o.restful);
     this.usable = objects.filter((o) => USE[o.def]);
@@ -1263,7 +1263,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
    * eat, `carried` in the hand); none while walking, talking (`busy`), lying, sitting down or getting up.
    */
   private handPropOf(rig: SimRig, pose: number, busy: boolean, tag: string, plate: string, carried: boolean): HandProp | null {
-    const act = ACTIONS[tag]?.prop;
+    const act = actionOf(tag, rig.useObj?.how?.[tag])?.prop;
     const still = !busy && rig.tagKnown && rig.walkT < 0 && pose !== Pose.Lie && !RISING.has(rig.cur.key);
     return still && act ? (typeof act === 'function' ? act(rig.useDef, plate, pose === Pose.Sit, carried) : act) : null;
   }
@@ -2435,7 +2435,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   ): void {
     const pair = partner ? Math.min(i, partner.id) : i;
     const known = useObj !== undefined;
-    const act = ACTIONS[tag];
+    const act = actionOf(tag, useObj?.how?.[tag]);
     rig.tag = tag;
     rig.tagKnown = known;
     rig.feetUp = false;
@@ -2449,7 +2449,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     let fade = DEFAULT_FADE;
     let upper = '';
     let rate = 1;
-    let hands: number = (typeof act?.hands === 'function' ? act.hands(useObj?.def ?? '') : act?.hands) ?? HANDS.relaxed;
+    let hands: number = act?.hands ?? HANDS.relaxed;
     // Step towards a partner (hugs, kisses, fights): eased towards `reach` at `reachRate`.
     let reach = 0;
     let reachRate = 4;
@@ -2555,13 +2555,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       fade = 0.35;
       rig.useDef = obj?.def ?? '';
       rig.useObj = obj ?? null;
+      // (The seat's manner, `how`: sat at, not the thing used from it.)
+      const sat = actionOf(tag, obj?.how?.[tag]);
       const ride = known && obj ? RIDES[obj.def] : undefined;
       if (social) key = speaking(pair, role, time) ? 'sitTalk' : 'sit';
       else if (ride) {
         // Astride a ride, the hands on its grips (`RIDES`).
         key = this.sizedClip(rig, ride.sizes);
         hands = HANDS.grip;
-      } else if (act?.sit) key = typeof act.sit === 'function' ? act.sit(rig.useDef) : act.sit;
+      } else if (sat?.sit) key = sat.sit;
       else if (!known && obj && SIT_HANDS.has(obj.def)) key = 'sitHands';
       else key = 'sit';
       if (floor) key = SIT_CLIPS[floor].sit;
@@ -2583,13 +2585,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         reachRate = 1.5;
       }
       if (!social) {
-        const up = known ? (typeof act?.upper === 'function' ? act.upper(rig.useDef) : act?.upper) : obj?.def === 'diningTable' ? 'eat' : undefined;
+        const up = known ? sat?.upper : obj?.def === 'diningTable' ? 'eat' : undefined;
         // Eating / drinking now and then (between sips the cup held: `between`); holding a book or phone throughout.
         if (up === 'eat' || up === 'drink') {
           // (With cutlery or a bite in the hand, the bite stops a fork's length off the mouth: `eatFork`; a drink served
           // as a plate is sipped from, the glass held between sips: `eatClip`.)
           const bite = up === 'eat' ? eatClip(rig.plate, carry !== '') : up;
-          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (bite === 'drink' ? 'holdCup' : (act?.between ?? '')) : '';
+          upper = Math.floor((rig.actTime + rig.seed * 9) / 4) % 3 === 0 ? bite : known ? (bite === 'drink' ? 'holdCup' : (sat?.between ?? '')) : '';
         }
         else if (up) upper = up;
       }

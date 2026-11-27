@@ -4,6 +4,7 @@
   "objects": [
     {
       "id": "hotHeaded.heavyBag",
+      "how": { "exercise": "punch" },
       "name": "Heavy punching bag",
       "model": "model.hotHeaded.heavyBag",
       "footprint": [1, 1],
@@ -117,6 +118,7 @@
     },
     {
       "id": "hotHeaded.grudgeJournal",
+      "how": { "write": "near" },
       "name": "Grudge-to-gratitude writing desk",
       "model": "model.hotHeaded.grudgeJournal",
       "footprint": [1, 1],

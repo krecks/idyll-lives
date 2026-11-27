@@ -69,6 +69,7 @@
     },
     {
       "id": "romantic.letterBureau",
+      "how": { "write": "near" },
       "name": "Love-letter bureau",
       "model": "model.romantic.letterBureau",
       "footprint": [1, 1],

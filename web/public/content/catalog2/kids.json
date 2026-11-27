@@ -25,6 +25,7 @@
     },
     {
       "id": "kidsChair",
+      "how": { "write": "pencil" },
       "name": "Kids' chair",
       "model": "model.kidsChair",
       "footprint": [
@@ -136,6 +137,7 @@
     },
     {
       "id": "toyChest",
+      "how": { "play": "floor" },
       "name": "Toy chest",
       "model": "model.toyChest",
       "footprint": [
@@ -207,6 +209,7 @@
     },
     {
       "id": "kidsEasel",
+      "how": { "paint": "brush" },
       "name": "Kids' easel",
       "model": "model.kidsEasel",
       "footprint": [
@@ -239,6 +242,7 @@
     },
     {
       "id": "trainTable",
+      "how": { "play": "crouch" },
       "name": "Train table",
       "model": "model.trainTable",
       "footprint": [

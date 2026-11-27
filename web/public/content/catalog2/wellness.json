@@ -32,6 +32,7 @@
   "objects": [
     {
       "id": "massageTable",
+      "how": { "relax": "upright" },
       "name": "Massage table",
       "model": "model.massageTable",
       "footprint": [

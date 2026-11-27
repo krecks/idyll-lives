@@ -309,6 +309,7 @@
     },
     {
       "id": "raisedBed",
+      "how": { "tend": "raised" },
       "grows": {
         "days": 2
       },
@@ -413,6 +414,7 @@
     },
     {
       "id": "greenhouse",
+      "how": { "tend": "waist" },
       "name": "Greenhouse",
       "model": "model.greenhouse",
       "footprint": [
@@ -473,6 +475,7 @@
     },
     {
       "id": "compostBin",
+      "how": { "tend": "waist" },
       "name": "Compost bin",
       "model": "model.compostBin",
       "footprint": [
@@ -815,6 +818,7 @@
     },
     {
       "id": "letterbox",
+      "how": { "read": "post" },
       "name": "Letterbox on a post",
       "model": "model.letterbox",
       "footprint": [
@@ -850,6 +854,7 @@
     },
     {
       "id": "hoseReel",
+      "how": { "water": "mist" },
       "name": "Garden hose reel",
       "model": "model.hoseReel",
       "footprint": [
@@ -895,6 +900,7 @@
     },
     {
       "id": "lawnMower",
+      "how": { "clean": "push" },
       "name": "Push lawnmower",
       "model": "model.lawnMower",
       "footprint": [

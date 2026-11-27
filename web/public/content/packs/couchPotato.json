@@ -187,6 +187,7 @@
     },
     {
       "id": "couchPotato.fitnessGame",
+      "how": { "exercise": "workout" },
       "name": "Living-room workout game",
       "model": "model.couchPotato.fitnessGame",
       "stand": { "height": 0.115 },

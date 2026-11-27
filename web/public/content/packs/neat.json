@@ -3,6 +3,7 @@
   "objects": [
     {
       "id": "neat.steamMopDock",
+      "how": { "clean": "push" },
       "name": "Steam mop dock",
       "model": "model.neat.steamMopDock",
       "held": {"part": "mop", "grip": "pole"},
@@ -30,6 +31,7 @@
     },
     {
       "id": "neat.laundryCenter",
+      "how": { "clean": "laundry" },
       "name": "Stacked laundry centre",
       "model": "model.neat.laundryCenter",
       "footprint": [2, 1],
@@ -109,6 +111,7 @@
     },
     {
       "id": "neat.organizerDesk",
+      "how": { "write": "near" },
       "name": "Label-and-sort organizer desk",
       "model": "model.neat.organizerDesk",
       "footprint": [2, 1],

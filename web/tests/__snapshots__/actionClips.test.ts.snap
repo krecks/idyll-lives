@@ -1,0 +1,175 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`action clips per tag, per object, per height 1`] = `
+"admire | * | stand=idle,foldArms sit=- upper=- hands=0.6 prop=-
+bake | * | stand=interact,idle,foldArms,idle sit=- upper=- hands=0.6 prop=-
+bake | chefStove | stand=pickUp,idle,foldArms,idle sit=- upper=- hands=0.6 prop=-
+bake | kind.neighbourlyOven | stand=pickUp,idle,foldArms,idle sit=- upper=- hands=0.6 prop=-
+bake | rangeCooker | stand=pickUp,idle,foldArms,idle sit=- upper=- hands=0.6 prop=-
+bake | stoveElectric | stand=pickUp,idle,foldArms,idle sit=- upper=- hands=0.6 prop=-
+bake | stoveGas | stand=pickUp,idle,foldArms,idle sit=- upper=- hands=0.6 prop=-
+bath | * | stand=- sit=- upper=- hands=0.85 prop=-
+buy | * | stand=buy,idle sit=- upper=- hands=0.35 prop=-
+change | * | stand=interact,spell sit=- upper=- hands=0.6 prop=-
+chop | * | stand=chop,interact,chop sit=- upper=- hands=0.1 prop=knife
+clean | * | stand=interact,spell sit=- upper=- hands=0.35 prop=-
+clean | dishwasher | stand=pickUp,interact,pickUp,idle sit=- upper=- hands=0.35 prop=-
+clean | dishwasherCompact | stand=pickUp,interact,pickUp,idle sit=- upper=- hands=0.35 prop=-
+clean | ironingBoard | stand=stir sit=- upper=- hands=0.35 prop=iron
+clean | laundryBasket | stand=spell,interact,pickUp sit=- upper=- hands=0.35 prop=-
+clean | laundryDryer | stand=spell,interact,pickUp sit=- upper=- hands=0.35 prop=-
+clean | laundryHamper | stand=spell,interact,pickUp sit=- upper=- hands=0.35 prop=-
+clean | laundryWasher | stand=spell,interact,pickUp sit=- upper=- hands=0.35 prop=-
+clean | lawnMower | stand=push sit=- upper=- hands=0.35 prop=-
+clean | neat.laundryCenter | stand=spell,interact,pickUp sit=- upper=- hands=0.35 prop=-
+clean | neat.steamMopDock | stand=push sit=- upper=- hands=0.35 prop=-
+cook | * | stand=spell,interact,spell,pickUp sit=sitHands upper=- hands=0.35 prop=-
+cook | breakfastCounter | stand=spell,interact sit=sitHands upper=- hands=0.35 prop=-
+cook | microwave | stand=spell,interact sit=sitHands upper=- hands=0.35 prop=-
+cuddle | * | stand=idle sit=- upper=- hands=0.6 prop=-
+dance | * | stand=dance sit=- upper=- hands=0.6 prop=-
+drink | * | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=mug
+drink | barCart | stand=shake sit=- upper=drink hands=0.35 prop=shaker
+drink | barStool | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=glass
+drink | cheerful.mocktailCart | stand=shake sit=- upper=drink hands=0.35 prop=shaker
+drink | drinkingFountain | stand=drink,idle,idle sit=- upper=drink hands=0.35 prop=-
+drink | fridge | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | fridgeBuiltIn | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | fridgeFrenchDoor | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | fridgeMini | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | fridgeMiniRetro | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | fridgeRetro | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | outgoing.partyBar | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=glass
+drink | slob.gamingRecliner | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | stoolBarHigh | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=glass
+drink | stoolCounter | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=glass
+drink | vendingDrink | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=can
+drink | wineFridge | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=wine
+drink | wineGlasses | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 prop=wine
+eat | * | stand=eat,idle sit=- upper=eat hands=0.35 prop=-
+exercise | * | stand=jog sit=sitHands upper=- hands=0.1 prop=-
+exercise | basketballHoop | stand=pickUp,interact sit=sitHands upper=- hands=0.1 prop=basketball
+exercise | cheerful.sunriseLamp | stand=idle sit=sitHands upper=- hands=0.1 prop=-
+exercise | couchPotato.fitnessGame | stand=dance,punchJab,punchCross sit=sitHands upper=- hands=0.1 prop=-
+exercise | energetic.streetballHoop | stand=pickUp,interact sit=sitHands upper=- hands=0.1 prop=basketball
+exercise | hotHeaded.heavyBag | stand=punchJab,punchCross sit=sitHands upper=- hands=0.1 prop=-
+exercise | yogaMat | stand=jog sit=sitHands upper=- hands=0.85 prop=-
+feed | * | stand=interact,idle,interact,spell sit=sit upper= hands=0.35 prop=-
+feed | parkBench | stand=interact,idle,interact,spell sit=sit upper=scatter hands=0.35 prop=seed
+fetch | * | stand=interact,pickUp,idle sit=- upper=- hands=0.35 prop=-
+fetch | chestFreezer | @child stand=chestFetch112 sit=- upper=- hands=0.35 prop=-
+fetch | chestFreezer | @teen stand=chestFetch147 sit=- upper=- hands=0.35 prop=-
+fetch | chestFreezer | @adult stand=chestFetch177 sit=- upper=- hands=0.35 prop=-
+fetch | chinaCabinet | stand=interact,idle sit=- upper=- hands=0.35 prop=-
+fetch | coatHooks | stand=interact,idle sit=- upper=- hands=0.35 prop=-
+fetch | wallCabinet | stand=interact,idle sit=- upper=- hands=0.35 prop=-
+fetch | wallCabinetCorner | stand=interact,idle sit=- upper=- hands=0.35 prop=-
+fetch | wallCabinetGlass | stand=interact,idle sit=- upper=- hands=0.35 prop=-
+flip | * | stand=flip,interact,flip sit=- upper=- hands=0.1 prop=spatula
+garden | * | stand=harvest,plant sit=- upper=- hands=0.35 prop=-
+garden | garden.bonsai | stand=water sit=- upper=- hands=0.35 prop=-
+garden | kind.songbirdFeeder | stand=interact,spell sit=- upper=- hands=0.35 prop=-
+garden | loner.bonsaiBench | stand=water sit=- upper=- hands=0.35 prop=-
+garden | natureLover.mossTerrarium | stand=water sit=- upper=- hands=0.35 prop=-
+garden | plant | stand=water sit=- upper=- hands=0.35 prop=wateringCan
+harvest | * | stand=harvest,plant sit=- upper=- hands=0.35 prop=-
+harvest | garden.apple | @child stand=pickHigh112 sit=- upper=- hands=0.35 prop=-
+harvest | garden.apple | @teen stand=pickHigh147 sit=- upper=- hands=0.35 prop=-
+harvest | garden.apple | @adult stand=pickHigh177 sit=- upper=- hands=0.35 prop=-
+harvest | garden.herbs | stand=pick sit=- upper=- hands=0.35 prop=-
+harvest | garden.meadow | stand=plant,kneel sit=- upper=- hands=0.35 prop=-
+harvest | garden.pumpkins | stand=plant,kneel sit=- upper=- hands=0.35 prop=-
+harvest | garden.strawberries | stand=plant,kneel sit=- upper=- hands=0.35 prop=-
+idle | * | stand=idle sit=- upper=- hands=0.6 prop=-
+idle | kind.givingJar | stand=interact,idle sit=- upper=- hands=0.6 prop=jarCoin
+knock | * | stand=interact,idle sit=- upper=- hands=0.6 prop=-
+knock | doorbell | @child stand=pressBell112 sit=- upper=- hands=0.85 prop=-
+knock | doorbell | @teen stand=pressBell147 sit=- upper=- hands=0.85 prop=-
+knock | doorbell | @adult stand=pressBell177 sit=- upper=- hands=0.85 prop=-
+lift | * | stand=pickUp sit=- upper=- hands=0.1 prop=-
+listen | * | stand=idle,foldArms sit=- upper=- hands=0.85 prop=-
+look | * | stand=idle,foldArms sit=- upper=- hands=0.6 prop=-
+look | fountainTown | stand=toss,idle,foldArms sit=- upper=- hands=0.6 prop=coin
+meditate | * | stand=idle sit=- upper=- hands=0.85 prop=-
+mix | * | stand=stir,interact,stir sit=- upper=- hands=0.1 prop=whisk
+music | * | stand=spell sit=sitHands upper=- hands=0.75 prop=-
+music | gloomy.cello | stand=spell sit=sit upper=- hands=0.75 prop=-
+nap | * | stand=- sit=- upper=- hands=0.85 prop=-
+paint | * | stand=spell,interact,spell sit=- upper=- hands=0.35 prop=-
+paint | easel | stand=spell,interact,spell sit=- upper=- hands=0.35 prop=paintbrush
+paint | kidsChalkboard | stand=spell,interact,spell sit=- upper=- hands=0.35 prop=chalk
+paint | kidsEasel | stand=spell,interact,spell sit=- upper=- hands=0.35 prop=paintbrush
+paint | whiteboard | stand=spell,interact,spell sit=- upper=- hands=0.35 prop=marker
+phone | * | stand=phone sit=sit upper=phone hands=0.35 prop=phoneEar
+phone | cheerful.partyBooth | stand=phone sit=sitTalk upper= hands=0.35 prop=-
+phone | loner.shortwaveRadio | stand=phone sit=sit upper=phone hands=0.35 prop=-
+phone | outgoing.videoCallNook | stand=phone sit=sitTalk upper= hands=0.35 prop=-
+phone | phoneBooth | stand=phone sit=sit upper=phone hands=0.35 prop=receiver
+phoneScreen | * | stand=phoneText sit=sit upper=phoneText hands=0.35 prop=phoneHeld
+play | * | stand=spell sit=sitHands upper=- hands=0.75 prop=-
+play | dartboard | stand=dartThrow sit=sitHands upper=- hands=0.1 prop=dart
+play | foosball | stand=spell sit=sitHands upper=- hands=0.1 prop=-
+play | pingPongTable | stand=pingPong sit=sitHands upper=- hands=0.1 prop=bat
+play | poolTable | stand=spell sit=sitHands upper=- hands=0.1 prop=cue
+play | toyBox | stand=kneel sit=sitHands upper=- hands=0.75 prop=-
+play | toyChest | stand=kneel sit=sitHands upper=- hands=0.75 prop=-
+play | trainTable | stand=crouch sit=sitHands upper=- hands=0.75 prop=-
+prune | * | stand=interact,spell,interact sit=- upper=- hands=0.1 prop=secateurs
+prune | loner.bonsaiBench | stand=interact,spell,interact sit=- upper=- hands=0.1 prop=-
+read | * | stand=lantern sit=- upper=lantern hands=0.35 prop=book
+read | busStop | stand=idle sit=- upper=lantern hands=0.35 prop=book
+read | foodie.cookbookLectern | stand=lantern sit=- upper=lantern hands=0.35 prop=-
+read | letterbox | stand=lantern sit=- upper=lantern hands=0.35 prop=postcard
+read | noticeBoard | stand=idle sit=- upper=lantern hands=0.35 prop=book
+relax | * | stand=idle,foldArms sit=- upper=- hands=0.85 prop=-
+relax | firePit | stand=warmHands sit=- upper=- hands=0.85 prop=-
+relax | massageTable | stand=interact,spell sit=- upper=- hands=0.85 prop=-
+run | * | stand=jog sit=- upper=- hands=0.1 prop=-
+sell | * | stand=sell,idle sit=- upper=- hands=0.35 prop=-
+serve | * | stand=setDown sit=- upper=- hands=0.35 prop=-
+shower | * | @child stand=showerChild sit=- upper=- hands=0.85 prop=-
+shower | * | @teen stand=shower sit=- upper=- hands=0.85 prop=-
+shower | * | @adult stand=shower sit=- upper=- hands=0.85 prop=-
+sing | * | stand=talk sit=- upper=- hands=0.6 prop=-
+sit | * | stand=- sit=- upper=- hands=0.85 prop=-
+sit | hallStand | stand=- sit=sitTieShoes upper=- hands=0.35 prop=-
+sleep | * | stand=- sit=- upper=- hands=0.85 prop=-
+smell | * | stand=crouch sit=- upper=- hands=0.6 prop=-
+smell | garden.cosmos | stand=pick sit=- upper=- hands=0.6 prop=-
+smell | garden.flowerBox | stand=pick sit=- upper=- hands=0.6 prop=-
+smell | garden.lavender | stand=pick sit=- upper=- hands=0.6 prop=-
+smell | garden.lilies | stand=pick sit=- upper=- hands=0.6 prop=-
+smell | garden.lupins | stand=pick sit=- upper=- hands=0.6 prop=-
+smell | garden.roses | stand=pick sit=- upper=- hands=0.6 prop=-
+smell | garden.wheelbarrow | stand=pick sit=- upper=- hands=0.6 prop=-
+stir | * | stand=stir,interact,stir sit=- upper=- hands=0.1 prop=woodenSpoon
+talk | * | stand=talk sit=- upper=- hands=0.6 prop=-
+tend | * | stand=kneel sit=- upper=- hands=0.6 prop=-
+tend | compostBin | stand=pick sit=- upper=- hands=0.6 prop=-
+tend | foodie.herbGarden | stand=pick sit=- upper=- hands=0.6 prop=-
+tend | garden.tomatoes | stand=harvest,water sit=- upper=- hands=0.6 prop=-
+tend | greenhouse | stand=pick sit=- upper=- hands=0.6 prop=-
+tend | natureLover.veggieBed | stand=harvest sit=- upper=- hands=0.6 prop=-
+tend | raisedBed | stand=harvest sit=- upper=- hands=0.6 prop=-
+tinker | * | stand=interact,spell,pickUp sit=sitHands upper=- hands=0.1 prop=-
+tinker | grandfatherClock | stand=interact,spell sit=sitHands upper=- hands=0.1 prop=-
+toilet | * | stand=- sit=- upper=- hands=0.6 prop=-
+type | * | stand=spell sit=sitHands upper=- hands=0.75 prop=-
+wash | * | stand=spell,interact sit=- upper= hands=0.6 prop=-
+wash | dishwasher | stand=pickUp,interact,pickUp,idle sit=- upper= hands=0.35 prop=-
+wash | dishwasherCompact | stand=pickUp,interact,pickUp,idle sit=- upper= hands=0.35 prop=-
+wash | dressingTable | stand=spell,interact sit=- upper=brushHair hands=0.1 prop=-
+watch | * | stand=foldArms,idle sit=- upper=- hands=0.85 prop=-
+water | * | stand=water sit=- upper=- hands=0.35 prop=wateringCan
+water | hoseReel | stand=water sit=- upper=- hands=0.35 prop=-
+water | loner.bonsaiBench | stand=water sit=- upper=- hands=0.35 prop=-
+water | natureLover.mossTerrarium | stand=water sit=- upper=- hands=0.35 prop=-
+write | * | stand=interact,spell sit=sitHands upper=- hands=0.35 prop=pen
+write | gloomy.journalDesk | stand=interact,spell sit=sitHandsNear upper=- hands=0.35 prop=pen
+write | hotHeaded.grudgeJournal | stand=interact,spell sit=sitHandsNear upper=- hands=0.35 prop=pen
+write | kidsChair | stand=interact,spell sit=sitHands upper=- hands=0.35 prop=pencil
+write | kidsDesk | stand=interact,spell sit=sitHands upper=- hands=0.35 prop=pencil
+write | neat.organizerDesk | stand=interact,spell sit=sitHandsNear upper=- hands=0.35 prop=pen
+write | postBox | stand=interact,spell sit=sitHands upper=- hands=0.35 prop=postcard
+write | romantic.letterBureau | stand=interact,spell sit=sitHandsNear upper=- hands=0.35 prop=pen"
+`;

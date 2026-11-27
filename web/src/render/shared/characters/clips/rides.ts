@@ -4,7 +4,7 @@
  * off at the run-out and back round to the front), the upper bunk's ladder (characters.ts `BUNK_LADDER`: up it and
  * onto the mattress getting into bed, down it getting up), and the rides sat astride with the hands on the
  * grips (characters.ts `RIDES`): the rocking horse and the spring rider, the seesaw, the merry-go-round and the
- * swing (the legs pumping in time with it).
+ * swing (the legs pumping in time with it); and the rowing machine's stroke, in time with its seat.
  *
  * The things are at fixed heights, so the clips come in sizes, fitted as the climbing frame's (`street.ts`) but
  * by the legs: each size is for a body whose legs are `s` of the reference skeleton's (the runtime moves the
@@ -807,6 +807,52 @@ function swingPose(f: RideFit): (p: number) => PoseSpec {
   };
 }
 
+/**
+ * The rowing machine (fitness, `model.rowingMachine`, anyone's): sat on its seat (0.25 m up) facing the housing, the
+ * feet on the footplate and the hands on the handle, one stroke in time with its `stroke` loop (characters.ts syncs
+ * the clip to it): the legs push the seat back, the body swings back and the arms pull the handle to the chest (the
+ * finish), the hands go away, the body over, and the seat slides back up to the catch. The seat carries the rider
+ * with it, so the footplate and the handle are placed from it: at the catch the ankles `feet` m ahead of the seat's
+ * point and up, the handle `handle` m ahead and up, out along its chain's line 10° up; the seat's way back and the
+ * handle's out along the stroke, and the lean (deg), as the model's `STROKE` keys (crates/art/things/src/fitness/row.rs).
+ * (The model's footplate is 0.465 m ahead at the catch, and its seat goes 0.45 m back: further than a grown-up's legs
+ * reach at the finish. The feet are 6 cm short of it at the catch, and a little more at the finish, legs straight.)
+ */
+export const ROW = rideSizes('row', 0, 2);
+export const ROW_S = 2.7;
+const ROWER = { feet: [0.4, 0.02] as const, handle: [0.36, 0.25] as const, rise: Math.sin((10 * Math.PI) / 180), grip: 0.2 };
+const STROKE: readonly (readonly [t: number, seat: number, handle: number, lean: number])[] = [
+  [0, 0, 0, 22],
+  [0.6, 0.4, 0.44, 6],
+  [0.9, 0.45, 0.7, -18],
+  [1.25, 0.45, 0.48, -16],
+  [1.5, 0.45, 0.42, 14],
+  [ROW_S, 0, 0, 22],
+];
+const strokeKeys = (i: 1 | 2 | 3): K<number>[] => STROKE.map((k) => [k[0] / ROW_S, k[i]]);
+const ROW_SEAT = strokeKeys(1);
+const ROW_HANDLE = strokeKeys(2);
+const ROW_LEAN = strokeKeys(3);
+function rowPose(f: RideFit): (p: number) => PoseSpec {
+  return (p) => {
+    const back = value(ROW_SEAT, p);
+    const out = value(ROW_HANDLE, p);
+    const lean = value(ROW_LEAN, p);
+    const grip = (x: number): Vec => onRide(f, [x, ROWER.handle[1] + ROWER.rise * out, ROWER.handle[0] + back - Math.sqrt(1 - ROWER.rise ** 2) * out]);
+    return astride({
+      lean,
+      nod: -0.4 * lean,
+      breath: p,
+      feet: onRide(f, [-0.1, ROWER.feet[1], ROWER.feet[0] + back]),
+      knees: 0,
+      up: 1,
+      toes: -30,
+      hands: [grip(-ROWER.grip), grip(ROWER.grip)],
+      pronate: 80,
+    });
+  };
+}
+
 // --- bikes and e-scooters, ridden (vehicles.ts `MOUNTS`) ---------------------------------------------
 
 /**
@@ -870,5 +916,6 @@ export function rideClips(): ClipDef[] {
     ...RIDE_SEESAW.map(({ clip, fit }) => cycle(clip, { seconds: 2.8, loop: true }, seesawPose(fit))),
     ...RIDE_ROUND.map(({ clip, fit }) => cycle(clip, { seconds: 2.4, loop: true }, roundPose(fit))),
     ...RIDE_SWING.map(({ clip, fit }) => cycle(clip, { seconds: SWING_S, loop: true }, swingPose(fit))),
+    ...ROW.map(({ clip, fit }) => cycle(clip, { seconds: ROW_S, loop: true }, rowPose(fit))),
   ];
 }

@@ -368,6 +368,7 @@
     },
     {
       "id": "whiteboard",
+      "how": { "paint": "marker" },
       "name": "Whiteboard",
       "model": "model.whiteboard",
       "footprint": [

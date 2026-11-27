@@ -560,6 +560,7 @@
     },
     {
       "id": "rangeCooker",
+      "how": { "bake": "low" },
       "name": "Range cooker",
       "model": "model.rangeCooker",
       "footprint": [
@@ -703,6 +704,7 @@
     },
     {
       "id": "fridgeFrenchDoor",
+      "how": { "drink": "can" },
       "name": "French-door fridge",
       "model": "model.fridgeFrenchDoor",
       "stores": true,
@@ -811,6 +813,7 @@
     },
     {
       "id": "fridgeRetro",
+      "how": { "drink": "can" },
       "name": "Retro fridge",
       "model": "model.fridgeRetro",
       "stores": true,
@@ -882,6 +885,7 @@
     },
     {
       "id": "fridgeMiniRetro",
+      "how": { "drink": "can" },
       "name": "Retro mini fridge",
       "model": "model.fridgeMiniRetro",
       "stores": true,
@@ -953,6 +957,7 @@
     },
     {
       "id": "wineFridge",
+      "how": { "drink": "wine" },
       "name": "Wine fridge",
       "model": "model.wineFridge",
       "footprint": [
@@ -1000,6 +1005,7 @@
     },
     {
       "id": "dishwasherCompact",
+      "how": { "wash": "rack", "clean": "rack" },
       "name": "Stainless dishwasher",
       "model": "model.dishwasherCompact",
       "footprint": [
@@ -1118,6 +1124,7 @@
     },
     {
       "id": "wallCabinetGlass",
+      "how": { "fetch": "high" },
       "name": "Glazed wall cabinet",
       "model": "model.wallCabinetGlass",
       "stations": [
@@ -1138,6 +1145,7 @@
     },
     {
       "id": "wallCabinetCorner",
+      "how": { "fetch": "high" },
       "name": "Wall cabinet with end shelves",
       "model": "model.wallCabinetCorner",
       "stations": [
@@ -1206,6 +1214,7 @@
     },
     {
       "id": "chestFreezer",
+      "how": { "fetch": "chest" },
       "name": "Chest freezer",
       "model": "model.chestFreezer",
       "stores": true,

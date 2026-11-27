@@ -35,6 +35,7 @@
     },
     {
       "id": "parkBench",
+      "how": { "feed": "seed" },
       "name": "Long park bench",
       "model": "model.parkBench",
       "footprint": [
@@ -88,6 +89,7 @@
     },
     {
       "id": "drinkingFountain",
+      "how": { "drink": "noCup" },
       "name": "Drinking fountain",
       "model": "model.drinkingFountain",
       "footprint": [
@@ -135,6 +137,7 @@
     },
     {
       "id": "busStop",
+      "how": { "read": "board" },
       "name": "Taxi rank shelter",
       "model": "model.busStop",
       "footprint": [
@@ -183,6 +186,7 @@
     },
     {
       "id": "postBox",
+      "how": { "write": "post" },
       "name": "Post box",
       "model": "model.postBox",
       "footprint": [
@@ -217,6 +221,7 @@
     },
     {
       "id": "noticeBoard",
+      "how": { "read": "board" },
       "name": "Notice board",
       "model": "model.noticeBoard",
       "footprint": [
@@ -248,6 +253,7 @@
     },
     {
       "id": "phoneBooth",
+      "how": { "phone": "receiver" },
       "name": "Phone box",
       "model": "model.phoneBooth",
       "footprint": [
@@ -283,6 +289,7 @@
     },
     {
       "id": "fountainTown",
+      "how": { "look": "wish" },
       "name": "Town fountain",
       "model": "model.fountainTown",
       "footprint": [
@@ -570,6 +577,7 @@
     },
     {
       "id": "basketballHoop",
+      "how": { "exercise": "hoop" },
       "name": "Basketball hoop",
       "model": "model.basketballHoop",
       "footprint": [
@@ -610,6 +618,7 @@
     },
     {
       "id": "pingPongTable",
+      "how": { "play": "bat" },
       "name": "Ping-pong table",
       "model": "model.pingPongTable",
       "footprint": [
@@ -813,6 +822,7 @@
     },
     {
       "id": "vendingDrink",
+      "how": { "drink": "can" },
       "name": "Drinks machine",
       "model": "model.vendingDrink",
       "footprint": [

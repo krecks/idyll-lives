@@ -35,6 +35,7 @@
     },
     {
       "id": "loner.shortwaveRadio",
+      "how": { "phone": "handsFree" },
       "name": "Shortwave radio desk",
       "model": "model.loner.shortwaveRadio",
       "footprint": [1, 1],
@@ -109,6 +110,7 @@
     },
     {
       "id": "loner.bonsaiBench",
+      "how": { "garden": "mist", "water": "mist", "prune": "handsFree" },
       "name": "Bonsai potting bench",
       "model": "model.loner.bonsaiBench",
       "footprint": [1, 1],

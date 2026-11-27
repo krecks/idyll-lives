@@ -79,6 +79,7 @@
   "objects": [
     {
       "id": "kind.neighbourlyOven",
+      "how": { "bake": "low" },
       "name": "Neighbourly baking counter",
       "model": "model.kind.neighbourlyOven",
       "stations": [
@@ -145,6 +146,7 @@
     },
     {
       "id": "kind.givingJar",
+      "how": { "idle": "coin" },
       "name": "Community giving jar",
       "model": "model.kind.givingJar",
       "footprint": [
@@ -278,6 +280,7 @@
     },
     {
       "id": "kind.songbirdFeeder",
+      "how": { "garden": "upright" },
       "name": "Songbird feeding station",
       "model": "model.kind.songbirdFeeder",
       "outdoors": true,

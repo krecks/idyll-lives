@@ -492,6 +492,7 @@
     },
     {
       "id": "wineGlasses",
+      "how": { "drink": "wine" },
       "name": "Wine and glasses",
       "model": "model.wineGlasses",
       "footprint": [

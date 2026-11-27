@@ -226,6 +226,7 @@
     },
     {
       "id": "garden.apple",
+      "how": { "harvest": "bough" },
       "name": "Apple tree",
       "model": "model.tree.fruit",
       "grows": {
@@ -671,6 +672,7 @@
     },
     {
       "id": "garden.roses",
+      "how": { "smell": "waist" },
       "name": "Rose bush",
       "model": "model.garden.rosebush",
       "price": 130,
@@ -776,6 +778,7 @@
     },
     {
       "id": "garden.lavender",
+      "how": { "smell": "waist" },
       "name": "Lavender",
       "model": "model.garden.lavender",
       "price": 60,
@@ -1307,6 +1310,7 @@
     },
     {
       "id": "garden.lilies",
+      "how": { "smell": "waist" },
       "name": "Lilies",
       "model": "model.garden.lilies",
       "price": 55,
@@ -1375,6 +1379,7 @@
     },
     {
       "id": "garden.lupins",
+      "how": { "smell": "waist" },
       "name": "Lupins",
       "model": "model.garden.lupins",
       "price": 45,
@@ -1466,6 +1471,7 @@
     },
     {
       "id": "garden.cosmos",
+      "how": { "smell": "waist" },
       "name": "Cosmos",
       "model": "model.garden.cosmos",
       "price": 35,
@@ -1534,6 +1540,7 @@
     },
     {
       "id": "garden.meadow",
+      "how": { "harvest": "soil" },
       "name": "Wildflower meadow",
       "model": "model.garden.meadow",
       "price": 20,
@@ -1606,6 +1613,7 @@
     },
     {
       "id": "garden.flowerBox",
+      "how": { "smell": "waist" },
       "name": "Flower box",
       "model": "model.garden.flowerBox",
       "price": 80,
@@ -1715,6 +1723,7 @@
     },
     {
       "id": "garden.tomatoes",
+      "how": { "tend": "staked" },
       "grows": {
         "days": 3
       },
@@ -1780,6 +1789,7 @@
     },
     {
       "id": "garden.strawberries",
+      "how": { "harvest": "soil" },
       "grows": {
         "days": 2
       },
@@ -1845,6 +1855,7 @@
     },
     {
       "id": "garden.herbs",
+      "how": { "harvest": "waist" },
       "name": "Herb planter",
       "model": "model.garden.herbs",
       "price": 110,
@@ -1892,6 +1903,7 @@
     },
     {
       "id": "garden.pumpkins",
+      "how": { "harvest": "soil" },
       "grows": {
         "days": 4
       },
@@ -2306,6 +2318,7 @@
     },
     {
       "id": "garden.bonsai",
+      "how": { "garden": "mist" },
       "name": "Bonsai",
       "model": "model.garden.bonsai",
       "price": 240,
@@ -2516,6 +2529,7 @@
     },
     {
       "id": "garden.wheelbarrow",
+      "how": { "smell": "waist" },
       "name": "Wheelbarrow planter",
       "model": "model.garden.wheelbarrow",
       "price": 95,

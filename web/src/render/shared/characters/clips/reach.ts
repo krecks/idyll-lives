@@ -3,7 +3,7 @@
  * picks the size for their height, as the street's clips, `street.ts`): clean things put away in a wall
  * cupboard (its pulls reached and the doors drawn open, a stack lifted from the worktop onto the shelf, a door
  * pushed shut), the longcase clock wound at its dial, the songbird feeder's house filled from a scoop, and
- * lines written on the whiteboard. Each size is fitted to a body of its share `s` of the reference skeleton's
+ * lines written on the whiteboard; reaching down into the chest freezer under its lid, and the doorbell pressed. Each size is fitted to a body of its share `s` of the reference skeleton's
  * size standing `to` m from the object's middle: the object's points (m: `x` to the user's right, `y` up, `z`
  * from its middle towards the user) divided by `s` give the clip's. They go up on tiptoe, lift the shoulder
  * and lean in as far as the hands need (`upFor`), and reach as far as they can if it is out of reach: a child
@@ -17,6 +17,7 @@ import { bump, hangArms, stand, TAU } from './idle';
 import { armIK, footIK, len, lerpV, pointOn, sub, wrist, type ArmOptions } from './ik';
 import { smooth } from '../../../../game/noise';
 import { SHARES_177, sizes, type Fit, type Size } from './street';
+import { stoopBody } from './uses';
 
 /** The smallest share that reaches a wall cupboard's pulls or the clock's dial (a teen's; a child's doesn't). */
 const REACHES_UP = 0.75;
@@ -100,7 +101,11 @@ function upFor(l: Hand | null, r: Hand | null, look: Vec | null, p: number, o: {
     const elev = (Math.atan2(d[1], Math.hypot(d[0], d[2])) * 180) / Math.PI;
     head = [Math.max(-45, Math.min(40, -elev - 0.3 * leanAt(u))), ((Math.atan2(d[0], d[2]) * 180) / Math.PI) * 0.8, 0];
   }
-  const body = make(u, head);
+  return handsOn(make(u, head), l, r);
+}
+
+/** The hands at their places on `body` (a null hand hangs; one on its way from hanging, `w` under 1, blended from the hanging arm). */
+function handsOn(body: PoseSpec, l: Hand | null, r: Hand | null): PoseSpec {
   const hang: PoseSpec = { ...body, ...hangArms(5, 8, 16) };
   const ref = reference();
   const arm = (s: 'l' | 'r', h: Hand | null): PoseSpec => {
@@ -407,11 +412,140 @@ function boardPose(fit: BoardFit): (p: number) => PoseSpec {
   };
 }
 
+// --- the chest freezer ----------------------------------------------------------------------------
+
+/**
+ * The chest freezer (`crates/art/wet/src/kitchen/freezers.rs`, 2 × 1): the box's rim 0.82 m up, its front's face
+ * 0.45 m out from the middle; the lid hinged along its back (0.845 m up, 0.41 m behind the middle), its handle at
+ * the front, 0.88 m from the hinge. The lid lifts 85° in 1.2 s as the use starts (`lid_open`), stays up 3.5 s and
+ * comes down in 1.2 s. Used from `CHEST_TO` m out (characters.ts `STAND_BACK`), the toes at the box.
+ */
+const LID = { y: 0.845, z: -0.41, dy: 0.015, dz: 0.88, deg: 85, open: 1.2, held: 3.5 };
+export const CHEST_TO = 0.65;
+export const CHEST: Size[] = sizes('chestFetch', SHARES_177, (s) => ({ s, to: CHEST_TO }));
+const CHEST_S = 6.4;
+/** The lid's lift (deg) `t` s into the use. */
+function lidAt(t: number): number {
+  const shut = LID.open + LID.held;
+  return LID.deg * (t < LID.open ? smooth(t / LID.open) : t < shut ? 1 : 1 - smooth((t - shut) / LID.open));
+}
+/** The lid's handle `x` m to the user's right, `t` s into the use (m: the object's frame). */
+function lidHandle(t: number, x: number): [number, number, number] {
+  const a = (lidAt(t) * Math.PI) / 180;
+  return [x, LID.y + LID.dz * Math.sin(a) + LID.dy * Math.cos(a), LID.z + LID.dz * Math.cos(a) - LID.dy * Math.sin(a)];
+}
+/** Where the hands go into the well (m, the object's frame: the right's; the left's mirrored), by the size: a grown-up's near its floor, a child's just under the rim. */
+const WELL = (s: number): [number, number, number] => (s > 0.9 ? [0.13, 0.4, 0.12] : s > 0.7 ? [0.13, 0.48, 0.18] : [0.12, 0.62, 0.3]);
+
+/**
+ * Getting something out of the chest freezer: the right hand to the lid's handle, lifting it with it as it swings
+ * up and letting it go on; bent over the rim (from the hips, the knees giving), both hands down into the well,
+ * rummaging and taking hold; straightening up with it at the chest; the right hand up to meet the lid as it comes
+ * down and lowering it shut, back to the side. The smaller let it go sooner going up and meet it lower coming down.
+ */
+function chestPose(fit: Fit): (p: number) => PoseSpec {
+  const { s } = fit;
+  const o = (v: readonly [number, number, number]) => at(fit, v[0], v[1], v[2]);
+  const w = WELL(s);
+  const well = (sx: number, dx = 0, dz = 0) => o([sx * w[0] + dx, w[1], w[2] + dz]);
+  const rim = (sx: number) => o([sx * 0.15, 0.95, 0.42]);
+  const held = (sx: number): Vec => [sx * 0.08, 1.12, 0.3];
+  const stoop = (bend: number, p: number, gaze: number) => stoopBody(bend, -0.0016 * bend, 0, p, gaze);
+  // How far bent over the rim for the hands to be in the well (found while baking): the shoulders within an arm of it.
+  let deep = -1;
+  const solve = () => {
+    deep = 10;
+    while (deep < 85 && len(sub(well(1), pointOn(stoop(deep, 0, 60), 'upperarm_r', [0, 0, 0]))) > ARM) deep++;
+  };
+  // The lid lifted with the hand as far as the size reaches up (the times it is let go at and caught at, coming down).
+  const [lets, caught] = s > 0.9 ? [0.7, 5.25] : s > 0.7 ? [0.5, 5.4] : [0.4, 5.55];
+  const R: Track = [
+    [0, null],
+    [0.3, o(lidHandle(Math.min(0.3, lets - 0.15), 0.12))],
+    [lets, o(lidHandle(lets, 0.12))],
+    [1.0, null],
+    [1.25, rim(1)],
+    [1.5, well(1)],
+    [1.9, well(1, -0.04, 0.04)],
+    [2.4, well(1, 0.03, -0.02)],
+    [2.8, well(1)],
+    [3.1, rim(1)],
+    [3.5, held(1)],
+    [caught - 0.35, held(1)],
+    [caught, o(lidHandle(caught, 0.12))],
+    [5.9, o(lidHandle(5.9, 0.12))],
+    [6.3, null],
+    [CHEST_S, null],
+  ];
+  const L: Track = [
+    [0, null],
+    [1.0, null],
+    [1.25, rim(-1)],
+    [1.5, well(-1)],
+    [2.0, well(-1, 0.03, 0)],
+    [2.5, well(-1, 0, 0.03)],
+    [2.8, well(-1)],
+    [3.1, rim(-1)],
+    [3.5, held(-1)],
+    [5.7, held(-1)],
+    [6.2, null],
+    [CHEST_S, null],
+  ];
+  return (p) => {
+    if (deep < 0) solve();
+    const t = p * CHEST_S;
+    const bend = track<number>([[0, 6], [0.5, 14], [1.0, 8], [1.5, deep], [2.8, deep], [3.5, 8], [caught, 4], [5.9, 16], [CHEST_S, 6]], t);
+    const gaze = track<number>([[0, 20], [0.5, 30], [1.0, 10], [1.5, 65], [2.8, 65], [3.5, 25], [caught, -15], [5.9, 35], [CHEST_S, 20]], t);
+    // The palms down into the well and on the handle; up under what is held at the chest (the right's till it goes to the lid).
+    const hand = (side: 'l' | 'r', keys: Track) => {
+      const sx = side === 'l' ? -1 : 1;
+      const hold = bump(t, 3.2, side === 'l' ? 6.1 : caught - 0.05, 0.3);
+      return handOn(keys, t, { pronate: 70 - 80 * hold, pole: [0.75 * sx, -0.7, -0.3], hand: wrist(side, -10, 0) });
+    };
+    return handsOn(stoop(bend, p, gaze), hand('l', L), hand('r', R));
+  };
+}
+
+// --- the doorbell ---------------------------------------------------------------------------------
+
+/**
+ * The doorbell (`crates/art/rooms/src/decor/fittings.rs`, on the wall, its face 0.43 m behind the middle): the
+ * button 1.34 m up, its face 0.394 m behind the middle. Stood up to it (characters.ts `STEP_IN`), the feet nearer
+ * the smaller they are, as at the whiteboard; the fingertips 0.085 m ahead of the palm's centre.
+ */
+const BELL = { y: 1.34, z: -0.394, tips: 0.085 };
+// (A child, 1.12 m, stretches up for it on tiptoe and doesn't quite reach.)
+export const PRESS: Size[] = sizes('pressBell', SHARES_177, (s) => ({ s, to: s > 0.9 ? 0.06 : s > 0.7 ? 0 : -0.06 }));
+const PRESS_S = 4;
+
+/** Ringing: the right hand up to the button, a short press with the fingertips and off; down, and waiting at the door. */
+function pressPose(fit: Fit): (p: number) => PoseSpec {
+  const o = (x: number, y: number, z: number) => at(fit, x, y, z);
+  const off = o(0, BELL.y, BELL.z + BELL.tips + 0.05);
+  const on = o(0, BELL.y, BELL.z + BELL.tips);
+  const R: Track = [
+    [0, null],
+    [0.55, off],
+    [0.68, on],
+    [0.9, on],
+    [1.05, off],
+    [1.6, null],
+    [PRESS_S, null],
+  ];
+  return (p) => {
+    const t = p * PRESS_S;
+    const r = handOn(R, t, { pronate: 15, pole: [0.8, -0.7, -0.2], hand: wrist('r', -20, 0) });
+    return upFor(null, r, lerpV(AHEAD, on, bump(t, 0.2, 1.4, 0.3)), p);
+  };
+}
+
 export function reachClips(): ClipDef[] {
   return [
     ...Object.values(PUT_AWAY).flatMap((sz) => sz.map(({ clip, fit }) => cycle(clip, { seconds: CUPBOARD_S, loop: true }, cupboardPose(fit)))),
     ...CLOCK.map(({ clip, fit }) => cycle(clip, { seconds: CLOCK_S, loop: true }, clockPose(fit))),
     ...FEEDER.map(({ clip, fit }) => cycle(clip, { seconds: FEEDER_S, loop: true }, feederPose(fit))),
     ...BOARD.map(({ clip, fit }) => cycle(clip, { seconds: BOARD_S, loop: true }, boardPose(fit))),
+    ...CHEST.map(({ clip, fit }) => cycle(clip, { seconds: CHEST_S, loop: true }, chestPose(fit))),
+    ...PRESS.map(({ clip, fit }) => cycle(clip, { seconds: PRESS_S, loop: true, hands: 'open' }, pressPose(fit))),
   ];
 }
