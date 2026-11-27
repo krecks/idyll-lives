@@ -24,6 +24,8 @@
 //!   kit::duvet!(F, top, 0.86, z_fold, z_foot, 0.25, M.bedding, seed = 2);   // a duvet's still two thirds, rumpled
 //!   kit::turn_down!(kit::duvet_flap!(F, top, 0.86, z_top, z_fold, M.bedding, M.sheet), "turn_down", 0.86, 1.0);   // its top third folding back
 //!   let (verts, faces) = kit::pleats!(F, &rows, -0.8, -0.1, z, 6, 0.018, 0.01);   // a pleated curtain's points and faces
+//!   kit::prism("gable", near, far, M.paint);   // a slab between an outline's two copies (Blender points)
+//!   let ring = kit::fluted(0.05, 0.4, 12, 0.1, 3, 0.0);   // a fluted column's ring, for a loft
 //!   let body = kit::figure8((0.17, 0.2, 0.17), (0.38, 0.145, 0.13), 8, 1);   // a guitar's outline
 //!   kit::turn_round(&meshes(), 0.05);   // a model built in place, turned to face the other way
 //!   fbox!(F, "back", 1.0, 0.8, 0.02, (0, 0.4, kit::WALL + 0.01), M.oak);   // against the wall's face
@@ -31,7 +33,7 @@
 //! By kind: `hardware` (pulls, knobs), `turned` (legs, turned and lofted round pieces), `joinery` (bent paths, frame-and-panel fronts, mouldings,
 //! a bench's ends, a recess or a hole cut into a body), `metalwork` (tube, scrolls), `creatures` (a songbird),
 //! `signs` (the taxi's word and chequers, raised block letters), `tableware`; and a piece a file: `board`, `duvet`
-//! (and its flap and clip), `figure8`, `iron`, `mug`, `pleats`, `throw`, `tiled_walls`, `turn_round`, `wall` (`WALL`).
+//! (and its flap and clip), `figure8`, `iron`, `mug`, `pleats`, `prism`, `throw`, `tiled_walls`, `turn_round`, `wall` (`WALL`).
 
 mod board;
 pub mod creatures;
@@ -44,6 +46,7 @@ mod macros;
 pub mod metalwork;
 mod mug;
 mod pleats;
+mod prism;
 pub mod signs;
 pub mod tableware;
 mod throw;
@@ -62,6 +65,7 @@ pub use joinery::*;
 pub use metalwork::*;
 pub use mug::*;
 pub use pleats::*;
+pub use prism::*;
 pub use signs::*;
 pub use throw::*;
 pub use tiled_walls::*;

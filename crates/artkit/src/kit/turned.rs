@@ -2,7 +2,7 @@
 
 use crate::forms::{self, Loft, Ring, Scale, Sweep};
 use crate::materials::Mat;
-use crate::math::P3;
+use crate::math::{P3, TAU, cos, sin};
 use crate::place::{Coord, GameFrame};
 use crate::scene::Obj;
 use crate::shapes::{self, Revolve, options};
@@ -121,4 +121,22 @@ pub fn lathe(
             ..Loft::default()
         },
     )
+}
+
+/// A ring of `flutes` shallow flutes round radius `r` at Blender height `z`, about the origin, turned `phase`
+/// radians: `per` points a flute, sunk `depth` of the radius at their middles (a column, a tart's case, a cupcake's
+/// paper cup).
+pub fn fluted(r: f64, z: f64, flutes: usize, depth: f64, per: usize, phase: f64) -> Vec<P3> {
+    let n = flutes * per;
+    (0..n)
+        .map(|i| {
+            let a = TAU * i as f64 / n as f64 + phase;
+            let k = 1.0 - depth * (0.5 + 0.5 * cos(flutes as f64 * a));
+            P3 {
+                x: r * k * cos(a),
+                y: r * k * sin(a),
+                z,
+            }
+        })
+        .collect()
 }
