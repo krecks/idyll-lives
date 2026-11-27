@@ -2,7 +2,7 @@
 //! outline (`leafy_shrub`), a clipped block (`hedge_block`), what is spread over them, their perches, and a plant
 //! grown from random numbers fitted to its size (`fit_to`).
 
-use crate::botany::flowers::{Florets, florets};
+
 use crate::botany::leaf::{Leaf, leaf};
 use crate::botany::lump::{Lump, lump};
 use crate::botany::stems::{Twig, twig};
@@ -476,7 +476,7 @@ pub fn hedge_top(h: f64) -> Vec<(f64, f64, f64)> {
 
 options! {
     /// `hedge_block`'s options.
-    HedgeBlock { name: &'static str = "hedge", seed: i64 = 0 }
+    HedgeBlock { name: &'static str = "hedge", seed: i64 = 0, rough: f64 = 0.0 }
 }
 
 /// A clipped hedge `length` x `h` x `depth` (fitted to it): a block of small leaves battered in at the foot and
@@ -551,30 +551,61 @@ pub fn hedge_block(p: &Palette, length: f64, h: f64, depth: f64, o: HedgeBlock) 
                 },
             );
         }
-        for i in 0..low(22, 0) {
-            // tufts grown back, lighter, on the top and sides
-            let x = rng.uniform(-0.45, 0.45) * length;
-            let side = rng.choice(&[-1.0, 1.0]);
-            let top = rng.random() < 0.5;
-            let at = (
-                x,
-                side * depth * if top { 0.25 } else { 0.47 },
-                h * if top { 0.99 } else { rng.uniform(0.35, 0.85) },
-            );
-            florets(
-                format!("{name}_tuft{i}"),
-                0.07,
-                (at.0, at.1, at.2 - 0.04),
-                [p.get("leaf_light"), p.get("stem")][i % 2],
-                Florets {
-                    bumps: 3.0,
-                    amount: 0.12,
-                    flat: 0.65,
-                    segments: 6,
-                    rings: 4,
-                    seed: i as f64 * 0.7,
-                },
-            );
+        // the clipped faces' leaf clumps: rows of flat, lumpy mounds over the top and both faces, in three
+        // greens, so the shears' work reads as leaves, not a smooth slab; `rough` raises some and swells them
+        // (a hedgerow's uneven top)
+        let dark = if p.has("leaf_dark") {
+            p.get("leaf_dark")
+        } else {
+            p.get("leaf")
+        };
+        let cols = [p.get("leaf"), p.get("leaf_light"), dark];
+        let across = ((length / 0.3).round() as usize).max(3);
+        let mut k = 0;
+        for i in 0..across {
+            let x = (i as f64 + 0.5) / across as f64 * length * 0.94 - length * 0.47;
+            for (zf, yf, rf) in [
+                (0.985, -0.22, 0.62),
+                (0.985, 0.22, 0.62),
+                (0.86, -0.44, 0.7),
+                (0.86, 0.44, 0.7),
+                (0.6, -0.47, 0.75),
+                (0.6, 0.47, 0.75),
+            ] {
+                k += 1;
+                if is_low() && k % 3 != 0 {
+                    continue;
+                }
+                let top = zf > 0.95;
+                let r = 0.2 * rf * rng.uniform(0.85, 1.2) * (1.0 + o.rough * 0.3);
+                let lift = if top {
+                    o.rough * h * rng.uniform(-0.04, 0.16)
+                } else {
+                    0.0
+                };
+                let at = (
+                    x + rng.uniform(-0.04, 0.04),
+                    yf * depth + rng.uniform(-0.02, 0.02),
+                    h * zf + lift - r * 0.8 + rng.uniform(-0.03, 0.03) * h,
+                );
+                lump(
+                    format!("{name}_clump{k}"),
+                    r,
+                    at,
+                    cols[rng.randrange(3) as usize],
+                    Lump {
+                        scale: P3 {
+                            x: 1.25,
+                            y: 1.0,
+                            z: 0.8,
+                        },
+                        noise: 0.45,
+                        seed: k as f64 * 1.7,
+                        segments: low(6, 5),
+                        rings: low(4, 3),
+                    },
+                );
+            }
         }
     });
     fit_to(&made, length, h, depth);

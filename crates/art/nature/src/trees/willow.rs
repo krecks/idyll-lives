@@ -192,7 +192,9 @@ fn crown(tree: &mut Tree) {
         }
         masses.push((line[2], a, 2));
     }
-    masses.push((v3(0.05, 0.0, 5.0), off, 3));
+    masses.push((v3(0.05, 0.0, 5.35), off, 3));
+    masses.push((v3(0.9 * cos(off), 0.9 * sin(off), 5.1), off, 3));
+    masses.push((v3(-0.9 * cos(off), -0.9 * sin(off), 5.1), off, 3));
     // the crown: leaf masses along the arches' crests and over the middle, drooping
     let light = |z: f64| (z - 4.2) / 1.6;
     for &(at, a, k) in &masses {
@@ -205,10 +207,10 @@ fn crown(tree: &mut Tree) {
             &light,
             &mut tree.clumps,
             k = k,
-            size = if k < 3 { (0.62, 0.74) } else { (0.85, 0.95) },
+            size = if k < 3 { (0.7, 0.84) } else { (1.0, 1.15) },
             ring = if k < 3 { 0.42 } else { 0.6 },
             drop = (-0.2, 0.0),
-            squash = (0.6, 0.72),
+            squash = (0.78, 0.92),
             noise = 0.3
         );
     }
@@ -231,13 +233,13 @@ fn crown(tree: &mut Tree) {
             rng.uniform(4.1, 4.6)
         };
         let foot = if outer {
-            rng.uniform(0.45, 0.8)
+            rng.uniform(0.3, 1.4)
         } else {
-            rng.uniform(0.9, 1.5)
+            rng.uniform(0.7, 2.0)
         };
         let (heading, reach, width) = (
-            a + rng.uniform(-0.15, 0.15),
-            rng.uniform(0.25, 0.45),
+            a + rng.uniform(-0.45, 0.45),
+            rng.uniform(0.2, 0.7),
             rng.uniform(0.17, 0.23),
         );
         let col = cols[rng.randint(1, 4) as usize];

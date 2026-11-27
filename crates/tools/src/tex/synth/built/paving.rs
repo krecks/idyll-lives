@@ -173,7 +173,7 @@ pub(super) fn hexpaving(n: &Noise, size: usize) -> Surface {
     })
 }
 
-/// Concrete sidewalk slabs (grey detail): 60 x 30 cm in running bond, pepper-speckled aggregate.
+/// Concrete sidewalk slabs (grey detail): 1.4 m square in running bond, pepper-speckled aggregate.
 pub(super) fn sidewalk(n: &Noise, size: usize) -> Surface {
     let t = TILE_SIDEWALK;
     let (cols, rows) = SIDEWALK_SLABS;

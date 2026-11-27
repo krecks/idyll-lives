@@ -30,13 +30,16 @@
       "type": "model",
       "url": "../../models/fields/hedgerow.glb",
       "materials": {
+        "blossom": {
+          "finish": "material.finish.foliage"
+        },
         "leaf": {
           "finish": "material.finish.foliage"
         },
-        "leaf_light": {
+        "leaf_dark": {
           "finish": "material.finish.foliage"
         },
-        "stem": {
+        "leaf_light": {
           "finish": "material.finish.foliage"
         },
         "twig": {
@@ -50,14 +53,14 @@
         }
       ],
       "perches": [
-        [0.266, 1.415, 0.187],
-        [-0.892, 1.39, 0.121],
-        [0.786, 1.295, -0.342],
-        [-0.22, 1.357, -0.273],
-        [0.726, 1.399, 0.189],
-        [-0.592, 1.233, 0.354],
-        [0.36, 1.393, -0.211],
-        [0.039, 1.383, -0.037]
+        [0.41, 1.353, -0.021],
+        [-0.688, 0.938, -0.022],
+        [-0.066, 0.959, 0.059],
+        [0.592, 0.962, 0.016],
+        [0.286, 1.022, 0.233],
+        [-0.21, 1.164, -0.168],
+        [-0.223, 1.168, 0.162],
+        [-0.576, 1.033, 0.201]
       ],
       "habitat": "hedge"
     },

@@ -50,3 +50,8 @@ and fingerpost on one 1 m tile.
 - **The gate does not open.** No interaction or clip; it matches the static field-boundary set.
 - **Content group.** The five objects are in `web/public/content/countryside.json` under the existing `community` /
   `countryside` group, so no new group, content file or `base.json` include is needed.
+
+## Hedgerow (2026-11-27)
+
+The hedgerow's block is `hedge_block` with `rough = 1`: an uneven top of swollen clumps, five bare saplings with leaf
+sprays standing out of it to 1.45 m, and nine haws (red, on `foliage`). 3,006 triangles, one draw.

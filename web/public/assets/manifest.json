@@ -603,7 +603,7 @@
       "texture": "street/sidewalk/albedo.jpg",
       "normal": "normal.jpg",
       "arm": "arm.jpg",
-      "uvScale": 0.556,
+      "uvScale": 0.357,
       "projection": "xz",
       "roughness": 1,
       "metallic": 0,
