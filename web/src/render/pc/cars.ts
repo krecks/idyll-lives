@@ -24,7 +24,7 @@
 import * as pc from './engine';
 import { INSTANCE_COLOR, type Instances } from './instancing';
 import { drawMesh } from './meshes';
-import { LIFT, rollWheels, Vehicles } from './vehicles';
+import { LIFT, newStand, rollWheels, type Stand, Vehicles } from './vehicles';
 import { maxAlpha, type FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
@@ -112,6 +112,8 @@ interface Drawn {
   owned: boolean;
   /** Its wheels' and contact shadow's place in their draws while drawn (as `writeAround` last wrote them). */
   slot: number;
+  /** Where it stands on the ground (`standing`). */
+  stand: Stand;
   /** The wheels' turn (rad, about their axle), the front ones' steer (rad, +: towards +x), the body's tilt (rad, nose up) and its speed (m/s, smoothed). */
   spin: number;
   steer: number;
@@ -188,6 +190,7 @@ export class Cars extends Vehicles {
     // (Seconds of drive time a real second: the cars go on the traffic's clock.)
     const drive = rate * layout.driveScale;
     this.lastNow = frame.now;
+    this.stamp++;
     this.moved = false;
     this.stillMoved = false;
     if (layout.carBase === undefined || layout.carStride === undefined || !f) return;
@@ -433,7 +436,7 @@ export class Cars extends Vehicles {
       n = 0;
       for (const car of this.cars) {
         if (car.parkedLook !== look || !car.drawn || car.owned) continue;
-        p.draw.setMatrix(n, this.carMatrix(car.at, car.shape));
+        p.draw.setMatrix(n, this.carMatrix(car));
         if (p.tinted) p.draw.set(INSTANCE_COLOR, n, tintOf(car.paint, car.age));
         n++;
       }
@@ -463,12 +466,13 @@ export class Cars extends Vehicles {
 
   /** A drawn car's four wheels and its contact shadow, at its `slot`. */
   private writeCar(car: Drawn): void {
-    this.writeAt(car.slot, car.at, car.shape, WHEELS[car.body], car);
+    this.writeAt(car.slot, car.at, car.shape, WHEELS[car.body], car, this.standing(car.at, car.shape.wheelBase, car.stand));
   }
 
   /** A parked car's body in game space (turned about y; on a land the town follows, on the ground, pitched with it). */
-  private carMatrix(at: Drawn['at'], shape: CarBody): Float32Array {
-    const stand = this.standing(at, shape.wheelBase, this.stand);
+  private carMatrix(car: Drawn): Float32Array {
+    const { at } = car;
+    const stand = this.standing(at, car.shape.wheelBase, car.stand);
     compose(1, 1, 1, quatYawPitchRoll(at.yaw, -stand.pitch, 0, this.q), at.x, stand.y, at.z, this.m);
     return this.m;
   }
@@ -478,7 +482,7 @@ export class Cars extends Vehicles {
     const own = (car.own ??= this.makeOwn(car));
     if (!own.entity.enabled) own.entity.enabled = true;
     // (On a land the town follows, on the ground under it, pitched with it as well as by its speed changing.)
-    const stand = this.standing(car.at, car.shape.wheelBase, this.stand);
+    const stand = this.standing(car.at, car.shape.wheelBase, car.stand);
     own.entity.setLocalPosition(car.at.x, stand.y, car.at.z);
     own.entity.setLocalEulerAngles(0, (car.at.yaw * 180) / Math.PI, 0);
     // (Nose up: turned back about x.)
@@ -617,6 +621,7 @@ function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: 
     drawn: false,
     owned: false,
     slot: -1,
+    stand: newStand(),
     spin: 0,
     steer: 0,
     pitch: 0,

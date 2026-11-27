@@ -49,6 +49,20 @@ export interface Wheel {
   front: boolean;
 }
 
+/** Where a vehicle stands on the ground (`Vehicles.standing`), and where it stood and when it was worked out. */
+export interface Stand {
+  y: number;
+  pitch: number;
+  x: number;
+  z: number;
+  yaw: number;
+  wheelBase: number;
+  stamp: number;
+}
+
+/** A `Stand` not worked out yet. */
+export const newStand = (): Stand => ({ y: 0, pitch: 0, x: NaN, z: NaN, yaw: NaN, wheelBase: NaN, stamp: -1 });
+
 /** The wheels' turn (rad, about their axle) and the front ones' steer (rad, +: towards +x). */
 export interface Rolling {
   spin: number;
@@ -147,9 +161,17 @@ export abstract class Vehicles {
 
   /**
    * Where a vehicle at `at`, `wheelBase` m between its axles, stands: the ground under its middle (`y`) and its pitch
-   * from the ground under its two axles (`pitch`, rad, nose up), into `out` (0 and 0 without a ground).
+   * from the ground under its two axles (`pitch`, rad, nose up), into `out` (0 and 0 without a ground). Worked out once
+   * an update (`stamp`) while it stays put: placing its body and writing its contact shadow ask it the same frame, and
+   * each look at the ground walks the roads round it.
    */
-  protected standing(at: { x: number; z: number; yaw: number }, wheelBase: number, out: { y: number; pitch: number }): { y: number; pitch: number } {
+  protected standing(at: { x: number; z: number; yaw: number }, wheelBase: number, out: Stand): Stand {
+    if (out.stamp === this.stamp && out.x === at.x && out.z === at.z && out.yaw === at.yaw && out.wheelBase === wheelBase) return out;
+    out.stamp = this.stamp;
+    out.x = at.x;
+    out.z = at.z;
+    out.yaw = at.yaw;
+    out.wheelBase = wheelBase;
     const g = this.ground;
     if (!g) {
       out.y = 0;
@@ -157,13 +179,16 @@ export abstract class Vehicles {
       return out;
     }
     // (Its nose along (sin yaw, cos yaw).)
-    const [fx, fz] = [Math.sin(at.yaw) * (wheelBase / 2), Math.cos(at.yaw) * (wheelBase / 2)];
-    const [front, back] = [g(at.x + fx, at.z + fz), g(at.x - fx, at.z - fz)];
+    const fx = Math.sin(at.yaw) * (wheelBase / 2);
+    const fz = Math.cos(at.yaw) * (wheelBase / 2);
+    const front = g(at.x + fx, at.z + fz);
+    const back = g(at.x - fx, at.z - fz);
     out.y = (front + back) / 2;
     out.pitch = wheelBase > 0 ? Math.atan2(front - back, wheelBase) : 0;
     return out;
   }
-  protected readonly stand = { y: 0, pitch: 0 };
+  /** Moved on at each update: a `Stand` from an update before is worked out again (the land may have changed under it). */
+  protected stamp = 0;
 
   abstract clear(): void;
 
@@ -208,15 +233,14 @@ export abstract class Vehicles {
     }
   }
 
-  /** A drawn vehicle's four wheels (`wide`: their width, as a wheel's) and its contact shadow, at `slot` in their draws. */
-  protected writeAt(slot: number, at: Spot, size: { wid: number; len: number; wheelR: number; wheelBase?: number }, four: readonly Wheel[], v: Rolling, wide = 1): void {
+  /** A drawn vehicle's four wheels (`wide`: their width, as a wheel's) and its contact shadow, at `slot` in their draws, standing as `stand` (`standing`). */
+  protected writeAt(slot: number, at: Spot, size: { wid: number; len: number; wheelR: number }, four: readonly Wheel[], v: Rolling, stand: Stand, wide = 1): void {
     const { m, q } = this;
     const s = Math.sin(at.yaw);
     const c = Math.cos(at.yaw);
     const wheels = this.wheels;
     // (On a land the town follows, each wheel on the ground under it, the shadow under the body's middle, pitched as it.)
     const g = this.ground;
-    const stand = this.standing(at, size.wheelBase ?? size.len * 0.6, this.stand);
     if (wheels) {
       const r = size.wheelR;
       for (let w = 0; w < 4; w++) {

@@ -2,12 +2,13 @@
 // that casts into it moved, `SunShadows.reaches`): a car that moves, comes or goes draws it again when it casts
 // into it where it is now or where it was the frame before. At the fastest speed a car goes tens of metres a
 // frame: one driving off from in the map to out of it left its shadow behind on the ground (Canalside, game
-// speed 5). On the engine's null device: no GPU.
+// speed 5). A car driving looks the ground up under its axles once a frame (its body and its contact shadow), and under each wheel. On the
+// engine's null device: no GPU.
 import { afterAll, describe, expect, mock, test } from 'bun:test';
 import * as pc from '../src/render/pc/engine';
 import type { FrameState } from '../src/core/bridge';
 import type { WorldStructure } from '../src/core/protocol';
-import { carRowAt } from '../src/render/shared/cars';
+import { CARS, carRowAt, wheelAt } from '../src/render/shared/cars';
 import { layout, LAYOUT } from './snapshotLayout';
 
 const realLocation = globalThis.location;
@@ -22,6 +23,7 @@ mock.module('../src/render/pc/materials', () => ({
 // (The shader chunks' module reads the settings too: only the cutaway's attribute, which the meshes name.)
 mock.module('../src/render/pc/shaders/chunks', () => ({ WALL_CUT_SEMANTIC: pc.SEMANTIC_ATTR7 }));
 const { Cars } = await import('../src/render/pc/cars');
+const { LIFT } = await import('../src/render/pc/vehicles');
 
 function scene() {
   const canvas = { width: 1, height: 1, style: {}, addEventListener() {}, removeEventListener() {}, getBoundingClientRect: () => ({ width: 1, height: 1 }) } as unknown as HTMLCanvasElement;
@@ -76,5 +78,41 @@ describe("the cars and the sun's shadow map", () => {
     // Back in, then out of town where it stands in the map: drawn again.
     step(20, 2);
     expect(step(20, 0)).toBe(true);
+  });
+});
+
+describe('the cars on the ground', () => {
+  test("a car driving looks the ground up under its axles once a frame, and under each wheel", () => {
+    const { app, root } = scene();
+    const cars = new Cars(app, root, false);
+    cars.build({ cars: [{ plot: 0, x: 10, z: 10, yaw: 0, body: 0, paint: 0 }] } as unknown as WorldStructure);
+    let looks = 0;
+    // A slope up along x: 0.1 m a metre.
+    cars.setGround((x) => (looks++, x * 0.1));
+    let curr = new Float32Array(layout.capacity);
+    let now = 0;
+    const step = (x: number): void => {
+      const prev = curr;
+      curr = new Float32Array(layout.capacity);
+      curr[layout.header.speed] = 1;
+      curr[LAYOUT.header.carCount] = 1;
+      const o = carRowAt(layout, 0);
+      [curr[o + F.shown], curr[o + F.x], curr[o + F.z], curr[o + F.yaw]] = [2, x, 10, Math.PI / 2];
+      now += 1000 / 60;
+      cars.update({ prev, curr, alpha: 1, steps: 1, layout, now });
+    };
+    step(10);
+    step(10.5);
+    looks = 0;
+    step(11);
+    // (Two under its axles, four under its wheels: not its axles again for its contact shadow.)
+    expect(looks).toBe(6);
+    // Its nose along +x: the front wheels (z of the car +half its wheelbase) on the ground at x + that, each on its own.
+    const half = CARS[0].wheelBase / 2;
+    const r = CARS[0].wheelR;
+    const m = (cars as unknown as { wheels: { matrices(): Float32Array } }).wheels.matrices();
+    const ys = [0, 1, 2, 3].map((w) => m[w * 16 + 13] - r);
+    const front = [0, 1, 2, 3].map((w) => wheelAt(CARS[0], w).front);
+    for (let w = 0; w < 4; w++) expect(ys[w] - LIFT).toBeCloseTo((11 + (front[w] ? half : -half)) * 0.1, 4);
   });
 });
