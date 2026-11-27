@@ -89,7 +89,7 @@ import { closedParts, flatLids, inClosed, LID_THICK, viewedFlats, viewedLot, typ
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
 import { cutInView } from '../shared/landVeil';
-import { DOOR_SWING, doorLead, goingThrough, MOVER } from '../shared/doors';
+import { anyoneNear, DOOR_SWING, doorLead, doorReach, goingThrough, moverCells } from '../shared/doors';
 import { smooth } from '../../game/noise';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
@@ -227,7 +227,7 @@ const TARGET_EASE = 0.25;
 const PIT_MARGIN = 0.3;
 /** The doors and gates opening or falling shut kept for the world's sound between its looks (`doorSounds`). */
 const DOOR_SOUNDS = 16;
-/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`). */
+/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`), at least: wider at a speed whose lead reaches further (`doorReach`). */
 const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
@@ -694,7 +694,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly awakeRooms = new Set<number>();
   private readonly occupiedRooms = new Set<number>();
   private readonly movers: number[] = [];
-  /** The cells (`GATE_CELL`) someone on the move is in this frame. */
+  /** The cells (`GATE_CELL` or wider: `swingDoors`) someone on the move is in this frame. */
   private readonly moverCells = new Set<number>();
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
@@ -2972,19 +2972,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Only a leaf where it casts into the sun's map draws the map again: one across town moves the picture alone.)
     const casts = (c: readonly [number, number]) => this.sunShadows.reaches(c[0], c[1] - this.rowOf(this.storeyOf(Math.floor(c[1]))));
     // (A town has a gate in most gardens, a house a door or more a room: one standing shut with
-    // nobody within a cell of it isn't asked.)
+    // nobody within a cell of it isn't asked. The cells as wide as the lead reaches at this speed, at super speed tens of metres.)
+    const size = Math.max(GATE_CELL, doorReach(lead));
     const near = this.moverCells;
-    near.clear();
-    const cell = (cx: number, cz: number) => (cx + 1024) * 4096 + cz + 1024;
-    for (let i = 0; i < movers.length; i += MOVER) near.add(cell(Math.floor(movers[i] / GATE_CELL), Math.floor(movers[i + 1] / GATE_CELL)));
-    const anyone = (x: number, z: number) => {
-      if (!near.size) return false;
-      const [cx, cz] = [Math.floor(x / GATE_CELL), Math.floor(z / GATE_CELL)];
-      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (near.has(cell(cx + dx, cz + dz))) return true;
-      return false;
-    };
+    moverCells(movers, size, near);
     for (const gate of this.gates) {
-      if (gate.open === 0 && lead < GATE_CELL && !anyone(gate.leaf.centre[0], gate.leaf.centre[1])) continue;
+      if (gate.open === 0 && !anyoneNear(near, size, gate.leaf.centre[0], gate.leaf.centre[1])) continue;
       const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1, lead, hand);
       // It opens away from the one coming through, and shuts the way it opened.
       if (way && gate.open === 0) gate.towards = way;
@@ -3000,7 +2993,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     for (const door of this.doors) {
       const { leaf } = door;
       // (Both in lot rows: the storey is in the row.)
-      if (door.open === 0 && lead < GATE_CELL && !anyone(leaf.centre[0], leaf.centre[1])) continue;
+      if (door.open === 0 && !anyoneNear(near, size, leaf.centre[0], leaf.centre[1])) continue;
       const target = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1, lead, hand) !== 0 ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
