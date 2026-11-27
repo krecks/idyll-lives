@@ -7,7 +7,7 @@
 // as the hand reaches the handle.)
 import { describe, expect, test } from 'bun:test';
 import { PLAYBACK_RATE } from '../src/render/shared/gameSpeed';
-import { DOOR_SWING, PACE, doorLead, goingThrough } from '../src/render/shared/doors';
+import { anyoneNear, DOOR_SWING, PACE, doorLead, doorReach, goingThrough, moverCells } from '../src/render/shared/doors';
 import { rustConst } from './snapshotLayout';
 
 /**
@@ -103,5 +103,30 @@ describe('doors', () => {
   test('a doorway in a wall along z works the same, across x', () => {
     expect(goingThrough(movers([-0.7, 0, 2, 0, 1.5]), 'v', door, false, lead)).toBe(1);
     expect(goingThrough(movers([0.7, 0, -2, 0, 1.5]), 'v', door, false, lead)).toBe(-1);
+  });
+
+  test('anyone going through a doorway at any speed is in its cell or one beside it, the cells as wide as the lead reaches', () => {
+    const cells = new Set<number>();
+    // A gate at a cell's corner; walkers heading straight for it from every way, just inside each speed's lead.
+    const gate: [number, number] = [40.1, 7.9];
+    let asked = 0;
+    for (const rate of [1, 10, 30, 60]) {
+      const l = doorLead(rate);
+      const size = Math.max(8, doorReach(l));
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2;
+        const off = l - 0.2;
+        const [x, z] = [gate[0] + Math.sin(a) * off, gate[1] + Math.cos(a) * off];
+        const one = movers([x, z, gate[0], gate[1], l + 2]);
+        if (!goingThrough(one, 'h', gate, false, l)) continue;
+        moverCells(one, size, cells);
+        expect(anyoneNear(cells, size, gate[0], gate[1])).toBe(true);
+        asked++;
+      }
+    }
+    expect(asked).toBeGreaterThan(32);
+    // Nobody near: nobody asked.
+    moverCells(movers([200, 200, 201, 200, 1]), 8, cells);
+    expect(anyoneNear(cells, 8, gate[0], gate[1])).toBe(false);
   });
 });

@@ -792,13 +792,19 @@ export interface CarPose {
   yaw: number;
 }
 
-/** Where the point `inCar` last looked at is in the car (m): along it (+: towards its front) and across it (+: towards +x at yaw 0). */
+/** Where the point `inCar` last found in the car is in it (m; read only after it says so): along it (+: towards its front) and across it (+: towards +x at yaw 0). */
 const inside = { along: 0, across: 0 };
 
 /** Whether (x, z) is in `body` standing at `pose` (its box seen from above): someone sat in it (`pc/cars.ts` `seatAt`, `carriedAlong`). */
 export function inCar(body: CarBody, pose: CarPose, x: number, z: number): boolean {
-  const [dx, dz] = [x - pose.x, z - pose.z];
-  const [s, c] = [Math.sin(pose.yaw), Math.cos(pose.yaw)];
+  const dx = x - pose.x;
+  const dz = z - pose.z;
+  // (Further off along x or z than its corners can be, however it's turned: no turn worked out. Asked for every car
+  // shown by every resident sat down.)
+  const r = (body.len + body.wid) / 2;
+  if (Math.abs(dx) > r || Math.abs(dz) > r) return false;
+  const s = Math.sin(pose.yaw);
+  const c = Math.cos(pose.yaw);
   inside.along = dx * s + dz * c;
   inside.across = dx * c - dz * s;
   return Math.abs(inside.along) < body.len / 2 && Math.abs(inside.across) < body.wid / 2;
