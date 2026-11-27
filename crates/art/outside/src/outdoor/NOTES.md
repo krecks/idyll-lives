@@ -225,7 +225,8 @@ a finial, and a bench along the back inside the rail), `pergola` (2.92 × 2.42 �
 wall's face: a rail, five canvas slats stepping down to the front bar and the valance) and `solarPanels` (2.02 ×
 0.65 × 1.66 m: its frame on the ground and two panels, each a 1.00 × 1.66 m module as real ones are, 2 cm apart;
 0.86 m wide before 2026-11-27). Timber and roof sheet, or frame and panels, map to 1–3 draw
-calls; none has a clip. Their roofs are flat: the kit has no rotated slab here, so the gazebo's is a skirt with a
+calls; none has a clip. The gazebo is joined into one `body` (2026-11-27: its 32 parts, the bench's
+included, were the gate's `unmoved` before). Their roofs are flat: the kit has no rotated slab here, so the gazebo's is a skirt with a
 lantern rather than a pitched roof, and the awning's slope is five stepped slats. The awning is declared with its
 own centre (0.025 m) because its parts' box is not centred on the tile.
 

@@ -115,81 +115,84 @@ pub fn chest_freezer() -> Vec<Obj> {
 /// The upright freezer: a tall cabinet whose door is hinged on its left, three baskets behind it.
 pub fn upright_freezer() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    // the shell: back, the two sides, its top and floor, and the liner with its baskets
-    fbox!(
-        f,
-        "back",
-        0.60,
-        1.80,
-        0.04,
-        (0, 0.92, -0.40),
-        M.body,
-        bevel = 0.010
-    );
-    for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+    let still = new_parts(|| {
+        // the shell: back, the two sides, its top and floor, and the liner with its baskets
         fbox!(
             f,
-            format!("side{i}"),
-            0.04,
+            "back",
+            0.60,
             1.80,
-            0.66,
-            (sx * 0.28, 0.92, -0.10),
+            0.04,
+            (0, 0.92, -0.40),
             M.body,
             bevel = 0.010
         );
-    }
-    fbox!(
-        f,
-        "top",
-        0.60,
-        0.04,
-        0.66,
-        (0, 1.80, -0.10),
-        M.body,
-        bevel = 0.008
-    );
-    fbox!(
-        f,
-        "floor",
-        0.60,
-        0.06,
-        0.66,
-        (0, 0.03, -0.10),
-        M.body,
-        bevel = 0.006
-    );
-    fbox!(f, "liner", 0.50, 1.68, 0.58, (0, 0.90, -0.13), M.liner);
-    for (i, y) in [0.55, 0.95, 1.35].into_iter().enumerate() {
+        for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("side{i}"),
+                0.04,
+                1.80,
+                0.66,
+                (sx * 0.28, 0.92, -0.10),
+                M.body,
+                bevel = 0.010
+            );
+        }
         fbox!(
             f,
-            format!("basket{i}"),
-            0.44,
-            0.12,
-            0.020,
-            (0, y, 0.17),
-            M.chrome,
-            bevel = 0.004
+            "top",
+            0.60,
+            0.04,
+            0.66,
+            (0, 1.80, -0.10),
+            M.body,
+            bevel = 0.008
         );
-    }
-    fbox!(
-        f,
-        "plinth",
-        0.56,
-        0.07,
-        0.60,
-        (0, 0.035, -0.12),
-        M.trim,
-        bevel = 0.006
-    );
-    fbox!(
-        f,
-        "badge",
-        0.09,
-        0.028,
-        0.006,
-        (0.18, 1.72, 0.245),
-        M.chrome
-    );
+        fbox!(
+            f,
+            "floor",
+            0.60,
+            0.06,
+            0.66,
+            (0, 0.03, -0.10),
+            M.body,
+            bevel = 0.006
+        );
+        fbox!(f, "liner", 0.50, 1.68, 0.58, (0, 0.90, -0.13), M.liner);
+        for (i, y) in [0.55, 0.95, 1.35].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("basket{i}"),
+                0.44,
+                0.12,
+                0.020,
+                (0, y, 0.17),
+                M.chrome,
+                bevel = 0.004
+            );
+        }
+        fbox!(
+            f,
+            "plinth",
+            0.56,
+            0.07,
+            0.60,
+            (0, 0.035, -0.12),
+            M.trim,
+            bevel = 0.006
+        );
+        fbox!(
+            f,
+            "badge",
+            0.09,
+            0.028,
+            0.006,
+            (0.18, 1.72, 0.245),
+            M.chrome
+        );
+    });
+    join(&still, "body", Some(P3::ZERO));
     let parts = new_parts(|| {
         fbox!(
             f,

@@ -176,6 +176,7 @@ is deep). It is 1.90 × 0.88 × 0.70 m (2026-11-27: 0.90 m deep before, past the
 `cargo review sizes`): its 0.68 m box stands with its back on the wall's face (`centre` 0, −0.08), the handle 2 cm
 proud of its front, and its still parts are joined into one `body`. The resident's `chestFetch` clips
 (clips/reach.ts `CHEST`, `CHEST_TO` 0.45 m, the lid 0.68 m from its hinge) are fitted to that depth. The upright one is a tall cabinet whose door is hinged on its left and swung 100° about Z, with three
-baskets on the liner behind it. Each declares one motion in `mod.rs` — `lid_open` (1.2 s) and `door_open` (1.2 s,
+baskets on the liner behind it; its still parts are joined into one `body` (2026-11-27), the door, seam and
+handles into the `door`. Each declares one motion in `mod.rs` — `lid_open` (1.2 s) and `door_open` (1.2 s,
 `BackOut`) — keyed to the `fetch` animation (`frozenTreat` and any other fetch from it) and held open 3.5 s, as the
 fridges' are; the resident's own animation is the shared `fetch`, so no new clip is added to `base.json`.

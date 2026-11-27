@@ -9,13 +9,11 @@
     "model.coatHooks": 9,
     "model.deskExecutive": 2,
     "model.doorbell": 3,
-    "model.gazebo": 12,
     "model.hallStand": 16,
     "model.pergola": 11,
     "model.shoeRack": 14,
     "model.sideboard": 3,
     "model.solarPanels": 11,
-    "model.uprightFreezer": 7,
     "model.wallCabinetGlass": 1
   },
   "uses.hands": {

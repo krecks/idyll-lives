@@ -1,6 +1,7 @@
 //! O9: the garden's built things — the carport, the gazebo, the pergola, the awning and the solar array.
 
 use super::common::M;
+use artkit::parts::{join_all, settle};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fsphere, settle};
@@ -220,8 +221,8 @@ pub fn gazebo() -> Vec<Obj> {
             bevel = 0.005
         );
     }
-    settle!();
-    meshes()
+    // no clip moves a part: all of it is the still body
+    settle(&[join_all("body")])
 }
 
 // --- O9: the pergola: four posts, two beams and the rafters over them -------------------------------------
