@@ -7,14 +7,14 @@ use artkit::mesh::Mesh;
 use artkit::normals::custom_from_verts;
 use artkit::scene::{self, Obj};
 
-/// How far a blade's or leaf's normals bend to the sky (`_mesh`).
+/// How far a blade's or leaf's normals bend to the sky (`mesh`).
 pub const SKY: f64 = 1.5;
 
 /// A part from points (Blender metres) and faces, normals outward. `sky` bends every face's normal that far
 /// towards straight up (normals of its own: the shape stays), as a lawn's grass is shaded, so near-upright blades
 /// take the light the ground round them does rather than drawing dark from above. `recalc` false keeps the faces
 /// wound as given (a ribbon's two sides, which have no outside to turn to).
-pub fn _mesh(
+pub fn mesh(
     name: impl AsRef<str>,
     verts: Vec<V3>,
     faces: &[Vec<u32>],
@@ -144,7 +144,7 @@ pub fn blade(
     );
     // Flat, its normals bent to the sky: upright, its faces drew dark against the lawn from above.
     let both = [side.clone(), side].concat();
-    _mesh(name, both, &faces, material, false, SKY, false)
+    mesh(name, both, &faces, material, false, SKY, false)
 }
 
 // ---- the wildflowers -------------------------------------------------------------------------------------------
@@ -186,7 +186,7 @@ pub fn stem(
             faces.push(vec![i * 3 + j, i * 3 + k, (i + 1) * 3 + k, (i + 1) * 3 + j]);
         }
     }
-    _mesh(name, verts, &faces, material, true, 0.0, true)
+    mesh(name, verts, &faces, material, true, 0.0, true)
 }
 
 #[cfg(test)]

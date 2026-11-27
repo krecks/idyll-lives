@@ -45,12 +45,12 @@ the wheelbarrow come down by half while showing more.
 (2026-10-22, headless, WebGPU and WebGL2): the gallery and the fountain's `flow` on the clips bench, no errors.
 
 Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). The boulders'
-cuts are the ground's (`ground::rock::_cut`, on artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`): a
+cuts are the ground's (`ground::rock::cut`, on artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`): a
 stone's fractures are cut where it was made, at the origin.
 
 ## The gate's edges and texels (2026-11-25)
 
-The stone lantern's hexagons have their corners eased 5 mm (`common::_eased`: each 60° turn in two of 30°), the
+The stone lantern's hexagons have their corners eased 5 mm (`common::eased`: each 60° turn in two of 30°), the
 platform's rims and the roof's eave rounded over (rows added, no turn of 60°), its lotus petals' rim rolled, the
 posts bevelled boxes (were square cones) and the panels bevelled 4 mm: 52 edges to none, 3,992 triangles (was
 2,076; the aim for its 1.03 m is 8,000). The fountain's stem has its collar and top rounded and both basins' water,

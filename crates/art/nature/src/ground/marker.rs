@@ -1,7 +1,7 @@
 //! The selection marker: the sparkle star over the selected resident.
 
 use super::M;
-use super::common::_mesh;
+use super::common::mesh;
 use artkit::edit::{NgonMethod, QuadMethod, triangulate};
 use artkit::math::{PI, TAU, V3, cos, pow, sin, sqrt, v3};
 use artkit::normals::custom_from_verts;
@@ -15,7 +15,7 @@ const RAYS: [(f64, f64, f64); 2] = [(0.17, 0.0425, 0.025), (0.115, 0.0375, 0.022
 const CORE: (f64, f64) = (0.05, 0.03);
 
 /// The star's half-depth at (a across, b up) in its plane: a smooth union of the rays' and the core's.
-fn _depth(a: f64, b: f64) -> f64 {
+fn depth(a: f64, b: f64) -> f64 {
     let mut parts = Vec::new();
     for ((length, w0, d0), (u, l)) in [(RAYS[0], (b.abs(), a)), (RAYS[1], (a.abs(), b))] {
         if u < length {
@@ -39,7 +39,7 @@ fn _depth(a: f64, b: f64) -> f64 {
 
 /// The star's outline as `keep` points evenly spaced along it (so the tips get as many as the flanks), each the
 /// furthest point inside it along a direction from the middle.
-fn _outline(samples: usize, keep: usize) -> Vec<(f64, f64)> {
+fn outline(samples: usize, keep: usize) -> Vec<(f64, f64)> {
     let mut pts = Vec::with_capacity(samples);
     for i in 0..samples {
         let t = TAU * i as f64 / samples as f64;
@@ -47,7 +47,7 @@ fn _outline(samples: usize, keep: usize) -> Vec<(f64, f64)> {
         let (mut lo, mut hi) = (0.0, 0.18);
         for _ in 0..30 {
             let m = (lo + hi) / 2.0;
-            (lo, hi) = if _depth(c * m, s * m) > 0.0 {
+            (lo, hi) = if depth(c * m, s * m) > 0.0 {
                 (m, hi)
             } else {
                 (lo, m)
@@ -108,31 +108,27 @@ fn _outline(samples: usize, keep: usize) -> Vec<(f64, f64)> {
 /// middle, as the old part's. Its normals come from the shell's shape (`normal`). 1,344 triangles (the old part:
 /// 1,936).
 pub fn marker() -> Vec<Obj> {
-    let outline = _outline(4000, 96);
+    let outline = outline(4000, 96);
     let (n, rings) = (outline.len(), 4);
     let (mut verts, mut normals): (Vec<V3>, Vec<V3>) = (Vec::new(), Vec::new());
     let h = 1e-4;
     // The shell's normal (game) from its depth's slope: the game pushes its outline out along it, so it is worked
     // out, not left to the triangles (thin ones along the rays folded the outline through the front).
     let normal = |a: f64, b: f64, side: f64| {
-        let da = (_depth(a + h, b) - _depth(a - h, b)) / (2.0 * h);
-        let db = (_depth(a, b + h) - _depth(a, b - h)) / (2.0 * h);
+        let da = (depth(a + h, b) - depth(a - h, b)) / (2.0 * h);
+        let db = (depth(a, b + h) - depth(a, b - h)) / (2.0 * h);
         v3(-da, -db, side).normalized()
     };
     // Game (a, b, depth) -> Blender (-a, -depth, b).
     let to_blender = |v: V3| v3(-v.x, -v.z, v.y);
     for side in [1.0, -1.0] {
-        verts.push(v3(0, -side * _depth(0.0, 0.0), 0));
+        verts.push(v3(0, -side * depth(0.0, 0.0), 0));
         normals.push(to_blender(v3(0, 0, side)));
         for j in 1..=rings {
             // closer together towards the outline, where the shell turns
             let f = 1.0 - pow(1.0 - j as f64 / rings as f64, 2.0);
             for (i, &(a, b)) in outline.iter().enumerate() {
-                let d = if j == rings {
-                    0.0
-                } else {
-                    _depth(a * f, b * f)
-                };
+                let d = if j == rings { 0.0 } else { depth(a * f, b * f) };
                 verts.push(v3(-a * f, -side * d, b * f));
                 if j == rings {
                     // On the outline: square to it, in the star's plane.
@@ -190,7 +186,7 @@ pub fn marker() -> Vec<Obj> {
         .iter()
         .map(|f| f.iter().map(|&v| index[v]).collect())
         .collect();
-    let obj = _mesh(
+    let obj = mesh(
         "marker",
         used.iter().map(|&v| verts[v]).collect(),
         &remapped,

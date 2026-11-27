@@ -1,6 +1,6 @@
 //! The garden lamp post and the string lights.
 
-use super::common::{_near_light, _own, F};
+use super::common::{F, near_light, own};
 use artkit::far::low;
 use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
@@ -16,9 +16,8 @@ use artkit::{boulder, fbox, fcone, fcyl, fsphere, fsweep, leaf, loft, revolve, r
 /// The content's `light.height`: the panes' middle.
 const LAMP_Y: f64 = 2.3;
 
-#[allow(non_snake_case)]
-pub fn lampPost() -> Vec<Obj> {
-    let m = _own("lampPost");
+pub fn lamp_post() -> Vec<Obj> {
+    let m = own("lampPost");
     let (post, frame) = (m.body, m.lantern);
     let sq = pow(2.0, 0.5);
     // A square ring of half side `r` at game height `y`, turned to face the front, its corners eased 6 mm (each
@@ -229,7 +228,7 @@ pub fn lampPost() -> Vec<Obj> {
         material = frame,
         segments = low(12, 6)
     );
-    _near_light("lampPost", LAMP_Y);
+    near_light("lampPost", LAMP_Y);
     join_all("lampPost");
     settle_all();
     meshes()
@@ -242,13 +241,12 @@ const WIRE_Y: f64 = 2.27;
 const SAG: f64 = 0.28;
 const BULBS: usize = 9;
 
-fn _wire_y(x: f64) -> f64 {
+fn wire_y(x: f64) -> f64 {
     WIRE_Y - SAG * (1.0 - pow(x / (POST_X - 0.04), 2.0))
 }
 
-#[allow(non_snake_case)]
-pub fn stringLights() -> Vec<Obj> {
-    let m = _own("stringLights");
+pub fn string_lights() -> Vec<Obj> {
+    let m = own("stringLights");
     let mut rng = Random::new(23);
     let still = new_parts(|| {
         for i in [-1, 1] {
@@ -393,14 +391,14 @@ pub fn stringLights() -> Vec<Obj> {
         let wire: Vec<(f64, f64, i32)> = (0..=n)
             .map(|i| {
                 let x = -x0 + 2.0 * x0 * i as f64 / n as f64;
-                (x, _wire_y(x), 0)
+                (x, wire_y(x), 0)
             })
             .collect();
         fsweep!(F, "wire", &wire, 0.0045, m.wire, verts = 5);
         let mut heights = Vec::new();
         for i in 0..BULBS {
             let x = -x0 + 2.0 * x0 * (i as f64 + 0.5) / BULBS as f64;
-            let y = _wire_y(x);
+            let y = wire_y(x);
             // the socket: a clip round the wire and a ribbed holder; the bulb a festoon globe on a short neck
             let b = F.at(x, 0, 0);
             let socket: Vec<Vec<P3>> = [
@@ -433,7 +431,7 @@ pub fn stringLights() -> Vec<Obj> {
             heights.push(y - 0.09);
         }
         let n = heights.len() as f64;
-        _near_light("stringLights", py::sum(heights) / n);
+        near_light("stringLights", py::sum(heights) / n);
     });
     let string = hinged(join(&string, "string", None), F.at(0, WIRE_Y, 0));
     settle_with(

@@ -1,7 +1,7 @@
 //! The lawn's wildflowers and its drifts: daisies, buttercups, violets and fallen petals.
 
 use super::M;
-use super::common::{_mesh, SKY, blade, stem};
+use super::common::{SKY, blade, mesh, stem};
 use artkit::far::{is_low, low};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, TAU, V3, atan2, cos, degrees, pow, radians, sin, sqrt, v3};
@@ -11,7 +11,7 @@ use artkit::rand::Random;
 use artkit::scene::Obj;
 
 options! {
-    /// A flower head's shape (`flower`, `_head`).
+    /// A flower head's shape (`flower`, `head`).
     Head { n: usize = 5, notch: f64 = 0.8, cup: f64 = 0.0, disc: f64 = 0.32, dome: f64 = 0.011 }
 }
 
@@ -99,7 +99,7 @@ pub fn flower(
         }
     }
     let placed: Vec<V3> = verts.iter().map(|&v| place * v).collect();
-    let obj = _mesh(name, placed, &faces, petals, true, 0.0, true);
+    let obj = mesh(name, placed, &faces, petals, true, 0.0, true);
     if full {
         paint(obj, eye, &colours);
     }
@@ -160,7 +160,7 @@ pub fn bud(
         colours.extend([0, 1]);
     }
     let placed: Vec<V3> = verts.iter().map(|&v| place * v).collect();
-    let obj = _mesh(name, placed, &faces, sepals, true, 0.0, true);
+    let obj = mesh(name, placed, &faces, sepals, true, 0.0, true);
     paint(obj, petals, &colours);
     obj
 }
@@ -284,10 +284,10 @@ pub fn flowers() -> Vec<Obj> {
 /// the ground, from and to: at the tips of a mown lawn's blades) scattered over a disc `spread` across, none on
 /// another, each tilted its own way a little. No leaves: they are down among the grass. The game stands patches by
 /// the hundred where the lawn's flowers gather (render/shared/nature.ts `lawns`), so it is light: a head under 3
-/// triangles a petal (`_head`) and no stem, which the blades round it would hide (a sliver of one drew as a dark
+/// triangles a petal (`head`) and no stem, which the blades round it would hide (a sliver of one drew as a dark
 /// mark beside each head); a far version's heads a fan each.
 #[allow(clippy::too_many_arguments)]
-fn _drift(
+fn drift(
     name: &str,
     seed: i128,
     petals: Mat,
@@ -315,8 +315,8 @@ fn _drift(
             rng.uniform(3.0, 12.0),
             rng.uniform(0.0, 360.0),
         );
-        _head(
-            &format!("{name}_head{i}"),
+        head(
+            &format!("{name}head{i}"),
             top,
             r,
             tilt,
@@ -340,7 +340,7 @@ fn _drift(
 /// sky sees it (`SKY`), so its petals are one light colour whichever way they lean: shaded each by its own slope,
 /// half of a head 4 px across drew dark. 3n - 2 triangles; n in a far version (no eye, no notches).
 #[allow(clippy::too_many_arguments)]
-fn _head(
+fn head(
     name: &str,
     at: V3,
     radius: f64,
@@ -406,7 +406,7 @@ fn _head(
         colours = vec![0; n as usize];
     }
     let placed: Vec<V3> = verts.iter().map(|&v| place * v).collect();
-    let obj = _mesh(name, placed, &faces, petals, false, SKY, false);
+    let obj = mesh(name, placed, &faces, petals, false, SKY, false);
     if full {
         paint(obj, eye, &colours);
     }
@@ -415,7 +415,7 @@ fn _head(
 
 /// A patch of lawn daisies: white rays round a yellow eye.
 pub fn daisies() -> Vec<Obj> {
-    _drift(
+    drift(
         "daisies",
         7,
         M.petal_white,
@@ -436,7 +436,7 @@ pub fn daisies() -> Vec<Obj> {
 
 /// A patch of creeping buttercups: five glossy yellow petals, cupped.
 pub fn buttercups() -> Vec<Obj> {
-    _drift(
+    drift(
         "buttercups",
         11,
         M.petal_yellow,
@@ -457,7 +457,7 @@ pub fn buttercups() -> Vec<Obj> {
 
 /// A patch of low violet flowers (a selfheal's or a speedwell's blue-violet), a pale eye in each.
 pub fn violets() -> Vec<Obj> {
-    _drift(
+    drift(
         "violets",
         19,
         M.petal_violet,
@@ -508,7 +508,7 @@ pub fn petals() -> Vec<Obj> {
             faces.push(vec![k, k + 2, k + 3]);
         }
     }
-    _mesh("petals", verts, &faces, M.petal_pink, false, SKY, false);
+    mesh("petals", verts, &faces, M.petal_pink, false, SKY, false);
     settle_with(
         &[join_all("petals")],
         Settle {
