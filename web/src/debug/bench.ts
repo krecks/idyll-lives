@@ -549,8 +549,13 @@ export interface BenchResult {
   interval: Stats | null;
   /** Main-thread work per frame: all of it, the game's update (residents, camera, bubbles…) and drawing (PlayCanvas's update and render), ms. */
   cpu: { frame: Stats; update: Stats; render: Stats } | null;
-  /** GPU time per frame, ms (null: the browser can't measure it); per pass on WebGPU. */
-  gpu: { frame: Stats | null; source: 'frame' | 'passes' | 'none'; passes: { name: string; ms: number; frames: number }[] };
+  /**
+   * GPU time per frame, ms (null: the browser can't measure it); per pass on WebGPU. `overlapped`: the frame's span
+   * (its first pass's start to its last pass's end) came out longer than the time between frames, so it is no GPU
+   * time: the stamps overlap other frames' work (Metal: the town view's bloom chain read ~5.7 ms a pass, 62 ms a frame,
+   * at 95 fps uncapped, 2026-11-27). Judge such a run by its frame times and `diag=` runs against each other.
+   */
+  gpu: { frame: Stats | null; source: 'frame' | 'passes' | 'none'; overlapped: boolean; passes: { name: string; ms: number; frames: number }[] };
   drawCalls: { total: number; shadow: number; mirrors: number };
   triangles: { total: number; shadow: number; mirrors: number };
   /** Render passes of a frame and their pixels × samples, and bytes × samples (colour plus depth, written once). */
@@ -740,7 +745,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       fps: rafCount / secs,
       interval: stats(intervals),
       cpu: frames ? { frame: stats(cpuFrame)!, update: stats(cpuUpdate)!, render: stats(cpuRender)! } : null,
-      gpu: { frame: stats(timed), source: timed.length ? 'frame' : passes.length ? 'passes' : 'none', passes },
+      gpu: { frame: stats(timed), source: timed.length ? 'frame' : passes.length ? 'passes' : 'none', overlapped: !!timed.length && rafCount > 0 && stats(timed)!.avg > secs * 1000 / rafCount, passes },
       drawCalls: { total: per(sums.draws), shadow: per(sums.shadowDraws), mirrors: per(sums.mirrorDraws) },
       triangles: { total: per(sums.tris), shadow: per(sums.shadowTris), mirrors: per(sums.mirrorTris) },
       passes: info.passes,
@@ -808,7 +813,7 @@ function emptyResult(b: BenchFlags, startedAt: string): BenchResult {
     fps: 0,
     interval: null,
     cpu: null,
-    gpu: { frame: null, source: 'none', passes: [] },
+    gpu: { frame: null, source: 'none', overlapped: false, passes: [] },
     drawCalls: { total: 0, shadow: 0, mirrors: 0 },
     triangles: { total: 0, shadow: 0, mirrors: 0 },
     passes: [],
