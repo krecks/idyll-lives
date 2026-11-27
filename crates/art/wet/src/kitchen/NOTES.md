@@ -188,3 +188,5 @@ freezer's door or lid clip — `lid_open` (1.2 s) and `door_open` (1.2 s, `BackO
 one's `drawer_open` (0.6 s, 14 cm out) starts 0.9 s in, once the door is past 90°, and is held 1.6 s, so it is back
 in before the door shuts (the opened door's liner clears the drawer's front by 2 cm). The resident's own animation
 is the shared `fetch`, so no new clip is added to `base.json`.
+
+- **chestFreezer** (2026-11-27): the rim is a frame (it was a slab that hid the liner) and two wire baskets hang on it, seen when the lid is up. The lid already has its handle; the upright freezer already has real drawers, so it is unchanged.

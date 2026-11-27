@@ -760,6 +760,9 @@
         "liner": {
           "finish": "material.finish.matte"
         },
+        "shelf": {
+          "finish": "material.finish.gloss"
+        },
         "trim": {
           "finish": "material.finish.satin"
         }

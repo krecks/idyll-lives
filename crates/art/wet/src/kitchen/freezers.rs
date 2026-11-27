@@ -59,7 +59,29 @@ pub fn chest_freezer() -> Vec<Obj> {
             bevel = 0.006
         );
         fbox!(f, "liner", 1.78, 0.70, 0.56, (0, 0.40, z), M.liner);
-        fbox!(f, "rim", 1.88, 0.020, 0.66, (0, 0.815, z), M.trim);
+        // the rim: a frame on the walls' tops, so the opening shows the liner and the baskets
+        for (k, dz) in [-0.315, 0.315].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("rim_side{k}"),
+                1.88,
+                0.020,
+                0.05,
+                (0, 0.815, z + dz),
+                M.trim
+            );
+        }
+        for (k, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("rim_end{k}"),
+                0.05,
+                0.020,
+                0.58,
+                (sx * 0.915, 0.815, z),
+                M.trim
+            );
+        }
         fbox!(
             f,
             "badge",
@@ -69,6 +91,36 @@ pub fn chest_freezer() -> Vec<Obj> {
             (0.78, 0.55, z + 0.342),
             M.chrome
         );
+        // two wire baskets hung on the rim inside: a frame each, seen when the lid is up
+        for (i, bx) in [-0.42, 0.42].into_iter().enumerate() {
+            for (k, (w, d, dz)) in [(0.80, 0.014, 0.14), (0.80, 0.014, -0.14)]
+                .into_iter()
+                .enumerate()
+            {
+                fbox!(
+                    f,
+                    format!("basket{i}_side{k}"),
+                    w,
+                    0.05,
+                    d,
+                    (bx, 0.775, z + dz),
+                    M.shelf,
+                    bevel = 0.004
+                );
+            }
+            for (k, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+                fbox!(
+                    f,
+                    format!("basket{i}_end{k}"),
+                    0.014,
+                    0.05,
+                    0.28,
+                    (bx + sx * 0.393, 0.775, z),
+                    M.shelf,
+                    bevel = 0.004
+                );
+            }
+        }
     });
     join(&still, "body", Some(P3::ZERO));
     let parts = new_parts(|| {
