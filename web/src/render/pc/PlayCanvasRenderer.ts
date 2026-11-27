@@ -1396,6 +1396,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const shift = viewShift(p.alpha, p.beta, p.targetScreenOffset.x, p.targetScreenOffset.y, this.townShift);
       this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true, shift);
       this.landHaze?.show(p.radius, ex + shift[0], ez + shift[2]);
+      // (The contact shading faded out by the distance as the game's town view fades it, `frameTownView`.)
+      this.post?.setContact(1 - townBlend(p.radius));
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
     } else {
       const o = this.orbit;
