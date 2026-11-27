@@ -1,12 +1,13 @@
 //! D4: wall fittings — the venetian blinds, the coat hooks, and the door's gadgets: the bell, the alarm keypad and the camera.
 
 use super::common::{M, WALL};
+use artkit::kit;
 use artkit::math::{Axis, P3};
 use artkit::motion::{FLAT, flat};
-use artkit::parts::{hinged, join, new_parts, turn};
+use artkit::parts::{hinged, join, join_all, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsphere, grow, settle, squash, swing};
+use artkit::{fbox, fcyl, fsphere, grow, settle, squash, swing};
 
 // --- D4: the venetian blinds: a head rail on the wall, slats, a bottom rail and their cords -------------
 // At night (`close`) the slats shut: one part can't turn each slat about its own length, so the open slats thin to
@@ -86,9 +87,12 @@ pub fn blinds() -> Vec<Obj> {
     meshes()
 }
 
-// --- D4: the coat hooks: a painted board on the wall and four brass hooks ---------------------------------
+// --- D4: the coat hooks: a painted board on the wall and four J hooks, each on a round rose ----------------
+// A hook runs out from the board at 1.60 m (the height `coatHooks:fetch` reaches for), dips and turns up to a
+// ball tip, so a coat's loop stays on it.
 pub fn coat_hooks() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
+    let face = WALL + 0.022;
     fbox!(
         f,
         "board",
@@ -101,24 +105,47 @@ pub fn coat_hooks() -> Vec<Obj> {
     );
     for i in 0..4 {
         let x = -0.315 + 0.21 * i as f64;
-        fbox!(
+        fcyl!(
             f,
-            format!("arm{i}"),
-            0.018,
-            0.022,
-            0.075,
-            (x, 1.60, WALL + 0.022 + 0.0375),
+            format!("rose{i}"),
+            0.014,
+            0.006,
+            (x, 1.60, face + 0.003),
             M.gadget_chrome,
-            bevel = 0.004
+            rot = (90, 0, 0),
+            verts = 16,
+            bevel = 0.002
+        );
+        let pts: Vec<(f64, f64, f64)> = [
+            (1.600, 0.000),
+            (1.596, 0.030),
+            (1.590, 0.058),
+            (1.596, 0.076),
+            (1.614, 0.083),
+            (1.636, 0.080),
+        ]
+        .iter()
+        .map(|&(y, d)| (x, y, face + d))
+        .collect();
+        kit::tube!(
+            f,
+            format!("hook{i}"),
+            &pts,
+            0.0065,
+            M.gadget_chrome,
+            round = 4
         );
         fsphere!(
             f,
-            format!("ball{i}"),
-            0.016,
-            (x, 1.60, WALL + 0.104),
-            M.gadget_chrome
+            format!("tip{i}"),
+            0.0085,
+            (x, 1.638, face + 0.080),
+            M.gadget_chrome,
+            segments = 10,
+            rings = 6
         );
     }
+    join_all("coatHooks");
     settle!();
     meshes()
 }

@@ -180,6 +180,11 @@ the keypad's case and keys, the camera's housing and lens. All five are built at
 (`WALL`, −0.43 m) and declared `.on_wall()`; the blinds' two cords hang 3 cm in front of the slats, which is what sets
 their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, under the eaves.
 
+- **Coat hooks** (looked at again 2026-11-27): each hook is a J (`kit::tube!` on a round rose), out from the board at
+  1.60 m (the height `coatHooks:fetch` and its `high` reach are fitted to), dipping 1 cm and turning up 4 cm to a
+  ball tip, so a coat stays on; they were straight pegs. 0.90 × 0.14 × 0.111 m, `centre` (0, −0.3745) so the board's
+  back stays on the wall face; one part (`join_all`), 3,420 → 2,588 triangles, 1 draw.
+
 The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains). One part can't turn each slat about its
 own length, and a part a slat would cost a draw call each (9 in all), so the clip swaps two parts: the open slats
 (`slats`) thin to nothing front to back, while the shut ones (`vanes`: the same eight slats turned 70° and 9.5 cm

@@ -185,9 +185,9 @@ pub fn family() -> Family {
                 .on_wall()
                 .motions(night())
                 .paint(&[("blind_slat", "Slats"), ("blind_rail", "Head rail")]),
-            Model::new("coatHooks", fittings::coat_hooks, (0.90, 0.14, 0.12))
+            Model::new("coatHooks", fittings::coat_hooks, (0.90, 0.14, 0.111))
                 .key("model.coatHooks")
-                .centre(0.0, -0.37)
+                .centre(0.0, -0.3745)
                 .on_wall()
                 .paint(&[("hook_board", "Board"), ("gadget_chrome", "Hooks")]),
             Model::new("doorbell", fittings::doorbell, (0.10, 0.16, 0.036))
