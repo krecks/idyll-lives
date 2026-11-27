@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## 0.9.0 — 2026-11-27
+
+- **A real kerb:** the step from the road up to the sidewalk is 75 mm, a real kerb's least (it was 33 mm); the sidewalk rises with it, and the lamps, mailboxes, hydrants, bins and benches on it stand on it as before (`roads.ts` `KERB_Y`, `WALK_Y`).
+
 ## 0.8.4 — 2026-11-26
 
 - **Curtains gather when drawn:** drawn at night, the curtains' cloth is let out as real curtains are, in narrower folds, instead of stretching its weave and its folds wide; open, they look as they did. The model gate now measures a part's texture at its most stretched as well as at rest.

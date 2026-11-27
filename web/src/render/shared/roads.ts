@@ -28,8 +28,8 @@ import { levelsOf } from './landSurface';
 export { RoadIndex, roadIndex, SIDEWALK };
 /** The kerb's width, and the levels of the sidewalk, the kerb and the road. */
 export const KERB = 0.14;
-export const WALK_Y = 0.03;
-export const KERB_Y = 0.045;
+export const WALK_Y = 0.072;
+export const KERB_Y = 0.087;
 export const ROAD_Y = 0.012;
 /** How high the road markings lie over the road (m: their material is drawn over it too, `MaterialLibrary.roadPaint`). */
 export const MARK_Y = ROAD_Y + 0.004;
