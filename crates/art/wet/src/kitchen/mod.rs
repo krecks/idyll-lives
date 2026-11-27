@@ -199,12 +199,12 @@ pub fn family() -> Family {
             Model::new("chestFreezer", freezers::chest_freezer, (1.90, 0.89, 0.90))
                 .key("model.chestFreezer")
                 .centre(0.0, 0.01)
-                .motions(json!({"uses": {"frozenTreat": "lid_open"}}))
+                .motions(json!({"uses": {"fetch": "lid_open"}, "hold": 3.5}))
                 .paint(&[("body", "Body"), ("chrome", "Handles"), ("trim", "Plinth")]),
             Model::new("uprightFreezer", freezers::upright_freezer, (0.60, 1.82, 0.679))
                 .key("model.uprightFreezer")
                 .centre(0.0, -0.0805)
-                .motions(json!({"uses": {"frozenTreat": "door_open"}}))
+                .motions(json!({"uses": {"fetch": "door_open"}, "hold": 3.5}))
                 .paint(&[("body", "Body"), ("chrome", "Handles"), ("trim", "Plinth")]),
         ],
         "The kitchen (crates/art/wet/src/kitchen, built by cargo art). Listed in the base \

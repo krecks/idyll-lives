@@ -760,9 +760,18 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
         "trim": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "lid_open"
+        },
+        "hold": 3.5
       },
       "paint": [
         {
@@ -789,9 +798,18 @@
         "chrome": {
           "finish": "material.finish.chrome"
         },
+        "liner": {
+          "finish": "material.finish.matte"
+        },
         "trim": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "uses": {
+          "fetch": "door_open"
+        },
+        "hold": 3.5
       },
       "paint": [
         {
