@@ -1,7 +1,7 @@
 //! TT3 books and small plants.
 
 use super::M;
-use super::common::{disc, done};
+use super::common::{disc, done, spline};
 use artkit::forms::{Plane, by, rounded_rect};
 use artkit::kit::fillet;
 use artkit::materials::Mat;
@@ -220,6 +220,14 @@ const VASE_BODY: [(f64, f64); 9] = [
     (0.027, 0.225),
 ];
 
+/// `VASE_BODY` with its belly and shoulder on a curve (its rolled lip kept sharp).
+fn _vase_profile() -> Vec<(f64, f64)> {
+    let mut rows = vec![VASE_BODY[0]];
+    rows.extend(spline(&VASE_BODY[1..6], 2));
+    rows.extend(&VASE_BODY[6..]);
+    rows
+}
+
 /// The vase's bunch: `VASE_HEADS` on curving stems from the water at `water`, leaves at the neck.
 fn _bunch(water: f64, neck: f64) {
     for (i, &(x, y, z, colour, kind)) in VASE_HEADS.iter().enumerate() {
@@ -323,7 +331,7 @@ fn _bunch(water: f64, neck: f64) {
 /// A glazed vase swelling at its belly with a flared lip, a mixed bunch on curving stems: white and yellow daisies
 /// (ray petals round a raised eye), two tulips and a pink cosmos, leaves at the neck.
 pub fn vase_flowers() -> Vec<Obj> {
-    turned!("vase", &VASE_BODY, M.vase, verts = 16);
+    turned!("vase", &_vase_profile(), M.vase, verts = 24);
     _bunch(0.2, 0.232);
     done("vaseFlowers", false)
 }
@@ -334,7 +342,7 @@ pub fn vase_flowers() -> Vec<Obj> {
 /// from the shop. The bunch is the vase of flowers' own (`VASE_HEADS`).
 pub fn vase_empty() -> Vec<Obj> {
     let body = new_parts(|| {
-        turned!("vase", &VASE_BODY, M.vase, verts = 16);
+        turned!("vase", &_vase_profile(), M.vase, verts = 24);
     });
     join!(&body, "vase", origin = (0, 0, 0));
     let part = new_parts(|| _bunch(0.2, 0.232));
@@ -356,17 +364,15 @@ pub fn vase_empty() -> Vec<Obj> {
 pub fn vase_small() -> Vec<Obj> {
     turned!(
         "vase",
-        &[
-            (0.026, 0.0),
-            (0.03, 0.004),
-            (0.039, 0.035),
-            (0.04, 0.06),
-            (0.025, 0.12),
-            (0.013, 0.148),
-            (0.016, 0.16),
-            (0.011, 0.16),
-            (0.009, 0.15)
-        ],
+        &{
+            let mut rows = vec![(0.026, 0.0)];
+            rows.extend(spline(
+                &[(0.03, 0.004), (0.039, 0.035), (0.0385, 0.06), (0.025, 0.12), (0.013, 0.148)],
+                2,
+            ));
+            rows.extend([(0.016, 0.16), (0.011, 0.16), (0.009, 0.15)]);
+            rows
+        },
         M.bud_vase,
         verts = 16
     );

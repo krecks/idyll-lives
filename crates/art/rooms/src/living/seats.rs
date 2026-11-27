@@ -636,9 +636,11 @@ pub fn bean_bag() -> Vec<Obj> {
             // the dent the sitter has left, in front of the back
             for v in &mut o.mesh.verts {
                 let (x, y, z) = (v.x as f64, v.y as f64, v.z as f64);
-                let d = exp(-(pow(x / 0.24, 2.0) + pow((y + 0.05) / 0.2, 2.0)));
+                let d = exp(-(pow(x / 0.27, 2.0) + pow((y + 0.05) / 0.2, 2.0)));
                 if z > 0.18 {
-                    v.z = (z - 0.2 * d * 1.0_f64.min((z - 0.18) / 0.12)) as f32;
+                    // (eased in by a smoothstep, so the hollow has no crease at its rim)
+                    let k = 1.0_f64.min((z - 0.18) / 0.2);
+                    v.z = (z - 0.15 * d * k * k * (3.0 - 2.0 * k)) as f32;
                 }
             }
             // the seat panel sewn into the dent, in its own colour
@@ -653,7 +655,7 @@ pub fn bean_bag() -> Vec<Obj> {
                 }
                 let c = c * (1.0 / corners.len() as f32);
                 let n = o.mesh.face_normal(f);
-                if c.z as f64 > 0.15 && n.z as f64 > 0.45 && oval(c.x as f64, c.y as f64) < 1.0 {
+                if c.z as f64 > 0.15 && n.z as f64 > 0.15 && oval(c.x as f64, c.y as f64) < 1.0 {
                     o.mesh.faces[f].mat = slot;
                     seat[f] = true;
                 }
@@ -681,7 +683,7 @@ pub fn bean_bag() -> Vec<Obj> {
                 (v.x, v.y) = ((x * k) as f32, ((y + 0.07) * k - 0.07) as f32);
             }
         });
-        jitter!(bag, 0.012, size = 0.14, seed = 2.0, up = 0.5);
+        jitter!(bag, 0.005, size = 0.16, seed = 2.0, up = 0.5);
         fsweep!(
             F,
             "strap",

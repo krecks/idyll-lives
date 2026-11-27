@@ -349,7 +349,9 @@ pub fn vase_pedestal() -> Vec<Obj> {
 /// A marble bust on a stone pedestal: a turned socle, a chest cut off at the shoulders, a neck, a head lofted from
 /// chin to crown with a nose, eyelids, lips, a chin and ears, under a cap of curly hair.
 pub fn bust_marble() -> Vec<Obj> {
-    let y = 1.0;
+    let y = 0.975; // (the head is taller, so the pedestal is lower: the bust keeps its height)
+    // a head of life proportions (about 0.15 wide, 0.23 tall): the face's heights stretched up from the chin
+    let hz = |z: f64| 0.335 + (z - 0.335) * 1.3;
     new_parts(|| {
         pedestal(y, 0.4, M.stone);
         revolve!(
@@ -435,7 +437,9 @@ pub fn bust_marble() -> Vec<Obj> {
             (0.508, 0.005, 0.005, 0.012),
         ]
         .iter()
-        .map(|&(z, rx, ry, cy)| ring!(rx, ry, z = y + z, verts = 20, square = 2.2, at = (0.0, cy)))
+        .map(|&(z, rx, ry, cy)| {
+            ring!(rx * 1.12, ry * 1.04, z = y + hz(z), verts = 24, square = 2.2, at = (0.0, cy))
+        })
         .collect();
         loft!("head", &head, material = M.marble);
         extrude!(
@@ -448,7 +452,7 @@ pub fn bust_marble() -> Vec<Obj> {
                 (-0.004, -0.044)
             ],
             0.02,
-            at = (0, -0.078, y + 0.452),
+            at = (0, -0.082, y + hz(0.452)),
             material = M.marble,
             plane = Plane::YZ,
             rot = (0, 0, 180),
@@ -460,7 +464,7 @@ pub fn bust_marble() -> Vec<Obj> {
             sphere!(
                 format!("lid{s}"),
                 0.5,
-                at = (sf * 0.028, -0.074, y + 0.437),
+                at = (sf * 0.032, -0.078, y + hz(0.437)),
                 material = M.marble,
                 scale = (0.026, 0.012, 0.012),
                 segments = 10,
@@ -469,7 +473,7 @@ pub fn bust_marble() -> Vec<Obj> {
             sphere!(
                 format!("ear{s}"),
                 0.5,
-                at = (sf * 0.07, 0.004, y + 0.425),
+                at = (sf * 0.078, 0.004, y + hz(0.425)),
                 material = M.marble,
                 scale = (0.018, 0.03, 0.048),
                 rot = (0, 0, s * 20),
@@ -477,11 +481,11 @@ pub fn bust_marble() -> Vec<Obj> {
                 rings = 6
             );
         }
-        for (k, z) in [0.384, 0.374].into_iter().enumerate() {
+        for (k, z) in [hz(0.384), hz(0.374)].into_iter().enumerate() {
             sphere!(
                 format!("lip{k}"),
                 0.5,
-                at = (0, -0.074, y + z),
+                at = (0, -0.078, y + z),
                 material = M.marble,
                 scale = (0.03, 0.012, 0.009),
                 segments = 10,
@@ -491,7 +495,7 @@ pub fn bust_marble() -> Vec<Obj> {
         sphere!(
             "chin",
             0.5,
-            at = (0, -0.062, y + 0.352),
+            at = (0, -0.066, y + hz(0.352)),
             material = M.marble,
             scale = (0.036, 0.026, 0.026),
             segments = 10,
@@ -501,9 +505,9 @@ pub fn bust_marble() -> Vec<Obj> {
         let hair = boulder!(
             "hair",
             0.085,
-            at = (0, 0.016, y + 0.4),
+            at = (0, 0.016, y + hz(0.4)),
             material = M.marble,
-            scale = (0.95, 1.05, 0.8),
+            scale = (1.08, 1.12, 1.0),
             seed = 3.0,
             noise = 0.18,
             subdivisions = 3

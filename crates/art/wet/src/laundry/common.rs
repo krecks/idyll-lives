@@ -82,10 +82,10 @@ pub fn lump(
         material = mat,
         scale = scale,
         rot = (0.0, turn, 0.0),
-        segments = 10,
-        rings = 6
+        segments = 16,
+        rings = 10
     );
-    jitter!(obj, r * 0.18, size = r * 0.9, seed = seed)
+    jitter!(obj, r * 0.1, size = r * 1.2, seed = seed)
 }
 
 /// A folded towel lying on `y`: a soft slab, its folded edge rolled to the front.

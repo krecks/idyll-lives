@@ -1,7 +1,7 @@
 //! TT4 small ornaments.
 
 use super::M;
-use super::common::{_place, disc, done};
+use super::common::{_place, disc, done, spline};
 use artkit::forms::{self, rounded_rect};
 use artkit::kit::fillet;
 use artkit::kit::{Moulding, moulding};
@@ -312,7 +312,7 @@ pub fn globe() -> Vec<Obj> {
             (0.02, 0.026)
         ],
         M.wood_dark,
-        verts = 12
+        verts = 20
     );
     turned!(
         "column",
@@ -324,18 +324,18 @@ pub fn globe() -> Vec<Obj> {
             (0.006, 0.077)
         ],
         M.wood_dark,
-        verts = 8
+        verts = 12
     );
     let (z, r) = (0.19, 0.105);
     // (its sides between corners)
     let sea = ball!(
         "sea",
-        r / cosd(11.25),
+        r / cosd(180.0 / 28.0),
         (0.0, 0.0, z),
         M.globe,
         rot = (23, 0, 0),
-        seg = 16,
-        rings = 12
+        seg = 28,
+        rings = 16
     );
     sea.edit(|o| {
         let land = o.mesh.slot(M.land);
@@ -362,12 +362,12 @@ pub fn globe() -> Vec<Obj> {
             }
         }
     });
-    let ring: Vec<(f64, f64, f64)> = (0..18)
+    let ring: Vec<(f64, f64, f64)> = (0..36)
         .map(|i| {
             (
                 0.0,
-                0.117 * cos(TAU * i as f64 / 18.0),
-                z + 0.117 * sin(TAU * i as f64 / 18.0),
+                0.117 * cos(TAU * i as f64 / 36.0),
+                z + 0.117 * sin(TAU * i as f64 / 36.0),
             )
         })
         .collect();
@@ -532,23 +532,23 @@ pub fn trophy() -> Vec<Obj> {
             (0.014, 0.11)
         ],
         M.trophy,
-        verts = 12
+        verts = 16
     );
     turned!(
         "cup",
-        &[
-            (0.014, 0.108),
-            (0.03, 0.118),
-            (0.05, 0.145),
-            (0.06, 0.19),
-            (0.063, 0.218),
-            (0.065, 0.226),
-            (0.06, 0.226),
-            (0.057, 0.205),
-            (0.0, 0.2)
-        ],
+        &{
+            let mut rows = spline(
+                &[(0.014, 0.108), (0.03, 0.118), (0.05, 0.145), (0.06, 0.19), (0.063, 0.218), (0.065, 0.226)],
+                2,
+            );
+            for r in &mut rows {
+                r.0 *= 0.97; // (a full circle is wider than the old 14-gon: the size stays)
+            }
+            rows.extend([(0.06, 0.226), (0.057, 0.205), (0.0, 0.2)]);
+            rows
+        },
         M.trophy,
-        verts = 14
+        verts = 28
     );
     for s in [-1, 1] {
         let k = s as f64;

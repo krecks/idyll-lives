@@ -279,9 +279,20 @@ pub fn bean_bag_kids() -> Vec<Obj> {
         (0.515, 0.09, 0.07, -0.16),
         (0.528, 0.004, 0.004, -0.165),
     ];
-    let sections: Vec<Vec<P3>> = rings
+    // (a ring between each pair too, so the seat pressed in has rows to bend)
+    let mut all = vec![rings[0]];
+    for w in rings.windows(2) {
+        all.push((
+            (w[0].0 + w[1].0) / 2.0,
+            (w[0].1 + w[1].1) / 2.0,
+            (w[0].2 + w[1].2) / 2.0,
+            (w[0].3 + w[1].3) / 2.0,
+        ));
+        all.push(w[1]);
+    }
+    let sections: Vec<Vec<P3>> = all
         .iter()
-        .map(|&(y, rx, rz, z)| ring!(rx, rz, z = y, verts = 24, at = (0.0, -z)))
+        .map(|&(y, rx, rz, z)| ring!(rx, rz, z = y, verts = 32, at = (0.0, -z)))
         .collect();
     let bag = loft!("bag", &sections, material = M.bag);
     bag.edit(|o| {
@@ -295,7 +306,7 @@ pub fn bean_bag_kids() -> Vec<Obj> {
             }
         }
     });
-    rumple(bag, 0.014, 0.03, 7.0, 0.08);
+    rumple(bag, 0.007, 0.05, 7.0, 0.08);
     // (its cloth laid on from the sides, not round it: the seat pressed in stretches a turned layout)
     bag.edit(|o| o.uv = artkit::mesh::UvWay::Box); // up and down only: its bounds (the size and centre checks) stay put
     slab(
