@@ -5900,7 +5900,7 @@
       "group": "play",
       "outdoors": true,
       "decor": 0.3,
-      "description": "A little wooden house with a door and a window: children keep house in it for hours.",
+      "description": "A little wooden house with a doorway and a window: children keep house in it for hours.",
       "interactions": [
         {
           "id": "play",

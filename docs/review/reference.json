@@ -960,6 +960,74 @@
     "burgEuropaStand": {
       "title": "BURG-WÄCHTER stand for the Europa letter box (freestanding): 1200 × 80 × 80 mm, set in concrete",
       "url": "https://uk.burg.biz/p/post-box/stand-for-europa"
+    },
+    "haierChest": {
+      "title": "Haier chest freezer specification guide (HCF97W-HCF720W, April 2026): 845 mm high, 545-2042 mm wide, 500-780 mm deep",
+      "url": "https://www.haier.com.au/on/demandware.static/-/Sites-haier-master-catalog/default/dwfcb3fbc5/DesignPlanning-HaierAU/Haier-SpecificationGuide-en-HCF97W-HCF140W-HCF195W-HCF300W-HCF420W-HCF520W-HCF720W-ChestFreezer-0-90004823C-AU-NZ.pdf"
+    },
+    "concept2RowErg": {
+      "title": "Concept2, RowErg product specifications: 244 x 61 cm, seat 36 cm (standard legs) or 51 cm (tall legs)",
+      "url": "https://concept2help.zendesk.com/hc/en-us/articles/29377699390605-RowErg-Product-Specifications"
+    },
+    "waterRowerNatural": {
+      "title": "Fit&Well, WaterRower Natural review: 209 cm long, 56 cm wide, 53 cm high",
+      "url": "https://fitandwell.com/reviews/waterrower-natural-review"
+    },
+    "timbelaPlayhouse": {
+      "title": "B&Q, Timbela M570Z wooden children's playhouse: W 111 x D 114 x H 121 cm",
+      "url": "https://www.diy.com/departments/wooden-childrens-playhouse-w111-x-d114-x-h121-cm-timbela-m570z/0653078925500_BQ.prd"
+    },
+    "kidkraftAtrium": {
+      "title": "Costco UK, KidKraft Atrium playhouse: assembled H 162 x W 131 x D 161 cm",
+      "url": "https://costco.co.uk/Toys-Baby-Child/Outdoor-Play/Playcentres-Climbing-Frames/KidKraft-Atrium-Playhouse-3-10-Years/p/1740585"
+    },
+    "fairDinkumCarport": {
+      "title": "Fair Dinkum Builds, carport sizes and dimensions guide: a single carport typically 3 x 6 m, at least 2.4 m high",
+      "url": "https://www.fairdinkumbuilds.com.au/news/carport-sizes-and-dimensions-guide/"
+    },
+    "canopiaArizona": {
+      "title": "Canopia, Arizona 2.9 m x 5 m single carport",
+      "url": "https://au.canopia.com/product/arizona-2-9m-x-5m-single-carport/"
+    },
+    "sunjoyGazebo": {
+      "title": "B&Q, Sunjoy cedar wood gazebo 273 x 273 cm (about 274 cm high); the same range at 335 x 335 cm",
+      "url": "https://diy.com/departments/sunjoy-fsc-cedar-wood-gazebo-rapi-273cm-x-273cm-brown/0047793313429_BQ.prd"
+    },
+    "outsunnyGazebo": {
+      "title": "B&Q, Outsunny 3 x 3 m double-tier hardtop gazebo, wood frame: 2.85 m overall, 2.01 m to the eaves",
+      "url": "https://www.diy.com/departments/outsunny-3x-3-m-double-tier-hardtop-gazebo-outdoor-patio-shelter-w-wood-frame/5056534570101_BQ.prd"
+    },
+    "corbelPergola": {
+      "title": "B&Q, Corbel wooden garden pergola kit 1.8 x 2.4 m",
+      "url": "https://DIY.com/departments/corbel-wooden-garden-pergola-kit-1-8m-x-2-4m-natural-finish-/7526816325671_BQ.prd"
+    },
+    "premierPergola": {
+      "title": "B&Q, Premier heavy duty wooden pergola kit: 3 m posts set in the ground, finishing 2.4 m high; 2.4 x 2.4 to 3 x 3 m",
+      "url": "https://www.diy.com/departments/premier-heavy-duty-wooden-pergola-kit-garden-patio-bbq-hot-tub-h-3m-x-w-2-4m-x-l-2-4m-champion-design-rafters/5056556601999_BQ.prd"
+    },
+    "premiumPergola": {
+      "title": "B&Q, Premium pergola frame 3.6 m long x 2.7 m wide",
+      "url": "https://www.Diy.Com/departments/premium-pergolas-frame-only-3-6m-long-x-2-7m-wide/5056633167837_BQ.prd"
+    },
+    "costwayAwning": {
+      "title": "Lowe's, Costway manual retractable awning: 79.2 in (2.01 m) wide, 40 in (1.02 m) projection",
+      "url": "https://www.lowes.com/pd/-/5014230613"
+    },
+    "solarHart400": {
+      "title": "SolarHart 400-450 W module datasheet: 1722 x 1134 x 30 mm",
+      "url": "https://cdn.shopify.com/s/files/1/0526/3917/0722/files/SolarHart-400-450w_DataSheet.pdf"
+    },
+    "solarWatt400": {
+      "title": "Bimble Solar, SolarWatt 400 W glass-foil module: 1708 x 1134 x 30 mm",
+      "url": "https://www.bimblesolar.com/400W-SolarWatt"
+    },
+    "dunelmVenetian": {
+      "title": "Dunelm, made to measure 50 mm slat venetian blind: width 40-240 cm, drop 40-250 cm",
+      "url": "https://dunelm.com/product/made-to-measure-50mm-slats-white-venetian-blind-1000228330"
+    },
+    "venetaBlinds": {
+      "title": "Veneta Blinds, venetian blind specifications: depth needed 39 mm (25 mm slats), 68 mm (50 mm slats), 92 mm with a valance",
+      "url": "https://venetablinds.com.au/pages/venetian-blinds-specifications"
     }
   },
   "kinds": {
@@ -15800,6 +15868,342 @@
         "neufert"
       ],
       "reason": "its back board with a rail for tools stands over the worktop: 1.0-1.5 m"
+    },
+    "chestFreezer": {
+      "label": "Chest freezer (about 100 to 700 L)",
+      "w": [
+        0.54,
+        2.05
+      ],
+      "h": [
+        0.84,
+        0.86
+      ],
+      "d": [
+        0.5,
+        0.78
+      ],
+      "uses": [
+        "get something frozen",
+        "put the shopping away"
+      ],
+      "sources": [
+        "haierChest"
+      ]
+    },
+    "rowingMachine": {
+      "label": "Rowing machine (air or water, full length)",
+      "w": [
+        0.56,
+        0.61
+      ],
+      "d": [
+        2.09,
+        2.44
+      ],
+      "seat": [
+        0.3,
+        0.51
+      ],
+      "uses": [
+        "row"
+      ],
+      "sources": [
+        "concept2RowErg",
+        "waterRowerNatural"
+      ]
+    },
+    "playhouse": {
+      "label": "Children's wooden playhouse (Wendy house)",
+      "w": [
+        1.1,
+        1.35
+      ],
+      "h": [
+        1.2,
+        1.67
+      ],
+      "d": [
+        1.1,
+        1.65
+      ],
+      "uses": [
+        "keep house",
+        "play inside"
+      ],
+      "sources": [
+        "timbelaPlayhouse",
+        "kidkraftAtrium"
+      ]
+    },
+    "carport": {
+      "label": "Single carport (one car)",
+      "w": [
+        2.4,
+        3.6
+      ],
+      "h": [
+        2.2,
+        2.7
+      ],
+      "d": [
+        5.0,
+        6.0
+      ],
+      "sources": [
+        "fairDinkumCarport",
+        "canopiaArizona"
+      ]
+    },
+    "gazebo": {
+      "label": "Timber garden gazebo with a bench",
+      "w": [
+        2.7,
+        3.4
+      ],
+      "h": [
+        2.7,
+        3.0
+      ],
+      "d": [
+        2.7,
+        3.4
+      ],
+      "seat": [
+        0.42,
+        0.48
+      ],
+      "uses": [
+        "sit in the shade"
+      ],
+      "sources": [
+        "sunjoyGazebo",
+        "outsunnyGazebo",
+        "dimBench"
+      ]
+    },
+    "pergola": {
+      "label": "Garden pergola on four posts",
+      "w": [
+        1.8,
+        3.6
+      ],
+      "h": [
+        2.2,
+        2.5
+      ],
+      "d": [
+        1.8,
+        3.6
+      ],
+      "sources": [
+        "corbelPergola",
+        "premierPergola",
+        "premiumPergola"
+      ]
+    },
+    "windowAwning": {
+      "label": "Canvas awning over a window or a door",
+      "w": [
+        1.0,
+        2.4
+      ],
+      "d": [
+        0.6,
+        1.05
+      ],
+      "uses": [
+        "let it out for shade"
+      ],
+      "sources": [
+        "costwayAwning",
+        "neufert"
+      ]
+    },
+    "solarArray": {
+      "label": "Ground-mounted solar array: two modules side by side (each 1.0-1.13 m wide, 1.65-1.76 m long), flat to 45 deg",
+      "w": [
+        2.0,
+        2.3
+      ],
+      "d": [
+        1.2,
+        1.76
+      ],
+      "sources": [
+        "solarHart400",
+        "solarWatt400"
+      ]
+    },
+    "blinds": {
+      "label": "Venetian blinds over a window",
+      "w": [
+        0.4,
+        2.4
+      ],
+      "h": [
+        0.4,
+        2.5
+      ],
+      "d": [
+        0.03,
+        0.1
+      ],
+      "uses": [
+        "let them down at night",
+        "tilt them against the sun"
+      ],
+      "sources": [
+        "dunelmVenetian",
+        "venetaBlinds"
+      ]
+    },
+    "shutters": {
+      "label": "Pair of louvred window shutters",
+      "w": [
+        0.6,
+        2.4
+      ],
+      "h": [
+        0.6,
+        2.2
+      ],
+      "d": [
+        0.03,
+        0.1
+      ],
+      "uses": [
+        "close them against the sun"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "coatHooks": {
+      "label": "Row of coat hooks on a board",
+      "w": [
+        0.3,
+        1.2
+      ],
+      "h": [
+        0.08,
+        0.25
+      ],
+      "d": [
+        0.05,
+        0.15
+      ],
+      "uses": [
+        "hang up a coat or a bag"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "hallStand": {
+      "label": "Hall stand: bench with a shoe shelf, hooks and a mirror",
+      "w": [
+        0.6,
+        1.2
+      ],
+      "h": [
+        1.7,
+        2.0
+      ],
+      "d": [
+        0.3,
+        0.45
+      ],
+      "seat": [
+        0.42,
+        0.48
+      ],
+      "uses": [
+        "sit to put on shoes",
+        "hang up a coat"
+      ],
+      "sources": [
+        "neufert",
+        "dimBench"
+      ]
+    },
+    "shoeRack": {
+      "label": "Shoe rack (two to four shelves)",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        0.3,
+        1.0
+      ],
+      "d": [
+        0.25,
+        0.4
+      ],
+      "uses": [
+        "keep the shoes tidy"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "doorbell": {
+      "label": "Doorbell push (wired or video)",
+      "w": [
+        0.03,
+        0.12
+      ],
+      "h": [
+        0.06,
+        0.18
+      ],
+      "d": [
+        0.02,
+        0.05
+      ],
+      "uses": [
+        "ring it"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "burglarAlarm": {
+      "label": "Burglar alarm bell box (and keypad)",
+      "w": [
+        0.15,
+        0.35
+      ],
+      "h": [
+        0.2,
+        0.4
+      ],
+      "d": [
+        0.04,
+        0.12
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "securityCamera": {
+      "label": "Security camera on a wall bracket",
+      "w": [
+        0.06,
+        0.15
+      ],
+      "h": [
+        0.06,
+        0.2
+      ],
+      "d": [
+        0.15,
+        0.4
+      ],
+      "sources": [
+        "neufert"
+      ]
     }
   },
   "groups": {
@@ -16460,7 +16864,24 @@
     "massageTable": "massageTable",
     "sauna": "saunaCabin",
     "toiletSmart": "toiletBoxed",
-    "toiletWallHung": "toiletBoxed"
+    "toiletWallHung": "toiletBoxed",
+    "uprightFreezer": "fridge",
+    "chestFreezer": "chestFreezer",
+    "rowingMachine": "rowingMachine",
+    "playhouse": "playhouse",
+    "carport": "carport",
+    "gazebo": "gazebo",
+    "pergola": "pergola",
+    "awning": "windowAwning",
+    "solarPanels": "solarArray",
+    "blinds": "blinds",
+    "shutters": "shutters",
+    "coatHooks": "coatHooks",
+    "hallStand": "hallStand",
+    "shoeRack": "shoeRack",
+    "doorbell": "doorbell",
+    "burglarAlarm": "burglarAlarm",
+    "cctvCamera": "securityCamera"
   },
   "decor": [
     "wallArt",
@@ -16531,7 +16952,15 @@
     "jetty",
     "rowingBoat",
     "reeds",
-    "beachHut"
+    "beachHut",
+    "coatHooks",
+    "hallStand",
+    "shoeRack",
+    "burglarAlarm",
+    "securityCamera",
+    "carport",
+    "pergola",
+    "solarArray"
   ],
   "surfaces": {
     "brick": {
