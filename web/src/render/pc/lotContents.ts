@@ -183,6 +183,9 @@ function fireFlicker(id: number, seconds: number): number {
  * whose share past 1 is the emission's own factor, `GAME_GLOW_TINT`); whether that changed it.
  */
 function setGlow(g: Glow, i: number, f: number, gain = 1): boolean {
+  // (Compared as stored: a level or gain a float32 can't hold would read as changed every time.)
+  f = Math.fround(f);
+  gain = Math.fround(gain);
   if (g.colors[i * 4] === f && g.colors[i * 4 + 3] === gain) return false;
   g.colors.fill(f, i * 4, i * 4 + 3);
   g.colors[i * 4 + 3] = gain;
@@ -1332,10 +1335,14 @@ export class LotContents {
         const lampOn = lamp >= 0 ? light.lampOn(lamp) : room ? light.roomOn(room) : 1;
         const dark = !!room && light.dimmed(room);
         const f = (dark ? 1 : light.level) * lampOn;
-        if (g.base) g.base[i] = f;
+        lit ||= f > 0;
+        if (g.base) {
+          // A fire: `animateFires` flickers its colour about the base, so only the base changing is a change.
+          if (g.base[i] === Math.fround(f)) return;
+          g.base[i] = f;
+        }
         // (A light fitting's glass `LAMP_GLASS` times as bright, and where no daylight comes as bright to the eye as at night.)
         changed = setGlow(g, i, f, g.glass ? LAMP_GLASS * (dark ? light.dark : 1) : 1) || changed;
-        lit ||= f > 0;
       });
       if (g.draw.destroyed) continue;
       if (changed) uploadGlow(g);
