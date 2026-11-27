@@ -80,9 +80,8 @@ export function swingGate(fences: Fences, gate: GateLeaf, open: number, towards:
  * The gates on the ground as it is now (`ground`, as they were built on; a land stroke moved it): each leaf and post
  * that moved lifted or lowered in the mesh and those spans alone sent up, as a swing's (many of them: the span from the
  * first to the last, at once), a leaf's rest with it (it swings on from there), the mesh's box grown to hold them.
- * Whether any moved.
  */
-export function regroundGates(fences: Fences, ground: (x: number, z: number) => number): boolean {
+export function regroundGates(fences: Fences, ground: (x: number, z: number) => number): void {
   const vb = fences.mesh.vertexBuffer;
   const e = vb.format.elements.find((el) => el.name === pc.SEMANTIC_POSITION)!;
   const copy = vb.lock();
@@ -115,7 +114,7 @@ export function regroundGates(fences: Fences, ground: (x: number, z: number) => 
       lift(post.first, post.count, dp);
     }
   }
-  if (!spans.length) return false;
+  if (!spans.length) return;
   // (A town's gates' mesh is some 12 MB, its posts after all the leaves: a stroke's few gates sent up span by span, a
   // whole town's, 1 000 uploads, as one.)
   if (spans.length <= 2 * MANY_SPANS) for (let i = 0; i < spans.length; i += 2) vb.unlock(e.offset + spans[i] * e.stride, (spans[i + 1] - 1) * e.stride + 12);
@@ -126,7 +125,6 @@ export function regroundGates(fences: Fences, ground: (x: number, z: number) => 
   const grown = new pc.BoundingBox();
   grown.setMinMax(min, max);
   fences.mesh.aabb = grown;
-  return true;
 }
 
 /** A leaf's `values` (x, y, z a vertex, from vertex `first`) into `vb`'s copy of stream `semantic`, and that span alone sent up: not the whole town's gates. */

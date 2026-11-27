@@ -7,7 +7,7 @@
 // as the hand reaches the handle.)
 import { describe, expect, test } from 'bun:test';
 import { PLAYBACK_RATE } from '../src/render/shared/gameSpeed';
-import { anyoneNear, DOOR_SWING, PACE, doorLead, doorReach, goingThrough, moverCells } from '../src/render/shared/doors';
+import { anyoneNear, DOOR_SWING, PACE, doorCell, doorLead, goingThrough, moverCells } from '../src/render/shared/doors';
 import { rustConst } from './snapshotLayout';
 
 /**
@@ -112,7 +112,7 @@ describe('doors', () => {
     let asked = 0;
     for (const rate of [1, 10, 30, 60]) {
       const l = doorLead(rate);
-      const size = Math.max(8, doorReach(l));
+      const size = doorCell(l);
       for (let k = 0; k < 16; k++) {
         const a = (k / 16) * Math.PI * 2;
         const off = l - 0.2;
@@ -126,7 +126,7 @@ describe('doors', () => {
     }
     expect(asked).toBeGreaterThan(32);
     // Nobody near: nobody asked.
-    moverCells(movers([200, 200, 201, 200, 1]), 8, cells);
-    expect(anyoneNear(cells, 8, gate[0], gate[1])).toBe(false);
+    moverCells(movers([200, 200, 201, 200, 1]), doorCell(lead), cells);
+    expect(anyoneNear(cells, doorCell(lead), gate[0], gate[1])).toBe(false);
   });
 });

@@ -90,7 +90,7 @@ import { closedParts, flatLids, inClosed, LID_THICK, viewedFlats, viewedLot, typ
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
 import { cutInView } from '../shared/landVeil';
-import { anyoneNear, DOOR_SWING, doorLead, doorReach, goingThrough, moverCells } from '../shared/doors';
+import { anyoneNear, DOOR_SWING, doorCell, doorLead, goingThrough, moverCells } from '../shared/doors';
 import { smooth } from '../../game/noise';
 import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, sunTurned, type Lighting, type RGB } from '../shared/environment';
@@ -228,8 +228,6 @@ const TARGET_EASE = 0.25;
 const PIT_MARGIN = 0.3;
 /** The doors and gates opening or falling shut kept for the world's sound between its looks (`doorSounds`). */
 const DOOR_SOUNDS = 16;
-/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`), at least: wider at a speed whose lead reaches further (`doorReach`). */
-const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** A roof's height (m) over a house's top storey, at most, for a click on it (`buildingAt`). */
@@ -704,7 +702,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly awakeRooms = new Set<number>();
   private readonly occupiedRooms = new Set<number>();
   private readonly movers: number[] = [];
-  /** The cells (`GATE_CELL` or wider: `swingDoors`) someone on the move is in this frame. */
+  /** The cells (`doorCell` m: `swingDoors`) someone on the move is in this frame. */
   private readonly moverCells = new Set<number>();
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
@@ -2244,6 +2242,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // it moved.)
     const shaped = this.lot.landscape;
     const taken = shaped?.heightField ? shaped.takeRoads(world) : [];
+    // (Solved there and then: what was placed on the surface before, the other lots' gates and maybe the traffic
+    // lights' poles, stands on it again. The sun's shadows are taken again once everyone is home, `buildSims`.)
+    if (taken.length) this.regroundPlaced();
     if (shaped && taken.length) void this.queueLand('land: roads taken', async () => {
       // (Behind the world's build and the warm-up, not in their way: on the way into a game, the land moved by a few
       // centimetres round its junctions.)
@@ -3019,7 +3020,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const casts = (c: readonly [number, number]) => this.sunShadows.reaches(c[0], c[1] - this.rowOf(this.storeyOf(Math.floor(c[1]))));
     // (A town has a gate in most gardens, a house a door or more a room: one standing shut with
     // nobody within a cell of it isn't asked. The cells as wide as the lead reaches at this speed, at super speed tens of metres.)
-    const size = Math.max(GATE_CELL, doorReach(lead));
+    const size = doorCell(lead);
     const near = this.moverCells;
     moverCells(movers, size, near);
     for (const gate of this.gates) {
@@ -3059,7 +3060,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // resident's pose does: held to the preset's `shadowRate`.)
       urgent ||= leaf.front;
     }
-    // (Doors and gates cast only the sun's shadow.)
+    // (Doors and gates cast only the sun's shadow. Any that swung shows in the mirrors' held reflections, whether it casts or not.)
+    if (swung) this.mirrors.changed();
     if (moved) this.sunShadows.moved(urgent, false);
     else if (swung) this.pictureChanged();
   }
@@ -3102,7 +3104,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.settleTarget(this.frameDt / 1000);
     this.keepCameraClear();
     if (this.lot.update(frame)) {
-      this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
+      this.mirrors.changed(); // (the objects' clips, the screens, the fires' flicker; things moving, in the held reflections.)
       this.pictureChanged();
     }
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
@@ -3842,18 +3844,24 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved();
     if (!surface || !this.builtWorld) return;
     if (this.street.landMoved(surface)) this.streamStreet();
-    // (Those that look the ground up only when placed: the traffic lights' poles, the cars standing, the parked rides,
-    // the other lots' gates.)
-    this.signals.setGround(this.builtGround);
-    this.cars.setGround(this.builtGround);
-    this.parkedRides.setGround(this.builtGround);
-    if (this.townGates) regroundGates(this.townGates, this.builtGround);
+    this.regroundPlaced();
     const view = this.view;
     const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     if (at < 0) return;
     const datum = surface.padY(at);
     this.applyDatum(datum);
     this.street.setLotY(datum);
+  }
+
+  /**
+   * Those that look the ground up only when placed stand on the surface again (solved again: a land stroke, a world's
+   * roads taken on): the traffic lights' poles, the cars standing, the parked rides, the other lots' gates.
+   */
+  private regroundPlaced(): void {
+    this.signals.setGround(this.builtGround);
+    this.cars.setGround(this.builtGround);
+    this.parkedRides.setGround(this.builtGround);
+    if (this.townGates) regroundGates(this.townGates, this.builtGround);
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {

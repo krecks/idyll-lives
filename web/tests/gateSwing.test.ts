@@ -76,8 +76,12 @@ describe('a gate swinging', () => {
     };
     const before = positions();
     const top = fences.mesh.aabb.getMax().y;
+    // (What is sent to the GPU: byte offset, length.)
+    const sent: [number, number][] = [];
+    const unlock = vb.impl.unlock.bind(vb.impl);
+    vb.impl.unlock = (b: pc.VertexBuffer, offset?: number, length?: number) => (sent.push([offset ?? 0, length ?? vb.numBytes]), unlock(b, offset, length));
     // The land raised 1.5 m under the pair, not under the one apart.
-    expect(regroundGates(fences, (x) => (x < 5 ? 1.5 : 0))).toBe(true);
+    regroundGates(fences, (x) => (x < 5 ? 1.5 : 0));
     const after = positions();
     const apart = new Set<number>();
     for (const g of [fences.gates[2]]) for (let v = g.first; v < g.first + g.rest.length / 3; v++) apart.add(v);
@@ -87,6 +91,9 @@ describe('a gate swinging', () => {
       expect(after[v * 3]).toBe(before[v * 3]);
       expect(after[v * 3 + 1]).toBeCloseTo(before[v * 3 + 1] + dy, 5);
       expect(after[v * 3 + 2]).toBe(before[v * 3 + 2]);
+      // Each one moved sent up with a span.
+      const at = pos.offset + v * pos.stride;
+      if (dy) expect(sent.some(([offset, length]) => at >= offset && at + 12 <= offset + length)).toBe(true);
     }
     // The open leaf swings on from its new rest; the box holds the lifted ones.
     const leaf = fences.gates[1];
@@ -94,7 +101,9 @@ describe('a gate swinging', () => {
     after.slice(leaf.first * 3, leaf.first * 3 + leaf.rest.length).forEach((v, k) => expect(v).toBeCloseTo(swung[k], 5));
     expect(fences.mesh.aabb.getMax().y).toBeGreaterThan(top + 1.4);
     expect(fences.mesh.aabb.getMax().y).toBeGreaterThanOrEqual(Math.max(...after.filter((_, k) => k % 3 === 1)));
-    // The same ground again: nothing to move.
-    expect(regroundGates(fences, (x) => (x < 5 ? 1.5 : 0))).toBe(false);
+    // The same ground again: nothing to move, nothing sent.
+    sent.length = 0;
+    regroundGates(fences, (x) => (x < 5 ? 1.5 : 0));
+    expect(sent).toEqual([]);
   });
 });

@@ -1271,6 +1271,11 @@
           "who": "post.ts idlePasses: the scene's half-size copy (scenePassHalf) is read only by the bloom and the depth of field"
         },
         {
+          "file": "extras/render-passes/frame-pass-camera-frame.js",
+          "text": "this.scenePassHalf = new RenderPassDownsample(",
+          "who": "post.ts idlePasses: the frame's half-size copy of the scene is its scenePassHalf (left out with the bloom)"
+        },
+        {
           "file": "extras/render-passes/frame-pass-bloom.js",
           "text": "onDisable() {",
           "who": "post.ts idlePasses: the bloom left out shrinks its targets, and makes them again in frameUpdate when back"

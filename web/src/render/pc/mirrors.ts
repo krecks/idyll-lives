@@ -31,11 +31,12 @@
  * A reflection is drawn on demand and held in between ("held": its camera is off and its target keeps
  * the last picture): again when the camera moves, the mirror moves (a cabinet's door), a resident in its
  * view moves, or the renderer says something else changed (`changed`: the sun, the lamps, things placed
- * or moving), with a `rate` (Low and Medium) at most that many times a second, without one (High) in the
- * frame it changed. A held reflection is looked up through the camera it was drawn for, so it stays on
- * the glass while the camera moves on (only its parallax lags, until the next draw). The picking that
- * places the glasses and ranks them runs only on the frames that may draw one. What moves only for the
- * eye (the plants' sway, the water's flow) stands still in a held reflection until the next draw.
+ * or moving, a door swinging, a fan turning, a fire's or a screen's flicker), with a `rate` (Low and
+ * Medium) at most that many times a second, without one (High) in the frame it changed. A held
+ * reflection is looked up through the camera it was drawn for, so it stays on the glass while the camera
+ * moves on (only its parallax lags, until the next draw). The picking that places the glasses and ranks
+ * them runs only on the frames that may draw one. What moves only for the eye (the plants' sway, the
+ * water's flow) stands still in a held reflection until the next draw.
  *
  * Mirrors follow their object's instance matrix each frame, so things popping in, hidden storeys,
  * things on walls cut away and objects being moved need nothing extra. A reflection's target (and
@@ -752,7 +753,7 @@ export class Mirrors {
 
   /**
    * Whether this frame can find anything to draw again: a reflection is due, and it was marked to
-   * draw again, or the camera moved since it was drawn, or a resident in its view did.
+   * draw again, or the camera moved since it was drawn, or a resident in its view (as it is now) did.
    */
   private due(now: number, viewProj: Float32Array, residents: MirrorResidents | null): boolean {
     let held = false;
@@ -761,9 +762,13 @@ export class Mirrors {
       if (!r) continue;
       held = true;
       if (now < r.due - EARLY) continue;
+      const shown = r.next?.slot === i;
+      // Who its view shows, again while anyone moves (`pick` finds it only in a frame that draws): else one walking
+      // into a view nobody was in would stay out of it.
+      if (shown && residents?.posed) this.seesResidents(r, residents);
       // Marked to draw again counts only while a glass still shows it: one no glass was given
       // isn't drawn, so its mark would otherwise hold every frame to a full pick until let go.
-      if ((r.dirty && r.next?.slot === i) || this.seenMoving(r, viewProj, residents)) return true;
+      if ((r.dirty && shown) || this.seenMoving(r, viewProj, residents)) return true;
     }
     // No reflection held (none made yet, or all let go): the glasses have to be picked again.
     return !held;

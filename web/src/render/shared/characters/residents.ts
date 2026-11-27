@@ -2046,9 +2046,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
       // Paused, posed twice already by what's the same now (`stillKey`): posed the same again, so left as they are. Not
       // those the carry-along above leaves out either (others' poses hang on theirs, or their frame's blanket, hand prop
-      // and seed are gathered as they're posed).
+      // and seed are gathered as they're posed), nor one getting up from under a blanket (drawn only as they're posed),
+      // nor one whose contact shadow the renderer took away (far off: back once the camera comes near).
       const flags = this.poseFar[i] | (this.facePx[i] >= MORPH_PX ? 2 : 0);
-      if (paused && this.stillTwice[i] && this.stillAt[i] === this.stillKey && this.stillFlags[i] === flags && doorSame && rig.visible && !rig.speech && !this.directions[i] && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i]) {
+      if (paused && this.stillTwice[i] && this.stillAt[i] === this.stillKey && this.stillFlags[i] === flags && doorSame && rig.visible && !rig.speech && !this.directions[i] && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i] && rig.cover <= 0 && shadows[i * 16 + 15] !== 0) {
         if (this.mountId[i] >= 0) this.riddenNow.add(this.mountId[i]);
         continue;
       }

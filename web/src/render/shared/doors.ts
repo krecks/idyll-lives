@@ -42,6 +42,14 @@ export function doorReach(lead: number): number {
   return Math.max(DOOR_CLEAR, lead + 0.5);
 }
 
+/** Cells (m) the residents on the move are sorted into (`moverCells`), at least. */
+const GATE_CELL = 8;
+
+/** The cells (m) to sort the movers into for a lead `lead` (`moverCells`): `GATE_CELL`, wider at a speed whose lead reaches further. */
+export function doorCell(lead: number): number {
+  return Math.max(GATE_CELL, doorReach(lead));
+}
+
 /** A cell's key (`moverCells`). */
 const cellKey = (cx: number, cz: number) => (cx + 1024) * 4096 + cz + 1024;
 
