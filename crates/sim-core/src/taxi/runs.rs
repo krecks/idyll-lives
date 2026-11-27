@@ -462,6 +462,20 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
                 )
         });
     }
+    // (Nor off while one is out round it in the other lane (`cars::PassBy`): stopped there, for
+    // someone on a bike on the far side, it was left behind it as it pulled away, out in the other
+    // lane, and a car coming that way waited for it, the taxi for that one, all three for good,
+    // Gannet Island. Till it's past, a while at most.)
+    if !busy && tick <= since + PASS_ROUND_MOST {
+        let key = crate::cars::car_first(c);
+        busy = w.traffic.passing.iter().any(|&(o, taxi)| {
+            taxi == key
+                && w.cars.get(crate::cars::car_index(o)).is_some_and(|x| {
+                    x.pass_by
+                        .is_some_and(|p| (p.from..p.to).contains(&x.progress))
+                })
+        });
+    }
     if !busy {
         let run = &mut w.taxis.runs[k];
         run.next += 1;
@@ -475,6 +489,9 @@ fn stand(w: &mut World, k: usize, c: usize, next: usize) {
 /// drive time).
 const PASS_BY: f32 = 0.3;
 const PASS_BY_MOST: u64 = crate::drive_secs(3.0);
+/// How long a taxi ready to go on waits at most since it stood for one out round it to get past
+/// (ticks of drive time).
+const PASS_ROUND_MOST: u64 = crate::drive_secs(30.0);
 
 /// Resident `i`, booked on a taxi, isn't riding it: unbooked, and on their way to work or school
 /// their own way (from the kerb, or wherever they've got to); planned once more for the same start
