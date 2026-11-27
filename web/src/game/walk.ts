@@ -153,6 +153,9 @@ export class WalkMode {
     const k = e.key.toLowerCase();
     if (down && (e.repeat || e.ctrlKey || e.metaKey || e.altKey)) return;
     if (down && this.deps.busy()) return;
+    // (Typed into a text box: words, not steps.)
+    const t = e.target;
+    if (down && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable))) return;
     if (k === 'f') {
       if (down) this.deps.useAt(innerWidth / 2, innerHeight / 2);
       return;

@@ -150,10 +150,11 @@ pub(super) fn wait_spot(travel: &crate::travel::Travel, stop: &Kerb) -> [f32; 2]
     let off = stop.s - stop.mouth.s;
     let way = if off < 0.0 { -1.0 } else { 1.0 };
     let end = off - way * (TAXI_LEN / 2.0 + WAIT_CLEAR);
+    // (Its near end too near the driveway's mouth: by its far end, still clear of where it parks.)
     let s = if end * way >= WAIT_ASIDE {
         stop.mouth.s + end
     } else {
-        stop.mouth.s + way * WAIT_ASIDE
+        stop.s + way * (TAXI_LEN / 2.0 + WAIT_CLEAR)
     };
     let (c, t) = (road.at(s), road.tangent(s));
     let right = crate::cars::right_of(t);

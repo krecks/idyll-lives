@@ -40,9 +40,14 @@ impl World {
             .get_mut(sim as usize)
             .filter(|s| s.here())
             .ok_or_else(|| Error::new(format!("unknown resident {sim}")))?;
-        if s.current.is_some() {
-            end_activity(s, content, objects);
+        // (Twice at most: a talk from the seat ended gives back what they sat down to do, `end_activity`.)
+        for _ in 0..2 {
+            if s.current.is_some() {
+                end_activity(s, content, objects);
+            }
         }
+        s.heeding = None;
+        s.engaged_with = None;
         s.queue.clear();
         self.enqueue(sim, TaskKind::MoveTo { x, z })
     }

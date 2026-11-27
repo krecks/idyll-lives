@@ -1779,7 +1779,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /** Walk mode's resident row, drawn without a body (-1: none). */
-  unseen = -1;
+  get unseen(): number {
+    return this.unseenRow;
+  }
+  set unseen(row: number) {
+    // (Paused, the row given back is posed again, not left as zeroed: `stillKey`.)
+    if (row !== this.unseenRow) this.stillKey++;
+    this.unseenRow = row;
+  }
+  private unseenRow = -1;
 
   /** Head-top position of Sim `i` (false if not drawn). */
   head(i: number, out: { x: number; y: number; z: number }): boolean {

@@ -196,7 +196,14 @@ pub(crate) fn park_beside(w: &mut World, c: usize) -> Option<bool> {
         return None;
     }
     let shift = car.shift + (want - car.shift).clamp(-PULL_RATE, PULL_RATE);
-    if (shift - car.shift).abs() < 1e-5 || w.sims.iter().any(|s| s.car_bound() == Some(c as u32)) {
+    // (Those riding in it, `car_bound` too, are seated where it is each tick: no one to move from under.)
+    let coming = |s: &crate::world::Sim| {
+        s.car_bound() == Some(c as u32)
+            && !s
+                .current()
+                .is_some_and(|a| matches!(a.phase, crate::world::Phase::Driving))
+    };
+    if (shift - car.shift).abs() < 1e-5 || w.sims.iter().any(coming) {
         return Some(false);
     }
     let mut others = vehicles(&w.cars, Some(c));

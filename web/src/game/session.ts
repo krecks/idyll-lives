@@ -888,7 +888,11 @@ async function openSession(
       game.customising = null;
       // (Build and Create happen at home: see below.)
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
-      if (mode !== 'live') controls.exitWalk();
+      if (mode !== 'live') {
+        controls.exitWalk();
+        // (A chat opened from a social menu, not walking: closed too, its resident let go.)
+        controls.openTalk(null);
+      }
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
       if (mode !== 'build') landMode.putAway();

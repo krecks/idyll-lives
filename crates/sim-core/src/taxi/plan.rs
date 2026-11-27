@@ -74,6 +74,7 @@ pub(super) fn warm_kerbs(w: &mut World) {
     if w.taxis.kerbs.stamp != stamp {
         w.taxis.kerbs = Kerbs::find(w, stamp);
     }
+    let mut moved = false;
     for h in 0..w.households.len() {
         let Some(plot) = w.households[h].plot else {
             continue;
@@ -97,6 +98,19 @@ pub(super) fn warm_kerbs(w: &mut World) {
             plots.resize(plot as usize + 1, None);
         }
         plots[plot as usize] = Some((door, kerb));
+        moved = true;
+    }
+    // (A door moved, its stand with it: the bays as the stands are now.)
+    if moved {
+        let stands: Vec<Kerb> = w
+            .taxis
+            .kerbs
+            .plots
+            .iter()
+            .flatten()
+            .filter_map(|p| p.1)
+            .collect();
+        w.taxis.kerbs.bays = find_bays(w, stands.into_iter());
     }
 }
 
