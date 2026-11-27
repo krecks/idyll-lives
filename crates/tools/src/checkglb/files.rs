@@ -125,12 +125,15 @@ pub(super) fn check(
         furniture,
         counting.file,
     )?;
-    // `opened` came in after the models it finds: counted against the baseline.
-    let mut opened = Found::default();
+    // `opened` and `unmoved` came in after the models they find: counted against the baseline.
+    let mut tagged: BTreeMap<&'static str, Found> = BTreeMap::new();
     warnings.retain(|w| match untag(w) {
-        Some(("opened", text)) => {
-            opened.count += 1;
-            opened.text.push(text.to_string());
+        Some((kind, text)) if TAGGED.contains(&kind) => {
+            let found = tagged
+                .entry(TAGGED.iter().find(|k| **k == kind).unwrap())
+                .or_default();
+            found.count += 1;
+            found.text.push(text.to_string());
             false
         }
         _ => true,
@@ -223,11 +226,14 @@ pub(super) fn check(
     // The counted checks: what they found in the file and its far version's (`far: …`), and the batch checks'.
     let mut found: BTreeMap<&'static str, Found> = BTreeMap::new();
     // (Counted where it finds any, or the baseline or the entry names it: none found is then stale, or unused.)
-    if opened.count > 0
-        || counting.baseline.get("opened", entry_key) > 0
-        || entry.get("accept").and_then(|a| a.get("opened")).is_some()
-    {
-        found.insert("opened", opened);
+    for check in TAGGED {
+        let f = tagged.remove(check).unwrap_or_default();
+        if f.count > 0
+            || counting.baseline.get(check, entry_key) > 0
+            || entry.get("accept").and_then(|a| a.get(check)).is_some()
+        {
+            found.insert(check, f);
+        }
     }
     let far_found = far_counted.into_iter().map(|(c, f)| {
         let text = f.text.into_iter().map(|t| format!("far: {t}")).collect();
@@ -264,6 +270,52 @@ pub(super) fn check(
         summary,
         counts,
     })
+}
+
+/// The counted checks (`COUNTED`) found among a file's tagged warnings (`strict`), not by a `FileCheck`.
+const TAGGED: [&str; 2] = ["opened", "unmoved"];
+
+/// The strict `unmoved` warnings of a model file (not a far version's): each named part no clip moves, but the
+/// still `body`, where the model has more than one still part. Not a part it carries (`ASIDE`), nor one a
+/// content object draws it with takes in the hand (`held.part`); not a held `tool.*`, a bird or a vehicle, whose
+/// parts the game moves by code (birds.ts, vehicles.ts).
+pub(super) fn unmoved(key: &str, entry: &J, g: &Glb, facts: Option<&Vec<Facts>>) -> R<Vec<String>> {
+    let objects: Vec<&J> = facts.into_iter().flatten().map(|f| &f.object).collect();
+    let vehicle = objects
+        .iter()
+        .any(|o| o.get("vehicle").is_some_and(J::truthy));
+    if in_hand(key) || entry.get("bird").is_some_and(J::truthy) || vehicle {
+        return Ok(Vec::new());
+    }
+    let held: HashSet<String> = objects
+        .iter()
+        .filter_map(|o| Some(o.get("held")?.get("part")?.str()?.to_string()))
+        .collect();
+    let aside = aside_nodes(&g.gltf);
+    let empty = J::Arr(Vec::new());
+    let nodes = g.gltf.get("nodes").unwrap_or(&empty);
+    let still: Vec<String> = node_matrices(&g.gltf, None, None)?
+        .iter()
+        .filter(|p| p.part.is_none() && !aside.contains(&p.node))
+        .map(|p| node_name(nodes, p.node))
+        .filter(|n| !held.contains(n))
+        .collect();
+    if still.len() < 2 {
+        return Ok(Vec::new());
+    }
+    Ok(still
+        .iter()
+        .filter(|n| *n != "body")
+        .map(|n| {
+            strict(
+                "unmoved",
+                format!(
+                    "part {} moves in no clip and isn't held: join it into the still `body`, or give it its clip",
+                    repr_str(n)
+                ),
+            )
+        })
+        .collect())
 }
 
 /// What `check` found of one model: its errors, its warnings, the strict findings its entry `accept`s (each with
@@ -340,6 +392,9 @@ fn check_file(
     let (clip_errors, clip_warnings) = check_clips(&g, entry)?;
     errors.extend(clip_errors);
     warnings.extend(clip_warnings);
+    if !far {
+        warnings.extend(unmoved(entry_key, entry, &g, facts)?);
+    }
     // The parts the player may colour (`paint`: a material's name, or {material, label}): materials of the file.
     let materials = gltf.get("materials").and_then(J::list).unwrap_or(&[]);
     let names: Vec<J> = materials

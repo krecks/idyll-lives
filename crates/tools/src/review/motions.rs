@@ -45,6 +45,135 @@ pub fn action_keys(source: &str) -> Result<BTreeSet<String>, String> {
         .collect())
 }
 
+/// The renderer's tables a use is weighed against (render/shared/characters/actions.ts, `Renderer::parse`).
+#[derive(Debug, Clone, Default)]
+pub struct Renderer {
+    /// `ACTIONS`' tags (`action_keys`).
+    pub actions: BTreeSet<String>,
+    /// {tag: its `sit`} of `ACTIONS`, as TypeScript: a clip's name, or a function of the object's id (`sit_clips`).
+    pub sits: BTreeMap<String, String>,
+    /// {manner: its `sit`, if it has one} of `MANNERS` (content `how` names them; none in the source: empty).
+    pub manners: BTreeMap<String, Option<String>>,
+    /// `RIDES`' object ids: sat astride, the hands on its grips, whatever the tag's `sit` (residents.ts).
+    pub rides: BTreeSet<String>,
+    /// The source's `const NAME = new Set([…])` of strings, for a `sit` that asks `NAME.has(def)`.
+    pub sets: BTreeMap<String, BTreeSet<String>>,
+}
+
+impl Renderer {
+    /// The tables of actions.ts (`source`): `ACTIONS` must be there, `MANNERS` and `RIDES` may not.
+    pub fn parse(source: &str) -> Result<Renderer, String> {
+        let sit = |body: &str| field(body, "sit").map(String::from);
+        let optional = |name| ts_block(source, name).map(ts_entries).unwrap_or_default();
+        let literal = Regex::new(r"'([^']*)'").unwrap();
+        let set =
+            Regex::new(r"(?s)\bconst (\w+)(?::[^=]*)? = new Set(?:<[^>]*>)?\(\[(.*?)\]\)").unwrap();
+        Ok(Renderer {
+            actions: action_keys(source)?,
+            sits: ts_entries(ts_block(source, "ACTIONS")?)
+                .into_iter()
+                .filter_map(|(k, body)| Some((k, sit(&body)?)))
+                .collect(),
+            manners: optional("MANNERS")
+                .into_iter()
+                .map(|(k, body)| (k, sit(&body)))
+                .collect(),
+            rides: optional("RIDES").into_iter().map(|(k, _)| k).collect(),
+            sets: set
+                .captures_iter(source)
+                .map(|c| {
+                    let names = literal.captures_iter(&c[2]).map(|l| l[1].to_string());
+                    (c[1].to_string(), names.collect())
+                })
+                .collect(),
+        })
+    }
+}
+
+/// The top-level entries of a TypeScript object's body (`ts_block`): (key, its value's text), comment lines left out.
+fn ts_entries(block: &str) -> Vec<(String, String)> {
+    let key = Regex::new(r"^  ([A-Za-z_$][\w$]*|'[^']+'): (.*)$").unwrap();
+    let mut out: Vec<(String, String)> = Vec::new();
+    for line in block.lines().filter(|l| !l.trim_start().starts_with("//")) {
+        match (key.captures(line), out.last_mut()) {
+            (Some(c), _) => out.push((c[1].trim_matches('\'').to_string(), c[2].to_string())),
+            (None, Some((_, body))) => {
+                body.push('\n');
+                body.push_str(line);
+            }
+            (None, None) => {}
+        }
+    }
+    out
+}
+
+/// The value of `name` in an object literal's text (`{ stand: […], sit: 'sitHands' }`): up to the `,` or `}` that
+/// ends it at the literal's own depth, strings skipped.
+fn field<'a>(object: &'a str, name: &str) -> Option<&'a str> {
+    let b = object.as_bytes();
+    let (mut depth, mut quote, mut start) = (0i32, None::<u8>, None::<usize>);
+    for (i, &c) in b.iter().enumerate() {
+        if let Some(q) = quote {
+            if c == q && b[i - 1] != b'\\' {
+                quote = None;
+            }
+            continue;
+        }
+        match c {
+            b'\'' | b'"' | b'`' => quote = Some(c),
+            b'{' | b'[' | b'(' => depth += 1,
+            b'}' | b']' | b')' | b',' if depth == 1 && start.is_some() => {
+                return Some(object[start?..i].trim());
+            }
+            b'}' | b']' | b')' => depth -= 1,
+            _ if depth == 1
+                && start.is_none()
+                && object[i..].starts_with(name)
+                && object[i + name.len()..].starts_with(':')
+                && (i == 0 || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_')) =>
+            {
+                start = Some(i + name.len() + 1);
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The clips a `sit` (`Renderer::sits`, `manners`) plays at object `def`: a name; a function of `def` that is one
+/// test (`def.includes('x')`, `def === 'x'`, `SET.has(def)`, or `!` one) choosing between two names; else (or a
+/// set it can't read) every name it holds.
+pub fn sit_clips(
+    sit: &str,
+    def: &str,
+    sets: &BTreeMap<String, BTreeSet<String>>,
+) -> BTreeSet<String> {
+    let literal = Regex::new(r"'([^']*)'").unwrap();
+    let arrow = Regex::new(r"^\(?\s*\w+(?:\s*:\s*\w+)?\s*\)?\s*=>\s*").unwrap();
+    let test = Regex::new(r"^(!?)(?:def\.includes\('([^']*)'\)|def === '([^']*)'|(\w+)\.has\(def\))\s*\?\s*'([^']*)'\s*:\s*'([^']*)'$").unwrap();
+    let body = arrow.replace(sit.trim(), "");
+    let mut e = body.trim();
+    if e.starts_with('(') && e.ends_with(')') {
+        e = e[1..e.len() - 1].trim();
+    }
+    let every = || literal.captures_iter(e).map(|c| c[1].to_string()).collect();
+    let Some(c) = test.captures(e) else {
+        return every();
+    };
+    let truth = match (c.get(2), c.get(3), c.get(4)) {
+        (Some(part), _, _) => Some(def.contains(part.as_str())),
+        (_, Some(id), _) => Some(def == id.as_str()),
+        (_, _, Some(set)) => sets.get(set.as_str()).map(|s| s.contains(def)),
+        _ => None,
+    };
+    let negated = !c[1].is_empty();
+    match truth.map(|t| t != negated) {
+        Some(true) => [c[5].to_string()].into(),
+        Some(false) => [c[6].to_string()].into(),
+        None => every(),
+    }
+}
+
 /// {action tag: loop}: `ACTION_SOUNDS` in audio/world.ts (`source`).
 pub fn action_sounds(source: &str) -> Result<BTreeMap<String, String>, String> {
     let entry = Regex::new(r"(?m)^  ([A-Za-z_$][\w$]*): '([^']+)'").unwrap();

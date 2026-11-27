@@ -18,13 +18,20 @@
 //!   cargo review uses [--md <dir>]    each object's uses, poses, minutes, effects, skills, slots, approach,
 //!                                     motions and sounds, and what looks wrong there: a summary per category
 //!                                     (`--md`: every object, `<dir>/uses-<cat>.md`)
+//!         [--check]                   fails on a hard flag (an anim not in `ACTIONS`, a stray `motions` key, an
+//!                                     open without `motions.open`), and on an object with more of a counted flag
+//!                                     than tools/art/gate-baseline.json holds for it (`USES_CHECKS`, by id: a `how`
+//!                                     not in `MANNERS`, a clip with no sound, an `overWindow` with no `night` clip
+//!                                     or `shut` sound, a seat with the desk's hands and no `surface`), or fewer
+//!         [--update-baseline] [--seed-baseline]
+//!                                     as `sizes`'s, for those sections
 //!
 //! The content is read as the game reads it (sim-core merges base.json and its includes, so `default_anim` and
 //! the defaults apply), and raw for what sim-core keeps no copy of (`model`, `category`, `group`, a use's `when`,
 //! `leaves` and its tags in order). Sizes and heights are `cargo check-glb`'s (`checkglb::measures`), with what
 //! the review measures besides: a top its kind has and its content hasn't, a table's H without its seats and a
 //! stair's top step (`h_of`). The manifests give each model's
-//! `motions`; the renderer's `ACTIONS` (render/shared/characters/actions.ts) and action sounds (audio/world.ts) are read from its
+//! `motions`; the renderer's `ACTIONS`, `MANNERS` and `RIDES` (render/shared/characters/actions.ts) and action sounds (audio/world.ts) are read from its
 //! source. A category is the object's buy category, or `packs` for a personality
 //! pack's objects.
 

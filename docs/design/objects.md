@@ -495,7 +495,10 @@ are the examples; `hinged`, `turn`, `swing!` and `slide!` do the work.
   `--preview` also draws each file as read. A content file or manifest it can't read is a FAIL naming the file.
 - **`cargo review sizes --check`** (in CI) holds every buyable object's sizes and heights to its kind in
   `docs/review/reference.json` (a tree or plant to its species), what is outside today held by
-  `tools/art/gate-baseline.json`'s `reference`; **`cargo review uses --check`** every use the renderer plays.
+  `tools/art/gate-baseline.json`'s `reference`; **`cargo review uses --check`** every use the renderer plays,
+  and, held by the same file's `uses.*` sections, each `how` a manner of `MANNERS`, each clip a use plays heard (or
+  `"none"`), each `overWindow` thing shut with a `night` clip or a `shut` sound, and no seat on the desk's hands
+  without a top.
   It measures the piece's own body: what it carries (`parts::aside`, a moving part named `<what>_aside` too) is
   left out of its size, its top and its height as a table, though the seats and mattresses residents use are
   measured on all of it; a model no content object draws (a street bench) has its seat found as its kind's.

@@ -26,6 +26,13 @@ pub struct Object {
     pub sounds: BTreeMap<String, String>,
     /// The world sound it makes by itself (content `ambient`: a fountain).
     pub ambient: Option<String>,
+    /// How its uses are done, by animation tag (content `how`: a manner of the renderer's `MANNERS`).
+    pub how: BTreeMap<String, String>,
+    /// It hangs over a window, shut at dusk (content `overWindow`: curtains, blinds, shutters).
+    pub over_window: bool,
+    /// A seated use's hands have a top to rest on: its own (content `surface`), the desk or table it is pulled up
+    /// to (`seatAt`), or the one it stands on (`layer: surface`, a laptop).
+    pub top: bool,
 }
 
 /// One of an object's interactions.
@@ -234,6 +241,16 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
                 .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
                 .collect(),
             ambient: raw["ambient"].as_str().map(String::from),
+            how: raw["how"]
+                .as_object()
+                .into_iter()
+                .flatten()
+                .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
+                .collect(),
+            over_window: raw["overWindow"].as_bool().unwrap_or(false),
+            top: raw.get("surface").is_some_and(|s| !s.is_null())
+                || !strs(&raw["seatAt"]).is_empty()
+                || raw["layer"].as_str() == Some("surface"),
         });
     }
     Ok(out)

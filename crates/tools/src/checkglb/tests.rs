@@ -1327,11 +1327,12 @@ fn the_gate_judges_by_the_baseline_and_update_only_lowers() {
     set("{\"edges\": {\"model.gone\": 2}}\n");
     let none: &[(&'static str, FileCheck)] = &[("edges", nothing)];
     // (A stub check finds nothing, so a model that accepts `edges` fails for its accept being unused; and this
-    // baseline has no `opened` section, strict for every model, so the models it finds fail too.)
+    // baseline has no `opened` or `unmoved` section, strict for every model, so the models they find fail too.)
     let expected = |t: &str| {
         t.lines().filter(|l| l.contains("error: ")).all(|l| {
             l.contains("`accept.edges` is unused")
                 || l.contains("error: opened (")
+                || l.contains("error: part '")
                 || l.contains("no model the gate checked")
         })
     };
@@ -1532,4 +1533,65 @@ fn a_top_on_a_pad_is_not_taken_for_a_thing_on_a_rail() {
         top_near(&s, [0.85, 0.95], &[]).map(|(_, h)| (h * 1000.0).round()),
         Some(843.0)
     );
+}
+
+/// `unmoved`: a named part no clip moves, besides the still `body`, where a model has more than one still part;
+/// not what it carries (`_aside`), the part its object takes in the hand (`held.part`), a held tool's, a bird's or a
+/// vehicle's.
+#[test]
+fn a_still_part_besides_the_body_is_unmoved() {
+    let model = |names: &[&str]| {
+        let nodes: Vec<String> = names
+            .iter()
+            .map(|n| format!(r#"{{"name": "{n}", "mesh": 0}}"#))
+            .collect();
+        let json = format!(
+            r#"{{"asset": {{"version": "2.0"}}, "scenes": [{{"nodes": {:?}}}], "nodes": [{}],
+            "meshes": [{{"primitives": [{{"attributes": {{"POSITION": 0}}}}]}}],
+            "animations": [{{"name": "open", "channels": [{{"sampler": 0, "target": {{"node": 1, "path": "rotation"}}}}], "samplers": []}}],
+            "bufferViews": [{{"byteOffset": 0, "byteLength": 36}}],
+            "accessors": [{{"bufferView": 0, "componentType": 5126, "type": "VEC3", "count": 3, "min": [0, 0, 0], "max": [0.5, 0.5, 0]}}]}}"#,
+            (0..names.len()).collect::<Vec<_>>(),
+            nodes.join(", ")
+        );
+        let bin: Vec<u8> = [0f32, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0]
+            .iter()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
+        parse_glb(&glb::tests::glb(&json, &bin)).unwrap()
+    };
+    let facts = |object: &str| {
+        vec![Facts {
+            id: J::Str("thing".into()),
+            footprint: j("[1, 1]"),
+            layer: J::Null,
+            outside: false,
+            stairs: false,
+            radius: 0.12,
+            object: j(object),
+        }]
+    };
+    let found = |key: &str, entry: &str, g: &Glb, f: Option<&Vec<Facts>>| -> Vec<String> {
+        unmoved(key, &j(entry), g, f)
+            .unwrap()
+            .iter()
+            .map(|w| {
+                let (kind, text) = untag(w).unwrap();
+                assert_eq!(kind, "unmoved");
+                text.split('\'').nth(1).unwrap().to_string()
+            })
+            .collect()
+    };
+    // The door (node 1) moves; the lid and the ukulele don't; the picture is carried.
+    let g = model(&["body", "door", "lid", "picture_aside", "ukulele"]);
+    assert_eq!(found("model.x", "{}", &g, None), ["lid", "ukulele"]);
+    let held = facts(r#"{"held": {"part": "ukulele"}}"#);
+    assert_eq!(found("model.x", "{}", &g, Some(&held)), ["lid"]);
+    // Moved by code, or only ever in the hand: none.
+    assert!(found("tool.x", "{}", &g, None).is_empty());
+    assert!(found("model.x", r#"{"bird": {"kind": "x"}}"#, &g, None).is_empty());
+    let bike = facts(r#"{"vehicle": {"kind": "bike"}}"#);
+    assert!(found("model.x", "{}", &g, Some(&bike)).is_empty());
+    // One still part is the body, whatever its name.
+    assert!(found("model.x", "{}", &model(&["cabinet", "door"]), None).is_empty());
 }

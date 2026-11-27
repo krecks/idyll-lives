@@ -5,7 +5,7 @@ use super::*;
 pub fn use_flags(
     object: &Object,
     motions: Option<&Value>,
-    actions: &BTreeSet<String>,
+    renderer: &Renderer,
     medians: &BTreeMap<String, f32>,
     decor: bool,
     heard: &Sounds,
@@ -15,7 +15,7 @@ pub fn use_flags(
         out.push(Flag::NoUse);
     }
     for u in &object.uses {
-        if !u.anim.is_empty() && !actions.contains(&u.anim) {
+        if !u.anim.is_empty() && !renderer.actions.contains(&u.anim) {
             out.push(Flag::NoAction {
                 using: u.id.clone(),
                 anim: u.anim.clone(),
@@ -81,7 +81,75 @@ pub fn use_flags(
             }
         }
     }
+    for (tag, manner) in &object.how {
+        if !renderer.manners.contains_key(manner) {
+            out.push(Flag::Manner {
+                tag: tag.clone(),
+                manner: manner.clone(),
+            });
+        }
+    }
+    for u in &object.uses {
+        let clip = ["uses", "loops"].iter().any(|part| {
+            motions
+                .and_then(|m| m[*part].as_object())
+                .is_some_and(|m| m.contains_key(&u.id) || m.contains_key(&u.anim))
+        });
+        if clip
+            && u.end_sound.is_none()
+            && sound_of(heard.tag, object, u).is_none()
+            && !hushed(object, u)
+        {
+            out.push(Flag::Silent {
+                using: u.id.clone(),
+            });
+        }
+    }
+    let night = motions.is_some_and(|m| m.get("night").is_some_and(|n| !n.is_null()));
+    if object.over_window && !night && !object.sounds.contains_key("shut") {
+        out.push(Flag::NoShut);
+    }
+    // (Astride a ride the hands are on its grips, whatever the tag sits with: residents.ts.)
+    if !object.top && !renderer.rides.contains(&object.id) {
+        for u in object.uses.iter().filter(|u| u.pose == "sit") {
+            let manner = object
+                .how
+                .get(&u.anim)
+                .and_then(|m| renderer.manners.get(m));
+            let Some(sit) = manner
+                .cloned()
+                .flatten()
+                .or_else(|| renderer.sits.get(&u.anim).cloned())
+            else {
+                continue;
+            };
+            if sit_clips(&sit, &object.id, &renderer.sets)
+                .iter()
+                .any(|c| c.starts_with("sitHands"))
+            {
+                out.push(Flag::DeskHands {
+                    using: u.id.clone(),
+                    anim: u.anim.clone(),
+                });
+            }
+        }
+    }
     out
+}
+
+/// Whether use `u` of `o` is silent by choice: `"none"` its own `sound`, else the object's for its animation (each
+/// step's, for a recipe's steps at it).
+fn hushed(o: &Object, u: &Use) -> bool {
+    let none = |anim: &str, own: Option<&String>| {
+        own.or_else(|| o.sounds.get(anim))
+            .is_some_and(|s| s == "none")
+    };
+    match &u.steps_here {
+        Some(steps) => {
+            !steps.is_empty() && steps.iter().all(|(anim, own)| none(anim, own.as_ref()))
+        }
+        None => none(&u.anim, u.sound.as_ref()),
+    }
 }
 
 /// The sounds only one kind of object makes: `sound` → that kind, for every sound `SOUND_OWNERS` objects of one

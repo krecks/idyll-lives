@@ -1,8 +1,9 @@
 //! `cargo review` on small fixtures (tests/fixtures/review/reference.json and a few objects made here): the
 //! range logic, which kind an object is, and each flag of `uses`; and once over the shipped content.
 
+use ll_tools::checkglb::baseline::Baseline;
 use ll_tools::checkglb::{Height, Measure, Measures, Paths};
-use ll_tools::review::{self, Flag, Object, Reference, Use};
+use ll_tools::review::{self, Flag, Object, Reference, Renderer, Use};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -424,7 +425,7 @@ fn the_kind_is_by_id_then_model_then_category_and_group_then_group() {
 }
 
 /// A toy catalogue: a sofa bed whose model is missing `motions.open`, a fridge with a stray key, decor.
-fn catalogue() -> (Vec<Object>, BTreeMap<String, Value>, BTreeSet<String>) {
+fn catalogue() -> (Vec<Object>, BTreeMap<String, Value>, Renderer) {
     let mut sofa = object("sofaBed", "living", "seating");
     sofa.uses = vec![
         using("relax", "relax", 30.0, &["rest"]),
@@ -463,10 +464,13 @@ fn catalogue() -> (Vec<Object>, BTreeMap<String, Value>, BTreeSet<String>) {
             json!({ "uses": { "fetch": "door", "stir": "door", "drink": "door" }, "loops": { "feast": "hum", "dance": "spin" } }),
         ),
     ]);
-    let actions: BTreeSet<String> = ["relax", "nap", "fetch", "eat", "wash", "harvest", "cook"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let actions = Renderer {
+        actions: ["relax", "nap", "fetch", "eat", "wash", "harvest", "cook"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        ..Renderer::default()
+    };
     (
         vec![sofa, fridge, sink, table, vase, crate_, crop],
         motions,
@@ -531,12 +535,20 @@ fn each_uses_flag() {
             },
         )
     };
-    // Opens with `leaves` but its model has no `motions.open`.
+    // Opens with `leaves` but its model has no `motions.open`; its clips sound of nothing.
     assert_eq!(
         flags("sofaBed", false),
-        [Flag::NoOpen {
-            using: "doze".into()
-        }]
+        [
+            Flag::NoOpen {
+                using: "doze".into()
+            },
+            Flag::Silent {
+                using: "doze".into()
+            },
+            Flag::Silent {
+                using: "pullOut".into()
+            },
+        ]
     );
     // A key that is a use's id (`feast`), an anim (`fetch`) or a station's anim (`stir`) is fine; `drink` and
     // `dance` aren't. 90 minutes is over 3 × the median of `eat`, 20.
@@ -554,6 +566,12 @@ fn each_uses_flag() {
                 minutes: 90.0,
                 like: "eat".into(),
                 median: 20.0
+            },
+            Flag::Silent {
+                using: "snack".into()
+            },
+            Flag::Silent {
+                using: "feast".into()
             },
         ]
     );
@@ -687,6 +705,62 @@ fn the_renderer_tables_are_read_from_its_source() {
             .collect()
     );
     assert!(review::action_keys("const OTHER = {\n};\n").is_err());
+    // Each tag's `sit` (a comment line left out); `MANNERS` and `RIDES` may be missing.
+    let r = Renderer::parse(ts).unwrap();
+    assert_eq!(
+        r.sits,
+        BTreeMap::from([("exercise".to_string(), "'sitHands'".to_string())])
+    );
+    assert!(r.manners.is_empty() && r.rides.is_empty());
+    let more = format!(
+        "{ts}export const NEAR = new Set(['desk.a', 'desk.b']);\nexport const MANNERS: Record<string, Partial<ActionAnim>> = {{\n  row: {{ stand: ['jog'], sit: (def) => (def.includes('Rower') ? 'sitRow' : 'sit'), hands: HANDS.grip }},\n  plain: {{\n    hands: HANDS.open,\n  }},\n}};\nconst RIDES: Record<string, Ride> = {{\n  swingSet: {{ sizes: X }},\n}};\n"
+    );
+    let r = Renderer::parse(&more).unwrap();
+    assert_eq!(
+        r.manners,
+        BTreeMap::from([
+            ("plain".to_string(), None),
+            (
+                "row".to_string(),
+                Some("(def) => (def.includes('Rower') ? 'sitRow' : 'sit')".to_string())
+            )
+        ])
+    );
+    assert_eq!(r.rides, ["swingSet".to_string()].into());
+    assert_eq!(
+        r.sets["NEAR"],
+        ["desk.a".to_string(), "desk.b".to_string()].into()
+    );
+    // A `sit` by the object: one test chooses (or `!` it), else every clip it names.
+    let clips = |sit: &str, def: &str| {
+        review::sit_clips(sit, def, &r.sets)
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(clips("'sitHands'", "x"), ["sitHands"]);
+    let row = r.manners["row"].as_deref().unwrap();
+    assert_eq!(clips(row, "bigRower"), ["sitRow"]);
+    assert_eq!(clips(row, "bike"), ["sit"]);
+    let near = "(def) => (NEAR.has(def) ? 'sitHandsNear' : 'sitHands')";
+    assert_eq!(clips(near, "desk.a"), ["sitHandsNear"]);
+    assert_eq!(clips(near, "desk.c"), ["sitHands"]);
+    assert_eq!(
+        clips("(def) => (!NEAR.has(def) ? 'a' : 'b')", "desk.a"),
+        ["b"]
+    );
+    assert_eq!(
+        clips("(def) => (def === 'cello' ? 'sit' : 'sitHands')", "cello"),
+        ["sit"]
+    );
+    // A set it can't read, or more than one test: either.
+    assert_eq!(
+        clips("(def) => (OTHER.has(def) ? 'a' : 'b')", "x"),
+        ["a", "b"]
+    );
+    assert_eq!(
+        clips("(def) => (A.has(def) ? 'a' : B.has(def) ? 'b' : 'c')", "x"),
+        ["a", "b", "c"]
+    );
     let world = "const ACTION_SOUNDS: Record<string, LoopKind> = {\n  cook: 'sizzle',\n  // The cooking steps.\n  chop: 'chop',\n  wash: 'tap',\n};\n";
     let sounds = review::action_sounds(world).unwrap();
     assert_eq!(sounds.len(), 3);
@@ -742,7 +816,7 @@ fn the_renderer_tables_are_read_from_its_source() {
 fn the_shipped_content_reads() {
     let paths = Paths::repo();
     let objects = review::objects(Path::new(&paths.content)).unwrap();
-    assert_eq!(objects.len(), 608);
+    assert_eq!(objects.len(), 625);
     let by = |id: &str| objects.iter().find(|o| o.id == id).unwrap();
     let sofa = by("sofaBed");
     assert_eq!(
@@ -791,7 +865,7 @@ fn the_shipped_content_reads() {
     let motions = review::motions(&paths).unwrap();
     assert_eq!(motions["model.sofaBed"]["open"], "bed_out");
     let root = ll_tools::checkglb::repo_root();
-    let actions = review::action_keys(
+    let actions = Renderer::parse(
         &std::fs::read_to_string(format!(
             "{root}/web/src/render/shared/characters/actions.ts"
         ))
@@ -799,16 +873,24 @@ fn the_shipped_content_reads() {
     )
     .unwrap();
     assert!(
-        actions.len() > 40 && actions.contains("serve") && !actions.contains("stand"),
+        actions.actions.len() > 40
+            && actions.actions.contains("serve")
+            && !actions.actions.contains("stand"),
         "{actions:?}"
     );
+    // A tag's seat, a function of the object (`write`) or none (`eat`); the rides by id; the sets a `sit` asks.
+    assert_eq!(actions.sits["type"], "'sitHands'");
+    assert!(actions.sits["write"].contains("NEAR_DESKS.has(def)"));
+    assert!(!actions.sits.contains_key("eat"));
+    assert!(actions.rides.contains("swingSet"));
+    assert!(actions.sets["NEAR_DESKS"].contains("gloomy.journalDesk"));
     let sounds = review::action_sounds(
         &std::fs::read_to_string(format!("{root}/web/src/audio/world.ts")).unwrap(),
     )
     .unwrap();
     assert_eq!(sounds.get("shower").map(String::as_str), Some("shower"));
     let (text, files, _) = review::uses(&objects, &motions, &actions, &sounds, None);
-    assert!(text.contains("| **all** | 608 |"), "{text}");
+    assert!(text.contains("| **all** | 625 |"), "{text}");
     assert_eq!(files.len(), 16);
 
     // The gate CI runs (`cargo review uses --check`): no use the renderer can't play, no `motions` key
@@ -817,4 +899,193 @@ fn the_shipped_content_reads() {
     let reference = review::Reference::parse(&reference).unwrap();
     let (_, _, hard) = review::uses(&objects, &motions, &actions, &sounds, Some(&reference));
     assert!(hard.is_empty(), "{hard:?}");
+    // And the counted flags within tools/art/gate-baseline.json.
+    let sections = review::use_sections(&objects, &motions, &actions, &sounds, Some(&reference));
+    let baseline = Baseline::read(&paths.baseline).unwrap();
+    let over = review::judge(&sections, &baseline, "uses");
+    assert!(over.is_empty(), "{over:?}");
+}
+
+/// The counted flags of `uses`: a `how` no manner answers, a clip that sounds of nothing, a window thing that shuts
+/// unseen and unheard, and a seat with the desk's hands and nothing to rest them on (the rowing machine's).
+#[test]
+fn each_counted_uses_flag() {
+    let mut rower = object("rower", "hobbies", "fitness");
+    rower.uses = vec![using("row", "exercise", 30.0, &["fitness"])];
+    rower.uses[0].pose = "sit";
+    let motions = json!({ "uses": { "row": "pull" } });
+    let mut renderer = Renderer {
+        actions: ["exercise".to_string()].into(),
+        sits: [("exercise".to_string(), "'sitHands'".to_string())].into(),
+        manners: [
+            ("row".to_string(), Some("'sitRow'".to_string())),
+            ("lift".to_string(), None),
+        ]
+        .into(),
+        ..Renderer::default()
+    };
+    let no_sounds = BTreeMap::new();
+    let flags = |o: &Object, m: Option<&Value>, r: &Renderer, sounds: &BTreeMap<String, String>| {
+        review::use_flags(
+            o,
+            m,
+            r,
+            &BTreeMap::new(),
+            false,
+            &review::Sounds {
+                tag: sounds,
+                owners: &BTreeMap::new(),
+                kind: None,
+            },
+        )
+    };
+    let desk_hands = Flag::DeskHands {
+        using: "row".into(),
+        anim: "exercise".into(),
+    };
+    let silent = Flag::Silent {
+        using: "row".into(),
+    };
+    assert_eq!(
+        flags(&rower, Some(&motions), &renderer, &no_sounds),
+        [silent.clone(), desk_hands.clone()]
+    );
+    // A sound by its tag, its own `"none"` or one as it ends: heard, or silent by choice.
+    let sounds = BTreeMap::from([("exercise".to_string(), "whirr".to_string())]);
+    assert_eq!(
+        flags(&rower, Some(&motions), &renderer, &sounds),
+        vec![desk_hands.clone()]
+    );
+    let mut hushed = rower.clone();
+    hushed.sounds = [("exercise".to_string(), "none".to_string())].into();
+    assert_eq!(
+        flags(&hushed, Some(&motions), &renderer, &no_sounds),
+        vec![desk_hands.clone()]
+    );
+    hushed.sounds.clear();
+    hushed.uses[0].end_sound = Some("clunk".into());
+    assert_eq!(
+        flags(&hushed, Some(&motions), &renderer, &no_sounds),
+        vec![desk_hands.clone()]
+    );
+    // A loop by its tag plays a clip too; no clip, no flag.
+    let loops = json!({ "loops": { "exercise": "pull" } });
+    assert_eq!(
+        flags(&rower, Some(&loops), &renderer, &no_sounds),
+        [silent, desk_hands.clone()]
+    );
+    assert_eq!(
+        flags(&rower, None, &renderer, &no_sounds),
+        vec![desk_hands.clone()]
+    );
+    // Its manner sits it otherwise; a manner `MANNERS` lacks is flagged and sits by the tag; one with no `sit` too.
+    let mut rowed = rower.clone();
+    rowed.how = [("exercise".to_string(), "row".to_string())].into();
+    assert_eq!(flags(&rowed, None, &renderer, &no_sounds), []);
+    rowed.how = [("exercise".to_string(), "glide".to_string())].into();
+    assert_eq!(
+        flags(&rowed, None, &renderer, &no_sounds),
+        [
+            Flag::Manner {
+                tag: "exercise".into(),
+                manner: "glide".into()
+            },
+            desk_hands.clone()
+        ]
+    );
+    rowed.how = [("exercise".to_string(), "lift".to_string())].into();
+    assert_eq!(
+        flags(&rowed, None, &renderer, &no_sounds),
+        vec![desk_hands.clone()]
+    );
+    // A top for the hands, or a ride's grips: no flag. Standing: none.
+    let mut desk = rower.clone();
+    desk.top = true;
+    assert_eq!(flags(&desk, None, &renderer, &no_sounds), []);
+    renderer.rides.insert("rower".into());
+    assert_eq!(flags(&rower, None, &renderer, &no_sounds), []);
+    renderer.rides.clear();
+    let mut standing = rower.clone();
+    standing.uses[0].pose = "stand";
+    assert_eq!(flags(&standing, None, &renderer, &no_sounds), []);
+    // Over a window: a `night` clip shows it shut, a `shut` sound (even `"none"`) says it.
+    let mut blinds = object("blinds", "decor", "windows");
+    blinds.over_window = true;
+    blinds.uses = vec![using("tilt", "exercise", 1.0, &[])];
+    assert_eq!(flags(&blinds, None, &renderer, &no_sounds), [Flag::NoShut]);
+    assert_eq!(
+        flags(
+            &blinds,
+            Some(&json!({ "night": "down" })),
+            &renderer,
+            &no_sounds
+        ),
+        []
+    );
+    blinds.sounds = [("shut".to_string(), "none".to_string())].into();
+    assert_eq!(flags(&blinds, None, &renderer, &no_sounds), []);
+    // Each is counted by the baseline, not hard; a section each.
+    for (f, section) in [
+        (Flag::NoShut, "uses.shut"),
+        (desk_hands, "uses.hands"),
+        (
+            Flag::Silent {
+                using: String::new(),
+            },
+            "uses.sound",
+        ),
+        (
+            Flag::Manner {
+                tag: String::new(),
+                manner: String::new(),
+            },
+            "uses.manner",
+        ),
+    ] {
+        assert!(!f.hard());
+        assert_eq!(f.section(), Some(section));
+        assert!(review::USES_CHECKS.contains(&section));
+    }
+
+    // Ratcheted: none in the baseline fails, as many is held, fewer is stale; seeding writes what is found.
+    let objects = vec![rower.clone(), blinds.clone()];
+    let renderer = Renderer {
+        rides: BTreeSet::new(),
+        ..renderer
+    };
+    let sections = review::use_sections(&objects, &BTreeMap::new(), &renderer, &no_sounds, None);
+    let hands = |b: &str| review::judge(&sections, &Baseline::parse(b).unwrap(), "uses");
+    let new = hands("{}");
+    assert_eq!(new.len(), 1, "{new:?}");
+    assert!(
+        new[0].starts_with(
+            "`rower`: 1 sat, desk hands, none in the baseline: row: sat at `exercise`"
+        ),
+        "{new:?}"
+    );
+    assert!(hands(r#"{"uses.hands": {"rower": 1}}"#).is_empty());
+    assert!(
+        hands(r#"{"uses.hands": {"rower": 2}}"#)[0]
+            .contains("lower it (`cargo review uses --update-baseline`)")
+    );
+    assert!(
+        hands(r#"{"uses.hands": {"rower": 1, "gone": 1}}"#)[0]
+            .starts_with("`gone`: in the baseline, but no object")
+    );
+    let seeded = review::seed(&sections, &Baseline::default()).unwrap();
+    assert_eq!(
+        seeded,
+        Baseline::parse(r#"{"uses.hands": {"rower": 1}}"#).unwrap()
+    );
+    assert!(review::seed(&sections, &seeded).is_err());
+    let (lowered, _) = review::lower(
+        &sections,
+        &Baseline::parse(r#"{"uses.hands": {"rower": 3}, "uses.shut": {"blinds": 1, "gone": 1}}"#)
+            .unwrap(),
+    );
+    // (The blinds have their `shut` sound now: out, with the id no object has.)
+    assert_eq!(
+        lowered,
+        Baseline::parse(r#"{"uses.hands": {"rower": 1}}"#).unwrap()
+    );
 }
