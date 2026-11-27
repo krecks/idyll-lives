@@ -4,7 +4,8 @@
 // again (`posed`), and the shadow-only copies draw only those who may cast into a map (`setCastTest`). And the pose
 // texture's three texels a bone (`layout.ts` `BONE_TEXELS`) are the skinning matrices' rows, number for number, its
 // changed rows uploaded in bands round them, not one from the first to the last; and residents far off are posed in
-// full only every few frames, carried along where they are between. `bun test`.
+// full only every few frames, carried along where they are between; and the seat or bed under one is looked for in
+// their square of the town, not among them all. `bun test`.
 //
 // (What this caught when written: the hair, the eyes and the shadow-only copies kept every resident built, drawn or
 // not, and one hidden counted as far off, so its low-detail body was drawn too; and anyone posed within the preset's
@@ -411,6 +412,42 @@ describe('residents not drawn', async () => {
     bands.length = 0;
     own.upload();
     expect([bands, own.posed]).toEqual([[], false]);
+  });
+
+  test('a seat or a bed under a resident is found in their square of the town, the same one as among them all', async () => {
+    const characters = new Characters(standInView(), assets, content, { castsShadows: true });
+    expect(await characters.init()).toBe(true);
+    // Sofas, beds and chairs across the squares' edges (every 4 m), either side of 0, touching and overlapping.
+    const defs = ['sofaThree', 'bedDouble', 'diningChair', 'chaise', 'bed', 'diningChair'];
+    const objects = Array.from({ length: 24 }, (_, j) => {
+      const def = defs[j % defs.length];
+      const [w, d] = content.object(def)?.footprint ?? [1, 1];
+      return { id: j, def, x: ((j * 7) % 19) - 9, z: ((j * 5) % 13) - 6, rot: j % 4, w, d, quality: 0, sellValue: null } as import('../src/core/protocol').ObjectPlacement;
+    });
+    await characters.build({ sims: [], objects });
+    type Placed = import('../src/render/shared/characters/seats').PlacedObject;
+    const own = characters as unknown as { objectAt(x: number, z: number): Placed | null; objectById: Map<number, Placed> };
+    const all = [...own.objectById.values()].filter((o) => o.restful);
+    // (`objectAt` as it was: over every seat and bed in town, the nearest middle, the first of equals.)
+    const among = (x: number, z: number) => {
+      let best: Placed | null = null;
+      let bestD = Infinity;
+      for (const o of all) {
+        if (x < o.minX - 0.05 || x > o.maxX + 0.05 || z < o.minZ - 0.05 || z > o.maxZ + 0.05) continue;
+        const d = Math.abs(x - o.cx) + Math.abs(z - o.cz);
+        if (d < bestD) [best, bestD] = [o, d];
+      }
+      return best;
+    };
+    let found = 0;
+    for (let x = -12; x <= 14; x += 0.05)
+      for (let z = -9; z <= 10; z += 0.05) {
+        const o = own.objectAt(x, z);
+        if (o !== among(x, z)) throw new Error(`at ${x}, ${z}`);
+        if (o) found++;
+      }
+    expect(found).toBeGreaterThan(1000);
+    expect(own.objectAt(NaN, 0)).toBeNull();
   });
 
   test("the pose texture's rows are the skinning matrices'", async () => {

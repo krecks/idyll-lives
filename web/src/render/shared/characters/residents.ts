@@ -157,6 +157,13 @@ function stationSide(rig: SimRig, station: PlacedObject): number {
  */
 const FAR_EVERY = [2, 4] as const;
 const FAR_LAG = 0.25;
+/** How far round a seat's or a bed's bounds a Sim is on it (m: `objectAt`), and the squares (m) they're kept by. */
+const REST_MARGIN = 0.05;
+const REST_CELL = 4;
+const restCell = (v: number) => Math.floor(v / REST_CELL);
+/** A square's key (squares within 131 km of the origin each have their own). */
+const restKey = (cx: number, cz: number) => cx * 0x10000 + cz;
+const NO_REST: readonly never[] = [];
 /** The most unchanged rows of the pose texture one upload spans between changed ones (`upload`): further apart, two uploads. */
 const UPLOAD_GAP = 8;
 /**
@@ -228,8 +235,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The drawn part meshes by mesh (`rowsOf`). */
   private readonly parts = new WeakMap<object, PartMesh<M>>();
   private sims: (SimRig | null)[] = [];
-  /** The placed objects Sims sit or lie on (`objectAt`), and those with a use clip (`objectInFront`). */
-  private restful: PlacedObject[] = [];
+  /**
+   * The placed objects Sims sit or lie on, by `REST_CELL` square of the ground (`objectAt`: each in every square its
+   * bounds and `REST_MARGIN` round them reach, in the objects' order); and those with a use clip (`objectInFront`).
+   */
+  private readonly restful = new Map<number, PlacedObject[]>();
   private usable: PlacedObject[] = [];
   /** Rows per storey (0: one storey): residents' rows are mapped back onto the ground's. */
   private storeyDepth = 0;
@@ -963,7 +973,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
       return { def: o.def, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, ride, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
-    this.restful = objects.filter((o) => o.restful);
+    this.restful.clear();
+    for (const o of objects) {
+      if (!o.restful) continue;
+      for (let cx = restCell(o.minX - REST_MARGIN); cx <= restCell(o.maxX + REST_MARGIN); cx++)
+        for (let cz = restCell(o.minZ - REST_MARGIN); cz <= restCell(o.maxZ + REST_MARGIN); cz++) {
+          const key = restKey(cx, cz);
+          const here = this.restful.get(key);
+          if (here) here.push(o);
+          else this.restful.set(key, [o]);
+        }
+    }
     this.usable = objects.filter((o) => USE[o.def]);
     this.footstools = objects.filter((o) => o.footstool);
     world.objects.forEach((o, j) => this.objectById.set(o.id, objects[j]));
@@ -1109,7 +1129,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.restartClock();
     this.sims = [];
     this.ghosts = [];
-    this.restful = [];
+    this.restful.clear();
     this.usable = [];
     this.footstools = [];
     this.objectById.clear();
@@ -4228,11 +4248,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const hipFwd = rootFwd + fit.hz * s;
     const hipY = rootY + fit.hy * s;
     const legs = (fit.l1 + fit.l2) * s;
+    // (The furthest a footstool's middle can be and still pass the tests below, but for its own size: as far ahead
+    // as the heels reach, slid forward, and a step aside; the town's others are passed over before any turning.)
+    const reach = Math.abs(hipFwd) + legs * FEET_UP.reach + Math.abs(FEET_UP.slide - FEET_UP.edge) + FEET_UP.side * 0.5;
     let best = Infinity;
     for (const o of this.footstools) {
       const f = o.footstool!;
       const dx = o.cx - rig.x;
       const dz = o.cz - rig.z;
+      const r = reach + 2 * (f.hw + f.hd);
+      if (dx * dx + dz * dz > r * r) continue;
       const ahead = dx * fx + dz * fz;
       const right = dx * fz - dz * fx;
       // Its half depth along the Sim's facing and half width across it (a box turned any way).
@@ -4616,11 +4641,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return under ?? useObj ?? null;
   }
 
+  /** The seat or bed whose bounds (and `REST_MARGIN` round them) hold (x, z): the one whose middle is nearest. */
   private objectAt(x: number, z: number): PlacedObject | null {
     let best: PlacedObject | null = null;
     let bestD = Infinity;
-    for (const o of this.restful) {
-      if (x < o.minX - 0.05 || x > o.maxX + 0.05 || z < o.minZ - 0.05 || z > o.maxZ + 0.05) continue;
+    for (const o of this.restful.get(restKey(restCell(x), restCell(z))) ?? NO_REST) {
+      if (x < o.minX - REST_MARGIN || x > o.maxX + REST_MARGIN || z < o.minZ - REST_MARGIN || z > o.maxZ + REST_MARGIN) continue;
       const d = Math.abs(x - o.cx) + Math.abs(z - o.cz);
       if (d < bestD) {
         best = o;
