@@ -795,7 +795,7 @@ fn earshot_answers_as_it_did_before_it_was_made_cheap() {
     let content = shipped_content();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves");
     let (mut asked, mut heard) = (0, 0);
-    for name in ["v042_village.json", "v035_normal.json", "live_day5.json"] {
+    for name in ["cedar_heights.json", "linden_way.json", "live_day5.json"] {
         let json = std::fs::read_to_string(dir.join(name)).unwrap();
         let w = World::from_save_json(&content, &json).unwrap();
         let nav = w.nav();

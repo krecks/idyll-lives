@@ -3,7 +3,9 @@
 //! Rules for this crate:
 //! - No rendering, browser, or asset-file knowledge. Visual data (models, icons,
 //!   colours) is passed through as opaque strings at most.
-//! - Deterministic: the same content, lot and seed always produce the same run.
+//! - Deterministic in a headless run (no view): the same content, lot and seed always produce
+//!   the same run. With a view, LOD and the search budget make the run depend on the camera
+//!   (`World::view` is not saved).
 //! - No allocation in the steady-state tick path where avoidable.
 
 pub mod ai;

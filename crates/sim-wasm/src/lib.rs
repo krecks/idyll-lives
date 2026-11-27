@@ -190,7 +190,8 @@ impl Game {
     }
 
     /// Pointer into WASM memory; read it as a `Float32Array` of `snapshot_len()` floats.
-    /// The buffer never moves for the lifetime of the `Game`.
+    /// The buffer never moves for the lifetime of the `Game`, but a `Float32Array` made over it
+    /// dies when WASM memory grows: make it again after any other call.
     pub fn snapshot_ptr(&self) -> *const f32 {
         self.snapshot.as_ptr()
     }
@@ -296,13 +297,12 @@ impl Game {
     /// `Uint16Array`, if they changed since this last gave them (or never did): a big world's are
     /// megabytes, and most edits of the lot (a fence, a floor painted, a door) leave them as they were.
     pub fn rooms_changed(&mut self) -> Option<Vec<u16>> {
-        let rooms = self.world.lot.rooms_row_major();
-        let print = rooms_print(&rooms);
+        let print = self.world.lot.rooms_print();
         if self.rooms_sent == Some(print) {
             return None;
         }
         self.rooms_sent = Some(print);
-        Some(rooms)
+        Some(self.world.lot.rooms_row_major())
     }
 
     /// Food and dishes on tables, counters and floors (JSON; see `sim_core::view::items_json`).
@@ -352,14 +352,15 @@ impl Game {
     }
 
     /// Builds lot geometry inside the tile rectangle `[x0, z0, x1, z1)`.
-    /// `kind`: 0 = full walls, 1 = low walls, 2 = floors.
+    /// `kind`: 0 = full walls, 1 = low walls, 2 = floors (anything else: nothing).
     pub fn build_mesh(&self, kind: u8, x0: i32, z0: i32, x1: i32, z1: i32) -> MeshBuffers {
         let lot = &self.world.lot;
         let region = [x0, z0, x1, z1];
         let m = match kind {
             0 => mesh::build_walls_in(lot, mesh::WALL_HEIGHT, region),
             1 => mesh::build_walls_in(lot, mesh::WALL_HEIGHT_LOW, region),
-            _ => mesh::build_floors_in(lot, region),
+            2 => mesh::build_floors_in(lot, region),
+            _ => mesh::MeshData::default(),
         };
         MeshBuffers {
             positions: m.positions,
@@ -368,23 +369,6 @@ impl Game {
             indices: m.indices,
         }
     }
-}
-
-/// A fingerprint of the rooms (`Game::rooms_changed`): an FNV-like hash over them four at a time,
-/// seeded with their count.
-fn rooms_print(rooms: &[u16]) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ rooms.len() as u64;
-    let (chunks, rest) = rooms.as_chunks::<4>();
-    for c in chunks {
-        let v =
-            u64::from(c[0]) | u64::from(c[1]) << 16 | u64::from(c[2]) << 32 | u64::from(c[3]) << 48;
-        h = (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
-        h ^= h >> 29;
-    }
-    for &r in rest {
-        h = (h ^ u64::from(r)).wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    h
 }
 
 impl Game {
@@ -567,5 +551,27 @@ mod tests {
         let err = load_save(&content, &with_version("999")).err().unwrap();
         assert_eq!(err.kind(), "tooNew");
         assert!(err.message().contains("999"), "{}", err.message());
+    }
+
+    /// The rooms go out the first time and after a wall changes them, not when nothing did.
+    #[test]
+    fn rooms_go_out_only_when_they_change() {
+        let lot = r#"{"width":12,"depth":12,"walls":[[2,2,8,2],[8,2,8,8],[2,8,8,8],[2,2,2,8]]}"#;
+        let mut g = Game::with_world(World::from_json(&content(), lot, 1).unwrap());
+        let first = g.rooms_changed().expect("the first time");
+        assert_eq!(first.len(), g.world.lot.width * g.world.lot.depth);
+        assert!(
+            first.iter().any(|&r| r != sim_core::lot::OUTDOORS),
+            "a room"
+        );
+        assert_eq!(g.rooms_changed(), None, "nothing changed");
+        g.world.lot.set_h(4, 2, sim_core::lot::Edge::Open);
+        g.world.lot.compute_rooms();
+        let open = g.rooms_changed().expect("a wall taken down");
+        assert!(open.iter().all(|&r| r == sim_core::lot::OUTDOORS));
+        assert_eq!(g.rooms_changed(), None);
+        g.world.lot.set_h(4, 2, sim_core::lot::Edge::Wall);
+        g.world.lot.compute_rooms();
+        assert_eq!(g.rooms_changed(), Some(first), "built again");
     }
 }

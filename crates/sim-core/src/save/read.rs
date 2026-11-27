@@ -181,11 +181,13 @@ impl World {
             let o = &save.objects[i];
             // (A corrupt save's second use of an id gets a fresh one.)
             let keep = o.id.filter(|s| !used.contains(s));
-            let placed = match world.content.object_index(&o.def) {
+            let def = world.content.object_index(&o.def);
+            let value = o
+                .value
+                .or_else(|| def.and_then(|d| world.content.objects[d].price))
+                .unwrap_or(0);
+            let placed = match def {
                 Some(def) => {
-                    let value = o
-                        .value
-                        .unwrap_or(world.content.objects[def].price.unwrap_or(0));
                     let colors = crate::world::parse_colors(&o.colors, None);
                     // A size the content no longer allows goes back to its kind's.
                     let own = crate::world::kind_size(world.content.objects[def].footprint);
@@ -197,38 +199,51 @@ impl World {
                         extent: Some(size),
                         tall,
                     };
-                    world.place(def, o.x, o.z, o.rot, layout, colors, o.quality, value, keep)
+                    world
+                        .place(def, o.x, o.z, o.rot, layout, colors, o.quality, value, keep)
+                        .ok()
                 }
-                None => continue,
+                None => None,
             };
             // What can't be placed is left out, and the rest of the game loads: a kind the content
             // no longer has, a thing whose top is gone, or one that doesn't fit where it was any
             // more (building can leave a ceiling lamp outdoors, or something upstairs outside a room).
-            if let Ok(id) = placed {
-                let obj = &world.objects[id as usize];
-                let turn = world.check_turn(obj.def, o.turn).unwrap_or(0);
-                let offset = world
-                    .check_offset(obj.def, obj.rot, o.offset)
-                    .unwrap_or([0, 0]);
-                let obj = &mut world.objects[id as usize];
-                obj.turn = turn;
-                obj.offset = offset;
-                obj.wear = o.wear.clamp(0.0, 1.0);
-                obj.open = o.open;
-                obj.off = o.off && world.content.objects[obj.def].switch;
-                obj.shut = o.shut && world.content.objects[obj.def].over_window;
-                obj.growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
-                let runs = world.content.objects[obj.def].runs;
-                obj.run = match o.run {
-                    Some(m) => runs.map(|full| finite(m, 0.0).clamp(0.0, full)),
-                    None => None,
-                };
-                obj.rack = o.rack.min(world.content.objects[obj.def].rack);
-                // (A thing kept by a plot it doesn't stand on: one of the plots, `World::keep`.)
-                world.keep(id, o.plot);
-                used.extend(keep);
-                object_ids.insert(i as u32, id);
-            }
+            // Its household gets its value back, as for a setup gone from the content.
+            let Some(id) = placed else {
+                let plot = o.plot.or_else(|| world.plot_at(o.x, o.z));
+                let back = world.build_price(value.max(0));
+                if let Some(h) = world
+                    .households
+                    .iter_mut()
+                    .find(|h| plot.is_some() && h.plot == plot)
+                {
+                    h.funds = h.funds.saturating_add(back);
+                }
+                continue;
+            };
+            let obj = &world.objects[id as usize];
+            let turn = world.check_turn(obj.def, o.turn).unwrap_or(0);
+            let offset = world
+                .check_offset(obj.def, obj.rot, o.offset)
+                .unwrap_or([0, 0]);
+            let obj = &mut world.objects[id as usize];
+            obj.turn = turn;
+            obj.offset = offset;
+            obj.wear = o.wear.clamp(0.0, 1.0);
+            obj.open = o.open;
+            obj.off = o.off && world.content.objects[obj.def].switch;
+            obj.shut = o.shut && world.content.objects[obj.def].over_window;
+            obj.growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
+            let runs = world.content.objects[obj.def].runs;
+            obj.run = match o.run {
+                Some(m) => runs.map(|full| finite(m, 0.0).clamp(0.0, full)),
+                None => None,
+            };
+            obj.rack = o.rack.min(world.content.objects[obj.def].rack);
+            // (A thing kept by a plot it doesn't stand on: one of the plots, `World::keep`.)
+            world.keep(id, o.plot);
+            used.extend(keep);
+            object_ids.insert(i as u32, id);
         }
         world.next_object_id = world.next_object_id.max(save.next_object_id.unwrap_or(0));
         // Genders, traits and perks the content no longer has are dropped (an unknown gender is
