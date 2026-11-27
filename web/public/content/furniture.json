@@ -5952,14 +5952,14 @@
       "model": "model.rowingMachine",
       "footprint": [
         1,
-        2
+        3
       ],
       "price": 700,
       "category": "fitness",
       "approach": "side",
       "seat": {
-        "height": 0.25,
-        "forward": 0,
+        "height": 0.33,
+        "forward": -0.43,
         "facing": "back"
       },
       "description": "A sliding seat and a handle on a chain: rowing works the whole body.",

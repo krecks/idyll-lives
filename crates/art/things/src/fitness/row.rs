@@ -10,11 +10,22 @@ use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fsphere, settle};
 
-/// The machine's back edge (game depth): on the wall's face in a 2-deep footprint.
-const BACK: f64 = -0.93;
-/// Where the chain leaves the housing (game height, depth) and where the handle rests, at the catch.
-const PIVOT: (f64, f64) = (0.46, BACK + 0.40);
-const HANDLE: (f64, f64) = (0.50, BACK + 0.62);
+/// The machine's back edge (game depth): the housing on the wall's face in a 3-deep footprint.
+const BACK: f64 = -1.43;
+/// The rower's hips at the catch (game depth): the content's seat (`forward`), 1.0 m in front of the back.
+const CATCH: f64 = BACK + 1.0;
+/// The seat's top (game height): the content's `seat.height`.
+const SEAT: f64 = 0.33;
+/// Where the chain leaves the housing (game height, depth) and where the handle rests, at the catch: the handle
+/// 0.36 m ahead of the hips and 0.25 m over the seat, where the resident's `row` clip puts the palms.
+const PIVOT: (f64, f64) = (SEAT + 0.21, CATCH - 0.58);
+const HANDLE: (f64, f64) = (SEAT + 0.25, CATCH - 0.36);
+/// The footplate's slope (deg from level, rising to the housing) and its face's middle (game height, depth): the
+/// soles of the `row` clip's feet, its ankles 0.34 m ahead of the hips and 0.02 m over the seat, the toes 40° up.
+const PLATE_DEG: f64 = 40.0;
+const PLATE: (f64, f64) = (SEAT - 0.011, CATCH - 0.431);
+/// The machine's length (m), to the rear foot.
+const LENGTH: f64 = 2.15;
 /// The stroke's keys: (seconds, how far back the seat is, how far the handle is along its chain's line), metres.
 const STROKE: [(f64, f64, f64); 6] = [
     (0.0, 0.0, 0.0),
@@ -36,7 +47,7 @@ pub fn rowing_machine() -> Vec<Obj> {
             0.40,
             0.08,
             0.28,
-            (0, 0.21, BACK + 0.98),
+            (0, SEAT - 0.04, CATCH + 0.04),
             M.pads,
             bevel = 0.02
         );
@@ -46,7 +57,7 @@ pub fn rowing_machine() -> Vec<Obj> {
             0.30,
             0.06,
             0.22,
-            (0, 0.14, BACK + 0.98),
+            (0, SEAT - 0.11, CATCH + 0.04),
             M.dark,
             bevel = 0.008
         );
@@ -112,16 +123,16 @@ pub fn rowing_machine() -> Vec<Obj> {
     meshes()
 }
 
-/// The housing, the rail and the rear foot.
+/// The housing, the footplate, the rail and the rear foot.
 fn still(f: &GameFrame) {
-    // the front housing: the fan in its cage, on the floor
+    // the front housing: the fan in its cage, on the floor, its face 0.60 m ahead of the hips at the catch
     fbox!(
         f,
         "housing",
         0.52,
-        0.44,
-        0.34,
-        (0, 0.22, BACK + 0.19),
+        0.60,
+        0.40,
+        (0, 0.30, BACK + 0.20),
         M.body,
         bevel = 0.03
     );
@@ -131,41 +142,56 @@ fn still(f: &GameFrame) {
         0.30,
         0.30,
         0.02,
-        (0, 0.24, BACK + 0.37),
+        (0, 0.36, BACK + 0.41),
         M.dark,
         bevel = 0.01
     );
+    // the footplate, sloped to the soles (its board behind its face), on a stretcher across the rails
+    let a = PLATE_DEG.to_radians();
+    let (sa, ca) = (sin(a), cos(a));
     fbox!(
         f,
         "footplate",
         0.40,
-        0.26,
-        0.05,
-        (0, 0.30, BACK + 0.42),
+        0.30,
+        0.03,
+        (0, PLATE.0 - 0.015 * ca, PLATE.1 - 0.015 * sa),
         M.pads,
-        bevel = 0.01
+        bevel = 0.01,
+        rot = (90.0 - PLATE_DEG, 0, 0)
     );
-    // the rail: two beams on the floor, back to the housing
+    fbox!(
+        f,
+        "stretcher",
+        0.44,
+        0.05,
+        0.06,
+        (0, 0.205, CATCH - 0.33),
+        M.dark,
+        bevel = 0.008
+    );
+    // the rail: two beams from the housing back to the rear foot, the carriage on them
+    let rail = LENGTH - 1.0 + 0.6;
     for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
         fbox!(
             f,
             format!("rail{i}"),
             0.07,
             0.11,
-            1.34,
-            (sx * 0.11, 0.055, BACK + 0.36 + 0.67),
+            rail,
+            (sx * 0.11, 0.135, CATCH - 0.60 + rail / 2.0),
             M.steel,
             bevel = 0.008
         );
     }
-    // the rear foot
+    // the rear foot, under the rail's end
     fbox!(
         f,
         "foot",
         0.34,
-        0.07,
+        0.08,
         0.12,
-        (0, 0.035, BACK + 1.66),
+        (0, 0.04, BACK + LENGTH - 0.06),
         M.dark,
         bevel = 0.01
     );

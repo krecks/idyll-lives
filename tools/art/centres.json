@@ -521,7 +521,7 @@
   "model.romantic.letterBureau": [0.0, 0.0255],
   "model.romantic.roseArbourSwing": [0.0, 0.0],
   "model.romantic.vanity": [0.0, -0.019],
-  "model.rowingMachine": [0.0, 0.0],
+  "model.rowingMachine": [0.0, -0.355],
   "model.rugLarge": [0.0, 0.0],
   "model.rugPattern": [0.0, 0.0],
   "model.rugRound": [0.0, 0.0],

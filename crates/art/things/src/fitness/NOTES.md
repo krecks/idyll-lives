@@ -162,15 +162,23 @@ nodes come out `roll` before `mat` (the order they are made).
 
 ## The rowing machine (2026-11-27)
 
-`rowingMachine` is the housing with its fan cage and footplate, two rails on the floor, the seat on its carriage,
-the handle on its chain and the rear foot. It is 0.56 × 0.52 × 1.70 m in a 1 × 2 footprint with the seat at 0.25 m
-(what the content's `seat` says), 4 draw calls: the still body and three moving parts, `carriage` (the seat), `chain`
-and `handle`.
+`rowingMachine` is the housing with its fan cage, the footplate on its stretcher, two rails raised on the housing
+and the rear foot, the seat on its carriage, the handle on its chain. It is 0.56 × 0.60 × 2.15 m in a 1 × 3
+footprint, the housing on the wall's face (`centre` 0, −0.355), with the seat's top at 0.33 m, 4 draw calls: the
+still body and three moving parts, `carriage` (the seat), `chain` and `handle`. (Before 2026-11-27 it was 1.70 m long
+with its seat at 0.25 m, short and low of a real rower's 2.09–2.44 m and 0.30–0.51 m in `cargo review sizes`.)
+
+It is built from the rower's hips at the catch, 1.0 m in front of the back: the content's `seat` (0.33 m up,
+`forward` −0.43, `facing` back), where the renderer puts them. The seat's middle is 4 cm behind the hips; the handle
+rests 0.36 m ahead of them and 0.25 m over the seat, and the footplate, sloped 40°, lies under the soles of ankles
+0.34 m ahead and 0.02 m over the seat with the toes 40° up: the resident's `row` clips (clips/rides.ts `ROWER`) put
+the palms and the feet there. (Before, the plate stood upright 0.43 m ahead, the feet ran through it, and the hands
+were 11 cm past the handle: the build's numbers were taken from the seat's middle, 0.11 m behind the hips.)
 
 `stroke` (2.7 s, a loop: `{"loops": {"row": "stroke"}, "ride": "stroke"}`) is one stroke, drive then a slower
-recovery. Rest is the catch: the seat 0.98 m from the back, the handle at 0.50 m high over the front of the rail. By
+recovery. Rest is the catch: the hips 1.0 m from the back, the handle 0.58 m high. By
 0.6 s the legs have pushed the seat 0.40 m back and the handle 0.44 m along its line; by 0.9 s (the finish) the seat
-is 0.45 m back and the arms have pulled the handle 0.70 m out, to 0.625 m high at the chest; by 1.25 s the hands are
+is 0.45 m back and the arms have pulled the handle 0.70 m out, to 0.70 m high at the chest; by 1.25 s the hands are
 away (0.48 m), by 1.5 s the body is over (0.42 m), and by 2.7 s the seat has slid back up to the catch. The handle runs
 on the straight line from the pivot through its rest place (10° up), and the chain, built level from the pivot and
 tilted up on its node, stretches along that line by the same keys, so its end stays on the handle. The seat part is

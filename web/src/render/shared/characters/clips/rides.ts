@@ -808,19 +808,19 @@ function swingPose(f: RideFit): (p: number) => PoseSpec {
 }
 
 /**
- * The rowing machine (fitness, `model.rowingMachine`, anyone's): sat on its seat (0.25 m up) facing the housing, the
+ * The rowing machine (fitness, `model.rowingMachine`, anyone's): sat on its seat (0.33 m up) facing the housing, the
  * feet on the footplate and the hands on the handle, one stroke in time with its `stroke` loop (characters.ts syncs
  * the clip to it): the legs push the seat back, the body swings back and the arms pull the handle to the chest (the
  * finish), the hands go away, the body over, and the seat slides back up to the catch. The seat carries the rider
  * with it, so the footplate and the handle are placed from it: at the catch the ankles `feet` m ahead of the seat's
- * point and up, the handle `handle` m ahead and up, out along its chain's line 10° up; the seat's way back and the
- * handle's out along the stroke, and the lean (deg), as the model's `STROKE` keys (crates/art/things/src/fitness/row.rs).
- * (The model's footplate is 0.465 m ahead at the catch, and its seat goes 0.45 m back: further than a grown-up's legs
- * reach at the finish. The feet are 6 cm short of it at the catch, and a little more at the finish, legs straight.)
+ * point and up, the toes 40° up on the plate sloped as much, the palms on the handle `handle` m ahead and up, out
+ * along its chain's line 10° up; the seat's way back and the handle's out along the stroke, and the lean (deg), as
+ * the model's `STROKE` keys (crates/art/things/src/fitness/row.rs, which builds its plate under these soles and its
+ * handle at these palms). (A grown-up's legs are straight at the finish, 0.45 m back; a child's don't reach.)
  */
 export const ROW = rideSizes('row', 0, 2);
 export const ROW_S = 2.7;
-const ROWER = { feet: [0.4, 0.02] as const, handle: [0.36, 0.25] as const, rise: Math.sin((10 * Math.PI) / 180), grip: 0.2 };
+const ROWER = { feet: [0.34, 0.02] as const, handle: [0.36, 0.25] as const, rise: Math.sin((10 * Math.PI) / 180), grip: 0.2 };
 const STROKE: readonly (readonly [t: number, seat: number, handle: number, lean: number])[] = [
   [0, 0, 0, 22],
   [0.6, 0.4, 0.44, 6],
@@ -846,7 +846,7 @@ function rowPose(f: RideFit): (p: number) => PoseSpec {
       feet: onRide(f, [-0.1, ROWER.feet[1], ROWER.feet[0] + back]),
       knees: 0,
       up: 1,
-      toes: -30,
+      toes: -40,
       hands: [grip(-ROWER.grip), grip(ROWER.grip)],
       pronate: 80,
     });

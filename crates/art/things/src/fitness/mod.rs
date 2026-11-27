@@ -103,7 +103,8 @@ pub fn family() -> Family {
                 .motions(json!({"uses": {"sauna": {"clip": "door_open", "hold": 1.5, "out": 1.5}}}))
                 .palette(sauna::palette())
                 .paint(&[("body", "Wood"), ("trim", "Trim")]),
-            Model::new("rowingMachine", row::rowing_machine, (0.56, 0.522, 1.70))
+            Model::new("rowingMachine", row::rowing_machine, (0.56, 0.60, 2.15))
+                .centre(0.0, -0.355)
                 .key("model.rowingMachine")
                 .motions(json!({"loops": {"row": "stroke"}, "ride": "stroke"}))
                 .paint(&[("body", "Frame"), ("pads", "Seat"), ("steel", "Rail")]),
