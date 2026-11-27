@@ -1,7 +1,7 @@
 //! The gift-knitting rocker, the welcome tea table and the hearthside quilted settee.
 
 use super::common::{M, cup, teapot};
-use crate::pack_hot_headed::common::fluted;
+use crate::common::fluted;
 use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;

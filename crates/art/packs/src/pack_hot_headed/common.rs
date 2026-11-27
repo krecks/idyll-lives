@@ -1,7 +1,7 @@
 //! What the hot-headed pack is built from: its palette, fluted rings and chains.
 
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, Quat, TAU, V3, cos, sin};
+use artkit::math::{Axis, Quat, V3};
 use artkit::parts::numbered;
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
@@ -56,23 +56,6 @@ palette! { M:
     amp = ("#E4E1DA", satin),
     speaker = ("#3A3D41", satin),
     ash = ("#8E8A84", matte),        // the incense's ash
-}
-
-/// A ring of Blender points of radius `r` at height `y`, in and out `depth` (a fraction) `flutes` times round: the
-/// pleats of a zafu, the ribs of a cactus, the kind pack's wicker basket and planter.
-pub fn fluted(r: f64, y: f64, verts: usize, at: (f64, f64), flutes: i32, depth: f64) -> Vec<P3> {
-    (0..verts)
-        .map(|k| {
-            let k = k as f64;
-            let v = verts as f64;
-            let flute = 1.0 + depth * cos(flutes as f64 * TAU * k / v);
-            P3 {
-                x: at.0 + r * flute * cos(TAU * k / v),
-                y: at.1 + r * flute * sin(TAU * k / v),
-                z: y,
-            }
-        })
-        .collect()
 }
 
 /// A chain of oval links from game point `a` to `b`, each turned a quarter to the last.

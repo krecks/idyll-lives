@@ -1,13 +1,14 @@
 //! What the slob pack is built from: its palette, rounded boxes, the cans, chip bags and wrappers strewn about,
 //! and the microwave's cavity.
 
+use crate::common::_box;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, V3, radians};
 use artkit::mesh::Mesh;
-use artkit::place::{Coord, GameFrame};
+use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::shapes::{SHARP, shade};
-use artkit::{boulder, fbox, loft, palette, revolve, ring, soft};
+use artkit::{boulder, fbox, palette, revolve, soft};
 
 palette! { M:
     body = ("#D9533F", metal),       // the microwave cart's frame; see the per-model notes for each body
@@ -65,41 +66,6 @@ pub const POP: [Mat; 6] = [
 ];
 /// The wall's face in a 1-deep footprint, game depth.
 pub use artkit::kit::WALL;
-
-/// A rounded-cornered box lofted upright (a case, a cabinet, the neat pack's appliances and dock), its top and
-/// bottom edges eased by `ease`.
-#[allow(clippy::too_many_arguments)]
-pub fn _box<X: Coord, Z: Coord>(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    d: f64,
-    at: (X, f64, Z),
-    material: Mat,
-    sq: f64,
-    verts: usize,
-    ease: f64,
-) -> Obj {
-    let (x, y, z) = at;
-    let b = f.at(x, y - h / 2.0, z);
-    let (bx, by, bz) = (b.x, b.y, b.z);
-    let rings = [(0.0, -ease), (ease, 0.0), (h - ease, 0.0), (h, -ease)];
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(hh, e)| {
-            ring!(
-                w / 2.0 + e,
-                d / 2.0 + e,
-                z = bz + hh,
-                verts = verts,
-                square = sq,
-                at = (bx, by)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
-}
 
 /// Bakes each part's placing into its mesh, so it can be turned about the world's origin.
 pub fn _bake(objs: &[Obj]) -> Vec<Obj> {

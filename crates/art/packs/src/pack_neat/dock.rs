@@ -1,7 +1,7 @@
 //! The steam mop dock and the robot vacuum with its dock.
 
 use super::common::{_bottle, M, WALL};
-use crate::pack_slob::common::_box;
+use crate::common::_box;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{P3, PI, TAU, cos, cosd, degrees, pow, radians, sin, sind};

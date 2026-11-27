@@ -1,6 +1,7 @@
 //! The spritz & go station and the pixel-blaster arcade cabinet.
 
-use super::common::{_box, _can, _wrapper, M, POP, WALL};
+use super::common::{_can, _wrapper, M, POP, WALL};
+use crate::common::_box;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
