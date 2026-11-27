@@ -249,3 +249,7 @@ wall-hung toilet with the boxing of their cisterns (0.90 × 1.20, 0.60 × 1.10 m
 ## Measured as the piece (2026-11-25)
 
 `bathtubClawfoot` and `bathtubFreestanding`: the taps (the clawfoot's riser filler, bar and hand shower; the freestanding bath's floor-standing filler and handset) and the stream they run (`stream_aside`, still grown by `tap_on`) are set aside (`parts::aside`): drawn as before, not the tub's size. `cargo review sizes` measures the tubs: 1.73 × 0.72 × 0.83 m (was 1.02 m high) and 1.79 × 0.60 × 0.83 m (was 1.90 × 0.92). The toilets keep their boxing: set aside, the wall-hung pans would measure 0.25 m high (they float), so their kind is the reference's to give.
+
+## Code layout (2026-11-27)
+
+`showers.rs`: `shower` and `shower_stall` share `cubicle_base` (tray, drain, tiled walls). `vanities.rs`: `worktop` and `basin` are shared by the double vanity and the vessel sink. The pack showers (`contrastShower`, `rainShowerTower`) differ in every part, so they share no builder. Bytes unchanged.
