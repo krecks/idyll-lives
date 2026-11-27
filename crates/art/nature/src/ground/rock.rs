@@ -1,7 +1,7 @@
 //! The woods' rock: boulders roughened, split and cut off flat under the ground.
 
 use super::M;
-use crate::common::{cut, lump, stone};
+use crate::common::stone;
 use artkit::far::low;
 use artkit::materials::Mat;
 use artkit::math::v3;

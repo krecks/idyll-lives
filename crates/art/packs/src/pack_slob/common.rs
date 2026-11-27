@@ -1,7 +1,6 @@
 //! What the slob pack is built from: its palette, rounded boxes, the cans, chip bags and wrappers strewn about,
 //! and the microwave's cavity.
 
-use crate::common::_box;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, V3, radians};
 use artkit::mesh::Mesh;
