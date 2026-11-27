@@ -1222,7 +1222,7 @@
       ],
       "description": "A wide lid over a deep well of frozen food: room for a whole shop, if you can find it again.",
       "sounds": {
-        "fetch": "fridgeDoor"
+        "fetch": "lidThud"
       },
       "interactions": [
         {

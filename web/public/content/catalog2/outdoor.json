@@ -1004,6 +1004,9 @@
       "outdoors": true,
       "decor": 0.3,
       "description": "A striped canvas awning on a frame: shade for the window or the door below.",
+      "sounds": {
+        "shut": "none"
+      },
       "interactions": []
     },
     {

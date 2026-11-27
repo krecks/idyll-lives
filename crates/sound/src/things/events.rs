@@ -1,5 +1,5 @@
 //! The sounds of things happening, not of things in use (`web/src/audio/events.ts` has the rules that play them):
-//! a door or a gate opened and falling shut, curtains drawn along their rail, a car's door shut and its engine
+//! a door or a gate opened and falling shut, curtains drawn along their rail (blinds' or shutters' slats), a car's door shut and its engine
 //! started, the post dropping through a letterbox, a shop's till, and a drawer pulled out and pushed shut.
 //!
 //! All are made from the things' own building blocks (`strike`, `rustle`, `swish`, `motor`, `noise`) and are dry:
@@ -8,10 +8,11 @@
 use super::*;
 
 /// The sounds of things happening, by name.
-pub const EVENTS: [&str; 8] = [
+pub const EVENTS: [&str; 9] = [
     "doorOpen",
     "doorClose",
     "curtain",
+    "slats",
     "carDoor",
     "carStart",
     "letterbox",
@@ -20,10 +21,11 @@ pub const EVENTS: [&str; 8] = [
 ];
 
 /// The ones played once as something happens (all of them).
-pub const ONCE_EVENTS: [&str; 8] = [
+pub const ONCE_EVENTS: [&str; 9] = [
     "doorOpen",
     "doorClose",
     "curtain",
+    "slats",
     "carDoor",
     "carStart",
     "letterbox",
@@ -37,6 +39,7 @@ pub(super) fn make(kind: &str, rate: f64) -> Option<Stereo> {
         "doorOpen" => door_open(rate),
         "doorClose" => door_close(rate),
         "curtain" => curtain(rate),
+        "slats" => slats(rate),
         "carDoor" => car_door(rate),
         "carStart" => car_start(rate),
         "letterbox" => letterbox(rate),
@@ -133,6 +136,50 @@ fn curtain(rate: f64) -> Stereo {
     }
     rustle(&mut out, &mut r, 0.05, 0.8, 0.35, 0.0, 1500.0, 0.5);
     rustle(&mut out, &mut r, 0.05, 0.8, 0.12, 0.0, 4500.0, 0.6);
+    dry(rate, out, 0.75, 0.0)
+}
+
+/// Blinds let down or shutters closed (or opened): the cord running through its lock, eighteen slats or
+/// louvres clattering against the next one by one, quickening as they go, and the bottom rail (the leaves'
+/// meeting) knocking home.
+fn slats(rate: f64) -> Stereo {
+    let mut r = Rng::new(98.0);
+    let mut out = once(rate, 1.2);
+    rustle(&mut out, &mut r, 0.0, 0.7, 0.1, 0.1, 2200.0, 0.9);
+    let slats = 18;
+    let mut at = 0.04;
+    let mut gap = 0.05;
+    for k in 0..slats {
+        let pan = 0.15 - 0.3 * k as f64 / (slats - 1) as f64;
+        let amp = 0.18 + 0.1 * r.next();
+        let hz = 1700.0 + 900.0 * r.next();
+        strike(
+            &mut out,
+            at,
+            amp,
+            pan,
+            &[
+                [hz, 0.008, 1.0],
+                [hz * 2.4, 0.004, 0.4],
+                [620.0, 0.012, 0.3],
+            ],
+            burst(3000.0, 0.9, 0.0015, 0.8),
+        );
+        at += gap;
+        gap *= 0.94;
+    }
+    strike(
+        &mut out,
+        at + 0.03,
+        0.5,
+        0.0,
+        &[
+            [380.0, 0.03, 1.0],
+            [900.0, 0.018, 0.5],
+            [2100.0, 0.008, 0.3],
+        ],
+        burst(1200.0, 0.8, 0.004, 1.0),
+    );
     dry(rate, out, 0.75, 0.0)
 }
 

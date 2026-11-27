@@ -308,7 +308,8 @@ export interface ObjectDef {
   /**
    * What's done at it sounds like this, by animation tag (world sound keys or `none`, as an
    * interaction's `sound`), for its uses without a `sound` and the cooking steps at it as a
-   * station: an oven's `stir` is silent, not a frying pan.
+   * station: an oven's `stir` is silent, not a frying pan. On a thing hung over a window (`overWindow`),
+   * `shut` is what it sounds like drawn or opened (default `curtain`: blinds' `slats`, an awning's `none`).
    */
   sounds?: Record<string, string>;
   /** A world sound it makes by itself, used or not, while its lot is looked at (a fountain's water). */

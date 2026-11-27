@@ -1,4 +1,4 @@
-//! The machines: a treadmill, bikes, a sewing machine, a pottery wheel, coffee machines, a blender, a mixer, a microwave, a toaster, an oven fan, a cooker hood, a fire, and the things played once at the fridge, bin, vending machines and phone box.
+//! The machines: a treadmill, bikes, a rowing machine, a sewing machine, a pottery wheel, coffee machines, a blender, a mixer, a microwave, a toaster, an oven fan, a cooker hood, a fire, and the things played once at the fridge, bin, vending machines and phone box.
 
 use super::*;
 
@@ -118,6 +118,84 @@ pub(super) fn bike(rate: f64) -> Stereo {
             burst(2200.0, 3.0, 0.03, 0.4),
         );
         k += 1.0;
+    }
+    done(
+        rate,
+        vec![fold(bed), ev.into()],
+        0.14,
+        0.0,
+        &[5.3, 7.9, 10.7, 13.1],
+        0.15,
+        0.0,
+        0.0,
+    )
+}
+
+/// A rowing machine at an easy 21 strokes a minute (2.8 s a stroke: three in the loop): the drive pulls
+/// the fan flywheel up to speed, its whoosh rising and brightening, the chain rattling out over its
+/// sprocket; on the recovery the wheel coasts down, the strap's spring reels the chain back in more
+/// lightly, and the seat rolls along its rail both ways, bumping softly at the catch.
+pub(super) fn rower(rate: f64) -> Stereo {
+    let mut r = Rng::new(34.0);
+    let stroke = 2.8;
+    let drive = 0.32;
+    let seconds = 3.0 * stroke;
+    let mut bed = track(rate, seconds, 0.6);
+    let n = bed.left.len();
+    let whoosh = noise(n, rate, &mut r, Filter::Bandpass, 480.0, 0.7);
+    let rush = noise(n, rate, &mut r, Filter::Bandpass, 1400.0, 0.6);
+    let rail = noise(n, rate, &mut r, Filter::Lowpass, 220.0, 0.7);
+    for i in 0..n {
+        let p = (i as f64 / rate % stroke) / stroke;
+        // The wheel's speed: pulled up through the drive, coasting down over the recovery.
+        let wheel = if p < drive {
+            0.5 + 0.5 * sin(0.5 * PI * p / drive)
+        } else {
+            0.5 + 0.5 * exp(-2.2 * (p - drive) / (1.0 - drive))
+        };
+        // The seat's speed along the rail: fast out on the drive, slower back on the recovery.
+        let seat = if p < drive {
+            sin(PI * p / drive)
+        } else {
+            0.55 * sin(PI * (p - drive) / (1.0 - drive))
+        };
+        let v = whoosh[i] as f64 * 0.9 * wheel * wheel
+            + rush[i] as f64 * 0.35 * pow(wheel, 4.0)
+            + rail[i] as f64 * 0.5 * seat;
+        bed.left[i] = v as f32;
+        bed.right[i] = v as f32;
+    }
+    let mut ev = looped(rate, seconds);
+    for k in 0..3 {
+        let at = k as f64 * stroke + (r.next() - 0.5) * 0.02;
+        // The seat meeting the catch.
+        strike(
+            &mut ev,
+            at,
+            0.25,
+            0.0,
+            &[[95.0, 0.04, 1.0], [210.0, 0.02, 0.4]],
+            burst(400.0, 0.8, 0.01, 1.0),
+        );
+        // The chain out over the sprocket on the drive, then reeled back in.
+        let runs = [
+            (0.04, drive * stroke * 0.9, 16, 0.07),
+            (drive * stroke + 0.1, 1.3, 12, 0.035),
+        ];
+        for (from, length, links, amp) in runs {
+            for j in 0..links {
+                let a = at + from + length * j as f64 / links as f64 + (r.next() - 0.5) * 0.02;
+                let hz = 3100.0 + 900.0 * r.next();
+                strike(
+                    &mut ev,
+                    a,
+                    amp * (0.6 + 0.4 * r.next()),
+                    0.05,
+                    &[[hz, 0.005, 1.0], [5400.0, 0.003, 0.4]],
+                    burst(4200.0, 1.0, 0.001, 0.7),
+                );
+            }
+        }
     }
     done(
         rate,

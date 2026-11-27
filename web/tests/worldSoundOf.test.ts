@@ -7,7 +7,7 @@ import type { Content } from '../src/content/content';
 mock.module('../src/ui/state.svelte', () => ({ game: {} }));
 mock.module('../src/settings/settings.svelte', () => ({ settings: {} }));
 mock.module('../src/audio/mixer', () => ({ audioContext: () => null, bus: () => null, musicGain: () => 1, space: () => null, updateVolumes: () => {} }));
-const { soundOf } = await import('../src/audio/world');
+const { knocks, shutSoundOf, soundOf } = await import('../src/audio/world');
 
 /** Content with just the objects `soundOf` reads. */
 const content = {
@@ -18,6 +18,10 @@ const content = {
     { id: 'computerDesk', interactions: [{ id: 'code', anim: 'type' }] },
     { id: 'plant', interactions: [{ id: 'water', anim: 'water' }] },
     { id: 'hedge', interactions: [{ id: 'trim', anim: 'prune' }] },
+    { id: 'doorbell', sounds: { knock: 'doorbell' }, interactions: [{ id: 'ring', anim: 'knock' }] },
+    { id: 'curtains', interactions: [] },
+    { id: 'blinds', sounds: { shut: 'slats' }, interactions: [] },
+    { id: 'awning', sounds: { shut: 'none' }, interactions: [] },
   ],
   recipes: [],
 } as unknown as Content;
@@ -51,5 +55,21 @@ describe('soundOf', () => {
     expect(soundOf(content, 'type', def('computerDesk'), 0)).toBe('typing');
     expect(soundOf(content, 'water', def('plant'), 0)).toBe('wateringCan');
     expect(soundOf(content, 'prune', def('hedge'), 0)).toBe('shears');
+  });
+});
+
+describe('knocks and curtains', () => {
+  test('a visitor at the door knocks; a doorbell rung chimes instead', () => {
+    expect(knocks(content, 'knock', -1, -1)).toBe(true);
+    expect(knocks(content, 'knock', def('doorbell'), 0)).toBe(false);
+    expect(soundOf(content, 'knock', def('doorbell'), 0)).toBe('doorbell');
+    expect(knocks(content, 'sit', def('diningChair'), 0)).toBe(false);
+  });
+
+  test('drawn curtains swish, blinds clatter, an awning is silent', () => {
+    expect(shutSoundOf(content, def('curtains'))).toBe('curtain');
+    expect(shutSoundOf(content, -1)).toBe('curtain');
+    expect(shutSoundOf(content, def('blinds'))).toBe('slats');
+    expect(shutSoundOf(content, def('awning'))).toBeUndefined();
   });
 });

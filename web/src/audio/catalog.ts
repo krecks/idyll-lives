@@ -56,6 +56,7 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   drums: { level: 0.2 },
   treadmill: { level: 0.21, drift: 0.02 },
   bike: { level: 0.2, drift: 0.04 },
+  rower: { level: 0.2, drift: 0.03 },
   tools: { level: 0.27 },
   bikeTools: { level: 0.27 },
   pool: { level: 0.27 },
@@ -107,7 +108,7 @@ export function pieceAt(hour: number, dancing: boolean): MusicKind {
 }
 
 /** Levels of the sounds played once. */
-export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21, kettleOff: 0.295, doorOpen: 0.22, doorClose: 0.135, curtain: 0.067, carDoor: 0.34, carStart: 0.105, letterbox: 0.17, till: 0.107, drawer: 0.22 };
+export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, lidThud: 0.24, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, doorbell: 0.2, toastPop: 0.27, pour: 0.21, kettleOff: 0.295, doorOpen: 0.22, doorClose: 0.135, curtain: 0.067, slats: 0.13, carDoor: 0.34, carStart: 0.105, letterbox: 0.17, till: 0.107, drawer: 0.22 };
 
 /**
  * The outdoors: the bed of wind (its level at night, and how much the day adds), the crickets at night, the

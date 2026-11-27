@@ -16,17 +16,17 @@ export type WaterKind = (typeof WATER)[number];
 export const ONCE = ['flush'] as const satisfies readonly WaterKind[];
 
 /** The things' sounds (`things.rs`); those played once as something happens. */
-export const THINGS = ['treadmill', 'bike', 'tools', 'bikeTools', 'pool', 'foosball', 'pingPong', 'darts', 'arcade', 'sewing', 'potteryWheel', 'bubbling', 'espresso', 'blender', 'mixer', 'microwave', 'toaster', 'ovenFan', 'hood', 'fire', 'basketball', 'singing', 'cello', 'punchBag', 'smash', 'fridgeDoor', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'toastPop', 'pour'] as const;
+export const THINGS = ['treadmill', 'bike', 'rower', 'tools', 'bikeTools', 'pool', 'foosball', 'pingPong', 'darts', 'arcade', 'sewing', 'potteryWheel', 'bubbling', 'espresso', 'blender', 'mixer', 'microwave', 'toaster', 'ovenFan', 'hood', 'fire', 'basketball', 'singing', 'cello', 'punchBag', 'smash', 'fridgeDoor', 'lidThud', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'doorbell', 'toastPop', 'pour'] as const;
 export type ThingKind = (typeof THINGS)[number];
-export const ONCE_THINGS = ['fridgeDoor', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'toastPop', 'pour'] as const satisfies readonly ThingKind[];
+export const ONCE_THINGS = ['fridgeDoor', 'lidThud', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'doorbell', 'toastPop', 'pour'] as const satisfies readonly ThingKind[];
 
 /** The things' sounds at home and in the garden (`things/home.rs`); the one played once. */
 export const HOME_THINGS = ['vacuum', 'iron', 'sweep', 'mop', 'mower', 'hose', 'wateringCan', 'shears', 'kettle', 'typing', 'saunaStove', 'fireplaceElectric', 'cutlery', 'kettleOff'] as const;
 export const ONCE_HOME = ['kettleOff'] as const satisfies readonly (typeof HOME_THINGS)[number][];
 
 /** The sounds of things happening (`things/events.rs`), all played once. */
-export const EVENT_THINGS = ['doorOpen', 'doorClose', 'curtain', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer'] as const;
-export const ONCE_EVENTS = ['doorOpen', 'doorClose', 'curtain', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer'] as const satisfies readonly (typeof EVENT_THINGS)[number][];
+export const EVENT_THINGS = ['doorOpen', 'doorClose', 'curtain', 'slats', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer'] as const;
+export const ONCE_EVENTS = ['doorOpen', 'doorClose', 'curtain', 'slats', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer'] as const satisfies readonly (typeof EVENT_THINGS)[number][];
 
 /** Every sound made off the main thread: the water's, the things' (at home and in the garden too) and those of things happening. */
 export const MADE = [...WATER, ...THINGS, ...HOME_THINGS, ...EVENT_THINGS] as const;

@@ -5865,6 +5865,9 @@
       "layer": "wall",
       "decor": 0.4,
       "description": "Slatted blinds on a cord: hang them over a window and tilt them against the afternoon sun.",
+      "sounds": {
+        "shut": "slats"
+      },
       "interactions": []
     },
     {
@@ -5939,6 +5942,7 @@
           "id": "row",
           "label": "Row",
           "anim": "exercise",
+          "sound": "rower",
           "minutes": 45,
           "pose": "sit",
           "effects": {
@@ -5975,6 +5979,9 @@
       },
       "decor": 0.2,
       "description": "A brass bell push by the front door.",
+      "sounds": {
+        "knock": "doorbell"
+      },
       "interactions": [
         {
           "id": "ring",
@@ -6037,6 +6044,9 @@
       "layer": "wall",
       "overWindow": true,
       "description": "Two louvred panels that close over the window when the sun is too much.",
+      "sounds": {
+        "shut": "slats"
+      },
       "interactions": []
     },
     {
