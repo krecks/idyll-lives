@@ -1,5 +1,6 @@
 /**
- * A face per resident: the looks' faces (`household.ts`) and how a resident's row takes one (`identity.ts`).
+ * A face per resident: the looks' faces (`household.ts`) and how a resident's row takes one (`identity.ts`); and the
+ * expression's pairs in the row (`face.ts` `FaceMixer.write`), used ones first, as the shader stops at the first unused.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -9,7 +10,8 @@ import { FACE_CHANNELS, FACE_GROUPS, faceFromId, lookFromSeed, randomFace, rando
 import { mulberry32 } from '../src/game/noise';
 import type { BodyData, MorphSet } from '../src/render/shared/characters/data';
 import { faceOf, writeIdentity } from '../src/render/shared/characters/identity';
-import { IDENTITY_PAIRS } from '../src/render/shared/characters/layout';
+import { FaceMixer } from '../src/render/shared/characters/face';
+import { IDENTITY_PAIRS, MORPH_PAIRS } from '../src/render/shared/characters/layout';
 import { MAX_CHARACTERS } from '../src/render/shared/characters/rig';
 
 /** No palettes: every colour is the fallback, the faces are what is looked at. */
@@ -116,5 +118,25 @@ describe('faces', () => {
     expect(count).toBe(FACE_CHANNELS.length);
     expect(count).toBeLessThanOrEqual(IDENTITY_PAIRS);
     for (const moved of Object.values(eyes)) for (const c of Object.keys(moved)) expect(rig.morphs.channels.indexOf(c)).toBeGreaterThanOrEqual(first);
+  });
+
+  test("the expression's used pairs come first, every one after the first unused unused too", () => {
+    const mixer = new FaceMixer({ channels: [], channel: {}, expressions: 60 } as unknown as MorphSet);
+    const rand = mulberry32(3);
+    const out = new Float32Array(MORPH_PAIRS * 2);
+    let full = 0;
+    for (let frame = 0; frame < 300; frame++) {
+      // Channels at 0, below the cut-off, negative, over 1: some frames more of them than there are pairs, and a
+      // channel used last frame at 0 this one.
+      const busy = rand() < 0.3 ? 0.9 : 0.2;
+      for (let c = 0; c < mixer.w.length; c++) mixer.w[c] = rand() < busy ? rand() * 1.4 - 0.1 : 0;
+      mixer.write(out, 0);
+      let used = 0;
+      while (used < MORPH_PAIRS && out[used * 2 + 1] !== 0) used++;
+      for (let k = used; k < MORPH_PAIRS; k++) expect([out[k * 2], out[k * 2 + 1]]).toEqual([0, 0]);
+      for (let k = 0; k < used; k++) expect(out[k * 2 + 1]).toBeGreaterThanOrEqual(0.01);
+      if (used === MORPH_PAIRS) full++;
+    }
+    expect(full).toBeGreaterThan(0);
   });
 });

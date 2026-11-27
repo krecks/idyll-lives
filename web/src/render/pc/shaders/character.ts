@@ -40,7 +40,7 @@
  * `select`s and `mix`es.
  */
 
-import { APPEARANCE_TEXELS, BONE_TEXELS, MORPH_TEXELS, SHIRT, SWAY_TEXEL } from '../../shared/characters/layout';
+import { APPEARANCE_TEXELS, BONE_TEXELS, EXPRESSION_TEXELS, MORPH_TEXELS, SHIRT, SWAY_TEXEL } from '../../shared/characters/layout';
 import { WISPS_PX } from '../../shared/characters/parts';
 import type { Language, ShaderFeature } from './chunks';
 
@@ -614,6 +614,11 @@ const VS_GLSL = {
 				int mCount = int(game_simMorph.z + 0.5);
 				for (int k = 0; k < ${MORPH_TEXELS}; k++) {
 					vec4 pw = texelFetch(game_simPoses, ivec2(simOff + ${PAIRS} + k, simRow), 0);
+					// (The expression's pairs come first, a weight of 0 after the last one used: on to the identity's.)
+					if (k < ${EXPRESSION_TEXELS} && abs(pw.y) < 0.0001) {
+						k = ${EXPRESSION_TEXELS} - 1;
+						continue;
+					}
 					for (int j = 0; j < 2; j++) {
 						float w = j == 1 ? pw.w : pw.y;
 						if (abs(w) < 0.0001) continue;
@@ -718,6 +723,11 @@ const VS_WGSL = {
 				let mCount = i32(game_simMorph.z + 0.5);
 				for (var k = 0; k < ${MORPH_TEXELS}; k++) {
 					let pw = textureLoad(game_simPoses, vec2i(simOff + ${PAIRS} + k, simRow), 0);
+					// (The expression's pairs come first, a weight of 0 after the last one used: on to the identity's.)
+					if (k < ${EXPRESSION_TEXELS} && abs(pw.y) < 0.0001) {
+						k = ${EXPRESSION_TEXELS} - 1;
+						continue;
+					}
 					for (var j = 0; j < 2; j++) {
 						let w = select(pw.y, pw.w, j == 1);
 						if (abs(w) < 0.0001) { continue; }

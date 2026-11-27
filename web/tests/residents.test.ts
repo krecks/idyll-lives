@@ -2,7 +2,8 @@
 // `ResidentView`, the way an engine draws them: a scripted lot (sleeping, a cuddle at the crib, sitting at a table,
 // a ride, talking and hugging, carrying, a guitar, a shower stepped into, walkers, the stress ghosts, a rebuild)
 // gives the same pose texture, drawn rows, props, quilts and ring per frame as recorded (`bun test`; after a
-// change meant to change how residents move, `bun test --update-snapshots`). The record was made when the code
+// change meant to change how residents move, `bun test --update-snapshots`); and, paused, the same with those left
+// as posed as with everyone posed every frame. The record was made when the code
 // moved out of the Babylon renderer (Stage 7), where a side-by-side run against the Babylon version before the
 // move showed no difference in any frame (bench-results/stage7b/equal.ts).
 //
@@ -78,6 +79,7 @@ describe('residents', async () => {
     const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
     return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
   }) as typeof fetch;
+  const publicFetch = globalThis.fetch;
   const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
@@ -120,6 +122,8 @@ describe('residents', async () => {
   let poses: Float32Array = new Float32Array(0);
   let width = 0;
   const cam = { x: 0, y: 6, z: 12 };
+  /** The drawing's height (px). */
+  const lens = { height: 720 };
   const view: View = {
     init(_set, data, w) {
       poses = data;
@@ -165,7 +169,7 @@ describe('residents', async () => {
     onModelFile: () => () => {},
     fileColour: async () => undefined,
     camera(out) {
-      [out[0], out[1], out[2], out[3], out[4]] = [cam.x, cam.y, cam.z, 720, 0.8];
+      [out[0], out[1], out[2], out[3], out[4]] = [cam.x, cam.y, cam.z, lens.height, 0.8];
       return true;
     },
     onDispose: () => {},
@@ -398,4 +402,92 @@ describe('residents', async () => {
       globalThis.fetch = realFetch;
     }
   }, 30_000);
+
+  test('paused, those left as posed are drawn as when everyone is posed every frame', async () => {
+    globalThis.fetch = publicFetch;
+    const realNow = performance.now;
+    let now = 0;
+    performance.now = () => now;
+    // (Everyone near, faces large: posed every frame and in full whether `everyFrame` or not, but for the pauses.)
+    lens.height = 20000;
+    [cam.x, cam.y, cam.z] = [0, 6, 12];
+    const run = async (everyFrame: boolean) => {
+      // (Props and quilts of this run's own.)
+      Object.assign(view, { props: new TemplateCache<Prop | null>({ retell: () => {}, gone: () => false, hide: () => {}, dispose: () => {} }) });
+      const [firstProp, firstQuilt] = [props.length, quilts.length];
+      const characters = new Characters(view, assets, content, { castsShadows: true });
+      expect(await characters.init()).toBe(true);
+      characters.setEmotions(content.emotions.map((e) => e.id));
+      await characters.build({ sims, objects });
+      characters.setTables(new Map(objects.map((o) => [o.id, { host: o.id, top: 0.75, boxes: Float32Array.of(-0.5, 0.5, 0.7, 0.76, 0.35, 1.1) }])));
+      characters.everyFrame = everyFrame;
+      // The game's clock: still while paused, as the rocking horse's.
+      let game = 0;
+      const ride = new Float32Array(16);
+      const rock = [0, 0, 0, 1] as [number, number, number, number];
+      characters.setRide((id) => {
+        if (objects[id]?.def !== 'rockingHorse') return null;
+        quatYawPitchRoll(0, 0.2 * Math.sin(game * 3), 0, rock);
+        compose(1, 1, 1, rock, 0, 0.03, 0, ride);
+        return ride;
+      });
+      characters.setLoop(() => (game * 0.4) % 1);
+      // Who is posed in full (each once a frame: `choose`).
+      const own = characters as unknown as { choose: (...a: unknown[]) => void };
+      const choose = own.choose.bind(characters);
+      let posed = 0;
+      own.choose = (...a) => (posed++, choose(...a));
+      const prev = new Float32Array(layout.capacity);
+      const curr = new Float32Array(layout.capacity);
+      const frame: FrameState = { prev, curr, alpha: 0, steps: 1, layout, now: 0 };
+      const shadows = new Float32Array(MAX_CHARACTERS * 16);
+      const track = { times: Float32Array.from([0, 0.12, 0.3, 0.45, 0.7, 0.9]), visemes: Uint8Array.from([10, 11, 13, 1, 4]), energy: Float32Array.from([0.4, 0.8, 1, 0.6, 0.3]) };
+      let tick = 0;
+      writeSnapshot(prev, 0);
+      writeSnapshot(curr, STEP);
+      const frames: string[] = [];
+      let pausedPosed = 0;
+      for (let f = 0; f < 300; f++) {
+        // Paused twice: a voice line starting in the first pause; in the second everyone out of view a moment (a storey
+        // looked at), then a resident moved (as Buy mode can).
+        const paused = (f >= 60 && f < 150) || (f >= 200 && f < 260);
+        if (!paused) {
+          game += 1 / 30;
+          while ((tick + 1) * STEP <= game) {
+            tick++;
+            prev.set(curr);
+            writeSnapshot(curr, (tick + 1) * STEP);
+          }
+          frame.alpha = (game - tick * STEP) / STEP;
+        }
+        prev[layout.header.speed] = curr[layout.header.speed] = paused ? 0 : 1;
+        if (f === 90) characters.setSpeech(actors.findIndex((a) => a.role === 1), track as never, now / 1000);
+        if (f === 230) curr[layout.headerLen + 7 * layout.simStride + layout.sim.x] += 3;
+        frame.now = now = 1000 + (f / 30) * 1000;
+        // The camera moving round, the pauses too.
+        [cam.x, cam.z] = [Math.sin(f * 0.01) * 12, Math.cos(f * 0.01) * 12];
+        posed = 0;
+        const hidden = f >= 210 && f < 214;
+        characters.update(frame, () => !hidden, shadows);
+        if (paused) pausedPosed += posed;
+        const held = props.slice(firstProp).map((p) => `${p.key} ${hash(p.matrices)}`);
+        const covered = quilts.slice(firstQuilt).map((q) => `${q.name} ${q.count} ${hash(q.matrices, 0, q.count * 16)} ${hash(q.ext, 0, q.count * 2)}`);
+        frames.push([f, hash(poses), hash(shadows), hash(characters.heads), ...held, ...covered].join(' '));
+      }
+      characters.clear();
+      log.length = 0;
+      return { frames, pausedPosed };
+    };
+    try {
+      const left = await run(false);
+      const all = await run(true);
+      expect(left.frames).toEqual(all.frames);
+      // (Most of them left as posed while paused: not those lying down, holding a thing in hand or stepping in.)
+      expect(left.pausedPosed).toBeLessThan(all.pausedPosed / 2);
+    } finally {
+      performance.now = realNow;
+      globalThis.fetch = realFetch;
+      lens.height = 720;
+    }
+  }, 60_000);
 });
