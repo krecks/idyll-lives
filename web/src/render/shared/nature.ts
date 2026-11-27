@@ -21,7 +21,7 @@ import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../gam
 import { tuned } from '../tune';
 import { ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 import { townPaving } from './townPaving';
-import type { TexelRect } from './groundShade';
+import { shadeReach, type TexelRect } from './groundShade';
 import { CROP_LOOK, cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type Crop, type FieldCanvas, type FieldClip, type FieldPoint } from './farmland';
 
 /**
@@ -2416,10 +2416,11 @@ export interface LawnChange {
 }
 
 /**
- * How far (tiles) a change reaches on the lawn: a door's worn earth, a wall's shade (`groundShade.ts`) and a tree's
- * darker grass (`lawn.ts`) lie up to 2 tiles past what made them, the grass's clearance from a wall 1.
+ * How far (tiles) a change reaches on the lawn: a door's worn earth and a tree's darker grass (`lawn.ts`) lie up to 2
+ * tiles past what made them, the ground's shade (`groundShade.ts`) as far as its reaches take it (2 as made, more if
+ * tuned), the grass's clearance from a wall 1: 3 as made.
  */
-const LAWN_REACH = 3;
+const lawnReach = (): number => Math.max(2, Math.ceil(shadeReach())) + 1;
 
 /** More rectangles than this and the one round them all is made again (a town edited at once). */
 const MOST_RECTS = 64;
@@ -2427,7 +2428,7 @@ const MOST_RECTS = 64;
 /**
  * Where what the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls, the lawn's map, the ground's shade:
  * rooms, things, walls, diagonals, floors, fences, doors) changed from `was` to `world`: the town's tiles (rows of
- * every storey, `[x0, z0, x1, z1]`, last ones included) whose lawn could differ, `LAWN_REACH` round each change; empty
+ * every storey, `[x0, z0, x1, z1]`, last ones included) whose lawn could differ, `lawnReach` round each change; empty
  * when none. Null: all of it (another size, or its plots, streets, paths, fields or paving changed). What didn't
  * change is the same object as before (`bridge.ts` `mergeWorld`): only what isn't is compared.
  */
@@ -2437,12 +2438,13 @@ export function lawnChanges(was: WorldStructure, world: WorldStructure): TexelRe
   if (was.width !== w || was.depth !== depth || was.storeyDepth !== world.storeyDepth || was.meta !== world.meta || was.parking !== world.parking || was.carParks !== world.carParks) return null;
   if (was.plots !== world.plots && (was.plots.length !== world.plots.length || was.plots.some((p, i) => p.x !== world.plots[i].x || p.z !== world.plots[i].z || p.w !== world.plots[i].w || p.d !== world.plots[i].d))) return null;
   const rects: TexelRect[] = [];
-  const add = (x0: number, z0: number, x1: number, z1: number, reach = LAWN_REACH): void => {
+  const most = lawnReach();
+  const add = (x0: number, z0: number, x1: number, z1: number, reach = most): void => {
     const r: TexelRect = [Math.max(0, x0 - reach), Math.max(0, z0 - reach), Math.min(w - 1, x1 + reach), Math.min(depth - 1, z1 + reach)];
     if (r[0] <= r[2] && r[1] <= r[3]) rects.push(r);
   };
   // (A thing's footprint, and as far again as it is moved off its tiles.)
-  const thing = (o: ObjectPlacement): void => add(o.x, o.z, o.x + o.w - 1, o.z + o.d - 1, LAWN_REACH + Math.ceil(Math.max(Math.abs(o.offset?.[0] ?? 0), Math.abs(o.offset?.[1] ?? 0)) / 100));
+  const thing = (o: ObjectPlacement): void => add(o.x, o.z, o.x + o.w - 1, o.z + o.d - 1, most + Math.ceil(Math.max(Math.abs(o.offset?.[0] ?? 0), Math.abs(o.offset?.[1] ?? 0)) / 100));
   // Rooms: the box round the tiles changed, storey by storey, and the things standing in it (outdoors or not now).
   if (was.rooms !== world.rooms) {
     const sd = groundDepth(world);

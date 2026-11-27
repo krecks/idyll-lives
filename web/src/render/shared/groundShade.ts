@@ -39,6 +39,12 @@ export const GROUND_SHADE = tuned('shade', {
 const HALF_WALL = 0.1;
 const HALF_FENCE = 0.06;
 
+/** How far (m) the shade lies at most past the tiles of what casts it, as `GROUND_SHADE` is now (`?tune=shade.…` may reach further). */
+export function shadeReach(): number {
+  const S = GROUND_SHADE;
+  return Math.max(S.wall[1] + HALF_WALL, S.fence[1] + HALF_FENCE, S.thing[1], S.trunk[1] + S.trunkRadius);
+}
+
 /** Trees among the world's things (their kinds' ids): a trunk in the middle, not a footprint. */
 const TREE = /^(tree|pine|appleTree|lemonTree|garden\.(maple|cherry|birch|willow|spruce|japaneseMaple|palm|apple|lemon|oak))$/;
 
