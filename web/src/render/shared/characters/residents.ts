@@ -1778,6 +1778,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return [Math.min(STATION_STEP_MAX, Math.max(0, ahead - STATION_REACH * rig.scale)), Math.min(along, Math.max(-along, across))];
   }
 
+  /** Walk mode's resident row, drawn without a body (-1: none). */
+  unseen = -1;
+
   /** Head-top position of Sim `i` (false if not drawn). */
   head(i: number, out: { x: number; y: number; z: number }): boolean {
     if (i < 0 || i >= MAX_CHARACTERS || !this.visible[i]) return false;
@@ -2465,6 +2468,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.mounting = null;
     this.props.forEachBuilt(this.showProp);
     this.pullChairs();
+    // Walk mode: the walker's body isn't drawn (the camera is in their head); still posed, for `head`.
+    const u = this.unseen;
+    if (u >= 0 && this.visible[u]) this.data.fill(0, this.row(u), this.row(u) + NB * BONE_FLOATS);
     this.upload();
     this.updateMs += (performance.now() - started - this.updateMs) * 0.1;
   }

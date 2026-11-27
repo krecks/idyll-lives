@@ -174,7 +174,8 @@ pub(crate) fn step_sim(
 
     // Sitting with others near (on the sofa, round a table): now and then a word from the seat,
     // without getting up (`conversation::from_seat`).
-    let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
+    let free_will =
+        ctx.autonomy && ctx.households[sim.household as usize].free_will && !sim.steered;
     if free_will
         && sim.pose == Pose::Sit
         && sim.current.as_ref().is_some_and(|a| {
@@ -259,6 +260,7 @@ pub(crate) fn step_sim(
             // Standing in the road with nothing to do (set down there, or a talk there over):
             // off it first, to the pavement (free will or not).
             if sim.idle_ticks >= AUTONOMY_DELAY_TICKS
+                && !sim.steered
                 && let Some(task) = off_the_road(sim, ctx)
             {
                 sim.idle_ticks = 0;

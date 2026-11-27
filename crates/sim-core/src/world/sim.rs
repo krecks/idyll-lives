@@ -251,6 +251,8 @@ pub struct Sim {
     /// Up from the upper bunk: the ticks left climbing down its ladder, doing nothing else meanwhile
     /// (`LADDER_DOWN_TICKS`). Not saved: a load finds them down already.
     pub(crate) ladder_ticks: u32,
+    /// Walk mode (`Command::Hold`): they choose nothing on their own. Not saved: a load lets go.
+    pub(crate) steered: bool,
     /// The first day this Sim looks for work again (after quitting or being let go).
     pub job_search_from: u32,
     /// Routines, goals and how planned blocks went (see `planner`).

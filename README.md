@@ -40,6 +40,7 @@ Build a home and watch the people who live in it.
 | L / B | Live / Build |
 | F · H · J · P · M | Follow · whole house · journal · planner · town map |
 | Tab, double-click a card | Look at the next resident, follow one |
+| Walk (resident panel) | Walk as them, seen from their eyes: W/S walk, A/D turn, Q/E step aside, drag to look, F to use what's in front or talk to whoever is there (their socials, or Talk… to type to them; the language model answers), Esc to stop |
 | E · Page Up/Down · Ctrl+Z/Y | Eyedropper · storeys · undo/redo (Build) |
 | W | Walls up → cutaway → down |
 | Esc | Step back, then the pause menu (save, load, settings) |

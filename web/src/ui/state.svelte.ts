@@ -236,6 +236,10 @@ class GameState {
   inspected = $state<number | null>(null);
   /** Resident the camera follows (also to other lots); null: the camera stays home. */
   follow = $state<number | null>(null);
+  /** Walk mode: the resident walked as, seen from their eyes (null: the orbit camera). */
+  walking = $state<number | null>(null);
+  /** Walk mode's chat: the resident talked with (null: closed). */
+  talkWith = $state<number | null>(null);
   /** The camera is watching on its own (the director): in Live, a while after the player's last input. */
   watching = $state(false);
   /** The mouse moved lately: a quiet interface shows itself again for a moment. */
@@ -297,6 +301,8 @@ class GameState {
     this.homeArea = null;
     this.relationships = [];
     this.socialMenu = null;
+    this.walking = null;
+    this.talkWith = null;
     this.feed = [];
     this.menu = null;
     this.pauseMenu = false;
@@ -348,6 +354,8 @@ export function nextWallMode(mode: WallMode): WallMode {
 
 let toastId = 0;
 export function toast(text: string, ms = 3500): void {
+  // (The same words already up are not stacked again: walk mode's steers can be refused several times a second.)
+  if (game.toasts.some((t) => t.text === text && !t.actions)) return;
   const id = ++toastId;
   game.toasts = [...game.toasts, { id, text }];
   setTimeout(() => dropToast(id), ms);
