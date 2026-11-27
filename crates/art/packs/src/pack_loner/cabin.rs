@@ -409,6 +409,23 @@ pub fn solo_sauna() -> Vec<Obj> {
             M.needle,
             rot = (0, -30, 0)
         );
+        // a vent grille high on each side wall: three dark slots
+        for s in [-1, 1] {
+            for k in 0..3 {
+                fbox!(
+                    f,
+                    numbered("vent_slot"),
+                    0.004,
+                    0.014,
+                    0.3,
+                    (s as f64 * 0.447, 1.76 + 0.045 * k as f64, zc - 0.05),
+                    M.dark
+                );
+            }
+        }
+        // the sauna light: a warm lamp in a slatted shade high on the back wall
+        fbox!(f, "lamp", 0.36, 0.05, 0.05, (0, 1.86, zb + 0.075), M.cream, bevel = 0.008);
+        fbox!(f, "lamp_hood", 0.4, 0.015, 0.09, (0, 1.9, zb + 0.095), M.cedar_dark, bevel = 0.004);
         // a towel over the bench's front edge
         let pts = [
             (0.0, 0.45, -0.12),
@@ -442,6 +459,12 @@ pub fn solo_sauna() -> Vec<Obj> {
             (0, 1.02, FRONT),
             M.glass
         );
+        for sx in [-1.0, 1.0] {
+            fbox!(f, "door_stile", 0.06, 1.84, 0.024, (sx * 0.36, 1.02, FRONT), M.cedar_dark, bevel = 0.006, bevel_segments = 1);
+        }
+        for y in [0.13, 1.91] {
+            fbox!(f, "door_rail", 0.66, 0.06, 0.024, (0, y, FRONT), M.cedar_dark, bevel = 0.006, bevel_segments = 1);
+        }
         kit::tube!(
             f,
             "pull",

@@ -5,7 +5,6 @@
 use super::common::{
     CEILING, DOME, F, Lathe, M, bulb, canopy, check_at, hang, lathe, loft_at, pear, ring_at, socket,
 };
-use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{cosd, sind};
 use artkit::parts::{join_all, new_parts};
@@ -234,8 +233,8 @@ pub fn ceiling_light() -> Vec<Obj> {
     check_at("ceilingLight")
 }
 
-/// A turned brass column on a rod, three S-scrolled arms down to a ring of ten globes and three curved spokes to a
-/// ring of six above, each globe in a bobeche; a drop globe and a finial under the column.
+/// A turned brass column on a rod, six S-scrolled arms down to one ring carrying six globes, each in a cup; a drop
+/// globe and a finial under the column.
 pub fn chandelier() -> Vec<Obj> {
     new_parts(|| {
         canopy("canopy", 0.08, 0.03, M.brass, 16, CEILING);
@@ -310,15 +309,13 @@ pub fn chandelier() -> Vec<Obj> {
             segments = 10
         );
         ring_at("ring_low", 0.435, (0, 2.05, 0), 0.013, M.brass, 36, 4);
-        ring_at("ring_high", 0.27, (0, 2.21, 0), 0.011, M.brass, 28, 4);
-        for a in [30, 150, 270] {
+        for a in [0, 60, 120, 180, 240, 300] {
             let (c, s) = (cosd(a as f64), sind(a as f64));
             let pts: Vec<(f64, f64, f64)> = [
-                (0.02, 2.35),
-                (0.12, 2.39),
-                (0.25, 2.35),
-                (0.36, 2.2),
-                (0.435, 2.062),
+                (0.02, 2.32),
+                (0.16, 2.30),
+                (0.3, 2.2),
+                (0.435, 2.055),
             ]
             .iter()
             .map(|&(r, y)| (r * c, y, r * s))
@@ -327,57 +324,32 @@ pub fn chandelier() -> Vec<Obj> {
                 F,
                 format!("arm{a}"),
                 &pts,
-                0.006,
+                0.007,
                 M.brass,
-                verts = 5,
+                verts = 6,
                 round = 4
             );
-        }
-        for a in [90, 210, 330] {
-            let (c, s) = (cosd(a as f64), sind(a as f64));
-            let pts: Vec<(f64, f64, f64)> = [(0.012, 2.21), (0.14, 2.235), (0.27, 2.215)]
-                .iter()
-                .map(|&(r, y)| (r * c, y, r * s))
-                .collect();
-            kit::tube!(
+            // a cup on the ring and its globe
+            let (x, z) = (0.435 * c, 0.435 * s);
+            kit::turned!(
                 F,
-                format!("spoke{a}"),
-                &pts,
-                0.0045,
+                format!("cup{a}"),
+                x,
+                2.051,
+                z,
+                &[(0.0, 0.0), (0.02, 0.012), (0.02, 0.017), (0.0, 0.017)],
                 M.brass,
-                verts = 5,
-                round = 3
+                segments = 8
             );
-        }
-        for (ring, n, r, y, size) in [(0.435, 10, 0.035, 2.1, 0.02), (0.27, 6, 0.03, 2.25, 0.017)] {
-            for k in 0..n {
-                let a = (360 * k) as f64 / n as f64 + if n == 6 { 15.0 } else { 0.0 };
-                let (x, z) = (ring * cosd(a), ring * sind(a));
-                kit::turned!(
-                    F,
-                    format!("cup{}_{k}", float_repr(y)),
-                    x,
-                    y - r - 0.014,
-                    z,
-                    &[
-                        (0.0, 0.0),
-                        (size, size * 0.6),
-                        (size, size * 0.85),
-                        (0.0, size * 0.85),
-                    ],
-                    M.brass,
-                    segments = 6
-                );
-                fsphere!(
-                    F,
-                    format!("globe{}_{k}", float_repr(y)),
-                    r,
-                    (x, y, z),
-                    M.bulb,
-                    segments = 8,
-                    rings = 6
-                );
-            }
+            fsphere!(
+                F,
+                format!("globe{a}"),
+                0.035,
+                (x, 2.1, z),
+                M.bulb,
+                segments = 8,
+                rings = 6
+            );
         }
         bulb(
             "chandelier",

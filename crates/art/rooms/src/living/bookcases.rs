@@ -7,7 +7,7 @@ use super::shelves::{
 };
 use super::{F, M};
 use artkit::forms::rounded_rect;
-use artkit::math::{PI, sin};
+use artkit::math::{PI, cosd, sin, sind};
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, join_all, new_parts};
 use artkit::place::Facing;
@@ -191,6 +191,11 @@ pub fn bookcase_corner() -> Vec<Obj> {
         quarter("end_shelf", x1, WALL, r, y - 0.022, y, M.shelf_white);
     }
     quarter("end_top", x1, WALL, r, 1.87, 1.9, M.shelf_white);
+    // a slim post up the curve's middle ties the shelves into one rounded end
+    for deg in [30.0, 60.0] {
+        let (px, pz) = ((r - 0.012) * cosd(deg), (r - 0.012) * sind(deg));
+        fcyl!(F, "end_post", 0.02, 1.83, (x1 + px, 0.95, WALL + pz), M.shelf_white, verts = 10);
+    }
     fbox!(
         F,
         "end_back",

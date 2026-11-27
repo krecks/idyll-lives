@@ -146,3 +146,5 @@ The gate's `edges` found none left: the ceiling canopies' rims against the ceili
 wall chamfered 3 mm, the ceiling light's canopy and the eaves of its lid, the track's top corners, the floor lamp's
 shade bands (all four corners), the bulkhead's hood (its back on the wall eased, its ends chamfered) and the swing-arm
 lamp's shade rim. Same sizes and looks; a few triangles more (the chandelier 3,996, under its 4,000).
+
+- 2026-11-27 realism pass: chandelier is six gently curved arms to one ring with six globes (no upper ring or spokes); the wall lamp arm's bulb sits at its shade's rim; the vitrine back is dark so the ornaments read through the glass (the preview draws `glass` opaque; the game draws it at 0.28 alpha); spiral treads overlap 5 degrees.

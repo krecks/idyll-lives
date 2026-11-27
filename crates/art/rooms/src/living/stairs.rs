@@ -270,7 +270,7 @@ fn wedge(r0: f64, r1: f64, a0: f64, a1: f64) -> Vec<(f64, f64)> {
 pub fn stairs_spiral() -> Vec<Obj> {
     let step = SPIRAL_TURN / f64::from(SPIRAL_TREADS - 1);
     let rise = (SPIRAL_TOP - SPIRAL_FIRST) / f64::from(SPIRAL_TREADS - 1);
-    let half = step / 2.0 + 1.2; // a little overlap, so no gap shows between the boards
+    let half = step / 2.0 + 5.0; // each tread overlaps the next in plan, as a real spiral's do: no wedge gap
     for k in 0..SPIRAL_TREADS {
         let a = 135.0 - f64::from(k) * step;
         let y = SPIRAL_FIRST + f64::from(k) * rise;
