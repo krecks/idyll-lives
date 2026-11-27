@@ -338,6 +338,9 @@
         "pads": {
           "finish": "material.finish.satin"
         },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
         "steel": {
           "finish": "material.finish.metal"
         }
