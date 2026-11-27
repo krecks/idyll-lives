@@ -1,7 +1,6 @@
 {
   "unmoved": {
     "model.awning": 10,
-    "model.blinds": 12,
     "model.buffet": 4,
     "model.burglarAlarm": 15,
     "model.carport": 12,
@@ -14,7 +13,6 @@
     "model.hallStand": 16,
     "model.pergola": 11,
     "model.shoeRack": 14,
-    "model.shutters": 26,
     "model.sideboard": 3,
     "model.solarPanels": 11,
     "model.uprightFreezer": 7,
