@@ -443,6 +443,11 @@ export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => n
   });
 }
 
+/** A far lot's house's windows (`lotBuilding`'s parts) lit at night or not as someone is up in it or not, in place. */
+export function lotUp(parts: readonly TownBuilding[], up: boolean): void {
+  for (const b of parts) if (b.style === TOWN_STYLE.house) b.lit = up ? LOT_LIT : 0;
+}
+
 // ---- the unit meshes ------------------------------------------------------------------------
 
 /** Vertex colour of a wall part (red 1) or a roof part (red 0), toned by `tone` (green; sRGB). */

@@ -82,8 +82,9 @@ import { townView } from '../shared/townView';
 import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
-import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
-import { STOREY as TOWN_STOREY } from '../shared/townBuildings';
+import { lotBuilding, lotUp, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
+import { STOREY as TOWN_STOREY, type TownBuilding } from '../shared/townBuildings';
+import { BoxGrid, type Box } from '../shared/boxGrid';
 import { lotWallsHeight, rayPrism, rectFootprint } from '../shared/buildingPick';
 import { closedParts, flatLids, inClosed, LID_THICK, viewedFlats, viewedLot, type ClosedPart } from '../shared/flatLids';
 import { TownGroundMap } from './groundTiles';
@@ -302,6 +303,8 @@ const IDENTITY = Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 
 /** No neighbours' houses (to look through). */
 const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
+/** How often (ms) the neighbours' houses are looked at for who is up in them at night (`findDarkRooms`). */
+const NEIGHBOURS_EVERY_MS = 250;
 
 /** Whether two worlds' garages are the same (field by field, as `sameObject`). */
 function sameGarages(a: readonly GarageInfo[] | undefined, b: readonly GarageInfo[] | undefined): boolean {
@@ -597,11 +600,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The eye (game space) this frame, for the woods' impostors (`Landscape.frameTiles`). */
   private readonly eyeNow = { x: 0, y: 0, z: 0 };
   private townGround!: TownGroundMap;
-  private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null; up: string } = { chunks: null, houses: null, up: '' };
+  private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null } = { chunks: null, houses: null };
+  /** The far lots' houses drawn (`frameTownView`), their parts by lot id: lit in place as their people get up and go to bed (`findTownUp`). */
+  private townLotParts = new Map<number, TownBuilding[]>();
   /** The far lots with someone up in their house (`findTownUp`: by lot id, and as a key), and when they were last looked for. */
   private townUp: ReadonlySet<number> = new Set();
-  private townUpKey = '';
   private townUpAt = 0;
+  /** The night's scans' houses bucketed, by their list (`gridOf`). */
+  private readonly grids = new WeakMap<object, { boxes: readonly Box[]; grid: BoxGrid }>();
+  /** When the neighbours' houses were last looked at for who is up in them (`findDarkRooms`). */
+  private neighboursAt = -Infinity;
   /** The weekday of the newest snapshot (0 = Monday: sim-core `clock::weekday`), for the town's opening hours. */
   private lastWeekday = 0;
   /** The town view's movers this frame (reused, a pool), and their colours by hex. */
@@ -1616,7 +1624,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private buildTownView(world: WorldStructure): void {
     this.townGround.bake(world);
-    this.townLotsBy = { chunks: null, houses: null, up: '' };
+    this.townLotsBy = { chunks: null, houses: null };
   }
 
   /**
@@ -1642,18 +1650,29 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townBuildings.setTime(this.lastMinute, this.lastWeekday);
     const houses = this.street.townHouses();
     const by = this.townLotsBy;
-    if (by.chunks === this.roam.chunks && by.houses === houses && by.up === this.townUpKey) return;
-    this.townLotsBy = { chunks: this.roam.chunks, houses, up: this.townUpKey };
+    if (by.chunks === this.roam.chunks && by.houses === houses) return;
+    this.townLotsBy = { chunks: this.roam.chunks, houses };
     const up = this.townUp;
     const land = this.lot.landscape;
     const ground = (x: number, z: number) => land?.heightAt(x, z) ?? 0;
-    this.townBuildings.setLots(houses.filter((h) => !this.street.chunkDrawn(h.chunk)).flatMap((h) => lotBuilding(h, ground, up.has(h.id))));
+    const parts = (this.townLotParts = new Map());
+    this.townBuildings.setLots(
+      houses
+        .filter((h) => !this.street.chunkDrawn(h.chunk))
+        .flatMap((h) => {
+          const drawn = lotBuilding(h, ground, up.has(h.id));
+          // (A lot with a look is lit by the hour, not by who is up.)
+          if (!h.look) parts.set(h.id, drawn);
+          return drawn;
+        }),
+    );
   }
 
   /**
    * Which far lots' houses have someone up in them (`townUp`, by lot id), twice a second while the town view is in
    * and the lamps are on: their windows glow at night only then (`lotBuilding`), as the neighbours' near the camera do
-   * (`findDarkRooms`). Nothing but the snapshot's positions is read.
+   * (`findDarkRooms`); the houses whose people got up or went to bed lit again in place (`lotUp`). Nothing but the
+   * snapshot's positions is read.
    */
   private findTownUp(frame: FrameState): void {
     if (this.townBlend <= 0 || this.lampsLevel <= 0 || frame.now - this.townUpAt < 500) return;
@@ -1662,6 +1681,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const k = layout.sim;
     const sleeping = this.sleepActions?.ids;
     const houses = this.street.townHouses();
+    const { boxes, grid } = this.gridOf(houses, (h) => h.box);
     const babies = this.babyStages();
     const sims = this.lastWorld?.sims ?? [];
     const up = new Set<number>();
@@ -1674,18 +1694,34 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const pz = curr[o + k.z];
       // (Upstairs is a storey's own rows: back to the ground's.)
       const gz = pz - this.rowOf(this.storeyOf(Math.floor(pz)));
-      for (const h of houses) {
-        const b = h.box;
-        if (px < b[0] || px > b[2] || gz < b[1] || gz > b[3]) continue;
-        up.add(h.id);
-        break;
-      }
+      const h = grid.find(boxes, px, gz);
+      if (h >= 0) up.add(houses[h].id);
     }
-    const key = [...up].sort((a, b) => a - b).join(',');
-    if (key === this.townUpKey) return;
-    this.townUpKey = key;
-    this.pictureChanged();
+    const was = this.townUp;
+    let relit = false;
+    let changed = false;
+    for (const id of new Set([...was, ...up])) {
+      if (was.has(id) === up.has(id)) continue;
+      changed = true;
+      const parts = this.townLotParts.get(id);
+      if (!parts) continue;
+      lotUp(parts, up.has(id));
+      relit = true;
+    }
+    if (!changed) return;
     this.townUp = up;
+    if (relit) this.townBuildings.relit();
+    this.pictureChanged();
+  }
+
+  /** Boxes bucketed for the night's scans (`BoxGrid`), made again only for another list. */
+  private gridOf<T>(list: readonly T[], box: (t: T) => Box): { boxes: readonly Box[]; grid: BoxGrid } {
+    let g = this.grids.get(list);
+    if (!g) {
+      const boxes = list.map(box);
+      this.grids.set(list, (g = { boxes, grid: new BoxGrid(boxes) }));
+    }
+    return g;
   }
 
   /**
@@ -2854,7 +2890,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * Where residents are this frame (`darkRooms`, `awakeRooms`, `occupiedRooms`, `movers`; away
-   * residents not counted), and which neighbours' houses have someone up in them (`neighboursUp`).
+   * residents not counted), and which neighbours' houses have someone up in them (`neighboursUp`, every
+   * `NEIGHBOURS_EVERY_MS`).
    */
   private findDarkRooms(frame: FrameState): void {
     const { curr, layout } = frame;
@@ -2876,11 +2913,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const sleeping = this.sleepActions.ids;
     const k = layout.sim;
     const W = world.width;
-    // Neighbours' houses only matter once their windows can glow.
-    const houses = this.townMode || this.lampsLevel <= 0 ? NO_HOUSES : this.street.houses;
+    // Neighbours' houses only matter once their windows can glow; who is up in them is looked for a few times a second
+    // (the street draws their windows again at most once a second, `Street.setUp`).
+    const all = this.townMode || this.lampsLevel <= 0 ? NO_HOUSES : this.street.houses;
+    const houses = all.length && frame.now - this.neighboursAt >= NEIGHBOURS_EVERY_MS ? all : NO_HOUSES;
     const up = this.neighboursUp;
-    up.length = houses.length;
-    up.fill(false);
+    const { boxes, grid } = this.gridOf(houses, (b) => b);
+    if (houses.length) {
+      this.neighboursAt = frame.now;
+      up.length = houses.length;
+      up.fill(false);
+    }
     const babies = this.babyStages();
     const count = curr[layout.header.simCount];
     for (let i = 0; i < count; i++) {
@@ -2909,13 +2952,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (asleep || baby || !houses.length) continue;
       // Upstairs is a storey's own rows: back to the ground's.
       const gz = pz - this.rowOf(this.storeyOf(z));
-      for (let h = 0; h < houses.length; h++) {
-        const b = houses[h];
-        if (px >= b[0] && px <= b[2] && gz >= b[1] && gz <= b[3]) {
-          up[h] = true;
-          break;
-        }
-      }
+      const h = grid.find(boxes, px, gz);
+      if (h >= 0) up[h] = true;
     }
     for (const room of awake) dark.delete(room);
     if (houses.length) this.street.setUp(up);

@@ -3,7 +3,7 @@
 // unit meshes' faces facing out.
 import { describe, expect, test } from 'bun:test';
 import type { LotLook } from '../src/core/protocol';
-import { homeLights, litAt, lotBuilding, lotLookBuilding, MOST_STOREYS, PALETTE, ROOFS, STYLE, unitMeshes } from '../src/render/shared/townBuildings';
+import { homeLights, litAt, lotBuilding, lotLookBuilding, lotUp, MOST_STOREYS, PALETTE, ROOFS, STYLE, unitMeshes } from '../src/render/shared/townBuildings';
 
 const flat = () => 0;
 const look = (use: LotLook['use'], roof: LotLook['roof'] = 'gable', n = 3): LotLook => ({ use, storeys: 2, roof, look: n });
@@ -52,6 +52,16 @@ describe("a far lot's house", () => {
     const [t] = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', parts: [part([10, 20, 18, 30], 6, 2.4)], pad: 0 }, flat);
     expect([t.cx, t.cz, t.w, t.d, t.top, t.rise, t.roof]).toEqual([14, 25, 10, 8, 6, 2.4, 'hip']);
     expect(t.uz).toBe(1);
+  });
+
+  test('lit in place as someone gets up or goes to bed, as built so; its garage never', () => {
+    const house = { id: 3, chunk: 0, box: [10, 20, 18, 30] as const, storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'gable' as const, parts: [part([10, 20, 16, 30], 6, 2.4), { ...part([16, 20, 18, 26], 3, 0.5), wall: '#808080' }], pad: 0 };
+    const parts = lotBuilding(house, flat, false);
+    lotUp(parts, true);
+    expect(parts).toEqual(lotBuilding(house, flat, true));
+    expect(parts[1].lit).toBe(0);
+    lotUp(parts, false);
+    expect(parts).toEqual(lotBuilding(house, flat, false));
   });
 
   test('on a hill stands on its pad, its walls from under its lowest corner', () => {
