@@ -114,7 +114,7 @@ pub fn family() -> Family {
             Model::new("carport", structures::carport, (2.952, 2.836, 5.00))
                 .key("model.carport")
                 .paint(&[("struct_timber", "Timber"), ("struct_roof", "Roof")]),
-            Model::new("gazebo", structures::gazebo, (2.97, 3.10, 2.96))
+            Model::new("gazebo", structures::gazebo, (2.98, 3.255, 2.98))
                 .key("model.gazebo")
                 .paint(&[("struct_timber", "Timber"), ("struct_roof", "Roof")]),
             Model::new("pergola", structures::pergola, (2.92, 2.42, 1.90))

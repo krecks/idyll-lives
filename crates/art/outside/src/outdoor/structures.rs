@@ -5,7 +5,7 @@ use artkit::math;
 use artkit::parts::{join_all, settle};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsphere, settle};
+use artkit::{fbox, fcone, fsphere, settle};
 
 // --- O9: the carport: four posts, eaves beams, two trusses and the rafters under a pitched roof -----------------
 /// The roof's pitch (degrees from level), each side of the ridge.
@@ -172,7 +172,7 @@ pub fn carport() -> Vec<Obj> {
 // --- O9: the gazebo: four posts, its ring beam, the stepped roof with its finial and a bench along the back -----------------------
 pub fn gazebo() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    let (w, d, h) = (2.84, 2.84, 2.30);
+    let (w, d, h) = (2.84, 2.84, 2.20);
     for (i, (sx, sz)) in [(-1.0f64, -1.0f64), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
         .into_iter()
         .enumerate()
@@ -192,10 +192,10 @@ pub fn gazebo() -> Vec<Obj> {
         fbox!(
             f,
             format!("beam{i}"),
-            w + 0.13,
+            w,
             0.16,
             0.11,
-            (0, h + 0.08, sz * d / 2.0),
+            (0, h + 0.08, sz * (d / 2.0 - 0.065)),
             M.struct_timber,
             bevel = 0.006
         );
@@ -207,44 +207,122 @@ pub fn gazebo() -> Vec<Obj> {
             0.11,
             0.16,
             d,
-            (sx * w / 2.0, h + 0.08, 0),
+            (sx * (w / 2.0 - 0.065), h + 0.08, 0),
             M.struct_timber,
             bevel = 0.006
         );
     }
-    // the roof: a broad skirt, the lantern over it and its own cap
-    fbox!(
+    // a bracket from each post up to the beams, both ways in
+    for (i, (sx, sz)) in [(-1.0f64, -1.0f64), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
+        .into_iter()
+        .enumerate()
+    {
+        let (px, pz) = (sx * (w / 2.0 - 0.065), sz * (d / 2.0 - 0.065));
+        fbox!(
+            f,
+            format!("bracketX{i}"),
+            0.40,
+            0.06,
+            0.06,
+            (px - sx * 0.14, h - 0.14, pz),
+            M.struct_timber,
+            rot = (0.0, -sx * 45.0, 0.0),
+            bevel = 0.005
+        );
+        fbox!(
+            f,
+            format!("bracketZ{i}"),
+            0.06,
+            0.06,
+            0.40,
+            (px, h - 0.14, pz - sz * 0.14),
+            M.struct_timber,
+            rot = (-sz * 45.0, 0.0, 0.0),
+            bevel = 0.005
+        );
+    }
+    // the hipped roof: a pyramid pitched 25° from the beams' top, 4 cm over them, a fascia board round its eaves
+    // and a finial on a short post at its peak
+    let (eave, half) = (h + 0.17, 1.49);
+    let rise = half * math::sin(25f64.to_radians()) / math::cos(25f64.to_radians());
+    let diag = half * core::f64::consts::SQRT_2;
+    artkit::bevel::eased(fcone!(
         f,
         "roof",
-        2.96,
-        0.10,
-        2.96,
-        (0, h + 0.21, 0),
+        diag,
+        0.0,
+        rise,
+        (0, eave + rise / 2.0, 0),
         M.struct_roof,
-        bevel = 0.008
-    );
+        verts = 4,
+        rot = (0, 0, 45),
+        smooth = false
+    ));
+    for (i, (sx, sz, along_x)) in [
+        (0.0f64, -1.0f64, true),
+        (0.0, 1.0, true),
+        (-1.0, 0.0, false),
+        (1.0, 0.0, false),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (bw, bd) = if along_x {
+            (2.0 * half, 0.025)
+        } else {
+            (0.025, 2.0 * half - 0.05)
+        };
+        fbox!(
+            f,
+            format!("fascia{i}"),
+            bw,
+            0.12,
+            bd,
+            (sx * (half - 0.0125), eave - 0.06, sz * (half - 0.0125)),
+            M.struct_timber,
+            bevel = 0.004
+        );
+    }
+    // a hip board down each of the roof's four hips, from the peak to its corner
+    let hip = math::atan2(rise, diag).to_degrees();
+    let run = diag - 0.08; // stopped short of the corner, where the fascia boards meet
+    for (i, (sx, sz, turn)) in [
+        (-1.0f64, -1.0f64, 45.0),
+        (1.0, -1.0, 135.0),
+        (-1.0, 1.0, -45.0),
+        (1.0, 1.0, -135.0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        fbox!(
+            f,
+            format!("hip{i}"),
+            run / math::cos(hip.to_radians()),
+            0.05,
+            0.09,
+            (
+                sx * run / 2.0 / core::f64::consts::SQRT_2,
+                eave + rise * (1.0 - run / 2.0 / diag) + 0.02,
+                sz * run / 2.0 / core::f64::consts::SQRT_2
+            ),
+            M.struct_timber,
+            rot = (0.0, hip, turn),
+            bevel = 0.005
+        );
+    }
     fbox!(
         f,
-        "lantern",
-        1.50,
-        0.30,
-        1.50,
-        (0, h + 0.41, 0),
+        "finialPost",
+        0.08,
+        0.14,
+        0.08,
+        (0, eave + rise + 0.02, 0),
         M.struct_timber,
         bevel = 0.006
     );
-    fbox!(
-        f,
-        "cap",
-        1.90,
-        0.09,
-        1.90,
-        (0, h + 0.605, 0),
-        M.struct_roof,
-        bevel = 0.008
-    );
-    fsphere!(f, "finial", 0.07, (0, h + 0.72, 0), M.struct_roof);
-    // the railing: two rails on the back and the two sides
+    fsphere!(f, "finial", 0.06, (0, eave + rise + 0.13, 0), M.struct_roof);
+    // the railing: two rails on the back and the two sides, balusters between them
     for (i, (sx, sz, len, along_x)) in [
         (0.0f64, -1.0f64, w, true),
         (-1.0, 0.0, d, false),
@@ -264,6 +342,24 @@ pub fn gazebo() -> Vec<Obj> {
                 (sx * (w / 2.0 - 0.065), y, sz * (d / 2.0 - 0.065)),
                 M.struct_timber,
                 bevel = 0.005
+            );
+        }
+        for k in 1..11 {
+            let t = -len / 2.0 + k as f64 * len / 11.0;
+            let (x, z) = if along_x {
+                (t, sz * (d / 2.0 - 0.065))
+            } else {
+                (sx * (w / 2.0 - 0.065), t)
+            };
+            fbox!(
+                f,
+                format!("baluster{i}{k}"),
+                0.035,
+                0.68,
+                0.035,
+                (x, 0.675, z),
+                M.struct_timber,
+                bevel = 0.004
             );
         }
     }

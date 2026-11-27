@@ -219,9 +219,12 @@ that move apart), reported to the owner.
 
 ## The garden's built things (2026-11-27)
 
-`carport` (2.95 × 2.84 × 5.00 m: four posts 2.15 m to the eaves beams (a car's clear height; the fascia's and the barge boards' lowest edge 2.13 m) with knee braces, a truss over each pair of posts (a tie beam and a king post up to the ridge beam), nine pairs of rafters 0.6 m apart, fascia boards along the eaves, barge boards up the gables and a roof sheet each side pitched 20° to a ridge cap along the 5 m length; joined into one `body`. One flat sheet on four posts, read as a table, before 2026-11-27), `gazebo` (2.97 × 3.09 ×
-2.96 m: four posts, a ring beam, two rails on three sides, a broad roof skirt, the lantern over it and its cap with
-a finial, and a bench along the back inside the rail), `pergola` (2.92 × 2.42 × 1.90 m: posts, two beams, five rafters), `awning` (1.90 × 0.40 × 0.91 m on the
+`carport` (2.95 × 2.84 × 5.00 m: four posts 2.15 m to the eaves beams (a car's clear height; the fascia's and the barge boards' lowest edge 2.13 m) with knee braces, a truss over each pair of posts (a tie beam and a king post up to the ridge beam), nine pairs of rafters 0.6 m apart, fascia boards along the eaves, barge boards up the gables and a roof sheet each side pitched 20° to a ridge cap along the 5 m length; joined into one `body`. One flat sheet on four posts, read as a table, before 2026-11-27), `gazebo` (2.98 × 3.25 ×
+2.98 m: four posts 2.20 m to a ring beam on them, a bracket from each post to the beam both ways in, two rails
+with balusters on three sides (the front open), a hipped roof pitched 25° as a four-sided pyramid (`fcone!` with
+`verts = 4`, `rot = (0, 0, 45)`) 8 cm over the beam, a fascia board round its eaves, a hip board down each hip and a
+finial on a short post at its peak, and a bench along the back inside the rail; a flat skirt with a boxy lantern
+on it before 2026-11-27), `pergola` (2.92 × 2.42 × 1.90 m: posts, two beams, five rafters), `awning` (1.90 × 0.40 × 0.91 m on the
 wall's face: a rail, five canvas slats stepping down to the front bar and the valance) and `solarPanels` (2.02 ×
 1.21 × 1.45 m: two 60-cell modules, each a real 1.00 × 1.66 m, 2 cm apart, tilted 30° up to the back on two low
 A-frames (a short front post, a tall back post, a rafter, a foot rail and a brace) under two purlins; the cells' gaps
@@ -230,8 +233,8 @@ Flat on four table legs, 0.86 m modules, before 2026-11-27). Timber and roof she
 calls; none has a clip. The gazebo is joined into one `body` (2026-11-27: its 32 parts, the bench's
 included, were the gate's `unmoved` before). A sloped part is an `fbox!` with `rot`: placed by an `at(s, n)` helper
 (`s` along the slope, `n` out of its face) and turned about kernel x (`rot = (tilt, 0, 0)`, rising to the back: the
-solar array) or kernel y (`rot = (0, -sx * pitch, 0)` for the slope on game side `sx`: the carport). The gazebo's
-roof is still a flat skirt with a lantern and the awning's slope five stepped slats. The awning is declared with its
+solar array) or kernel y (`rot = (0, -sx * pitch, 0)` for the slope on game side `sx`: the carport). The awning's
+slope is still five stepped slats. The awning is declared with its
 own centre (0.025 m) because its parts' box is not centred on the tile.
 
 The gazebo's bench (in the timber, no draw call of its own): three boards with their top at 0.45 m from the back

@@ -1000,7 +1000,7 @@
           ]
         }
       ],
-      "description": "A timber gazebo under a stepped roof, with a bench along the back: a shady place to sit out of the sun.",
+      "description": "A timber gazebo under a hipped roof with a finial, railed on three sides, with a bench along the back: a shady place to sit out of the sun.",
       "interactions": [
         {
           "id": "sit",
