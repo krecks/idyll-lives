@@ -1683,7 +1683,7 @@ fn a_house_with_one_stand_clear_of_the_driveways_has_its_taxi_for_each_run_an_ho
     // there and home. A run's stand is held for about when it's there, not all its time in town:
     // held so, the second run found no stand and didn't come, and its rider walked (there, or
     // home from the way out).
-    let kit = r#"{"name":"Kit","age":30,"traits":["cheerful"],"job":{"career":"business.entrepreneur","level":0}}"#;
+    let kit = r#"{"name":"Kit","age":30,"traits":["cheerful"],"job":{"career":"business.marketing","level":0}}"#;
     let south = |x: i32| House {
         south: true,
         ..house(x, &[])
