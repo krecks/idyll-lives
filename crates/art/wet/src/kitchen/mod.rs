@@ -41,6 +41,8 @@ palette! { M:
     frozen = ("#8FB6D6", satin),     // frozen pizza box
     icecream = ("#E8B4C8", satin),   // ice cream tub
     peas = ("#6FA96F", satin),       // frozen peas
+    drawer = ("#D3E4EC", gloss),     // the upright freezer's clear plastic drawers, pale blue
+    white_liner = ("#F4F6F7", matte), // the upright freezer's white inside
     porcelain = ("#F6F6F4", gloss),  // sink basins and the farmhouse apron
     pot = ("#B5653F", satin),        // a terracotta herb pot
     stone = ("#DCDDDA", gloss),      // sink worktops
@@ -201,10 +203,11 @@ pub fn family() -> Family {
                 .centre(0.0, -0.08)
                 .motions(json!({"uses": {"fetch": "lid_open"}, "hold": 3.5}))
                 .paint(&[("body", "Body"), ("chrome", "Handles"), ("trim", "Plinth")]),
-            Model::new("uprightFreezer", freezers::upright_freezer, (0.60, 1.82, 0.679))
+            Model::new("uprightFreezer", freezers::upright_freezer, (0.60, 1.82, 0.69))
                 .key("model.uprightFreezer")
                 .centre(0.0, -0.0805)
-                .motions(json!({"uses": {"fetch": "door_open"}, "hold": 3.5}))
+                // the middle drawer out once the door is open, back in before it shuts
+                .motions(json!({"uses": {"fetch": ["door_open", {"clip": "drawer_open", "delay": 0.9, "hold": 1.6}]}, "hold": 3.5}))
                 .paint(&[("body", "Body"), ("chrome", "Handles"), ("trim", "Plinth")]),
         ],
         "The kitchen (crates/art/wet/src/kitchen, built by cargo art). Listed in the base \
@@ -212,7 +215,7 @@ pub fn family() -> Family {
          per finish group. Each sink has a `water_on` clip (the stream from the tap) played while a \
          resident washes up. The fridges (K1) each hinge a door built closed and swing it open while \
          a resident takes food or a drink (`motions`); the French-door freezer slides and the wine \
-         fridge's top shelf of bottles slides out once its glass door is open; every freezer door and \
+         fridge's top shelf of bottles and the upright freezer's middle drawer slide out once their doors are open; every freezer door and \
          the French freezer drawer open for 'Get some ice cream'.",
     )
 }
