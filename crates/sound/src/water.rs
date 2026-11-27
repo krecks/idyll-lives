@@ -386,7 +386,7 @@ pub fn washer(rate: f64) -> Stereo {
     let mut out = track(rate, 16.0, 0.6);
     let n = out.left.len();
     // Turning between these times (seconds); paused for a moment in between to change direction.
-    let turns = [(0.8, 7.3), (8.8, 15.3), (16.8, 23.3)];
+    let turns = [(0.8, 7.3), (8.8, 15.3)];
     let mut turning = vec![0.0f32; n];
     for &(a, b) in &turns {
         let end = min(n as f64, b * rate);
@@ -406,8 +406,7 @@ pub fn washer(rate: f64) -> Stereo {
         let s = turning[i] as f64;
         // A soft, buzzy hum that rises with the motor's speed.
         phase += (2.0 * PI * 92.0 * (0.6 + 0.4 * s) * (1.0 + 0.01 * wobble[i] as f64)) / rate;
-        let saw =
-            sin(phase) + 0.5 * sin(2.0 * phase) + 0.3 * sin(3.0 * phase) + 0.15 * sin(5.0 * phase);
+        let saw = harmonics(phase / (2.0 * PI), &[1.0, 0.5, 0.3, 0.0, 0.15]);
         let v = hum.run(saw) * 0.025 * s
             + swish_hp.run(swish.run(p.next(&mut r))) * 0.8 * (0.3 + 0.7 * s);
         out.left[i] = v as f32;
