@@ -1008,7 +1008,7 @@
       ]
     },
     {
-      "for": "render/pc/poseTexture.ts: the residents' pose texture sent a band of rows at a time.",
+      "for": "render/pc/poseTexture.ts: the residents' pose texture sent a band of rows at a time; render/pc/grass.ts `uploadRect`: the town's grass mask sent a rectangle at a time (the same internals).",
       "anchors": [
         {
           "file": "platform/graphics/webgpu/webgpu-graphics-device.js",
@@ -1244,6 +1244,46 @@
           "file": "scene/shader-lib/glsl/chunks/render-pass/frag/ssao.js",
           "text": "if (uIntensity > 0.0) {",
           "who": "post.ts setContact: the same on WebGL2"
+        },
+        {
+          "file": "extras/render-passes/render-pass-ssao.js",
+          "text": "this.afterPasses.push(blurPassHorizontal);",
+          "who": "post.ts idlePasses: the occlusion's two blurs are its afterPasses (left out while the contact shading is off)"
+        },
+        {
+          "file": "extras/render-passes/camera-frame.js",
+          "text": "this.renderPassCamera = this.createRenderPass();",
+          "who": "post.ts idlePasses, targets: the CameraFrame's own pass is its renderPassCamera"
+        },
+        {
+          "file": "extras/render-passes/frame-pass-camera-frame.js",
+          "text": "this.ssaoPass = new RenderPassSsao(",
+          "who": "post.ts idlePasses: the frame's occlusion pass is its ssaoPass"
+        },
+        {
+          "file": "extras/render-passes/frame-pass-camera-frame.js",
+          "text": "this.bloomPass = new FramePassBloom(",
+          "who": "post.ts idlePasses: the frame's bloom is its bloomPass (left out by day)"
+        },
+        {
+          "file": "extras/render-passes/frame-pass-camera-frame.js",
+          "text": "this._sceneHalfEnabled = this._bloomEnabled || options.dofEnabled;",
+          "who": "post.ts idlePasses: the scene's half-size copy (scenePassHalf) is read only by the bloom and the depth of field"
+        },
+        {
+          "file": "extras/render-passes/frame-pass-camera-frame.js",
+          "text": "this.scenePassHalf = new RenderPassDownsample(",
+          "who": "post.ts idlePasses: the frame's half-size copy of the scene is its scenePassHalf (left out with the bloom)"
+        },
+        {
+          "file": "extras/render-passes/frame-pass-bloom.js",
+          "text": "onDisable() {",
+          "who": "post.ts idlePasses: the bloom left out shrinks its targets, and makes them again in frameUpdate when back"
+        },
+        {
+          "file": "scene/frame-graph.js",
+          "text": "if (pass.enabled) {",
+          "who": "post.ts idlePasses: a pass not enabled is left out of the frame, its frameUpdate too"
         },
         {
           "file": "extras/render-passes/render-pass-ssao.js",

@@ -37,7 +37,7 @@ import { litAt, type TownBuilding, type TownLotHouse } from '../shared/townBuild
 import { PANE_SETS, paneSetLit } from '../shared/buildingDress';
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
-import type { Geo, MeshData } from '../shared/geometry';
+import { Geo, type MeshData } from '../shared/geometry';
 import type { HousePart, SilhouettePlan } from '../shared/house';
 import type { StandIn } from '../shared/modelEntry';
 import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK } from '../shared/chunks';
@@ -79,6 +79,11 @@ interface Placed {
   draws: Instances[];
   cells: Map<number, Cell>;
   glows: { draw: Instances; material: pc.StandardMaterial }[];
+  /**
+   * The chunks' lists of its copies (`ChunkPlan.batches`, in chunk order) its draws were last written from (none:
+   * hidden, or not written yet). A chunk planned again has lists of its own, so the same lists are the same copies.
+   */
+  from?: readonly Inst[][];
 }
 
 /** A model's copies in one draw group (a 128 m superchunk, `shared/chunks.ts`). */
@@ -574,14 +579,20 @@ export class Street {
     if (!this.instancesDue) return;
     this.instancesDue = false;
     const batchesSpan = perfStart('street: batches');
-    // Every chunk's instances of a model, one list a model (chunk by chunk, in id order).
+    // Every chunk's instances of a model, one list a model (chunk by chunk, in id order), and the chunks' own lists it
+    // was made from (`Placed.from`).
     const order = [...this.chunks.keys()].sort((a, b) => a - b);
     const batches = new Map<string, Inst[]>((Object.values(FOLIAGE) as string[]).map((k) => [k, []]));
+    const from = new Map<string, Inst[][]>();
     for (const id of order) {
       for (const [k, items] of this.chunks.get(id)!.shape.batches) {
         let list = batches.get(k);
         if (!list) batches.set(k, (list = []));
         for (const i of items) list.push(i);
+        if (!items.length) continue;
+        let lists = from.get(k);
+        if (!lists) from.set(k, (lists = []));
+        lists.push(items);
       }
     }
     // Models from the last build that aren't used now are hidden.
@@ -591,16 +602,26 @@ export class Street {
     // last build drew, while this one awaits; `instances` adds those it draws now.)
     for (const [k, p] of this.placed) if (p.far && this.used.has(k)) this.used.add(farKey(k));
     this.plants = [...batches].flatMap(([k, items]) => items.map(([x, z, s, sy, yaw, y = 0]): StreetPlant => ({ key: k, x, y, z, sx: s, sy, sz: k === FOLIAGE.hedge ? 1 : s, yaw })));
+    let kept = 0;
     for (const [k, items] of batches) {
       if (!items.length) continue;
+      // (Its copies as they were, from the same template: left as written.)
+      const lists = from.get(k)!;
+      const p = this.placed.get(k);
+      if (p && sameLists(p.from, lists) && this.templates.built(k) === p.template && (!p.far || this.templates.built(farKey(k)) === p.far)) {
+        kept++;
+        continue;
+      }
       await pace?.();
       if (stale()) {
         this.instancesDue = true;
         return;
       }
       await perfTimeAsync(`street: batch ${k}`, () => this.instances(k, items, k === FOLIAGE.hedge, castsShadow(k), town.footprints.get(k), town.standIns.get(k), pace));
+      const now = this.placed.get(k);
+      if (now) now.from = lists;
     }
-    perfEnd(batchesSpan);
+    perfEnd(batchesSpan, `${kept} models kept`);
     this.framedAt.forget();
     // What files that came replace (the boxes) is drawn no more.
     this.disposeStale();
@@ -1041,12 +1062,14 @@ export class Street {
     const mine = this.homes.filter((h) => h.group === id);
     const lights = this.lights.filter((l) => l.group === id);
     for (const lit of [true, false]) {
-      const panes = mine.filter((h) => h.up === lit).map((h) => h.panes);
-      for (const l of lights) for (let k = 0; k < l.panes.length; k++) if (l.on[k] === lit && !l.panes[k].empty) panes.push(l.panes[k]);
-      const m = panes.length ? this.house.neighbourWindows(panes, lit, this.root) : null;
-      if (!m) continue;
-      this.dress(m.entity, false);
-      g.windows.push(m);
+      const panes = mine.filter((h) => h.up === lit).map((h) => paneData(h.panes));
+      for (const l of lights) for (let k = 0; k < l.panes.length; k++) if (l.on[k] === lit && !l.panes[k].empty) panes.push(paneData(l.panes[k]));
+      const data = concatMeshData(panes);
+      const part = this.house.planner.neighbourPanes([], lit);
+      const entity = data && this.house.drawData(part, data, this.root);
+      if (!entity) continue;
+      this.dress(entity, false);
+      g.windows.push({ entity, part });
     }
   }
 
@@ -1120,6 +1143,7 @@ export class Street {
   }
 
   private hide(p: Placed): void {
+    p.from = undefined;
     for (const d of p.draws) d.enabled = false;
     for (const c of p.cells.values()) for (const d of [...c.near, ...c.far]) if (d) d.enabled = false;
     for (const g of p.glows) g.draw.enabled = false;
@@ -1260,6 +1284,21 @@ export class Street {
     this.lib.excludeFromLights([], [d.meshInstance]);
     return d;
   }
+}
+
+/** Each set of panes' vertex arrays as the neighbours' glass draws them (`HousePlanner.neighbourPanes`: in its one colour). */
+const paneArrays = new WeakMap<Geo, MeshData>();
+
+/** A set of panes' vertex arrays (`paneArrays`): made once, as the glass is drawn again whenever a light goes on or off. */
+export function paneData(panes: Geo): MeshData {
+  let data = paneArrays.get(panes);
+  if (!data) paneArrays.set(panes, (data = new Geo().append(panes).meshData({ colors: true, cut: true })));
+  return data;
+}
+
+/** Whether `a` holds the same lists as `b`, in the same order (by identity: a list is never changed once planned). */
+function sameLists(a: readonly (readonly unknown[])[] | undefined, b: readonly (readonly unknown[])[]): boolean {
+  return !!a && a.length === b.length && a.every((l, i) => l === b[i]);
 }
 
 /** A model's size (m): the largest of its height, width and depth (its outline's, else its footprint's). */

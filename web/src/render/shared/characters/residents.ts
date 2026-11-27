@@ -157,6 +157,15 @@ function stationSide(rig: SimRig, station: PlacedObject): number {
  */
 const FAR_EVERY = [2, 4] as const;
 const FAR_LAG = 0.25;
+/** How far round a seat's or a bed's bounds a Sim is on it (m: `objectAt`), and the squares (m) they're kept by. */
+const REST_MARGIN = 0.05;
+const REST_CELL = 4;
+const restCell = (v: number) => Math.floor(v / REST_CELL);
+/** A square's key (squares within 131 km of the origin each have their own). */
+const restKey = (cx: number, cz: number) => cx * 0x10000 + cz;
+const NO_REST: readonly never[] = [];
+/** The most unchanged rows of the pose texture one upload spans between changed ones (`upload`): further apart, two uploads. */
+const UPLOAD_GAP = 8;
 /**
  * How long a resident the sim is catching up is hidden (real ms, `setDetailArea`): come into its full-detail area
  * (the camera's new area reaches the sim's worker, and its next tick catches them up on the ticks they owe, a few
@@ -226,8 +235,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The drawn part meshes by mesh (`rowsOf`). */
   private readonly parts = new WeakMap<object, PartMesh<M>>();
   private sims: (SimRig | null)[] = [];
-  /** The placed objects Sims sit or lie on (`objectAt`), and those with a use clip (`objectInFront`). */
-  private restful: PlacedObject[] = [];
+  /**
+   * The placed objects Sims sit or lie on, by `REST_CELL` square of the ground (`objectAt`: each in every square its
+   * bounds and `REST_MARGIN` round them reach, in the objects' order); and those with a use clip (`objectInFront`).
+   */
+  private readonly restful = new Map<number, PlacedObject[]>();
   private usable: PlacedObject[] = [];
   /** Rows per storey (0: one storey): residents' rows are mapped back onto the ground's. */
   private storeyDepth = 0;
@@ -423,8 +435,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private clock = 0;
   /** Frames posed (`update`): those far off are posed in full on their turn (`FAR_EVERY`, staggered by row). */
   private frameNo = 0;
-  /** Every resident posed in full every frame (`FAR_EVERY` off: to compare, from the console or a test). */
+  /** Every resident posed in full every frame (`FAR_EVERY` and the paused frames' `stillKey` off: to compare, from the console or a test). */
   everyFrame = false;
+  /**
+   * Paused, what residents are posed by: counted up whenever it changes (the snapshots and how far between them,
+   * the world, the tables, a prop built) and every frame the game runs. A resident posed in full twice at the same count
+   * (`stillAt`, `stillTwice`) is posed the same again, nothing of theirs moving: left as they are while it holds,
+   * the camera hasn't changed what of them is posed (`stillFlags`: `poseFar`, the face's morphs) and nothing moves
+   * them on the wall's clock (a voice line, a director).
+   */
+  private stillKey = 0;
+  private readonly stillAt = new Float64Array(MAX_CHARACTERS).fill(-1);
+  private readonly stillTwice = new Uint8Array(MAX_CHARACTERS);
+  private readonly stillFlags = new Uint8Array(MAX_CHARACTERS);
+  /** The paused frame's snapshots (their header and rows) and how far between them, as last compared (`stillKey`). */
+  private readonly stillFrame = { prev: new Float32Array(0), curr: new Float32Array(0), alpha: NaN, steps: NaN };
 
   /** Fixed-step playback: the animation's clock and the frames posed back to 0, so the same frames pose everyone the same. */
   restartClock(): void {
@@ -499,7 +524,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           const keys = this.props.invalidate(url);
           if (!keys.length) return;
           this.props.hideStale();
-          const dispose = () => this.props.disposeStale();
+          // (Paused, those holding them are posed again: `stillKey`.)
+          const dispose = () => {
+            this.props.disposeStale();
+            this.stillKey++;
+          };
           void Promise.all(keys.map((key) => this.props.get(key, () => this.view.buildProp(key)))).then(dispose, dispose);
         })
       : () => {};
@@ -961,7 +990,18 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
       return { def: o.def, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, ride, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
-    this.restful = objects.filter((o) => o.restful);
+    this.stillKey++;
+    this.restful.clear();
+    for (const o of objects) {
+      if (!o.restful) continue;
+      for (let cx = restCell(o.minX - REST_MARGIN); cx <= restCell(o.maxX + REST_MARGIN); cx++)
+        for (let cz = restCell(o.minZ - REST_MARGIN); cz <= restCell(o.maxZ + REST_MARGIN); cz++) {
+          const key = restKey(cx, cz);
+          const here = this.restful.get(key);
+          if (here) here.push(o);
+          else this.restful.set(key, [o]);
+        }
+    }
     this.usable = objects.filter((o) => USE[o.def]);
     this.footstools = objects.filter((o) => o.footstool);
     world.objects.forEach((o, j) => this.objectById.set(o.id, objects[j]));
@@ -990,6 +1030,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const set = this.set;
     const base = this.sims.find(Boolean);
     if (!set || !base) return;
+    this.stillKey++;
     const count = this.sims.length;
     const clips = ['idle', 'walk', 'talk', 'foldArms', 'idle', 'walk'];
     // Young adults of both genders in a T-shirt, trousers and sneakers.
@@ -1105,9 +1146,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   clear(): void {
     // (The next game's residents start on a clock of their own: what they do doesn't hang on how long this one ran.)
     this.restartClock();
+    this.stillKey++;
     this.sims = [];
     this.ghosts = [];
-    this.restful = [];
+    this.restful.clear();
     this.usable = [];
     this.footstools = [];
     this.objectById.clear();
@@ -1146,7 +1188,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private prop(key: string): P | null {
     const known = this.props.built(key);
     if (known !== undefined) return known;
-    void this.props.get(key, () => this.view.buildProp(key));
+    // (Built, paused: those holding it are posed again, in its matrices: `stillKey`.)
+    void this.props.get(key, () => this.view.buildProp(key)).then(() => this.stillKey++);
     return null;
   }
 
@@ -1825,6 +1868,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.changeAction = layout.actions.indexOf('change');
     }
     const hasAction = k.action !== undefined && k.object !== undefined;
+    // Paused with nothing new to pose by: those posed twice since are left as posed (`stillKey`).
+    const paused = frameDt === 0 && playRate === 0 && this.debugRate === null && !stalled && !this.everyFrame && !this.force && !this.faceDebug;
+    if (!paused || !this.sameFrame(frame, H + count * S)) this.stillKey++;
 
     // Group conversations: those listening in (role 3, the one who started it as partner), and
     // the middle of each group, everyone in it counted.
@@ -1867,7 +1913,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const cx = curr[o + k.x];
       const cz = this.groundRow(curr[o + k.z]);
       // The hand out to a door's handle (the renderer's `doorHand`: the leaf's swing is timed to it).
-      if (rig) rig.doorHand = doorHand ? doorHand[i] : 0;
+      const door = doorHand ? doorHand[i] : 0;
+      const doorSame = rig?.doorHand === door;
+      if (rig) rig.doorHand = door;
       const pz = this.groundRow(prev[o + k.z]);
       const ch = k.height !== undefined ? curr[o + k.height] : 0;
       let tx = cx;
@@ -1964,6 +2012,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
         if (rig) rig.cover = 0;
         this.visible[i] = 0;
+        // (Paused, shown again: posed twice afresh before they're left as posed, `stillKey`.)
+        this.stillAt[i] = -1;
         // (Shown again: on the ground where they are then, not eased there from where they were.)
         this.landY[i] = NaN;
         if (rig) rig.visible = false;
@@ -1994,6 +2044,18 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
         continue;
       }
+      // Paused, posed twice already by what's the same now (`stillKey`): posed the same again, so left as they are. Not
+      // those the carry-along above leaves out either (others' poses hang on theirs, or their frame's blanket, hand prop
+      // and seed are gathered as they're posed), nor one getting up from under a blanket (drawn only as they're posed),
+      // nor one whose contact shadow the renderer took away (far off: back once the camera comes near).
+      const flags = this.poseFar[i] | (this.facePx[i] >= MORPH_PX ? 2 : 0);
+      if (paused && this.stillTwice[i] && this.stillAt[i] === this.stillKey && this.stillFlags[i] === flags && doorSame && rig.visible && !rig.speech && !this.directions[i] && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i] && rig.cover <= 0 && shadows[i * 16 + 15] !== 0) {
+        if (this.mountId[i] >= 0) this.riddenNow.add(this.mountId[i]);
+        continue;
+      }
+      this.stillTwice[i] = this.stillAt[i] === this.stillKey ? 1 : 0;
+      this.stillAt[i] = this.stillKey;
+      this.stillFlags[i] = flags;
       // (Posed in full: as far on as the frames since it last was.)
       const dt = Math.min(FAR_LAG, frameDt + rig.lag);
       rig.lag = 0;
@@ -3273,6 +3335,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The tables seats face, with what is in front of them (`tableRooms`), by seat id: set with each world. */
   setTables(tables: Map<number, TableRoom>): void {
     this.tables = tables;
+    this.stillKey++;
     this.seatIds.clear();
     for (const [id] of tables) {
       const o = this.objectById.get(id);
@@ -4226,11 +4289,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const hipFwd = rootFwd + fit.hz * s;
     const hipY = rootY + fit.hy * s;
     const legs = (fit.l1 + fit.l2) * s;
+    // (The furthest a footstool's middle can be and still pass the tests below, but for its own size: as far ahead
+    // as the heels reach, slid forward, and a step aside; the town's others are passed over before any turning.)
+    const reach = Math.abs(hipFwd) + legs * FEET_UP.reach + Math.abs(FEET_UP.slide - FEET_UP.edge) + FEET_UP.side * 0.5;
     let best = Infinity;
     for (const o of this.footstools) {
       const f = o.footstool!;
       const dx = o.cx - rig.x;
       const dz = o.cz - rig.z;
+      const r = reach + 2 * (f.hw + f.hd);
+      if (dx * dx + dz * dz > r * r) continue;
       const ahead = dx * fx + dz * fz;
       const right = dx * fz - dz * fx;
       // Its half depth along the Sim's facing and half width across it (a box turned any way).
@@ -4571,7 +4639,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /**
    * Uploads the pose texture's rows that changed since the last upload (Sims drawn now, or just
-   * hidden), as one band of rows: a few of the 64 most frames, none while the game is paused.
+   * hidden), in bands of rows: one per run of changed rows no more than `UPLOAD_GAP` apart (the
+   * household in the first rows and a neighbour in view hundreds after are two small uploads, not one
+   * of every row between); none while the game is paused.
    */
   private upload(): void {
     const stride = this.width * 4;
@@ -4589,6 +4659,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       while (k < end && data[k] === uploaded[k]) k++;
       if (k === end) continue;
       uploaded.set(data.subarray(k, end), k);
+      if (lo >= 0 && i - hi > UPLOAD_GAP + 1) {
+        this.view.uploadPoseRows(lo, hi - lo + 1);
+        lo = -1;
+      }
       if (lo < 0) lo = i;
       hi = i;
       if (shadowed) continue;
@@ -4600,6 +4674,23 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     if (lo >= 0) this.view.uploadPoseRows(lo, hi - lo + 1);
   }
 
+  /** Whether the frame's snapshots (their first `n` floats) and how far between them are the last paused frame's; kept for the next. */
+  private sameFrame(frame: FrameState, n: number): boolean {
+    const was = this.stillFrame;
+    let same = frame.alpha === was.alpha && frame.steps === was.steps && was.prev.length === n;
+    // (A NaN the same as a NaN: an unused field.)
+    for (let j = 0; same && j < n; j++) {
+      const [a, b, c, d] = [frame.prev[j], was.prev[j], frame.curr[j], was.curr[j]];
+      same = (a === b || (a !== a && b !== b)) && (c === d || (c !== c && d !== d));
+    }
+    if (same) return true;
+    if (was.prev.length !== n) [was.prev, was.curr] = [new Float32Array(n), new Float32Array(n)];
+    was.prev.set(frame.prev.subarray(0, n));
+    was.curr.set(frame.curr.subarray(0, n));
+    [was.alpha, was.steps] = [frame.alpha, frame.steps];
+    return false;
+  }
+
   /** The seat a sitting Sim is on: the object they use if it's a seat, else the seat under them
    * (content `seatNear`: watching TV from the sofa). */
   private seatUnder(rig: SimRig, useObj: PlacedObject | null | undefined): PlacedObject | null {
@@ -4608,11 +4699,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     return under ?? useObj ?? null;
   }
 
+  /** The seat or bed whose bounds (and `REST_MARGIN` round them) hold (x, z): the one whose middle is nearest. */
   private objectAt(x: number, z: number): PlacedObject | null {
     let best: PlacedObject | null = null;
     let bestD = Infinity;
-    for (const o of this.restful) {
-      if (x < o.minX - 0.05 || x > o.maxX + 0.05 || z < o.minZ - 0.05 || z > o.maxZ + 0.05) continue;
+    for (const o of this.restful.get(restKey(restCell(x), restCell(z))) ?? NO_REST) {
+      if (x < o.minX - REST_MARGIN || x > o.maxX + REST_MARGIN || z < o.minZ - REST_MARGIN || z > o.maxZ + REST_MARGIN) continue;
       const d = Math.abs(x - o.cx) + Math.abs(z - o.cz);
       if (d < bestD) {
         best = o;

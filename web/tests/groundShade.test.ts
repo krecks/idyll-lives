@@ -79,31 +79,27 @@ describe('the ground’s shade', () => {
     expect(Buffer.from(groundShade(town([indoors, onTop]), N)).equals(Buffer.from(bare))).toBe(true);
   });
 
-  test('made again only round what changed: the same bytes as made whole', () => {
+  test('made again only within rectangles round what changed: the same bytes as made whole', () => {
     const chair = { id: 1, def: 'chairGarden', x: 2, z: 11, w: 1, d: 1, rot: 0 };
     const tree = { id: 2, def: 'garden.maple', x: 13, z: 2, w: 2, d: 2, rot: 0 };
     const map = groundShade(town([chair]), N);
+    // (A thing's tiles, 3 round them: its shade's reach and more, in texels.)
+    const round = (o: { x: number; z: number; w: number; d: number }): [number, number, number, number] => [(o.x - 3) * N, (o.z - 3) * N, (o.x + o.w + 3) * N - 1, (o.z + o.d + 3) * N - 1];
     // A tree bought beside it, then the chair moved next to the tree (their shades laid over each other), then sold.
-    for (const objects of [[chair, tree], [{ ...chair, x: 12, z: 3 }, tree], [tree]]) {
-      const { shade, changed } = updateGroundShade(town(objects), N, map);
+    const moved = { ...chair, x: 12, z: 3 };
+    for (const [objects, rects] of [
+      [[chair, tree], [round(tree)]],
+      [[moved, tree], [round(chair), round(moved)]],
+      [[tree], [round(moved)]],
+    ] as const) {
+      const { shade, changed } = updateGroundShade(town([...objects]), N, map, [...rects]);
       expect(shade).toBe(map);
-      expect(changed?.length).toBeGreaterThan(0);
-      expect(Buffer.from(map).equals(Buffer.from(groundShade(town(objects), N)))).toBe(true);
+      expect(changed?.length).toBe(rects.length);
+      expect(Buffer.from(map).equals(Buffer.from(groundShade(town([...objects]), N)))).toBe(true);
     }
-    // Nothing changed: no texel made again.
-    expect(updateGroundShade(town([tree]), N, map).changed).toEqual([]);
-  });
-
-  test('a house, its fence and its things gone together (a lot removed in step 2): made again round them alone, the same bytes as made whole', () => {
-    const chair = { id: 1, def: 'chairGarden', x: 2, z: 11, w: 1, d: 1, rot: 0 };
-    const tree = { id: 2, def: 'garden.maple', x: 13, z: 2, w: 2, d: 2, rot: 0 };
-    const whole = town([chair, tree]);
-    const map = groundShade(whole, N);
-    // (Walls first in the list, the fence and the chair after: gone from three places.)
-    const gone = { ...whole, walls: whole.walls.filter((e) => e.x < 6), rooms: whole.rooms.map(() => 0), fences: [], objects: [tree] as WorldStructure['objects'] };
-    const { changed } = updateGroundShade(gone, N, map);
-    expect(changed).not.toBeNull();
-    expect(Buffer.from(map).equals(Buffer.from(groundShade(gone, N)))).toBe(true);
+    // Nothing changed: no texel made again; no rectangles: all of them.
+    expect(updateGroundShade(town([tree]), N, map, []).changed).toEqual([]);
+    expect(updateGroundShade(town([tree]), N, map, null).changed).toBeNull();
   });
 
   test('made again into the same bytes', () => {

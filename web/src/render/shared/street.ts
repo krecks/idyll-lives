@@ -2094,7 +2094,22 @@ export class TownStreet {
    * what it was made from. Null when it has none.
    */
   farChunk(id: number, focus: number): { key: string; geo: Geo } | null {
-    const houses = (this.plotsByChunk().get(id) ?? []).filter((L) => L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop'));
+    const list = this.plotsByChunk().get(id) ?? [];
+    // (Kept, as `chunkKey`'s, until the world changes what the street stands among (`version`: the lots' houses,
+    // roofs, storeys, rooms, walls' coverings, garages and looks), the heights in it move (`BuiltSurface.version`) or
+    // the focus lot comes into it or leaves: its key, worked out below, strings every house's boxes.)
+    const moved = this.levels?.surface.version(id) ?? 0;
+    const here = list.some((L) => L.info.id === focus) ? focus : NO_FOCUS;
+    const known = this.farMemo.get(id);
+    if (known && known.version === this.version && known.moved === moved && known.focus === here) return known.far;
+    const far = this.farOf(id, list, here);
+    this.farMemo.set(id, { version: this.version, moved, focus: here, far });
+    return far;
+  }
+  private readonly farMemo = new Map<number, { version: number; moved: number; focus: number; far: { key: string; geo: Geo } | null }>();
+
+  private farOf(id: number, list: readonly PlotLayout[], focus: number): { key: string; geo: Geo } | null {
+    const houses = list.filter((L) => L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop'));
     if (!houses.length) return null;
     const plots = new Map(houses.map((L) => [L, this.farPlot(L)]));
     const key = `${id}|${houses.map((L) => `${L.info.id}:${JSON.stringify(plots.get(L))}${this.dresses.has(L.info.id) ? `:${hashString(JSON.stringify(this.dresses.get(L.info.id)))}` : ''}`).join(';')}${this.levels ? `|v${this.levels.surface.version(id)}` : ''}`;
