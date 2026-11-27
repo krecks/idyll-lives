@@ -9,7 +9,7 @@
  * Placements are matrices in game space (the layout of `math.ts`): 16 floats each.
  */
 
-import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
+import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type ObjectPlacement, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
 import { carriedWetEdgeAt, coverAt, EDGE_POND, seaRims, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, seaWays, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, waterMetres, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
@@ -21,6 +21,7 @@ import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../gam
 import { tuned } from '../tune';
 import { ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 import { townPaving } from './townPaving';
+import type { TexelRect } from './groundShade';
 import { CROP_LOOK, cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type Crop, type FieldCanvas, type FieldClip, type FieldPoint } from './farmland';
 
 /**
@@ -380,33 +381,37 @@ export function splitHalf(axis: 'dp' | 'dn', fx: number, fz: number): 0 | 1 {
 export function bareTiles(world: WorldStructure, mask?: LawnMask): Uint8Array {
   // (Asked again for a world whose lawn is as it was, the birds' after a focus lot shown: the same answer.)
   if (!mask) {
-    const inputs = lawnInputs(world);
-    if (lastBare && sameLawnInputs(lastBare.inputs, inputs)) return lastBare.bare;
-    const bare = bareTilesOf(world, lawnMask(world));
-    lastBare = { inputs, bare };
-    return bare;
+    if (lastBare && (lastBare.world === world || lawnChanges(lastBare.world, world)?.length === 0)) return lastBare.bare;
+    return keepBareTiles(world, lawnMask(world));
   }
-  return bareTilesOf(world, mask);
+  return bareTilesOf(world, mask, null);
 }
-let lastBare: { inputs: LawnInputs; bare: Uint8Array } | null = null;
+let lastBare: { world: WorldStructure; bare: Uint8Array; paved: Uint8Array } | null = null;
 
 /**
- * `bareTiles` for a world whose lawn inputs (`lawnInputs`) and mask the caller has made already (the
- * landscape's `refreshLawn`): kept as the answer `bareTiles` gives for those inputs (the birds' next).
+ * `bareTiles` for a world whose mask the caller has made already (the landscape's `refreshLawn`): kept as the
+ * answer `bareTiles` gives for it (the birds' next). `change`: since the world kept last, made again only within its
+ * rectangles.
  */
-export function keepBareTiles(world: WorldStructure, inputs: LawnInputs, mask: LawnMask): Uint8Array {
-  const bare = bareTilesOf(world, mask);
-  lastBare = { inputs, bare };
+export function keepBareTiles(world: WorldStructure, mask: LawnMask, change?: LawnChange | null): Uint8Array {
+  const before = change && lastBare?.world === change.was && lastBare.bare.length === world.width * groundDepth(world) ? lastBare : null;
+  const paved = before?.paved ?? unlawned(world);
+  const bare = bareTilesOf(world, mask, paved, before && { bare: before.bare, rects: change!.rects });
+  lastBare = { world, bare, paved };
   return bare;
 }
 
-function bareTilesOf(world: WorldStructure, mask: LawnMask): Uint8Array {
+/** `bareTiles`, its streets and paving `paved` (`unlawned`) if known; `before`: the last answer, made again (in place) only within `rects`. */
+function bareTilesOf(world: WorldStructure, mask: LawnMask, paved: Uint8Array | null, before?: { bare: Uint8Array; rects: readonly TexelRect[] } | null): Uint8Array {
   const w = world.width;
   const d = groundDepth(world);
-  const bare = mask.hidden.slice(0, w * d);
-  const paved = unlawned(world);
-  for (let i = 0; i < bare.length; i++) if (paved[i]) bare[i] = 1;
-  for (const [x, z] of world.floors ?? []) if (x >= 0 && z >= 0 && x < w && z < d) bare[z * w + x] = 1;
+  paved ??= unlawned(world);
+  const bare = before ? before.bare : new Uint8Array(w * d);
+  for (const [x0, z0, x1, z1] of before?.rects ?? [[0, 0, w - 1, d - 1]]) {
+    for (let z = z0; z <= Math.min(z1, d - 1); z++) for (let i = z * w + x0; i <= z * w + x1; i++) bare[i] = paved[i] ? 1 : mask.hidden[i];
+  }
+  // (Outside the rectangles, a floor is where it was: already 1.)
+  for (const f of world.floors ?? []) if (f[0] >= 0 && f[1] >= 0 && f[0] < w && f[1] < d) bare[f[1] * w + f[0]] = 1;
   return bare;
 }
 
@@ -432,22 +437,31 @@ export function unlawned(world: WorldStructure, any = true): Uint8Array {
   return out;
 }
 
-/** Where the lawn that grows is hidden now: the tiles indoors (or the half of a split tile that is) and under furniture. */
-export function lawnMask(world: WorldStructure): LawnMask {
-  const hidden = new Uint8Array(world.width * world.depth);
-  for (let i = 0; i < hidden.length; i++) if (world.rooms[i] !== 0) hidden[i] = 1;
+/**
+ * Where the lawn that grows is hidden now: the tiles indoors (or the half of a split tile that is) and under furniture.
+ * `before`: the mask of the world `lawnChanges` compared with, made again only within its `rects`.
+ */
+export function lawnMask(world: WorldStructure, before?: LawnMask | null, rects?: readonly TexelRect[] | null): LawnMask {
+  const { width, depth } = world;
+  const again = before && rects && before.hidden.length === width * depth;
+  // (Changed in place: a big world's is megabytes.)
+  const hidden = again ? before.hidden : new Uint8Array(width * depth);
   // Split tiles: 2 = half 0 indoors, 3 = half 1 indoors, 4 = both (bit 1 marks "per half").
   const splitAxis = new Map<number, 'dp' | 'dn'>();
-  for (const d of world.diagonals ?? []) {
-    const i = d.z * world.width + d.x;
-    const [a, b] = [d.rooms[0] !== 0, d.rooms[1] !== 0];
-    hidden[i] = a && b ? 1 : a ? 2 : b ? 3 : 0;
-    splitAxis.set(i, d.axis);
+  for (const d of world.diagonals ?? []) splitAxis.set(d.z * width + d.x, d.axis);
+  for (const [x0, z0, x1, z1] of again ? rects : [[0, 0, width - 1, depth - 1]]) {
+    for (let z = z0; z <= z1; z++) for (let i = z * width + x0; i <= z * width + x1; i++) hidden[i] = world.rooms[i] !== 0 ? 1 : 0;
+    for (const d of world.diagonals ?? []) {
+      if (d.x < x0 || d.x > x1 || d.z < z0 || d.z > z1) continue;
+      const [a, b] = [d.rooms[0] !== 0, d.rooms[1] !== 0];
+      hidden[d.z * width + d.x] = a && b ? 1 : a ? 2 : b ? 3 : 0;
+    }
+    for (const o of world.objects) {
+      if (o.x > x1 || o.z > z1 || o.x + o.w <= x0 || o.z + o.d <= z0) continue;
+      for (let z = Math.max(o.z, z0); z < Math.min(o.z + o.d, z1 + 1); z++) for (let x = Math.max(o.x, x0); x < Math.min(o.x + o.w, x1 + 1); x++) hidden[z * width + x] = 1;
+    }
   }
-  for (const o of world.objects) {
-    for (let z = o.z; z < o.z + o.d; z++) for (let x = o.x; x < o.x + o.w; x++) hidden[z * world.width + x] = 1;
-  }
-  return { width: world.width, hidden, splitAxis };
+  return { width, hidden, splitAxis };
 }
 
 /**
@@ -457,23 +471,17 @@ export function lawnMask(world: WorldStructure): LawnMask {
  */
 export function hideLawn<D>(layers: readonly LawnLayer<D>[], { width, hidden, splitAxis }: LawnMask, upload: (layer: LawnLayer<D>) => void): void {
   // (For the layers that keep clear: whether a tile or one of the eight round it is hidden, at all.)
-  let near: Uint8Array | undefined;
-  const nearHidden = (): Uint8Array => {
-    if (near) return near;
-    near = new Uint8Array(hidden.length);
-    const depth = Math.floor(hidden.length / width);
-    for (let i = 0; i < hidden.length; i++) {
-      if (!hidden[i]) continue;
-      const [x, z] = [i % width, Math.floor(i / width)];
-      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (x + dx >= 0 && x + dx < width && z + dz >= 0 && z + dz < depth) near[(z + dz) * width + x + dx] = 1;
-    }
-    return near;
+  const depth = Math.floor(hidden.length / width);
+  const nearHidden = (t: number): number => {
+    const [x, z] = [t % width, Math.floor(t / width)];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (x + dx >= 0 && x + dx < width && z + dz >= 0 && z + dz < depth && hidden[(z + dz) * width + x + dx]) return 1;
+    return 0;
   };
   for (const layer of layers) {
     let changed = false;
     for (let k = 0; k < layer.tiles.length; k++) {
       const t = layer.tiles[k];
-      let hide = t >= 0 ? (layer.clear ? nearHidden()[t] : hidden[t]) : 0;
+      let hide = t >= 0 ? (layer.clear ? nearHidden(t) : hidden[t]) : 0;
       if (hide > 1) {
         // The flower's position within its tile decides its half.
         const fx = layer.base[k * 16 + 12] - (t % width);
@@ -2401,41 +2409,132 @@ export function windDirection(yaw: number, sx: number, sz: number, out: { x: num
   out.z = -along * s + across * c;
 }
 
-/** What the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls, the lawn's map): rooms, things, walls, diagonals, floors, fences, doors, plots, paths and fields. */
-export interface LawnInputs {
-  width: number;
-  rooms: ArrayLike<number>;
-  things: Int32Array;
-  defs: string;
-  edges: string;
-  meta: unknown;
+/** What changed on the lawn since a world (`lawnChanges`): that world, and the town tiles round what changed. */
+export interface LawnChange {
+  was: WorldStructure;
+  rects: TexelRect[];
 }
 
-export function lawnInputs(world: WorldStructure): LawnInputs {
-  const things = new Int32Array(world.objects.length * 5);
-  world.objects.forEach((o, i) => things.set([o.x, o.z, o.w, o.d, o.rot], i * 5));
-  return {
-    width: world.width,
-    rooms: world.rooms,
-    things,
-    defs: world.objects.map((o) => o.def).join(),
-    edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join(), lawnEdges(world)]),
-    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields, world.meta?.centre, world.meta?.paving, world.meta?.greens, world.parking, world.carParks],
+/**
+ * How far (tiles) a change reaches on the lawn: a door's worn earth, a wall's shade (`groundShade.ts`) and a tree's
+ * darker grass (`lawn.ts`) lie up to 2 tiles past what made them, the grass's clearance from a wall 1.
+ */
+const LAWN_REACH = 3;
+
+/** More rectangles than this and the one round them all is made again (a town edited at once). */
+const MOST_RECTS = 64;
+
+/**
+ * Where what the lawn grows round (`lawnMask`, `bareTiles`, the grass's walls, the lawn's map, the ground's shade:
+ * rooms, things, walls, diagonals, floors, fences, doors) changed from `was` to `world`: the town's tiles (rows of
+ * every storey, `[x0, z0, x1, z1]`, last ones included) whose lawn could differ, `LAWN_REACH` round each change; empty
+ * when none. Null: all of it (another size, or its plots, streets, paths, fields or paving changed). What didn't
+ * change is the same object as before (`bridge.ts` `mergeWorld`): only what isn't is compared.
+ */
+export function lawnChanges(was: WorldStructure, world: WorldStructure): TexelRect[] | null {
+  if (was === world) return [];
+  const { width: w, depth } = world;
+  if (was.width !== w || was.depth !== depth || was.storeyDepth !== world.storeyDepth || was.meta !== world.meta || was.parking !== world.parking || was.carParks !== world.carParks) return null;
+  if (was.plots !== world.plots && (was.plots.length !== world.plots.length || was.plots.some((p, i) => p.x !== world.plots[i].x || p.z !== world.plots[i].z || p.w !== world.plots[i].w || p.d !== world.plots[i].d))) return null;
+  const rects: TexelRect[] = [];
+  const add = (x0: number, z0: number, x1: number, z1: number, reach = LAWN_REACH): void => {
+    const r: TexelRect = [Math.max(0, x0 - reach), Math.max(0, z0 - reach), Math.min(w - 1, x1 + reach), Math.min(depth - 1, z1 + reach)];
+    if (r[0] <= r[2] && r[1] <= r[3]) rects.push(r);
   };
+  // (A thing's footprint, and as far again as it is moved off its tiles.)
+  const thing = (o: ObjectPlacement): void => add(o.x, o.z, o.x + o.w - 1, o.z + o.d - 1, LAWN_REACH + Math.ceil(Math.max(Math.abs(o.offset?.[0] ?? 0), Math.abs(o.offset?.[1] ?? 0)) / 100));
+  // Rooms: the box round the tiles changed, storey by storey, and the things standing in it (outdoors or not now).
+  if (was.rooms !== world.rooms) {
+    const sd = groundDepth(world);
+    const boxes = new Map<number, TexelRect>();
+    for (let i = 0; i < w * depth; i++) {
+      if (was.rooms[i] === world.rooms[i]) continue;
+      const [x, z] = [i % w, Math.floor(i / w)];
+      const b = boxes.get(Math.floor(z / sd));
+      if (b) [b[0], b[2], b[3]] = [Math.min(b[0], x), Math.max(b[2], x), z];
+      else boxes.set(Math.floor(z / sd), [x, z, x, z]);
+    }
+    for (const [x0, z0, x1, z1] of boxes.values()) {
+      add(x0, z0, x1, z1);
+      for (const o of world.objects) if (o.x >= x0 && o.x <= x1 && o.z >= z0 && o.z <= z1) thing(o);
+    }
+  }
+  // The lot's edges and floors, by what the lawn reads of them (the lists' unchanged ends skipped).
+  const W = w + 1;
+  const edge = (e: { axis: string; x: number; z: number }) => (e.z * W + e.x) * 2 + (e.axis === 'h' ? 1 : 0);
+  changedKeys(was.walls, world.walls, edge, (e) => add(e.x - 1, e.z - 1, e.x, e.z));
+  changedKeys(was.diagonals ?? [], world.diagonals ?? [], (d) => (((d.z * W + d.x) * 2 + (d.axis === 'dp' ? 1 : 0)) * 2 + (d.rooms[0] !== 0 ? 1 : 0)) * 2 + (d.rooms[1] !== 0 ? 1 : 0), (d) => add(d.x, d.z, d.x, d.z));
+  changedKeys(was.fences ?? [], world.fences ?? [], (e) => edge(e) * 2 + (e.kind === 'gate' ? 1 : 0), (e) => add(e.x - 1, e.z - 1, e.x, e.z));
+  changedKeys(was.openings, world.openings, (o) => (o.kind === 'door' ? edge(o) : -1), (o) => o.kind === 'door' && add(o.x - 1, o.z - 1, o.x, o.z));
+  changedKeys(was.floors ?? [], world.floors ?? [], ([x, z]) => z * W + x, ([x, z]) => add(x, z, x, z));
+  // Things: matched by id past the lists' unchanged ends; one moved, resized, or now before one it was after, both
+  // where it was and where it is (the shade of two things over each other is laid in their order).
+  const [a, b] = [was.objects, world.objects];
+  let s = 0;
+  while (s < a.length && s < b.length && a[s] === b[s]) s++;
+  let [ea, eb] = [a.length, b.length];
+  while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) [ea, eb] = [ea - 1, eb - 1];
+  const old = new Map<number, number>();
+  for (let i = s; i < ea; i++) old.set(a[i].id, i);
+  let last = -1;
+  for (let i = s; i < eb; i++) {
+    const o = b[i];
+    const j = old.get(o.id);
+    old.delete(o.id);
+    if (j !== undefined && j > last && samePlace(a[j], o)) {
+      last = j;
+      continue;
+    }
+    thing(o);
+    if (j !== undefined) thing(a[j]);
+  }
+  for (const j of old.values()) thing(a[j]);
+  if (rects.length <= MOST_RECTS) return mergeRects(rects);
+  return [rects.reduce((r, q) => [Math.min(r[0], q[0]), Math.min(r[1], q[1]), Math.max(r[2], q[2]), Math.max(r[3], q[3])])];
 }
 
-/** What the lawn's map reads besides (`shared/lawn.ts`): the fences and gates, the doors and the plots. */
-function lawnEdges(world: WorldStructure): string {
-  const fences = (world.fences ?? []).map((e) => `${e.axis}${e.x},${e.z}${e.kind === 'gate' ? 'g' : ''}`).join();
-  const doors = world.openings.filter((o) => o.kind === 'door').map((o) => `${o.axis}${o.x},${o.z}`).join();
-  return `${fences}|${doors}|${world.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`).join()}`;
+/** Whether a thing stands as it did, as far as the lawn goes (its kind, tiles, turn, size, offset, lift). */
+function samePlace(a: ObjectPlacement, b: ObjectPlacement): boolean {
+  return a === b || (a.def === b.def && a.x === b.x && a.z === b.z && a.w === b.w && a.d === b.d && a.rot === b.rot && a.lift === b.lift && a.offset?.[0] === b.offset?.[0] && a.offset?.[1] === b.offset?.[1] && a.size?.[0] === b.size?.[0] && a.size?.[1] === b.size?.[1]);
 }
 
-export function sameLawnInputs(a: LawnInputs, b: LawnInputs): boolean {
-  if (a.width !== b.width || a.rooms.length !== b.rooms.length || a.things.length !== b.things.length || a.defs !== b.defs || a.edges !== b.edges) return false;
-  const [am, bm] = [a.meta as unknown[], b.meta as unknown[]];
-  if (am.some((v, i) => v !== bm[i] && JSON.stringify(v) !== JSON.stringify(bm[i]))) return false;
-  for (let i = 0; i < a.things.length; i++) if (a.things[i] !== b.things[i]) return false;
-  if (a.rooms !== b.rooms) for (let i = 0; i < a.rooms.length; i++) if (a.rooms[i] !== b.rooms[i]) return false;
-  return true;
+/**
+ * The items of `a` and `b` that one has and the other hasn't, by `key` (-1: not counted), each given to `at`. Only the
+ * middle of the lists, past their ends that are the same objects, is compared.
+ */
+function changedKeys<T>(a: readonly T[], b: readonly T[], key: (t: T) => number, at: (t: T) => void): void {
+  if (a === b) return;
+  let s = 0;
+  while (s < a.length && s < b.length && a[s] === b[s]) s++;
+  let [ea, eb] = [a.length, b.length];
+  while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) [ea, eb] = [ea - 1, eb - 1];
+  const count = new Map<number, { n: number; item: T }>();
+  const tally = (t: T, by: number): void => {
+    const k = key(t);
+    if (k < 0) return;
+    const c = count.get(k);
+    if (c) c.n += by;
+    else count.set(k, { n: by, item: t });
+  };
+  for (let i = s; i < ea; i++) tally(a[i], 1);
+  for (let i = s; i < eb; i++) tally(b[i], -1);
+  for (const c of count.values()) if (c.n) at(c.item);
+}
+
+/** `rects` with those touching or overlapping merged into the rectangle round them. */
+function mergeRects(rects: TexelRect[]): TexelRect[] {
+  const out = rects.map((r): TexelRect => [...r]);
+  for (let again = true; again; ) {
+    again = false;
+    for (let a = 0; a < out.length; a++) {
+      for (let b = out.length - 1; b > a; b--) {
+        const [p, q] = [out[a], out[b]];
+        if (p[0] > q[2] + 1 || q[0] > p[2] + 1 || p[1] > q[3] + 1 || q[1] > p[3] + 1) continue;
+        out[a] = [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[2], q[2]), Math.max(p[3], q[3])];
+        out.splice(b, 1);
+        again = true;
+      }
+    }
+  }
+  return out;
 }

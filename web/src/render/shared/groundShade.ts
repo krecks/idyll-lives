@@ -48,12 +48,6 @@ const STAMP = 7;
 /** A rectangle of texels, `[i0, j0, i1, j1]`, its last column and row included. */
 export type TexelRect = [number, number, number, number];
 
-/** The stamps each shade map was last made from, in order (`groundShade`, `updateGroundShade`). */
-const madeFrom = new WeakMap<Uint8Array, { n: number; W: number; stamps: Float64Array }>();
-
-/** More changed stamps than this and the whole map is made again (a house built at once, the first time). */
-const MOST_CHANGED = 64;
-
 /**
  * The ground's shade for `world` now: `world.width * n` × its ground's depth `* n` bytes, rows along x, 0 none
  * and 255 all the light taken. Into `into` when it is that size.
@@ -63,78 +57,29 @@ export function groundShade(world: WorldStructure, n: number, into?: Uint8Array)
   const out = into && into.length === W * D ? into.fill(0) : new Uint8Array(W * D);
   const stamps = shadeStamps(world);
   for (let k = 0; k < stamps.length; k += STAMP) stamp(out, W, D, n, stamps, k, null);
-  madeFrom.set(out, { n, W, stamps });
   return out;
 }
 
 /**
- * `out` (a map `groundShade` made, or this updated) made the ground's shade for `world` now, again only round
- * what changed since (a thing bought, a fence built): the same bytes as `groundShade` makes (as long as the
- * things that stayed kept their order, as the simulation's list does). The texels made again (null: all of
- * them, or a new map: when `out` isn't one for this world's size).
+ * `out` (a map `groundShade` made for this world's size) made the ground's shade for `world` now again only within
+ * `rects` (texels, last ones included: round what changed since, a thing bought, a fence built, `lawnChanges`): the
+ * same bytes as `groundShade` makes, as long as nothing changed outside them and the things that stayed kept their
+ * order (as `lawnChanges` makes sure). `rects` null, or `out` of another size: all of it. The texels made again (null: all).
  */
-export function updateGroundShade(world: WorldStructure, n: number, out: Uint8Array): { shade: Uint8Array; changed: TexelRect[] | null } {
+export function updateGroundShade(world: WorldStructure, n: number, out: Uint8Array, rects: readonly TexelRect[] | null): { shade: Uint8Array; changed: TexelRect[] | null } {
   const [W, D] = [world.width * n, groundDepth(world) * n];
-  const before = madeFrom.get(out);
-  if (!before || before.n !== n || before.W !== W || out.length !== W * D) return { shade: groundShade(world, n, out), changed: null };
-  const stamps = shadeStamps(world);
-  const old = before.stamps;
-  // The stamps gone and the new ones, by what they are: each old one matched to a new one alike (by a hash of its
-  // numbers, then all of them), the rest changed. (A lot removed takes its walls, its fences and its things from
-  // three places in the list: the others keep their order.)
-  const hashOf = (list: Float64Array, k: number): number => {
-    let h = 0x811c9dc5;
-    for (let c = 0; c < STAMP; c++) h = Math.imul(h ^ Math.round(list[k + c] * 1000), 16777619);
-    return h;
-  };
-  const same = (k: number, j: number): boolean => {
-    for (let c = 0; c < STAMP; c++) if (stamps[k + c] !== old[j + c]) return false;
-    return true;
-  };
-  const olds = new Map<number, number[]>();
-  for (let j = 0; j < old.length; j += STAMP) {
-    const h = hashOf(old, j);
-    const list = olds.get(h);
-    if (list) list.push(j);
-    else olds.set(h, [j]);
-  }
-  const rects: TexelRect[] = [];
-  for (let k = 0; k < stamps.length; k += STAMP) {
-    const list = olds.get(hashOf(stamps, k));
-    const at = list ? list.findIndex((j) => same(k, j)) : -1;
-    if (at >= 0) list!.splice(at, 1);
-    else rects.push(reachOf(stamps, k, W, D, n));
-  }
-  for (const list of olds.values()) for (const j of list) rects.push(reachOf(old, j, W, D, n));
-  // (Those near each other as one: a house's walls are tens of stamps side by side.)
-  const merged = mergeRects(rects.filter((r) => r[0] <= r[2] && r[1] <= r[3]), n * 2);
-  if (merged.length > MOST_CHANGED) return { shade: groundShade(world, n, out), changed: null };
-  const changed = merged;
-  // Each changed stamp's reach made again: cleared, and every stamp over it laid again in order.
+  if (!rects || out.length !== W * D) return { shade: groundShade(world, n, out), changed: null };
+  const changed = rects.map((r): TexelRect => [Math.max(0, r[0]), Math.max(0, r[1]), Math.min(W - 1, r[2]), Math.min(D - 1, r[3])]).filter((r) => r[0] <= r[2] && r[1] <= r[3]);
+  if (!changed.length) return { shade: out, changed };
+  // (Only the stamps reaching them: most of a big world's are nowhere near.)
+  const box = changed.reduce((b, r) => [Math.min(b[0], r[0]), Math.min(b[1], r[1]), Math.max(b[2], r[2]), Math.max(b[3], r[3])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const stamps = shadeStamps(world, [box[0] / n, box[1] / n, (box[2] + 1) / n, (box[3] + 1) / n]);
+  // Each cleared, and every stamp over it laid again in order.
   for (const r of changed) {
     for (let j = r[1]; j <= r[3]; j++) out.fill(0, j * W + r[0], j * W + r[2] + 1);
     for (let k = 0; k < stamps.length; k += STAMP) stamp(out, W, D, n, stamps, k, r);
   }
-  madeFrom.set(out, { n, W, stamps });
   return { shade: out, changed };
-}
-
-/** `rects` with those within `gap` texels of each other merged into the rectangle round them. */
-function mergeRects(rects: TexelRect[], gap: number): TexelRect[] {
-  const out = rects.map((r): TexelRect => [...r]);
-  for (let again = true; again; ) {
-    again = false;
-    for (let a = 0; a < out.length; a++) {
-      for (let b = out.length - 1; b > a; b--) {
-        const [p, q] = [out[a], out[b]];
-        if (p[0] > q[2] + gap || q[0] > p[2] + gap || p[1] > q[3] + gap || q[1] > p[3] + gap) continue;
-        out[a] = [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[2], q[2]), Math.max(p[3], q[3])];
-        out.splice(b, 1);
-        again = true;
-      }
-    }
-  }
-  return out;
 }
 
 /** The texels stamp `k` of `stamps` reaches (`[i0, j0, i1, j1]`, empty where `i0 > i1` or `j0 > j1`). */
@@ -178,45 +123,55 @@ function stamp(out: Uint8Array, W: number, D: number, n: number, stamps: Float64
   }
 }
 
-/** What shades the ground in `world`, in the order it is laid: outside walls, diagonals, fences, things and trunks. */
-function shadeStamps(world: WorldStructure): Float64Array {
+/**
+ * What shades the ground in `world`, in the order it is laid: outside walls, diagonals, fences, things and trunks;
+ * only those reaching `box` (m, `[x0, z0, x1, z1]`) if given.
+ */
+function shadeStamps(world: WorldStructure, box?: readonly number[]): Float64Array {
   const S = GROUND_SHADE;
   const [tw, td] = [world.width, groundDepth(world)];
   const list: number[] = [];
-  const out = { push: (s: readonly number[]) => list.push(...s) };
+  // (Whether a rectangle, with `reach` round it, misses the box: checked before anything else of a wall or a thing.)
+  const far = (x0: number, z0: number, x1: number, z1: number, reach: number): boolean => !!box && (x1 + reach < box[0] || x0 - reach > box[2] || z1 + reach < box[1] || z0 - reach > box[3]);
+  const push = (x0: number, z0: number, x1: number, z1: number, strength: number, reach: number, over: number): void => {
+    if (!far(x0, z0, x1, z1, reach)) list.push(x0, z0, x1, z1, strength, reach, over);
+  };
   const rooms = world.rooms;
   const outdoors = (x: number, z: number) => x < 0 || z < 0 || x >= tw || z >= td || rooms[z * world.width + x] === 0;
   // Outside walls (one with a room on both its sides shades no ground).
   const [ws, wr] = S.wall;
   for (const e of world.walls) {
+    if (far(e.x - 1, e.z - 1, e.x + 1, e.z + 1, wr)) continue;
     if (e.axis === 'h') {
       if (e.z > td || !(outdoors(e.x, e.z - 1) || outdoors(e.x, e.z))) continue;
-      out.push([e.x, e.z - HALF_WALL, e.x + 1, e.z + HALF_WALL, ws, wr, 0]);
+      push(e.x, e.z - HALF_WALL, e.x + 1, e.z + HALF_WALL, ws, wr, 0);
     } else {
       if (e.z >= td || !(outdoors(e.x - 1, e.z) || outdoors(e.x, e.z))) continue;
-      out.push([e.x - HALF_WALL, e.z, e.x + HALF_WALL, e.z + 1, ws, wr, 0]);
+      push(e.x - HALF_WALL, e.z, e.x + HALF_WALL, e.z + 1, ws, wr, 0);
     }
   }
   for (const d of world.diagonals ?? []) {
     // (A diagonal wall: its tile's middle, as far as its corners.)
-    if (d.z < td && (d.rooms[0] === 0 || d.rooms[1] === 0)) out.push([d.x + 0.3, d.z + 0.3, d.x + 0.7, d.z + 0.7, ws, wr, 0]);
+    if (d.z < td && (d.rooms[0] === 0 || d.rooms[1] === 0)) push(d.x + 0.3, d.z + 0.3, d.x + 0.7, d.z + 0.7, ws, wr, 0);
   }
   const [fs, fr] = S.fence;
   for (const e of world.fences ?? []) {
-    if (e.kind === 'gate') continue;
+    if (e.kind === 'gate' || far(e.x - 1, e.z - 1, e.x + 1, e.z + 1, fr)) continue;
     if (e.axis === 'h') {
-      if (e.z <= td) out.push([e.x, e.z - HALF_FENCE, e.x + 1, e.z + HALF_FENCE, fs, fr, 0]);
-    } else if (e.z < td) out.push([e.x - HALF_FENCE, e.z, e.x + HALF_FENCE, e.z + 1, fs, fr, 0]);
+      if (e.z <= td) push(e.x, e.z - HALF_FENCE, e.x + 1, e.z + HALF_FENCE, fs, fr, 0);
+    } else if (e.z < td) push(e.x - HALF_FENCE, e.z, e.x + HALF_FENCE, e.z + 1, fs, fr, 0);
   }
   // Things outdoors on the ground, and trunks.
   const [os, or] = S.thing;
   const [ts, tr] = S.trunk;
   for (const o of world.objects) {
-    if (o.z >= td || o.lift !== undefined || !outdoors(o.x, o.z)) continue;
+    if (o.z >= td || o.lift !== undefined) continue;
     const cx = o.x + o.w / 2 + (o.offset?.[0] ?? 0) / 100;
     const cz = o.z + o.d / 2 + (o.offset?.[1] ?? 0) / 100;
+    // (Its stamp lies within its tiles, as moved by its offset.)
+    if (far(cx - o.w / 2, cz - o.d / 2, cx + o.w / 2, cz + o.d / 2, Math.max(or, tr)) || !outdoors(o.x, o.z)) continue;
     if (TREE.test(o.def)) {
-      out.push([cx - S.trunkRadius, cz - S.trunkRadius, cx + S.trunkRadius, cz + S.trunkRadius, ts, tr, 1]);
+      push(cx - S.trunkRadius, cz - S.trunkRadius, cx + S.trunkRadius, cz + S.trunkRadius, ts, tr, 1);
       continue;
     }
     // (A resized thing's own size, turned as its footprint is.)
@@ -224,7 +179,7 @@ function shadeStamps(world: WorldStructure): Float64Array {
     const [sw, sd] = o.size ? [o.size[turned ? 1 : 0] / 100, o.size[turned ? 0 : 1] / 100] : [o.w, o.d];
     const hw = Math.max(0.1, Math.min(sw, o.w) / 2 - S.inset);
     const hd = Math.max(0.1, Math.min(sd, o.d) / 2 - S.inset);
-    out.push([cx - hw, cz - hd, cx + hw, cz + hd, os, or, 1]);
+    push(cx - hw, cz - hd, cx + hw, cz + hd, os, or, 1);
   }
   return Float64Array.from(list);
 }

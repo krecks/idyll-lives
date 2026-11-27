@@ -23,7 +23,7 @@ import type { WorldStructure } from '../../core/protocol';
 import { identity } from '../shared/math';
 import { GRASS, GRASS_PUSHERS, grassLod, gustNoise, townGrass, type GrassField, type GrassPusher, type GrassQuality } from '../shared/grass';
 import type { TexelRect } from '../shared/groundShade';
-import type { LawnMask } from '../shared/nature';
+import type { LawnChange, LawnMask } from '../shared/nature';
 
 export type { GrassPusher, GrassQuality } from '../shared/grass';
 
@@ -295,10 +295,10 @@ export class Grass {
 
   /**
    * The lawn grows as the lot is now (rooms and furniture changed): the town's mask again, where it changed
-   * (`mask`, `bare`: the world's `lawnMask` and `bareTiles`, if the caller has them).
+   * (`mask`, `bare`: the world's `lawnMask` and `bareTiles`, if the caller has them; `lawn`: what changed, `lawnChanges`).
    */
-  refresh(world: WorldStructure, mask?: LawnMask, bare?: Uint8Array): void {
-    const change = townGrass(this.field, world, mask, bare);
+  refresh(world: WorldStructure, mask?: LawnMask, bare?: Uint8Array, lawn?: LawnChange | null): void {
+    const change = townGrass(this.field, world, mask, bare, lawn);
     // (A lot of another shape, even of the same area, needs a texture of its own.)
     if (this.field.townW !== this.town.width || this.field.townD !== this.town.height || !this.field.town.length) {
       this.town.destroy();
@@ -307,8 +307,9 @@ export class Grass {
       this.lawn = this.lawnTexture();
       this.lawnSent = this.field.lawn.slice();
     } else {
+      const n = GRASS.townTexels;
       // The texels whose mask or shade changed (a thing bought: a few metres of a big world's millions).
-      const rects = change.tiles && change.shade ? [...change.shade, ...tileRects(change.tiles, this.field.townW / GRASS.townTexels, GRASS.townTexels)] : undefined;
+      const rects = change.tiles && change.shade ? [...change.shade, ...change.tiles.map((r): TexelRect => [r[0] * n, r[1] * n, (r[2] + 1) * n - 1, (r[3] + 1) * n - 1])] : undefined;
       if (!rects) {
         this.townTexels(this.town.lock() as Uint8Array, rects);
         this.town.unlock();
@@ -317,13 +318,15 @@ export class Grass {
         const level = this.townTexels(this.town.getSource() as unknown as Uint8Array, rects);
         uploadRect(this.town, level, rectBounds(rects), 2);
       }
-      // The lawn's map, whole (its mips are made from it), and only when it changed: a thing bought indoors leaves it be.
+      // The lawn's map, whole (its mips are made from it), and only when it changed (where it could have, `change.tiles`):
+      // a thing bought indoors leaves it be.
       const lawn = this.field.lawn;
-      if (!sameBytes(lawn, this.lawnSent)) {
+      if (!sameBytes(lawn, this.lawnSent, change.tiles, (this.field.townW / n) * 4)) {
         const level = this.lawn.lock() as Uint8Array;
         if (level !== lawn) level.set(lawn);
         this.lawn.unlock();
-        this.lawnSent = lawn.slice();
+        if (change.tiles && this.lawnSent.length === lawn.length) copyRows(lawn, this.lawnSent, change.tiles, (this.field.townW / n) * 4);
+        else this.lawnSent = lawn.slice();
       }
     }
     this.setTown();
@@ -456,19 +459,6 @@ export class Grass {
   }
 }
 
-/** The texels (`n` a tile) of the tiles marked in `tiles` (`tw` across), a rectangle per run of them along a row. */
-function tileRects(tiles: Uint8Array, tw: number, n: number): TexelRect[] {
-  const out: TexelRect[] = [];
-  for (let t = 0; t < tiles.length; t++) {
-    if (!tiles[t]) continue;
-    const start = t;
-    while (t + 1 < tiles.length && tiles[t + 1] && (t + 1) % tw !== 0) t++;
-    const [x0, x1, z] = [start % tw, t % tw, Math.floor(start / tw)];
-    out.push([x0 * n, z * n, (x1 + 1) * n - 1, (z + 1) * n - 1]);
-  }
-  return out;
-}
-
 /** The rectangle round all of `rects` (texels, last ones included). */
 function rectBounds(rects: readonly TexelRect[]): TexelRect {
   const out: TexelRect = [Infinity, Infinity, -Infinity, -Infinity];
@@ -481,10 +471,17 @@ function rectBounds(rects: readonly TexelRect[]): TexelRect {
   return out;
 }
 
-/** Whether `a` and `b` hold the same bytes. */
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+/** `from`'s bytes within `tiles` (rectangles of `row` bytes a row, 4 a tile, last ones included) into `to`. */
+function copyRows(from: Uint8Array, to: Uint8Array, tiles: readonly TexelRect[], row: number): void {
+  for (const [x0, z0, x1, z1] of tiles) for (let z = z0; z <= z1; z++) to.set(from.subarray(z * row + x0 * 4, z * row + (x1 + 1) * 4), z * row + x0 * 4);
+}
+
+/** Whether `a` and `b` hold the same bytes (only within `tiles` if given: rectangles of `row` bytes a row, 4 a tile, last ones included). */
+function sameBytes(a: Uint8Array, b: Uint8Array, tiles: readonly TexelRect[] | null, row: number): boolean {
   if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  for (const [x0, z0, x1, z1] of tiles ?? [[0, 0, row / 4 - 1, a.length / row - 1]]) {
+    for (let z = z0; z <= z1; z++) for (let i = z * row + x0 * 4; i < z * row + (x1 + 1) * 4; i++) if (a[i] !== b[i]) return false;
+  }
   return true;
 }
 
