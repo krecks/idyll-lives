@@ -765,6 +765,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Whether the camera has caught up with the resident it follows (`keepUp`: then it stays near them). */
   private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
+  /** Walk mode: the resident row seen from (their eyes), the way they look (heading in game x/z, pitch up; rad). */
+  private walk: { index: number; heading: number; pitch: number; eye: { x: number; y: number; z: number }; seen: boolean } | null = null;
   private framedView = '';
   /**
    * Whether a resident at ground point (x, z) on storey `k` is drawn: on the viewed lot (and just round
@@ -1397,6 +1399,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true, shift);
       this.landHaze?.show(p.radius, ex + shift[0], ez + shift[2]);
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
+    } else if (this.walk?.seen) {
+      // Looking out of the walker's eyes: the orbit pose turned round (the target a step ahead of the eye).
+      const { eye, heading, pitch } = this.walk;
+      const r = 0.3;
+      const [alpha, beta] = [heading + Math.PI, Math.PI / 2 + pitch];
+      const [tx, ty, tz] = [eye.x + r * Math.cos(heading) * Math.cos(pitch), eye.y + r * Math.sin(pitch), eye.z + r * Math.sin(heading) * Math.cos(pitch)];
+      this.applyTownCamera(r, alpha, beta, eye.x, eye.y, eye.z, false);
+      this.hazeWorld(alpha, beta, eye.x, eye.y, eye.z);
+      this.camera.setPose(alpha, beta, r, tx, ty, tz);
     } else {
       const o = this.orbit;
       // (The eye: target + radius × (cos α sin β, cos β, sin α sin β), game space.)
@@ -1875,6 +1886,38 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (!shot) return this.gameRig.release();
     this.followIndex = null;
     this.gameRig.setShot(shot, cut || this.townMode);
+  }
+
+  /**
+   * Walk mode: the camera in resident row `index`'s head, their body not drawn (null: back to the
+   * orbit camera, which keeps their place). Returns the heading the view starts at (the camera's).
+   */
+  setWalkView(index: number | null): number {
+    this.pictureChanged();
+    this.characters.unseen = index ?? -1;
+    this.orbit.enabled = index === null;
+    const heading = this.orbit.alpha + Math.PI;
+    this.walk = index === null ? null : { index, heading, pitch: 0, eye: { x: 0, y: 0, z: 0 }, seen: false };
+    if (index === null) this.orbit.radius = Math.max(this.orbit.radius, 6);
+    return heading;
+  }
+
+  setWalkLook(heading: number, pitch: number): void {
+    if (!this.walk) return;
+    this.walk.heading = heading;
+    this.walk.pitch = pitch;
+    this.pictureChanged();
+  }
+
+  /** Walk mode: the eye where the walker's head is (the orbit's target goes with it, for what's built and lit round it). */
+  private steerWalk(): void {
+    const w = this.walk!;
+    w.seen = this.simHead(w.index, w.eye);
+    if (!w.seen) return;
+    w.eye.y -= 0.12;
+    this.orbit.target.x = w.eye.x;
+    this.orbit.target.z = w.eye.z;
+    this.orbit.radius = this.orbit.limits.radius[0];
   }
 
   followSim(index: number | null): void {
@@ -2790,10 +2833,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view), unless a check keeps
-   * it (`keepRoof`). From the town view (`townWhole`) it is on whatever the walls' mode.
+   * it (`keepRoof`) or the camera is a walker's eyes (under it). From the town view (`townWhole`) it is on whatever the walls' mode.
    */
   private roofVisible(): boolean {
-    return (this.wallMode === 'up' || this.townWhole) && (this.roofKept || this.orbit.radius > ROOF_MIN_DISTANCE);
+    return (this.wallMode === 'up' || this.townWhole) && (this.roofKept || this.walk !== null || this.orbit.radius > ROOF_MIN_DISTANCE);
   }
 
   keepRoof(on: boolean): void {
@@ -3058,9 +3101,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.findDarkRooms(frame);
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms, this.orbit.target.x, this.orbit.target.z); // (lamps and glows fading, which cast shadows, `lamps.ts`.)
     this.swingDoors(playbackRate(curr, h));
-    this.steerCamera(this.frameDt / 1000);
-    this.settleTarget(this.frameDt / 1000);
-    this.keepCameraClear();
+    if (this.walk) this.steerWalk();
+    else {
+      this.steerCamera(this.frameDt / 1000);
+      this.settleTarget(this.frameDt / 1000);
+      this.keepCameraClear();
+    }
     if (this.lot.update(frame)) {
       this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
       this.pictureChanged();

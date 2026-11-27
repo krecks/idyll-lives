@@ -153,6 +153,18 @@ pub enum Command {
         x: f32,
         z: f32,
     },
+    /// Walk mode: drop everything and walk to `(x, z)` now (sent again and again while the
+    /// player steers; to where they stand to stop).
+    Steer {
+        sim: u32,
+        x: f32,
+        z: f32,
+    },
+    /// Walk mode: while `on`, the resident chooses nothing on their own (`Sim::steered`).
+    Hold {
+        sim: u32,
+        on: bool,
+    },
     /// Start a social interaction with another Sim.
     Social {
         sim: u32,

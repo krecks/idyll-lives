@@ -3,18 +3,48 @@
 use super::*;
 
 impl World {
-    /// Carries out `Command::MoveTo`.
-    pub(super) fn apply_move_to(&mut self, sim: u32, x: f32, z: f32) -> Result<(), Error> {
-        if !self.lot.in_bounds(x.floor() as i32, z.floor() as i32) {
+    /// Where a player sends someone on foot: a resident of the town, on the lot, and not leaving a
+    /// baby alone (`check_cover_at`).
+    fn check_walk(&self, sim: u32, x: f32, z: f32) -> Result<(), Error> {
+        self.sim(sim)?;
+        let (tx, tz) = (x.floor() as i32, z.floor() as i32);
+        if !self.lot.in_bounds(tx, tz) {
             return Err(Error::new("move target is off the lot"));
         }
-        crate::life::check_cover_at(
-            self,
-            sim as usize,
-            self.plot_at(x.floor() as i32, z.floor() as i32),
-        )?;
-        self.enqueue(sim, TaskKind::MoveTo { x, z })?;
-        Ok(())
+        crate::life::check_cover_at(self, sim as usize, self.plot_at(tx, tz))
+    }
+
+    /// Carries out `Command::MoveTo`.
+    pub(super) fn apply_move_to(&mut self, sim: u32, x: f32, z: f32) -> Result<(), Error> {
+        self.check_walk(sim, x, z)?;
+        self.enqueue(sim, TaskKind::MoveTo { x, z })
+    }
+
+    /// Carries out `Command::Steer`: what they were doing and had queued is dropped for the walk.
+    pub(super) fn apply_steer(&mut self, sim: u32, x: f32, z: f32) -> Result<(), Error> {
+        self.check_walk(sim, x, z)?;
+        // Into a wall or a thing: they stop at it, not go the long way round to what's behind it.
+        let from = self.sims[sim as usize].pos;
+        let [x, z] = if self.nav().line_walkable(from, [x, z]) {
+            [x, z]
+        } else {
+            from
+        };
+        let World {
+            sims,
+            objects,
+            content,
+            ..
+        } = self;
+        let s = sims
+            .get_mut(sim as usize)
+            .filter(|s| s.here())
+            .ok_or_else(|| Error::new(format!("unknown resident {sim}")))?;
+        if s.current.is_some() {
+            end_activity(s, content, objects);
+        }
+        s.queue.clear();
+        self.enqueue(sim, TaskKind::MoveTo { x, z })
     }
 
     /// Carries out `Command::Social`.

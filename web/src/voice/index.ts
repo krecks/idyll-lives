@@ -21,13 +21,13 @@
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { SimThreadStats, WorldStructure } from '../core/protocol';
-import { llmReady, llmStats, llmStatus, unloadLlm } from '../llm';
+import { ensureLlm, llmReady, llmStats, llmStatus, unloadLlm } from '../llm';
 import { heldSince, inferenceHeld } from '../ml/schedule.svelte';
 import { acoustics } from '../audio/acoustics';
 import type { Place } from '../audio/space';
 import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
-import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
+import { deviceTest, llmDevice, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
 import { BusyShare } from './busyShare';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
@@ -209,6 +209,27 @@ export class VoiceDirector {
   /** The player asked resident `a` to start a conversation with `b`. */
   playerConversation(a: number, b: number): void {
     this.playerTalk = { a, b, until: performance.now() + PLAYER_TALK_MS, started: false };
+  }
+
+  /**
+   * Walk mode's chat: resident `id`'s answer to what `from` said to them (`before`: the talk so far),
+   * said aloud too; null when the model gives none (its lines not chosen, or the words still loading).
+   */
+  async answer(id: number, from: number, words: string, before: string, signal: AbortSignal): Promise<string | null> {
+    const writer = this.llmWriter;
+    if (!writer || !this.frame) return null;
+    await ensureLlm(llmDevice());
+    const frame = this.frame;
+    const { curr, layout } = frame;
+    let row = -1;
+    for (let i = 0; i < curr[layout.header.simCount]; i++) if (curr[layout.headerLen + i * layout.simStride + layout.sim.id] === id) row = i;
+    if (row < 0 || signal.aborted) return null;
+    const text = await writer.answer({ speaker: id, row, partner: from, kind: 'emotion', emotion: 'calm', seed: 0 }, frame, { other: this.firstName(from), words, before }, signal);
+    if (text && !signal.aborted) {
+      const now = performance.now();
+      this.say(id, row, { text, key: 'llm:chat' }, from, false, now, now, MAX_WAIT_LLM_MS);
+    }
+    return text;
   }
 
   update(frame: FrameState): void {

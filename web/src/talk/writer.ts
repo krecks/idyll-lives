@@ -16,6 +16,8 @@ import { buildMessages, type TalkText } from './prompt';
 
 /** Time the model has to write a line, ms (speech is made after); cut short, it keeps the sentences finished. */
 export const WRITE_MS = 3500;
+/** Time an answer in walk mode's chat has (the player waits for it, so longer than a passing line), ms. */
+const ANSWER_MS = 20000;
 /** Tokens a line may take: five short sentences. */
 export const LINE_TOKENS = 160;
 /** Where a line ends: its closing quote, which isn't said. */
@@ -98,6 +100,22 @@ export class LlmWriter {
       if (this.log.push({ key: scripted?.key ?? req.kind, prompt, raw: result?.text ?? null, line, ms: performance.now() - start, stats }) > MAX_LOG) this.log.shift();
     }
     return line ? { text: line, tone: scripted?.tone ?? toneOf(req), key: `llm:${scripted?.key ?? req.kind}` } : null;
+  }
+
+  /** Walk mode's chat: what `req.speaker` answers to what was said to them (`heard`), or null. */
+  async answer(req: LineRequest, frame: FrameState, heard: { other: string; words: string; before: string }, signal: AbortSignal): Promise<string | null> {
+    const moment = gatherMoment(this.text, this.sources, req, frame);
+    if (!moment) return null;
+    const sentences = 2;
+    const built = buildMessages(this.text, moment.persona, moment.situation, { kind: 'heard', ...heard }, [], sentences);
+    if (!built) return null;
+    const quote = built.reply.trim().slice(-1);
+    const result = await generateText(
+      built.messages,
+      { seed: (Date.now() * 2654435761) >>> 0, maxTokens: LINE_TOKENS, stopAt: [quote, ...LINE_STOPS], sentences },
+      { reply: built.reply, lead: built.lead, deadline: Date.now() + ANSWER_MS, signal },
+    ).catch(() => null);
+    return result && !result.nonFinite ? cleanLine(result.text, { me: moment.me, names: [heard.other, ...moment.names], blocklist: this.text.blocklist, cut: cutShort(result) }) : null;
   }
 }
 

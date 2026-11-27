@@ -5,6 +5,7 @@
   import { closeOutside } from './kit/popup';
   import { services } from './services';
   import { game } from './state.svelte';
+  import { llmChosen } from '../talk';
 
   const menu = $derived(game.socialMenu);
   const target = $derived(menu ? game.roster.find((s) => s.id === menu.target) : undefined);
@@ -53,6 +54,12 @@
     {/if}
 
     <div class="options">
+      <!-- Typed talk: the language model answers for them (Settings: voices, lines by the model). -->
+      <button class="option" disabled={!llmChosen()} title={llmChosen() ? `Say something to ${target.name}` : 'Turn on voices with lines by the language model in Settings'} onclick={() => services.controls.openTalk(target.id)}>
+        <Icon name="icon.ui.voice" size={16} />
+        <span class="label">Talk…</span>
+        <span class="chance">{llmChosen() ? 'type' : 'model off'}</span>
+      </button>
       {#if !menu.options}
         <p class="loading">…</p>
       {:else}

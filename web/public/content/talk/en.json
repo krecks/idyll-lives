@@ -133,6 +133,7 @@
   "outcome": { "good": ", and {me} likes it.", "bad": ", and {me} doesn't like it." },
   "use": "{me} is about to {action}.",
   "emotion": "{me} suddenly feels {emotion}.",
+  "heard": "{name} says to {me}: \"{words}\"",
   "thought": {
     "skipped": "{me} decides to skip the plan to {subject}.",
     "noPlace": "{me} wants to {subject}, but there's nowhere for it here.",
