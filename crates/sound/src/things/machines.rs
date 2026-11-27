@@ -10,8 +10,8 @@ use super::*;
 pub(super) fn treadmill(rate: f64) -> Stereo {
     let mut r = Rng::new(31.0);
     let seconds = 8.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let wobble = wander(&mut r, n, rate, 0.5);
     let hum = motor(
         n,
@@ -19,22 +19,18 @@ pub(super) fn treadmill(rate: f64) -> Stereo {
         |i| 58.0 * (1.0 + 0.006 * wobble[i] as f64),
         &[0.9, 1.0, 0.5, 0.45, 0.2, 0.25, 0.1, 0.12],
     );
+    bed.add(hum, |_, x| x * 0.06);
     let whine = motor(
         n,
         rate,
         |i| 1240.0 * (1.0 + 0.004 * wobble[i] as f64),
         &[1.0, 0.2],
     );
+    bed.add(whine, |_, x| x * 0.004);
     let hiss = noise(n, rate, &mut r, Filter::Bandpass, 900.0, 0.6);
+    bed.add(hiss, |_, x| x * 0.5);
     let rumble = noise(n, rate, &mut r, Filter::Lowpass, 140.0, 0.7);
-    for i in 0..n {
-        let v = hum[i] as f64 * 0.06
-            + whine[i] as f64 * 0.004
-            + hiss[i] as f64 * 0.5
-            + rumble[i] as f64 * 0.5;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(rumble, |_, x| x * 0.5);
     let mut ev = looped(rate, seconds);
     // 22 steps in the 8 seconds, so the rhythm runs on round the loop.
     let step = seconds / 22.0;
@@ -71,7 +67,7 @@ pub(super) fn treadmill(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.14,
         0.0,
         &[5.3, 7.9, 10.7, 13.1],
@@ -86,8 +82,8 @@ pub(super) fn treadmill(rate: f64) -> Stereo {
 pub(super) fn bike(rate: f64) -> Stereo {
     let mut r = Rng::new(32.0);
     let seconds = 6.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let cadence = 80.0 / 60.0;
     let whirr = noise(n, rate, &mut r, Filter::Bandpass, 520.0, 0.8);
     let air = noise(n, rate, &mut r, Filter::Bandpass, 1500.0, 0.5);
@@ -97,13 +93,11 @@ pub(super) fn bike(rate: f64) -> Stereo {
         |i| 210.0 * (1.0 + 0.02 * sin((2.0 * PI * 2.0 * cadence * i as f64) / rate)),
         &[1.0, 0.4, 0.2],
     );
-    for i in 0..n {
+    bed.add(drive, |i, drive| {
         let push = pow(sin((PI * 2.0 * cadence * i as f64) / rate), 2.0);
-        let v = (whirr[i] as f64 * 0.8 + air[i] as f64 * 0.25) * (0.75 + 0.25 * push)
-            + drive[i] as f64 * 0.012 * (0.8 + 0.2 * push);
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+        (whirr[i] as f64 * 0.8 + air[i] as f64 * 0.25) * (0.75 + 0.25 * push)
+            + drive * 0.012 * (0.8 + 0.2 * push)
+    });
     let mut ev = looped(rate, seconds);
     // A pedal's bearing creaking at the bottom of each turn.
     let mut k = 0.0;
@@ -121,7 +115,7 @@ pub(super) fn bike(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.14,
         0.0,
         &[5.3, 7.9, 10.7, 13.1],
@@ -136,8 +130,8 @@ pub(super) fn bike(rate: f64) -> Stereo {
 pub(super) fn sewing(rate: f64) -> Stereo {
     let mut r = Rng::new(33.0);
     let seconds = 10.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let runs = [[0.3, 2.6, 13.0], [3.3, 4.4, 9.0], [5.1, 8.3, 14.0]];
     // How fast it's going (stitches a second), with speeding up and slowing down.
     let mut speed = vec![0.0f32; n];
@@ -157,14 +151,10 @@ pub(super) fn sewing(rate: f64) -> Stereo {
             1.0, 0.8, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25, 0.2, 0.18, 0.15, 0.12,
         ],
     );
-    let brush = noise(n, rate, &mut r, Filter::Bandpass, 3200.0, 0.7);
     let mut lp = Biquad::with(rate, Filter::Lowpass, 2500.0, 0.7);
-    for i in 0..n {
-        let s = speed[i] as f64 / 14.0;
-        let v = lp.run(whirr[i] as f64) * 0.05 * s + brush[i] as f64 * 0.12 * s;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(whirr, |i, x| lp.run(x) * 0.05 * (speed[i] as f64 / 14.0));
+    let brush = noise(n, rate, &mut r, Filter::Bandpass, 3200.0, 0.7);
+    bed.add(brush, |i, x| x * 0.12 * (speed[i] as f64 / 14.0));
     let mut ev = looped(rate, seconds);
     // Each stitch: the needle bar and hook, then the take-up lever half a turn on.
     let mut phase = 0.0;
@@ -221,7 +211,7 @@ pub(super) fn sewing(rate: f64) -> Stereo {
     );
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.0,
         0.75,
         &[3.1, 5.3, 7.1, 9.7],
@@ -237,8 +227,8 @@ pub(super) fn sewing(rate: f64) -> Stereo {
 pub(super) fn pottery_wheel(rate: f64) -> Stereo {
     let mut r = Rng::new(34.0);
     let seconds = 9.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let wobble = wander(&mut r, n, rate, 0.8);
     let press = wander(&mut r, n, rate, 0.6);
     let whine = motor(
@@ -247,23 +237,21 @@ pub(super) fn pottery_wheel(rate: f64) -> Stereo {
         |i| 640.0 * (1.0 + 0.003 * wobble[i] as f64),
         &[1.0, 0.3, 0.15],
     );
+    bed.add(whine, |_, x| x * 0.004);
     let mains = motor(n, rate, |_| 100.0, &[1.0, 0.4, 0.2]);
+    bed.add(mains, |_, x| x * 0.01);
     let swish = noise(n, rate, &mut r, Filter::Bandpass, 1100.0, 0.6);
     let squelch = noise(n, rate, &mut r, Filter::Lowpass, 450.0, 0.9);
-    let rumble = noise(n, rate, &mut r, Filter::Lowpass, 110.0, 0.7);
     let turn = 2.5;
-    for i in 0..n {
+    bed.add(squelch, |i, squelch| {
         let t = i as f64 / rate;
         let p = max(0.0, press[i] as f64);
         let round = 0.75 + 0.25 * sin(2.0 * PI * turn * t + 0.4 * wobble[i] as f64);
-        let v = whine[i] as f64 * 0.004
-            + mains[i] as f64 * 0.01
-            + swish[i] as f64 * 0.55 * round * (0.6 + 0.4 * p)
-            + squelch[i] as f64 * 0.9 * p * p * round
-            + rumble[i] as f64 * 0.4;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+        swish[i] as f64 * 0.55 * round * (0.6 + 0.4 * p) + squelch * 0.9 * p * p * round
+    });
+    let rumble = noise(n, rate, &mut r, Filter::Lowpass, 110.0, 0.7);
+    bed.add(rumble, |_, x| x * 0.4);
+    let mut bed = bed.track();
     // The sponge squeezed over the clay: a trickle of drops.
     for at in [2.2, 6.4] {
         let mut t = at;
@@ -294,15 +282,13 @@ pub(super) fn pottery_wheel(rate: f64) -> Stereo {
 pub(super) fn bubbling(rate: f64) -> Stereo {
     let mut r = Rng::new(35.0);
     let seconds = 8.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let roar = noise(n, rate, &mut r, Filter::Lowpass, 380.0, 0.7);
+    bed.add(roar, |_, x| x * 0.35);
     let hiss = noise(n, rate, &mut r, Filter::Bandpass, 3200.0, 0.5);
-    for i in 0..n {
-        let v = roar[i] as f64 * 0.35 + hiss[i] as f64 * 0.06;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(hiss, |_, x| x * 0.06);
+    let mut bed = bed.track();
     let surge = wander(&mut r, n, rate, 0.5);
     let mut t = r.next() * 0.01;
     while t < bed.seconds {
@@ -361,8 +347,8 @@ pub(super) fn bubbling(rate: f64) -> Stereo {
 pub(super) fn espresso(rate: f64) -> Stereo {
     let mut r = Rng::new(36.0);
     let seconds = 16.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let grinding = |t: f64| ramp(0.2, 0.4, t) * (1.0 - ramp(2.6, 2.9, t));
     let pumping = |t: f64| ramp(4.6, 4.7, t) * (1.0 - ramp(9.5, 9.6, t));
     let steaming = |t: f64| ramp(10.5, 10.55, t) * (1.0 - ramp(13.4, 13.5, t));
@@ -374,6 +360,12 @@ pub(super) fn espresso(rate: f64) -> Stereo {
             1.0, 0.7, 0.6, 0.5, 0.45, 0.4, 0.3, 0.25, 0.2, 0.2, 0.15, 0.12,
         ],
     );
+    let t = |i: usize| i as f64 / rate;
+    bed.add(grinder, |i, x| x * 0.03 * grinding(t(i)));
+    let grit = noise(n, rate, &mut r, Filter::Bandpass, 3000.0, 0.5);
+    bed.add(grit, |i, x| {
+        x * 0.35 * grinding(t(i)) * (1.0 - 0.5 * ramp(0.4, 2.7, t(i)))
+    });
     let pump = motor(
         n,
         rate,
@@ -383,30 +375,27 @@ pub(super) fn espresso(rate: f64) -> Stereo {
         ],
     );
     let mut pump_lp = Biquad::with(rate, Filter::Lowpass, 1800.0, 0.7);
-    let grit = noise(n, rate, &mut r, Filter::Bandpass, 3000.0, 0.5);
+    // The pump labours as the pressure builds against the puck.
+    bed.add(pump, |i, x| {
+        pump_lp.run(x) * 0.05 * pumping(t(i)) * (0.8 + 0.2 * ramp(4.7, 5.6, t(i)))
+    });
     let steam = noise(n, rate, &mut r, Filter::Highpass, 2500.0, 0.6);
     let roll = noise(n, rate, &mut r, Filter::Bandpass, 900.0, 0.6);
     let trickle = noise(n, rate, &mut r, Filter::Bandpass, 2300.0, 1.2);
     let flutter = wander(&mut r, n, rate, 0.015);
-    for i in 0..n {
-        let t = i as f64 / rate;
-        let g = grinding(t);
-        let p = pumping(t);
-        let s = steaming(t);
+    bed.add(steam, |i, x| {
+        let t = t(i);
         // The steam: a purge, then frothing (fluttering, tearing) for a second and a half, then rolling.
         let froth = ramp(10.9, 11.0, t) * (1.0 - ramp(12.2, 12.5, t));
         let tear = 1.0 + 0.6 * froth * flutter[i] as f64;
-        // The pump labours as the pressure builds against the puck.
-        let load = 0.8 + 0.2 * ramp(4.7, 5.6, t);
-        let v = grinder[i] as f64 * 0.03 * g
-            + grit[i] as f64 * 0.35 * g * (1.0 - 0.5 * ramp(0.4, 2.7, t))
-            + pump_lp.run(pump[i] as f64) * 0.05 * p * load
-            + steam[i] as f64 * 0.7 * s * tear * (1.0 - 0.4 * ramp(12.2, 12.5, t))
-            + roll[i] as f64 * 0.5 * s * ramp(12.0, 12.6, t)
-            + trickle[i] as f64 * 0.08 * p * ramp(5.6, 6.2, t);
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+        x * 0.7 * steaming(t) * tear * (1.0 - 0.4 * ramp(12.2, 12.5, t))
+    });
+    bed.add(roll, |i, x| {
+        x * 0.5 * steaming(t(i)) * ramp(12.0, 12.6, t(i))
+    });
+    bed.add(trickle, |i, x| {
+        x * 0.08 * pumping(t(i)) * ramp(5.6, 6.2, t(i))
+    });
     let mut ev = looped(rate, seconds);
     // Beans crunching between the burrs, fewer as they're ground.
     let mut t = 0.3;
@@ -450,7 +439,7 @@ pub(super) fn espresso(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.13,
         0.0,
         &[3.1, 5.3, 7.1, 9.7],
@@ -466,8 +455,8 @@ pub(super) fn espresso(rate: f64) -> Stereo {
 pub(super) fn blender(rate: f64) -> Stereo {
     let mut r = Rng::new(37.0);
     let seconds = 5.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let load = wander(&mut r, n, rate, 0.12);
     let churn = wander(&mut r, n, rate, 0.03);
     let speed =
@@ -480,20 +469,16 @@ pub(super) fn blender(rate: f64) -> Stereo {
             1.0, 0.8, 0.7, 0.6, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.22, 0.2, 0.18, 0.16, 0.14, 0.12,
         ],
     );
+    bed.add(hum, |_, x| x * 0.05);
     let comm = motor(n, rate, |i| 12.0 * speed(i), &[1.0, 0.3]);
+    bed.add(comm, |_, x| x * 0.02);
     let fan = noise(n, rate, &mut r, Filter::Bandpass, 2600.0, 0.45);
+    bed.add(fan, |_, x| x * 1.1);
     // The brushes sparking on the commutator: a hiss above.
     let hiss = noise(n, rate, &mut r, Filter::Highpass, 5000.0, 0.7);
+    bed.add(hiss, |_, x| x * 0.25);
     let slosh = noise(n, rate, &mut r, Filter::Lowpass, 520.0, 0.8);
-    for i in 0..n {
-        let v = hum[i] as f64 * 0.05
-            + comm[i] as f64 * 0.02
-            + fan[i] as f64 * 1.1
-            + hiss[i] as f64 * 0.25
-            + slosh[i] as f64 * 0.45 * (1.0 + 0.6 * churn[i] as f64);
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(slosh, |i, x| x * 0.45 * (1.0 + 0.6 * churn[i] as f64));
     let mut ev = looped(rate, seconds);
     let mut t = r.next() * 0.2;
     while t < seconds {
@@ -513,7 +498,7 @@ pub(super) fn blender(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.16,
         0.0,
         &[3.1, 5.3, 7.1, 9.7],
@@ -528,8 +513,8 @@ pub(super) fn blender(rate: f64) -> Stereo {
 pub(super) fn mixer(rate: f64) -> Stereo {
     let mut r = Rng::new(38.0);
     let seconds = 6.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let wobble = wander(&mut r, n, rate, 0.3);
     let hum = motor(
         n,
@@ -537,28 +522,25 @@ pub(super) fn mixer(rate: f64) -> Stereo {
         |i| 160.0 * (1.0 + 0.01 * wobble[i] as f64),
         &[1.0, 0.7, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15],
     );
+    bed.add(hum, |_, x| x * 0.04);
     let gears = motor(
         n,
         rate,
         |i| 1440.0 * (1.0 + 0.01 * wobble[i] as f64),
         &[1.0, 0.3],
     );
+    bed.add(gears, |_, x| x * 0.008);
     let air = noise(n, rate, &mut r, Filter::Bandpass, 1800.0, 0.5);
+    bed.add(air, |_, x| x * 0.25);
     let batter = noise(n, rate, &mut r, Filter::Lowpass, 700.0, 0.8);
     // The beater goes round the bowl about four times a second.
-    for i in 0..n {
-        let t = i as f64 / rate;
-        let slap = pow(max(0.0, sin(2.0 * PI * 4.0 * t)), 6.0);
-        let v = hum[i] as f64 * 0.04
-            + gears[i] as f64 * 0.008
-            + air[i] as f64 * 0.25
-            + batter[i] as f64 * (0.15 + 0.8 * slap);
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(batter, |i, x| {
+        let slap = pow(max(0.0, sin(2.0 * PI * 4.0 * (i as f64 / rate))), 6.0);
+        x * (0.15 + 0.8 * slap)
+    });
     done(
         rate,
-        vec![fold(bed)],
+        vec![bed.fold()],
         0.12,
         0.0,
         &[3.1, 5.3, 7.1, 9.7],
@@ -574,22 +556,20 @@ pub(super) fn mixer(rate: f64) -> Stereo {
 pub(super) fn microwave(rate: f64) -> Stereo {
     let mut r = Rng::new(39.0);
     let seconds = 8.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let wobble = wander(&mut r, n, rate, 1.2);
     let hum = motor(n, rate, |_| 100.0, &[1.0, 0.55, 0.4, 0.25, 0.15, 0.1]);
+    bed.add(hum, |_, x| x * 0.07);
     let blades = motor(
         n,
         rate,
         |i| 245.0 * (1.0 + 0.005 * wobble[i] as f64),
         &[1.0, 0.3],
     );
+    bed.add(blades, |_, x| x * 0.012);
     let fan = noise(n, rate, &mut r, Filter::Bandpass, 750.0, 0.5);
-    for i in 0..n {
-        let v = hum[i] as f64 * 0.07 + blades[i] as f64 * 0.012 + fan[i] as f64 * 0.45;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(fan, |_, x| x * 0.45);
     let mut ev = looped(rate, seconds);
     for at in [1.3, 4.2, 4.35, 6.8] {
         let at = at + r.next() * 0.1;
@@ -598,7 +578,7 @@ pub(super) fn microwave(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.12,
         0.0,
         &[3.7, 6.1, 8.3, 10.9],
@@ -612,15 +592,12 @@ pub(super) fn microwave(rate: f64) -> Stereo {
 pub(super) fn toaster(rate: f64) -> Stereo {
     let mut r = Rng::new(40.0);
     let seconds = 5.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let buzz = motor(n, rate, |_| 100.0, &[1.0, 0.5, 0.3]);
+    bed.add(buzz, |_, x| x * 0.02);
     let hiss = noise(n, rate, &mut r, Filter::Highpass, 4000.0, 0.6);
-    for i in 0..n {
-        let v = buzz[i] as f64 * 0.02 + hiss[i] as f64 * 0.08;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(hiss, |_, x| x * 0.08);
     let mut ev = looped(rate, seconds);
     let mut t = r.next() * 0.3;
     while t < seconds {
@@ -640,7 +617,7 @@ pub(super) fn toaster(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.06,
         0.0,
         &[3.1, 5.3, 7.1, 9.7],
@@ -655,22 +632,20 @@ pub(super) fn toaster(rate: f64) -> Stereo {
 pub(super) fn oven_fan(rate: f64) -> Stereo {
     let mut r = Rng::new(41.0);
     let seconds = 8.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let wobble = wander(&mut r, n, rate, 1.5);
     let hum = motor(n, rate, |_| 50.0, &[0.5, 1.0, 0.3, 0.3, 0.1]);
+    bed.add(hum, |_, x| x * 0.05);
     let blades = motor(
         n,
         rate,
         |i| 360.0 * (1.0 + 0.004 * wobble[i] as f64),
         &[1.0, 0.35, 0.1],
     );
+    bed.add(blades, |_, x| x * 0.03);
     let air = noise(n, rate, &mut r, Filter::Bandpass, 600.0, 0.5);
-    for i in 0..n {
-        let v = hum[i] as f64 * 0.05 + blades[i] as f64 * 0.03 + air[i] as f64 * 0.5;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(air, |_, x| x * 0.5);
     let mut ev = looped(rate, seconds);
     for at in [2.1, 5.7] {
         strike(
@@ -684,7 +659,7 @@ pub(super) fn oven_fan(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.1,
         0.0,
         &[3.7, 6.1, 8.3, 10.9],
@@ -699,29 +674,25 @@ pub(super) fn oven_fan(rate: f64) -> Stereo {
 pub(super) fn hood(rate: f64) -> Stereo {
     let mut r = Rng::new(42.0);
     let seconds = 8.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let wobble = wander(&mut r, n, rate, 0.8);
     let hum = motor(n, rate, |_| 100.0, &[1.0, 0.5, 0.3]);
+    bed.add(hum, |_, x| x * 0.03);
     let blades = motor(
         n,
         rate,
         |i| 690.0 * (1.0 + 0.004 * wobble[i] as f64),
         &[1.0, 0.25],
     );
+    bed.add(blades, |_, x| x * 0.012);
     let rush = noise(n, rate, &mut r, Filter::Bandpass, 520.0, 0.45);
+    bed.add(rush, |i, x| x * (0.7 + 0.04 * wobble[i] as f64));
     let high = noise(n, rate, &mut r, Filter::Bandpass, 1900.0, 0.6);
-    for i in 0..n {
-        let v = hum[i] as f64 * 0.03
-            + blades[i] as f64 * 0.012
-            + rush[i] as f64 * (0.7 + 0.04 * wobble[i] as f64)
-            + high[i] as f64 * 0.15;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+    bed.add(high, |_, x| x * 0.15);
     done(
         rate,
-        vec![fold(bed)],
+        vec![bed.fold()],
         0.14,
         0.0,
         &[3.1, 5.3, 7.1, 9.7],
@@ -736,22 +707,21 @@ pub(super) fn hood(rate: f64) -> Stereo {
 pub(super) fn fire(rate: f64) -> Stereo {
     let mut r = Rng::new(43.0);
     let seconds = 10.0;
-    let mut bed = track(rate, seconds, 0.6);
-    let n = bed.left.len();
+    let mut bed = Bed::new(rate, seconds);
+    let n = bed.len();
     let flicker = wander(&mut r, n, rate, 0.25);
     let slow = wander(&mut r, n, rate, 1.5);
     let roar = noise(n, rate, &mut r, Filter::Lowpass, 320.0, 0.7);
+    bed.add(roar, |i, x| {
+        x * (0.9 + 0.35 * flicker[i] as f64 + 0.2 * slow[i] as f64)
+    });
     let lick = noise(n, rate, &mut r, Filter::Bandpass, 850.0, 0.6);
+    bed.add(lick, |i, x| x * 0.12 * max(0.0, 1.0 + flicker[i] as f64));
     let steam = noise(n, rate, &mut r, Filter::Bandpass, 4200.0, 0.7);
-    for i in 0..n {
+    bed.add(steam, |i, x| {
         let t = i as f64 / rate;
-        let s = ramp(5.8, 6.4, t) * (1.0 - ramp(7.2, 8.2, t));
-        let v = roar[i] as f64 * (0.9 + 0.35 * flicker[i] as f64 + 0.2 * slow[i] as f64)
-            + lick[i] as f64 * 0.12 * max(0.0, 1.0 + flicker[i] as f64)
-            + steam[i] as f64 * 0.06 * s;
-        bed.left[i] = v as f32;
-        bed.right[i] = v as f32;
-    }
+        x * 0.06 * (ramp(5.8, 6.4, t) * (1.0 - ramp(7.2, 8.2, t)))
+    });
     let mut ev = looped(rate, seconds);
     let mut t = r.next() * 0.01;
     while t < seconds {
@@ -787,7 +757,7 @@ pub(super) fn fire(rate: f64) -> Stereo {
     }
     done(
         rate,
-        vec![fold(bed), ev.into()],
+        vec![bed.fold(), ev.into()],
         0.14,
         0.0,
         &[7.1, 9.3, 11.7, 13.9],
