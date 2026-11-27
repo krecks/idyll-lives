@@ -163,6 +163,16 @@ nodes come out `roll` before `mat` (the order they are made).
 ## The rowing machine (2026-11-27)
 
 `rowingMachine` is the housing with its fan cage and footplate, two rails on the floor, the seat on its carriage,
-the handle on its cable and the rear foot. Frame, seat, rail, dark and chrome map to 1 draw call. It is 0.56 ×
-0.54 × 1.70 m in a 1 × 2 footprint with the seat at 0.25 m (what the content's `seat` says). No clip: the resident
-rows on the seat with the `exercise` animation, as on the bike.
+the handle on its chain and the rear foot. It is 0.56 × 0.52 × 1.70 m in a 1 × 2 footprint with the seat at 0.25 m
+(what the content's `seat` says), 4 draw calls: the still body and three moving parts, `carriage` (the seat), `chain`
+and `handle`.
+
+`stroke` (2.7 s, a loop: `{"loops": {"row": "stroke"}, "ride": "stroke"}`) is one stroke, drive then a slower
+recovery. Rest is the catch: the seat 0.98 m from the back, the handle at 0.50 m high over the front of the rail. By
+0.6 s the legs have pushed the seat 0.40 m back and the handle 0.44 m along its line; by 0.9 s (the finish) the seat
+is 0.45 m back and the arms have pulled the handle 0.70 m out, to 0.625 m high at the chest; by 1.25 s the hands are
+away (0.48 m), by 1.5 s the body is over (0.42 m), and by 2.7 s the seat has slid back up to the catch. The handle runs
+on the straight line from the pivot through its rest place (10° up), and the chain, built level from the pivot and
+tilted up on its node, stretches along that line by the same keys, so its end stays on the handle. The seat part is
+named `carriage` because the file keys parts by name and a ride's riders move with its clip's first part. The
+resident's own `row` clip (the renderer's `RIDES`) keeps time with the loop.
