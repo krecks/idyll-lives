@@ -1,6 +1,7 @@
 //! O9: the garden's built things — the carport, the gazebo, the pergola, the awning and the solar array.
 
 use super::common::M;
+use artkit::math;
 use artkit::parts::{join_all, settle};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
@@ -341,68 +342,145 @@ pub fn awning() -> Vec<Obj> {
     meshes()
 }
 
-// --- O9: the solar array: its frame on the ground and the two panels --------------------------------------
+// --- O9: the solar array: two 60-cell modules tilted at the sun on a low braced ground frame -------------
+/// The modules' tilt (degrees from level), rising to the back.
+const SOLAR_TILT: f64 = 30.0;
+
 pub fn solar_panels() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    for (i, (sx, sz)) in [(-1.0f64, -1.0f64), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
-        .into_iter()
-        .enumerate()
-    {
-        fbox!(
-            f,
-            format!("leg{i}"),
-            0.06,
-            0.55,
-            0.06,
-            (sx * 0.97, 0.275, sz * 0.78),
-            M.panel_frame,
-            bevel = 0.006
-        );
-    }
-    for (i, sz) in [-1.0f64, 1.0].into_iter().enumerate() {
-        fbox!(
-            f,
-            format!("rail{i}"),
-            2.02,
-            0.06,
-            0.06,
-            (0, 0.55, sz * 0.78),
-            M.panel_frame,
-            bevel = 0.006
-        );
-    }
+    let (sin, cos) = (
+        math::sin(SOLAR_TILT.to_radians()),
+        math::cos(SOLAR_TILT.to_radians()),
+    );
+    // a point in the modules' plane: `s` up the slope from their middle, `n` out of their face
+    let at = |s: f64, n: f64| (0.80 + s * sin + n * cos, -s * cos + n * sin);
+    let tilt = (SOLAR_TILT, 0.0, 0.0);
+    let (len, wide) = (1.66, 1.00);
     for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+        let x = sx * (wide + 0.02) / 2.0;
+        // the module: its aluminium rim, the glass set in it, the cells' gaps on the glass (6 across, 10 up)
+        let (y, z) = at(0.0, -0.0175);
         fbox!(
             f,
-            format!("panel{i}"),
-            0.98,
-            0.05,
-            1.64,
-            (sx * 0.51, 0.605, 0),
-            M.panel_glass,
-            bevel = 0.008
-        );
-        fbox!(
-            f,
-            format!("edge{i}"),
-            1.00,
-            0.02,
-            1.66,
-            (sx * 0.51, 0.575, 0),
+            format!("module{i}"),
+            wide,
+            0.035,
+            len,
+            (x, y, z),
             M.panel_frame,
+            rot = tilt,
+            bevel = 0.004
+        );
+        let (y, z) = at(0.0, 0.003);
+        fbox!(
+            f,
+            format!("glass{i}"),
+            wide - 0.03,
+            0.006,
+            len - 0.03,
+            (x, y, z),
+            M.panel_glass,
+            rot = tilt,
+            bevel = 0
+        );
+        let (y, z) = at(0.0, 0.0065);
+        for c in 1..6 {
+            let cx = x - (wide - 0.03) / 2.0 + c as f64 * (wide - 0.03) / 6.0;
+            fbox!(
+                f,
+                format!("gapUp{i}"),
+                0.008,
+                0.002,
+                len - 0.04,
+                (cx, y, z),
+                M.panel_frame,
+                rot = tilt,
+                bevel = 0
+            );
+        }
+        for r in 1..10 {
+            let (y, z) = at(-(len - 0.03) / 2.0 + r as f64 * (len - 0.03) / 10.0, 0.0065);
+            fbox!(
+                f,
+                format!("gapAcross{i}"),
+                wide - 0.04,
+                0.002,
+                0.008,
+                (x, y, z),
+                M.panel_frame,
+                rot = tilt,
+                bevel = 0
+            );
+        }
+    }
+    // two purlins across under the modules, on two A-frames: a rafter up the slope, a short post at the front, a
+    // tall one at the back, a foot rail between them on the ground and a brace from the front foot up the back post
+    for (i, s) in [-0.55f64, 0.55].into_iter().enumerate() {
+        let (y, z) = at(s, -0.055);
+        fbox!(
+            f,
+            format!("purlin{i}"),
+            2.02,
+            0.04,
+            0.04,
+            (0, y, z),
+            M.panel_frame,
+            rot = tilt,
             bevel = 0.004
         );
     }
-    fbox!(
-        f,
-        "junction",
-        0.12,
-        0.10,
-        0.08,
-        (0.90, 0.60, 0.70),
-        M.struct_roof,
-        bevel = 0.006
-    );
-    settle!();
-    meshes()
+    for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+        let x = sx * 0.70;
+        let (y, z) = at(0.0, -0.105);
+        fbox!(
+            f,
+            format!("rafter{i}"),
+            0.05,
+            0.06,
+            1.52,
+            (x, y, z),
+            M.panel_frame,
+            rot = tilt,
+            bevel = 0.004
+        );
+        let (front, back) = (at(-0.65, -0.135), at(0.65, -0.135));
+        for (name, (top, z)) in [("postFront", front), ("postBack", back)] {
+            fbox!(
+                f,
+                format!("{name}{i}"),
+                0.05,
+                top,
+                0.05,
+                (x, top / 2.0, z),
+                M.panel_frame,
+                bevel = 0.004
+            );
+        }
+        fbox!(
+            f,
+            format!("foot{i}"),
+            0.06,
+            0.04,
+            front.1 - back.1 + 0.05,
+            (x, 0.02, (front.1 + back.1) / 2.0),
+            M.panel_frame,
+            bevel = 0.004
+        );
+        // the brace: from the front post's foot to 0.8 m up the back post
+        let (dz, dy) = (front.1 - back.1, 0.78);
+        let angle = math::atan2(dy, dz).to_degrees();
+        let length = math::sqrt(dz * dz + dy * dy);
+        fbox!(
+            f,
+            format!("brace{i}"),
+            0.04,
+            0.03,
+            length,
+            (x, 0.05 + dy / 2.0, (front.1 + back.1) / 2.0),
+            M.panel_frame,
+            rot = (angle, 0.0, 0.0),
+            bevel = 0.004
+        );
+    }
+    settle(&[join_all("body")])
 }

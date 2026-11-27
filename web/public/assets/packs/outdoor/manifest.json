@@ -746,9 +746,6 @@
         },
         "panel_glass": {
           "finish": "material.finish.gloss"
-        },
-        "struct_roof": {
-          "finish": "material.finish.satin"
         }
       },
       "paint": [

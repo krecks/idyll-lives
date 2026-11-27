@@ -223,8 +223,10 @@ that move apart), reported to the owner.
 2.96 m: four posts, a ring beam, two rails on three sides, a broad roof skirt, the lantern over it and its cap with
 a finial, and a bench along the back inside the rail), `pergola` (2.92 × 2.42 × 1.90 m: posts, two beams, five rafters), `awning` (1.90 × 0.40 × 0.91 m on the
 wall's face: a rail, five canvas slats stepping down to the front bar and the valance) and `solarPanels` (2.02 ×
-0.65 × 1.66 m: its frame on the ground and two panels, each a 1.00 × 1.66 m module as real ones are, 2 cm apart;
-0.86 m wide before 2026-11-27). Timber and roof sheet, or frame and panels, map to 1–3 draw
+1.21 × 1.45 m: two 60-cell modules, each a real 1.00 × 1.66 m, 2 cm apart, tilted 30° up to the back on two low
+A-frames (a short front post, a tall back post, a rafter, a foot rail and a brace) under two purlins; the cells' gaps
+are thin strips on the glass, 6 across and 10 up, so it reads as a solar array, not a table; joined into one `body`.
+Flat on four table legs, 0.86 m modules, before 2026-11-27). Timber and roof sheet, or frame and panels, map to 1–3 draw
 calls; none has a clip. The gazebo is joined into one `body` (2026-11-27: its 32 parts, the bench's
 included, were the gate's `unmoved` before). Their roofs are flat: the kit has no rotated slab here, so the gazebo's is a skirt with a
 lantern rather than a pitched roof, and the awning's slope is five stepped slats. The awning is declared with its

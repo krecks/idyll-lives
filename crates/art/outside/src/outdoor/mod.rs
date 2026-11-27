@@ -125,7 +125,7 @@ pub fn family() -> Family {
                 .centre(0.0, 0.025)
                 .on_wall()
                 .paint(&[("awning_stripe", "Canvas"), ("panel_frame", "Frame")]),
-            Model::new("solarPanels", structures::solar_panels, (2.02, 0.650, 1.66))
+            Model::new("solarPanels", structures::solar_panels, (2.02, 1.213, 1.452))
                 .key("model.solarPanels")
                 .paint(&[("panel_frame", "Frame"), ("panel_glass", "Panels")]),
         ],
