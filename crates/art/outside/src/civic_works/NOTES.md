@@ -32,10 +32,12 @@ finishes: one draw.
 A two-post lift (blue posts on foot plates, carriages, hydraulic rams, a control box with its buttons and cable, a
 chequer floor plate between the posts) holding a hatchback on its four arms, sills 1.27 m up. The car (`car_shell`,
 `car_running_gear`, `car_ends_and_underside`): three lofts, smooth round sections along its length (`BODY`, `HOUSE`,
-`ROOF`: the body, the tinted glasshouse leaning in, the roof panel), spoiler and front pillars in its colour, lamps,
+`ROOF`: the body, the tinted glasshouse leaning in, the roof panel), lamps,
 grille, plates (white at the front, yellow at the back), mirrors, door seams and handles; on each flank a flat dark
-arch with a brake disc, red caliper, hub and a spring in it; under it an exhaust, silencer and tank. Its four wheels (`alloy`: plain tyre, dished rim, cap): two stacked under its nose, one lying under its
-tail, one leaning on the right post. One draw.
+arch with a wheel in it (`alloy`: plain tyre, dished rim, cap; four on the car, hanging); under it an exhaust,
+silencer and tank. One draw. Redone 2026-11-28: the wheels went from the floor onto the car, so it reads as a car
+(arches with wheels); the brake discs, hubs, calipers and springs (hidden by the wheels), the roof wing and the
+detached pillar bars are gone; the roof panel is wider. 6,628 triangles, far 2,860.
 
 ## The printing press (2 × 2)
 
@@ -80,7 +82,7 @@ the two cylinders).
 | Model | Size (w × h × d) | Triangles (far) | Draws | Colour parts |
 |---|---|---|---|---|
 | `model.fireEngine` | 2.51 × 3.17 × 5.84 m | 11,880 (3,616) | 1 | Paint, Lockers, Stripes, Ladders |
-| `model.carLift` | 2.94 × 2.76 × 4.09 m | 10,772 (2,836) | 1 | Lift, Car, Wheels |
+| `model.carLift` | 2.94 × 2.75 × 3.98 m | 6,628 (2,860) | 1 | Lift, Car, Wheels |
 | `model.printingPress` | 1.72 × 1.51 × 1.86 m | 3,912 | 3 | Press |
 | `model.firePole` | 0.84 × 2.80 × 0.84 m | 2,612 | 1 | Pole, Mat |
 | `model.hoseRack` | 0.88 × 0.79 × 0.30 m | 2,328 | 1 | Rack, Hose, Second hose |

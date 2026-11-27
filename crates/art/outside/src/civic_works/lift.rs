@@ -1,17 +1,16 @@
-//! The car lift: 3x5, a two-post lift with a hatchback up on its arms, its wheels off. The posts stand either side
+//! The car lift: 3x5, a two-post lift with a hatchback up on its arms, its wheels on. The posts stand either side
 //! of the middle (game x +-1.32), the car along the depth, its nose to the front, its sills 1.27 m up on the arms'
-//! four pads; its wheels lie and lean on the floor round it.
+//! four pads.
 
 use super::common::{F, arc, own_palette, tyre};
 use artkit::far::{is_low, low};
-use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, atan2, degrees, radians};
 use artkit::parts::{join, join_all, new_parts, settle_all};
 use artkit::place::Facing;
 use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{cube, fbox, fcyl, fextrude, fsweep, kit_tube, loft, revolve, ring};
+use artkit::{cube, fbox, fcyl, fextrude, kit_tube, loft, revolve, ring};
 
 own_palette! { LIFT:
     body = ("#2F5F9E", gloss),        // the lift: its posts, carriages and arms
@@ -63,10 +62,10 @@ const ROOF_SQUARE: f64 = 2.0; // the roof's: an ellipse
 // only a smooth cap shows over it; its ends shrunk, no wide flat cap
 const ROOF: [(f64, f64, f64); 6] = [
     (0.42, 0.04, 0.02),
-    (0.36, 0.3, 0.12),
-    (0.2, 0.5, 0.22),
-    (-1.0, 0.52, 0.25),
-    (-1.5, 0.46, 0.2),
+    (0.36, 0.4, 0.12),
+    (0.2, 0.58, 0.22),
+    (-1.0, 0.6, 0.25),
+    (-1.5, 0.55, 0.2),
     (-1.58, 0.04, 0.02),
 ];
 const ROOF_TOP: f64 = 1.475; // the roof panel's top
@@ -104,29 +103,7 @@ fn car_shell(m: &LIFT) {
         .map(|&(z, hw, t)| section(z, hw, (y + ROOF_TOP - t, y + ROOF_TOP), ROOF_SQUARE))
         .collect();
     loft!("car_roof", &roof, material = m.car, angle = LOFT_SMOOTH);
-    fbox!(
-        F,
-        "car_spoiler",
-        1.2,
-        0.03,
-        0.18,
-        (0, y + 1.47, -1.56),
-        m.car,
-        bevel = low(0.012, 0.0),
-        bevel_segments = 1
-    );
     for s in [-1, 1] {
-        let x = s as f64 * 0.7;
-        // the front pillars, from the scuttle up to the roof's front corners
-        artkit::bevel::eased(fsweep!(
-            F,
-            format!("a_pillar{s}"),
-            &[(x, y + 0.95, 0.99), (x * 0.72, y + 1.42, 0.3)],
-            0,
-            m.car,
-            profile = rounded_rect(0.07, 0.03, 0.0, 1),
-            up = (0, 0, 1)
-        ));
         fbox!(
             F,
             format!("car_mirror{s}"),
@@ -189,48 +166,6 @@ fn car_running_gear(m: &LIFT) {
                 bevel = low(CYL_BEVEL, 0.0),
                 bevel_segments = 1
             );
-            fcyl!(
-                F,
-                format!("disc{s}{zcs}"),
-                0.14,
-                0.022,
-                (sf * 0.78, y + CAR_WR, zc),
-                m.steel,
-                rot = (0, 90, 0),
-                verts = low(20, 8),
-            );
-            fcyl!(
-                F,
-                format!("hub{s}{zcs}"),
-                0.065,
-                0.06,
-                (sf * 0.79, y + CAR_WR, zc),
-                m.iron,
-                rot = (0, 90, 0),
-                verts = low(12, 6),
-            );
-            fbox!(
-                F,
-                format!("caliper{s}{zcs}"),
-                0.06,
-                0.1,
-                0.09,
-                (sf * 0.785, y + CAR_WR + 0.06, zc - 0.11),
-                m.red_lens,
-                bevel = low(0.015, 0.0),
-                bevel_segments = 1
-            );
-            if !is_low() {
-                fcyl!(
-                    F,
-                    format!("spring{s}{zcs}"),
-                    0.05,
-                    0.4,
-                    (sf * 0.64, y + CAR_WR + 0.24, zc),
-                    m.iron,
-                    verts = 12,
-                );
-            }
         }
     }
 }
@@ -594,19 +529,14 @@ pub fn car_lift() -> Vec<Obj> {
         bevel_segments = 1
     );
     car(m);
-    // the wheels: two stacked under its nose, one lying under its tail, one leaning on the right post
-    for (k, (x, y, z, rx, rz)) in [
-        (-0.45, 0.1, 1.75, 90.0, 0.0),
-        (-0.42, 0.3, 1.73, 90.0, 0.0),
-        (0.42, 0.1, -1.72, 90.0, 0.0),
-        (CL_POST - 0.24, 0.315, 0.42, -12.0, 0.0),
-    ]
-    .into_iter()
-    .enumerate()
+    // the wheels on the car, hanging under it, their faces out to the sides
+    for (k, (sx, z)) in [(-1.0, CAR_FA), (1.0, CAR_FA), (-1.0, CAR_RA), (1.0, CAR_RA)]
+        .into_iter()
+        .enumerate()
     {
         let w = alloy(&format!("wheel{k}"), m);
-        w.set_rotation_euler((radians(rx), 0.0, radians(rz)));
-        w.set_location(F.at(x, y, z));
+        w.set_rotation_euler((radians(0.0), 0.0, radians(sx * 90.0)));
+        w.set_location(F.at(sx * (CAR_HALF - 0.06), CAR_Y + CAR_WR, z));
     }
     join_all(if is_low() { "carLift_far" } else { "carLift" });
     settle_all();

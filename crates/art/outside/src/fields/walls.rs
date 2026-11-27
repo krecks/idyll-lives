@@ -162,50 +162,80 @@ pub fn dry_stone_wall() -> Vec<Obj> {
     settle(&[join_all("dryStoneWall")])
 }
 
-/// A step stile over a low stone wall: the wall (two courses and a coping), an oak post at each end of it standing
-/// to hand height, and an oak tread on short legs against each face, a step of 0.25 m up to the coping and 0.25 m
-/// down again.
+/// A step stile in a dry-stone wall: the wall (three courses, 0.75 m) with a flat cap stone on each end pier and a
+/// wide flat slab between them, the crossing; two stone steps built up against each face (0.27 m a step) to the
+/// slab, and an oak hand post standing from the ground at one pier.
 pub fn stile() -> Vec<Obj> {
-    let heights = [0.22, 0.20];
-    courses("stileStone", 0.95, 0.52, 0.42, 0.0, &heights, 47);
-    coping("stileCoping", 0.95, 0.42, (0.0, 0.42), 49, (7, 0.12, 0.15));
+    let heights = [0.26, 0.25, 0.24];
+    courses("stileStone", 0.95, 0.50, 0.44, 0.0, &heights, 47);
+    // the dark heart, so the chinks and the gaps under the cap stones show no light through
+    fbox!(
+        F,
+        "stileHeart",
+        0.92,
+        0.74,
+        0.38,
+        (0.0, 0.37, 0.0),
+        M.stone_dark
+    );
+    for (i, x) in [-0.36, 0.36].iter().enumerate() {
+        fbox!(
+            F,
+            format!("pierCap{i}"),
+            0.23,
+            0.10,
+            0.46,
+            (*x, 0.80, 0.0),
+            M.stone_light,
+            bevel = COPING_BEVEL,
+            bevel_segments = 1
+        );
+    }
+    fbox!(
+        F,
+        "crossSlab",
+        0.5,
+        0.07,
+        0.5,
+        (0.0, 0.775, 0.0),
+        M.stone,
+        bevel = COPING_BEVEL,
+        bevel_segments = 1
+    );
     for (side, s) in [("front", 1.0), ("back", -1.0)] {
-        // the tread, its two legs under the outer corners
-        let zc = s * (0.225 + 0.11);
         fbox!(
             F,
-            format!("{side}Tread"),
-            0.50,
-            0.05,
-            0.22,
-            (0.0, 0.25, zc),
-            M.oak,
-            bevel = 0.008
+            format!("{side}Step0"),
+            0.5,
+            0.27,
+            0.30,
+            (0.0, 0.135, s * 0.30),
+            M.stone_light,
+            bevel = STONE_BEVEL,
+            bevel_segments = 1
         );
-        for (i, x) in [-0.22, 0.22].iter().enumerate() {
-            fbox!(
-                F,
-                format!("{side}Leg{i}"),
-                0.06,
-                0.225,
-                0.06,
-                (*x, 0.1125, s * (0.225 + 0.19)),
-                M.oak_dark,
-                bevel = 0.006
-            );
-        }
-    }
-    for (i, x) in [-0.40, 0.40].iter().enumerate() {
         fbox!(
             F,
-            format!("post{i}"),
-            0.10,
-            0.96,
-            0.10,
-            (*x, 0.48, 0.0),
-            M.oak,
-            bevel = 0.01
+            format!("{side}Step1"),
+            0.5,
+            0.27,
+            0.16,
+            (0.0, 0.405, s * 0.24),
+            M.stone,
+            bevel = STONE_BEVEL,
+            bevel_segments = 1
         );
     }
+    // the hand post, up through the right pier
+    fbox!(
+        F,
+        "post",
+        0.09,
+        1.25,
+        0.09,
+        (0.36, 0.625, 0.0),
+        M.oak,
+        bevel = 0.012
+    );
     settle(&[join_all("stile")])
 }

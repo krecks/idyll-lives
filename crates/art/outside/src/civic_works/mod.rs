@@ -42,7 +42,7 @@ pub fn family() -> Family {
                     ("ladder", "Ladders"),
                 ])
                 .palette(engine::ENGINE.palette()),
-            Model::new("carLift", lift::car_lift, (2.94, 2.76, 4.09))
+            Model::new("carLift", lift::car_lift, (2.94, 2.75, 3.98))
                 .key("model.carLift")
                 .far_low()
                 .paint(&[("body", "Lift"), ("car", "Car"), ("alloy", "Wheels")])
