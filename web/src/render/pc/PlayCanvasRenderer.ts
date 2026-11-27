@@ -2677,9 +2677,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
   }
 
-  /** The garden's pools of lamplight, as bright as its lamps are now. */
-  private applyGardenPools(): void {
-    this.gardenPools?.update(this.glowLevel, this.poolOn, this.lampColor);
+  /** The garden's pools of lamplight, as bright as its lamps are now; whether one changed. */
+  private applyGardenPools(): boolean {
+    return this.gardenPools?.update(this.glowLevel, this.poolOn, this.lampColor) ?? false;
   }
 
   /** Model files that failed have come (gathered by `modelRefresh`): the world draws again what it drew without them (once no build runs). */

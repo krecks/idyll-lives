@@ -1314,16 +1314,19 @@ export class LotContents {
   /**
    * The shades' and fires' glow (`lamps.ts` lights the rooms: `light` says how): each instance as
    * bright as its lamp, or its room's lights, at the lamps' level (by day too in a room without
-   * windows); a glow with nothing lit isn't drawn. Screens are lit by use (`update`).
+   * windows); a glow with nothing lit isn't drawn. Screens are lit by use (`update`). Whether a glow changed
+   * (only some lamps' and rooms' are drawn: the lot's).
    */
-  applyGlow(light: GlowLight): void {
+  applyGlow(light: GlowLight): boolean {
     this.glowLight = light;
+    let any = false;
     for (const g of this.glows) {
       if (g.screen) {
-        this.writeScreenGlow(g);
+        any = this.writeScreenGlow(g) || any;
         continue;
       }
       let lit = false;
+      let changed = false;
       g.rooms.forEach((room, i) => {
         const lamp = g.lamps[i];
         const lampOn = lamp >= 0 ? light.lampOn(lamp) : room ? light.roomOn(room) : 1;
@@ -1331,20 +1334,22 @@ export class LotContents {
         const f = (dark ? 1 : light.level) * lampOn;
         if (g.base) g.base[i] = f;
         // (A light fitting's glass `LAMP_GLASS` times as bright, and where no daylight comes as bright to the eye as at night.)
-        setGlow(g, i, f, g.glass ? LAMP_GLASS * (dark ? light.dark : 1) : 1);
+        changed = setGlow(g, i, f, g.glass ? LAMP_GLASS * (dark ? light.dark : 1) : 1) || changed;
         lit ||= f > 0;
       });
       if (g.draw.destroyed) continue;
-      uploadGlow(g);
+      if (changed) uploadGlow(g);
+      any ||= changed || g.draw.enabled !== lit;
       g.draw.enabled = lit;
     }
+    return any;
   }
 
   /**
    * Screens (a TV, a monitor) are lit only while a resident uses them, and flicker a little while
    * they run; the glow mesh's vertex colour is the screen's, its instance colour the brightness.
    */
-  private writeScreenGlow(g: Glow): void {
+  private writeScreenGlow(g: Glow): boolean {
     const level = this.glowLight.level;
     const t = this.screenTime / 1000;
     let changed = false;
@@ -1359,10 +1364,12 @@ export class LotContents {
       }
       changed = setGlow(g, i, f) || changed;
     }
-    if (g.draw.destroyed) return;
+    if (g.draw.destroyed) return false;
     // Uploaded only when a brightness changed; off (nobody watching) it isn't drawn at all.
     if (changed) uploadGlow(g);
-    if (g.draw.enabled !== on) g.draw.enabled = on;
+    if (g.draw.enabled === on) return changed;
+    g.draw.enabled = on;
+    return true;
   }
 
   /**

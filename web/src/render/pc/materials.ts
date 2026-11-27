@@ -663,16 +663,17 @@ export class MaterialLibrary {
     return mat;
   }
 
-  /** A material's emissive colour (linear), updated only for a change one could see. */
-  setEmissive(material: pc.StandardMaterial, color: pc.Color): void {
+  /** A material's emissive colour (linear), updated only for a change one could see; whether it was. */
+  setEmissive(material: pc.StandardMaterial, color: pc.Color): boolean {
     let was = this.glows.get(material);
     if (!was) this.glows.set(material, (was = new pc.Color(-1, -1, -1)));
-    if (!visibleChange(was.r, color.r) && !visibleChange(was.g, color.g) && !visibleChange(was.b, color.b)) return;
+    if (!visibleChange(was.r, color.r) && !visibleChange(was.g, color.g) && !visibleChange(was.b, color.b)) return false;
     was.copy(color);
     // (PlayCanvas takes its colours in sRGB.)
     const g = (v: number) => Math.pow(Math.max(0, v), 1 / 2.2);
     material.emissive.set(g(color.r), g(color.g), g(color.b));
     material.update();
+    return true;
   }
 
   /**
