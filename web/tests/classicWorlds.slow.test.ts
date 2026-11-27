@@ -15,7 +15,8 @@
 // not in their diagnostics), for traffic on the right as the game shows it (2026-11-24: each motorway's
 // carriageways on the other sides of its middle line, its ramps with them), and when the motorway went down before
 // the villages (2026-11-24: its course chosen with the main town alone, none costing a village; the villages kept
-// clear of it, its gates chosen by them; no side T where another area's street comes up end to end). A change that
+// clear of it, its gates chosen by them; no side T where another area's street comes up end to end), and when 70 careers'
+// hours moved a quarter or half an hour (2026-11-27: the jobs' starts spread across the morning). A change that
 // moves one on purpose re-pins it here.
 import { describe, expect, test } from 'bun:test';
 import { loadContent, templatesOf, usePublicFetch } from './support/content';
@@ -24,41 +25,41 @@ import { CLASSIC, type ClassicKind } from './support/classicWorlds';
 
 /** Each world: its kind, its seed, and the first 16 hex digits of its draft's SHA-256. */
 const GOLDEN: [ClassicKind, number, string][] = [
-  ['small', 11, '2dd709596b4378ae'],
-  ['small', 22, '083745ac0fba6841'],
-  ['medium', 11, '11bd80352eb79fdd'],
-  ['medium', 22, '64f86ed7e7d53446'],
-  ['dense', 11, '890f4da75136af38'],
-  ['dense', 22, 'f91df8ad22089afe'],
-  ['farm', 11, '1717d65a2c2b5301'],
-  ['farm', 22, '45d7b4ab9368e341'],
-  ['seaside', 11, 'ff559a9d6b6fcc70'],
-  ['seaside', 22, '8e2be8f03cc89e7d'],
-  ['mountain', 11, '861f41015c2c4985'],
-  ['mountain', 22, 'f859466e339960c9'],
-  ['lakeside', 11, '64df52b9edbfc847'],
-  ['lakeside', 22, '746c4faa2afec301'],
-  ['forest', 11, 'aa808aea1ec3997e'],
-  ['forest', 22, '30aa17736a4fbcee'],
-  ['dense', 808114082, 'aa74853331500d77'],
-  ['dense', 45, '2d7c25d568b427de'],
-  ['small', 199762, '9186dab0bfb29a75'],
-  ['forest', 223520, '97cd228b1512578e'],
-  ['medium', 104735, '4b8e73cb8e477a0b'],
-  ['mountain', 231441, '9cd7a60bf615e77e'],
-  ['lakeside', 239360, '93a98109b80d1f7d'],
-  ['farm', 271032, 'b1b9aeb91218f190'],
-  ['small', 278952, '40204b0c6986c2f0'],
-  ['forest', 278953, 'b7260415f246e38d'],
-  ['forest', 425059, 'f9a73a8993ff5607'],
-  ['lakeside', 215603, '4d436060d55c10f9'],
-  ['forest', 320330, '9e081f17322e9436'],
-  ['dense', 320329, '7123db8867f199ea'],
-  ['seaside', 215602, '1cadf5fe3e9c9d5f'],
-  ['forest', 104735, '6e566519b20124c9'],
-  ['forest', 112654, '97542cffbea03e00'],
-  ['lakeside', 225304, 'b11845113a71b297'],
-  ['small', 314192, '1e83cbff5b3e3eb9'],
+  ['small', 11, 'ad7e1aeae3b5d44d'],
+  ['small', 22, '5e9d475fbf39a8d9'],
+  ['medium', 11, 'caa30a5ab9c106fb'],
+  ['medium', 22, 'e9a365b546449ecf'],
+  ['dense', 11, '2f40d45a08b1c156'],
+  ['dense', 22, '536eaf8bdad6b315'],
+  ['farm', 11, '98b8b6e2cfbb8134'],
+  ['farm', 22, 'ee22b1dc3b0dec69'],
+  ['seaside', 11, '4b53c8bc5ad81378'],
+  ['seaside', 22, 'd63bdc3650fa89a2'],
+  ['mountain', 11, '7be313904fff3377'],
+  ['mountain', 22, '6e1ec82c2cd0b591'],
+  ['lakeside', 11, '02414342ce8855bf'],
+  ['lakeside', 22, '158fec3671ad17d8'],
+  ['forest', 11, '202ec567588e8385'],
+  ['forest', 22, '683716bec9dfac10'],
+  ['dense', 808114082, '6f15a39acd379243'],
+  ['dense', 45, 'b07f18985ff04e7d'],
+  ['small', 199762, '53d1404115b4fca6'],
+  ['forest', 223520, '8a0082da846d38ad'],
+  ['medium', 104735, '5112db7531757ede'],
+  ['mountain', 231441, '440da34c5376b012'],
+  ['lakeside', 239360, '195159c7796d6c94'],
+  ['farm', 271032, '57b1fbcf4a337ef6'],
+  ['small', 278952, '42c9fbdd83d24ac0'],
+  ['forest', 278953, 'efbeefdcf0cf3485'],
+  ['forest', 425059, 'ba5acf0db8a2ca53'],
+  ['lakeside', 215603, '3c8671f2f9082669'],
+  ['forest', 320330, '5dd92e45a38195b0'],
+  ['dense', 320329, '51d0d0ed6b4267d4'],
+  ['seaside', 215602, '41c5be8cacda85f9'],
+  ['forest', 104735, '0b5dbb8f2623fa4c'],
+  ['forest', 112654, 'fceda88fd52e89da'],
+  ['lakeside', 225304, '766ed383611cfb30'],
+  ['small', 314192, 'c402c860ae43f8cd'],
 ];
 
 describe('classic worlds', async () => {
