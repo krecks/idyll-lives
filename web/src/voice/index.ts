@@ -219,15 +219,19 @@ export class VoiceDirector {
     const writer = this.llmWriter;
     if (!writer || !this.frame) return null;
     await ensureLlm(llmDevice());
+    const rowOf = ({ curr, layout }: FrameState): number => {
+      for (let i = 0; i < curr[layout.header.simCount]; i++) if (curr[layout.headerLen + i * layout.simStride + layout.sim.id] === id) return i;
+      return -1;
+    };
     const frame = this.frame;
-    const { curr, layout } = frame;
-    let row = -1;
-    for (let i = 0; i < curr[layout.header.simCount]; i++) if (curr[layout.headerLen + i * layout.simStride + layout.sim.id] === id) row = i;
+    const row = rowOf(frame);
     if (row < 0 || signal.aborted) return null;
     const text = await writer.answer({ speaker: id, row, partner: from, kind: 'emotion', emotion: 'calm', seed: 0 }, frame, { other: this.firstName(from), words, before }, signal);
-    if (text && !signal.aborted) {
-      const now = performance.now();
-      this.say(id, row, { text, key: 'llm:chat' }, from, false, now, now, MAX_WAIT_LLM_MS);
+    // (Said by the row they are at now: the rows may have moved while the model wrote.)
+    const now = this.frame ? rowOf(this.frame) : -1;
+    if (text && !signal.aborted && now >= 0) {
+      const at = performance.now();
+      this.say(id, now, { text, key: 'llm:chat' }, from, false, at, at, MAX_WAIT_LLM_MS);
     }
     return text;
   }

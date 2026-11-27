@@ -273,6 +273,10 @@ impl G2p {
         for c in word.chars().filter(|c| c.is_alphabetic()) {
             ps.push_str(self.lexicon.get(&c.to_uppercase().to_string())?);
         }
+        // (No letters, "&" or "3": nothing to spell.)
+        if ps.is_empty() {
+            return None;
+        }
         let ps = apply_stress(&ps, Some(0.0));
         Some(match ps.rfind(SECONDARY) {
             Some(i) => format!("{}{PRIMARY}{}", &ps[..i], &ps[i + SECONDARY.len_utf8()..]),

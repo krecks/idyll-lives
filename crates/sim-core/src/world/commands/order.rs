@@ -23,6 +23,21 @@ impl World {
     /// Carries out `Command::Steer`: what they were doing and had queued is dropped for the walk.
     pub(super) fn apply_steer(&mut self, sim: u32, x: f32, z: f32) -> Result<(), Error> {
         self.check_walk(sim, x, z)?;
+        // (Bound for a car, in one, at the kerb for a taxi, or setting out: the car and the trip
+        // hold them, which dropping the activity would not let go of.)
+        let s = &self.sims[sim as usize];
+        let riding = s.current.as_ref().is_some_and(|a| {
+            matches!(
+                a.phase,
+                Phase::Boarding { .. }
+                    | Phase::Alighting { .. }
+                    | Phase::Driving
+                    | Phase::AtKerb { .. }
+            )
+        });
+        if riding || s.bound_for_car.is_some() || s.transition.is_some() {
+            return Err(Error::new(format!("{} can't walk off now", s.name)));
+        }
         // Into a wall or a thing: they stop at it, not go the long way round to what's behind it.
         let from = self.sims[sim as usize].pos;
         let [x, z] = if self.nav().line_walkable(from, [x, z]) {

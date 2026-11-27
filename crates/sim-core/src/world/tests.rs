@@ -790,6 +790,21 @@ fn steering_drops_what_they_were_doing_and_walks_there() {
 }
 
 #[test]
+fn a_steer_is_refused_while_bound_for_a_car() {
+    let mut w = world();
+    w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+    w.sims[0].bound_for_car = Some(0);
+    let steer = Command::Steer {
+        sim: 0,
+        x: 2.5,
+        z: 5.5,
+    };
+    assert!(w.apply(steer.clone()).is_err(), "steered out of a car");
+    w.sims[0].bound_for_car = None;
+    w.apply(steer).unwrap();
+}
+
+#[test]
 fn a_held_resident_chooses_nothing_until_let_go() {
     let mut w = world();
     w.sims[0].needs[0] = 0.05;

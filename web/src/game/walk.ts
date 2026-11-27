@@ -173,6 +173,8 @@ export class WalkMode {
     this.last = now;
     const me = whereIs(this.deps.bridge, sim);
     if (!me) return this.deps.lost();
+    // (A menu or the chat open: keys held when it opened walk no further.)
+    if (this.deps.busy()) this.held.clear();
     const { dir, turn } = moveDir(this.held, this.heading);
     if (turn) {
       this.heading -= turn * TURN * dt;

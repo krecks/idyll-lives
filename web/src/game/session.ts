@@ -653,6 +653,7 @@ async function openSession(
     enterWalk(id) {
       if (game.mode !== 'live' || !playerSims().includes(id)) return;
       controls.exitWalk();
+      controls.openTalk(null);
       if (game.follow !== null) controls.follow(null);
       takeBack();
       walk.enter(id, canvas);
@@ -682,6 +683,7 @@ async function openSession(
     openTalk(id) {
       const was = game.talkWith;
       if (was !== null && was !== game.walking) bridge.send({ type: 'hold', sim: was, on: false });
+      game.talkFrom = id === null ? null : (game.socialMenu?.actor ?? game.walking ?? game.selected);
       game.talkWith = id;
       game.socialMenu = null;
       // (Nothing new of their own while the chat is open: what they're at already goes on.)
@@ -690,7 +692,7 @@ async function openSession(
     async answer(words, before, signal) {
       const id = game.talkWith;
       if (id === null) return null;
-      return voices.answer(id, game.selected, words, before, signal);
+      return voices.answer(id, game.talkFrom ?? game.selected, words, before, signal);
     },
     frameHouse() {
       takeBack();
@@ -1843,7 +1845,7 @@ async function openSession(
   };
 
   const openSocialMenu = (actor: number, sim: number, x: number, y: number) => {
-    game.socialMenu = { target: sim, x, y, options: null };
+    game.socialMenu = { actor, target: sim, x, y, options: null };
     play('menu');
     bridge.requestSocialOptions(actor, sim).then(
       (options) => {

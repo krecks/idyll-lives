@@ -30,7 +30,7 @@
       .slice(-8)
       .map((l) => `${l.who}: "${l.text}"`)
       .join('\n');
-    const me = game.selected === null ? '' : firstName(game.selected);
+    const me = game.talkFrom === null ? '' : firstName(game.talkFrom);
     const them = other;
     lines = [...lines, { who: me, text: said }];
     words = '';
