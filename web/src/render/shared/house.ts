@@ -2454,13 +2454,11 @@ export class HousePlanner {
   }
 
   /**
-   * Neighbours' window glass (`SilhouettePlan.homes`' panes) as one mesh: glowing at night as the
-   * street's (`lit`), or dark (everyone in asleep, or nobody home).
+   * The part neighbours' window glass (`SilhouettePlan.homes`' panes) is drawn as, its mesh empty (the street fills
+   * it, `pc/street.ts` `drawWindows`): glowing at night as the street's (`lit`), or dark (everyone in asleep, or nobody home).
    */
-  neighbourPanes(panes: readonly Geo[], lit: boolean): HousePart {
-    const geo = new Geo();
-    for (const p of panes) geo.append(p);
-    return { geo, name: lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', surface: { kind: 'neighbourGlass', lit }, cut: true, cast: false, roof: false, shadowOnly: false, glass: false };
+  neighbourPanes(lit: boolean): HousePart {
+    return { geo: new Geo(), name: lit ? 'silhouetteWindowsLit' : 'silhouetteWindowsDark', surface: { kind: 'neighbourGlass', lit }, cut: true, cast: false, roof: false, shadowOnly: false, glass: false };
   }
 
   /**

@@ -38,7 +38,7 @@ export function doorLead(rate: number): number {
 }
 
 /** How far off (m) someone can be and still be going through a doorway (`goingThrough`), the lead `lead`: past it nobody is. */
-export function doorReach(lead: number): number {
+function doorReach(lead: number): number {
   return Math.max(DOOR_CLEAR, lead + 0.5);
 }
 

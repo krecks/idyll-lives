@@ -54,6 +54,28 @@ const STAMP = 7;
 /** A rectangle of texels, `[i0, j0, i1, j1]`, its last column and row included. */
 export type TexelRect = [number, number, number, number];
 
+/** The rectangle round all of `rects` (last ones included; none: `[Infinity, Infinity, -Infinity, -Infinity]`). */
+export function rectBounds(rects: readonly TexelRect[]): TexelRect {
+  const out: TexelRect = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [i0, j0, i1, j1] of rects) {
+    out[0] = Math.min(out[0], i0);
+    out[1] = Math.min(out[1], j0);
+    out[2] = Math.max(out[2], i1);
+    out[3] = Math.max(out[3], j1);
+  }
+  return out;
+}
+
+/** Tiles `r` (last ones included) as the texels they cover, `n` a tile's side. */
+export function tileTexels(r: TexelRect, n: number): TexelRect {
+  return [r[0] * n, r[1] * n, (r[2] + 1) * n - 1, (r[3] + 1) * n - 1];
+}
+
+/** `from`'s bytes within `tiles` (rectangles of `row` bytes a row, 4 a tile, last ones included; rows past `to`'s end left out) into `to`. */
+export function copyRows(from: Uint8Array, to: Uint8Array, tiles: readonly TexelRect[], row: number): void {
+  for (const [x0, z0, x1, z1] of tiles) for (let z = z0; z <= Math.min(z1, to.length / row - 1); z++) to.set(from.subarray(z * row + x0 * 4, z * row + (x1 + 1) * 4), z * row + x0 * 4);
+}
+
 /**
  * The ground's shade for `world` now: `world.width * n` × its ground's depth `* n` bytes, rows along x, 0 none
  * and 255 all the light taken. Into `into` when it is that size.
@@ -78,7 +100,7 @@ export function updateGroundShade(world: WorldStructure, n: number, out: Uint8Ar
   const changed = rects.map((r): TexelRect => [Math.max(0, r[0]), Math.max(0, r[1]), Math.min(W - 1, r[2]), Math.min(D - 1, r[3])]).filter((r) => r[0] <= r[2] && r[1] <= r[3]);
   if (!changed.length) return { shade: out, changed };
   // (Only the stamps reaching them: most of a big world's are nowhere near.)
-  const box = changed.reduce((b, r) => [Math.min(b[0], r[0]), Math.min(b[1], r[1]), Math.max(b[2], r[2]), Math.max(b[3], r[3])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const box = rectBounds(changed);
   const stamps = shadeStamps(world, [box[0] / n, box[1] / n, (box[2] + 1) / n, (box[3] + 1) / n]);
   // Each cleared, and every stamp over it laid again in order.
   for (const r of changed) {

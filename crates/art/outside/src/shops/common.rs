@@ -1,6 +1,7 @@
 //! What the shop fittings and the café furniture are built from: the palette, and the few shapes the family makes
 //! itself.
 
+pub use artkit::kit::fluted;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, cos, radians, sin, v3};
 use artkit::place::GameFrame;
@@ -130,12 +131,6 @@ pub fn arc(z0: f64, y0: f64, z1: f64, y1: f64, steps: usize, inset: f64) -> Vec<
             )
         })
         .collect()
-}
-
-/// A ring of `flutes` flutes round radius `r` at Blender height `z`, about the origin (a tart's fluted case, a
-/// cupcake's paper cup, a gondola's post).
-pub fn fluted(r: f64, z: f64, flutes: usize, depth: f64, per: usize) -> Vec<P3> {
-    artkit::kit::fluted(r, z, flutes, depth, per, 0.0)
 }
 
 /// A bottle standing at game point `foot`: a round body, a shoulder, a neck and its cap.

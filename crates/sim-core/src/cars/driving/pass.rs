@@ -181,7 +181,7 @@ const PARK_CLEAR: f32 = GAP + 0.1;
 /// Only at a taxi bay (`taxi::at_bay`): the kerbside furniture keeps clear of those; and not while
 /// anyone's on their way to its door (it would move from under them). Whether it pulled over
 /// further this tick (None: not at a bay, and it stands in its lane as before).
-pub(crate) fn park_beside(w: &mut World, c: usize, others: &[Driving]) -> Option<bool> {
+pub(crate) fn park_beside(w: &mut World, c: usize) -> Option<bool> {
     let car = &w.cars[c];
     let (_, route) = car.route.as_ref()?;
     let (p, yaw, back) = route.at(car.progress);
@@ -199,15 +199,9 @@ pub(crate) fn park_beside(w: &mut World, c: usize, others: &[Driving]) -> Option
     if (shift - car.shift).abs() < 1e-5 || w.sims.iter().any(|s| s.car_bound() == Some(c as u32)) {
         return Some(false);
     }
-    let standing: Vec<Driving> = parked(&w.cars).collect();
-    if guard(
-        &body(car.shift),
-        &body(shift),
-        car.layer(),
-        others.iter().chain(&standing),
-    )
-    .is_some()
-    {
+    let mut others = vehicles(&w.cars, Some(c));
+    others.extend(parked(&w.cars));
+    if guard(&body(car.shift), &body(shift), car.layer(), others.iter()).is_some() {
         return Some(false);
     }
     let at = body(shift).at;

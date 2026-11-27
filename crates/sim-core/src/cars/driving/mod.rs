@@ -807,10 +807,10 @@ pub(crate) fn stand_taxi(w: &mut World, c: usize) -> bool {
         car.shift = (car.shift - PULL_RATE).max(0.0);
         return false;
     }
-    let others = vehicles(&w.cars, Some(c));
-    match park_beside(w, c, &others) {
+    match park_beside(w, c) {
         Some(pulling) => pulling,
         None => {
+            let others = vehicles(&w.cars, Some(c));
             pull_over(w, c, &others, false, None);
             false
         }

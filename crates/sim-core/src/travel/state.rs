@@ -135,10 +135,10 @@ impl Travel {
         }
     }
 
-    /// `entry` for the door `door` of plot `plot`, as noted (`note_doors`), or found.
-    /// (The sim tests check it against `entry`: `common::check_lookups`.)
-    pub fn door_entry(&self, plot: u32, door: [f32; 2], mode: Mode) -> Option<RoadPoint> {
-        match self.doors.get(plot as usize) {
+    /// `entry` for the door `door` of plot `plot`, as noted (`note_doors`), or found (no plot:
+    /// found). (The sim tests check it against `entry`: `common::check_lookups`.)
+    pub fn door_entry(&self, plot: Option<u32>, door: [f32; 2], mode: Mode) -> Option<RoadPoint> {
+        match plot.and_then(|p| self.doors.get(p as usize)) {
             Some(Some((at, entries))) if *at == door.map(f32::to_bits) => entries[mode as usize],
             _ => self.entry(door, mode),
         }
@@ -195,7 +195,7 @@ impl Travel {
             mode,
             walk,
             || self.entry(from, mode),
-            || self.door_entry(plot, door, mode),
+            || self.door_entry(Some(plot), door, mode),
         )
     }
 
@@ -318,10 +318,7 @@ impl FromHere {
             Some((k, way)) if k == key => way,
             _ => {
                 let on = || self.on(travel, from, mode);
-                let off = || match plot {
-                    Some(plot) => travel.door_entry(plot, door, mode),
-                    None => travel.entry(door, mode),
-                };
+                let off = || travel.door_entry(plot, door, mode);
                 let way = match mode {
                     Mode::Foot => travel.foot_metres_via(from, door, on, off),
                     Mode::Car => travel.eta_via(from, door, mode, walk, on, off),

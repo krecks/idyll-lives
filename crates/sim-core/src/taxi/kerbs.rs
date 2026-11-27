@@ -134,19 +134,18 @@ fn out_end(
 /// furniture keeps clear of them (`view::StructureView::taxi_bays`). As last found (`warm_kerbs`)
 /// for the town as it is: found again, they were most of a structure update's time.
 pub fn taxi_bays(w: &World) -> Vec<[f32; 3]> {
-    if w.taxis.kerbs.stamp == kerb_stamp(w) {
+    let stamp = kerb_stamp(w);
+    if w.taxis.kerbs.stamp == stamp {
         return w.taxis.kerbs.bays.clone();
     }
-    find_bays(w)
+    Kerbs::find(w, stamp).bays
 }
 
-/// `taxi_bays`, found.
-pub(super) fn find_bays(w: &World) -> Vec<[f32; 3]> {
+/// `taxi_bays`, from the plots' stands (`Kerbs::find`).
+pub(super) fn find_bays(w: &World, kerbs: impl Iterator<Item = Kerb>) -> Vec<[f32; 3]> {
     let g = &w.travel.graph;
-    let mouths = drive_mouths(w);
-    let mut out: Vec<[f32; 3]> = (0..w.plots.len() as u32)
-        .filter_map(|plot| {
-            let k = kerb_at(&w.travel, &w.meta, home_way(w, plot)?, &[], &mouths)?;
+    let mut out: Vec<[f32; 3]> = kerbs
+        .map(|k| {
             let road = &g.roads[k.road as usize];
             let (c, r) = (road.at(k.s), crate::cars::right_of(road.tangent(k.s)));
             let m = g.point(k.mouth);
@@ -158,7 +157,7 @@ pub(super) fn find_bays(w: &World) -> Vec<[f32; 3]> {
             };
             let off = side
                 * (crate::cars::lane_on(road.width, road.kind) + crate::cars::park_shift(TAXI_WID));
-            Some([c[0] + r[0] * off, c[1] + r[1] * off, TAXI_LEN / 2.0])
+            [c[0] + r[0] * off, c[1] + r[1] * off, TAXI_LEN / 2.0]
         })
         .collect();
     out.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

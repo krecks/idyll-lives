@@ -83,9 +83,7 @@ export function swingGate(fences: Fences, gate: GateLeaf, open: number, towards:
  */
 export function regroundGates(fences: Fences, ground: (x: number, z: number) => number): void {
   const vb = fences.mesh.vertexBuffer;
-  const e = vb.format.elements.find((el) => el.name === pc.SEMANTIC_POSITION)!;
-  const copy = vb.lock();
-  const floats = copy instanceof ArrayBuffer ? new Float32Array(copy) : new Float32Array(copy.buffer, copy.byteOffset, copy.byteLength >> 2);
+  const { e, floats } = floatsOf(vb, pc.SEMANTIC_POSITION)!;
   const box = fences.mesh.aabb;
   let [lo, hi] = [box.getMin().y, box.getMax().y];
   // (The spans moved: first vertex, count.)
@@ -129,10 +127,9 @@ export function regroundGates(fences: Fences, ground: (x: number, z: number) => 
 
 /** A leaf's `values` (x, y, z a vertex, from vertex `first`) into `vb`'s copy of stream `semantic`, and that span alone sent up: not the whole town's gates. */
 function writeLeaf(vb: pc.VertexBuffer, semantic: string, first: number, values: Float32Array): void {
-  const e = vb.format.elements.find((el) => el.name === semantic);
-  if (!e) return;
-  const copy = vb.lock();
-  const floats = copy instanceof ArrayBuffer ? new Float32Array(copy) : new Float32Array(copy.buffer, copy.byteOffset, copy.byteLength >> 2);
+  const stream = floatsOf(vb, semantic);
+  if (!stream) return;
+  const { e, floats } = stream;
   const start = e.offset + first * e.stride;
   const n = values.length / 3;
   for (let v = 0; v < n; v++) {
@@ -142,4 +139,12 @@ function writeLeaf(vb: pc.VertexBuffer, semantic: string, first: number, values:
     floats[o + 2] = values[v * 3 + 2];
   }
   vb.unlock(start, (n - 1) * e.stride + 12);
+}
+
+/** `vb`'s stream `semantic` (null: it has none) and its copy, locked (`unlock` sends it up), as floats. */
+function floatsOf(vb: pc.VertexBuffer, semantic: string) {
+  const e = vb.format.elements.find((el) => el.name === semantic);
+  if (!e) return null;
+  const copy = vb.lock();
+  return { e, floats: copy instanceof ArrayBuffer ? new Float32Array(copy) : new Float32Array(copy.buffer, copy.byteOffset, copy.byteLength >> 2) };
 }

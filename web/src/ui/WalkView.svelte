@@ -1,10 +1,10 @@
 <script lang="ts">
   /** Walk mode (`game/walk.ts`): the crosshair F aims with, the keys, and the typed chat with a resident (the model answers). */
+  import { firstName } from '../talk/context';
   import { services } from './services';
   import { game } from './state.svelte';
 
-  const first = (id: number | null) => (game.roster.find((s) => s.id === id)?.name ?? '').split(' ')[0];
-  const other = $derived(first(game.talkWith));
+  const other = $derived(game.talkWith === null ? '' : firstName(game.talkWith));
 
   let lines = $state<{ who: string; text: string }[]>([]);
   let words = $state('');
@@ -30,7 +30,7 @@
       .slice(-8)
       .map((l) => `${l.who}: "${l.text}"`)
       .join('\n');
-    const me = first(game.selected);
+    const me = game.selected === null ? '' : firstName(game.selected);
     const them = other;
     lines = [...lines, { who: me, text: said }];
     words = '';

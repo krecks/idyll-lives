@@ -153,7 +153,7 @@ pub(super) fn wait_spot(travel: &crate::travel::Travel, stop: &Kerb) -> [f32; 2]
     let s = if end * way >= WAIT_ASIDE {
         stop.mouth.s + end
     } else {
-        stop.mouth.s + if off < 0.0 { -WAIT_ASIDE } else { WAIT_ASIDE }
+        stop.mouth.s + way * WAIT_ASIDE
     };
     let (c, t) = (road.at(s), road.tangent(s));
     let right = crate::cars::right_of(t);

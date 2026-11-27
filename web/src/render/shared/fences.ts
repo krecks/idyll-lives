@@ -52,7 +52,7 @@ export interface GateLeaf {
 }
 
 /** A gate's post in the fences' mesh: its corner (x, z), the ground it stands on (m), its vertices (`count` from `first`). */
-export interface GatePost {
+interface GatePost {
   x: number;
   z: number;
   y: number;

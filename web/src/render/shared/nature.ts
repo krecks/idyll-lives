@@ -21,7 +21,7 @@ import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../gam
 import { tuned } from '../tune';
 import { ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 import { townPaving } from './townPaving';
-import { shadeReach, type TexelRect } from './groundShade';
+import { rectBounds, shadeReach, type TexelRect } from './groundShade';
 import { CROP_LOOK, cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type Crop, type FieldCanvas, type FieldClip, type FieldPoint } from './farmland';
 
 /**
@@ -2472,10 +2472,7 @@ export function lawnChanges(was: WorldStructure, world: WorldStructure): TexelRe
   // Things: matched by id past the lists' unchanged ends; one moved, resized, or now before one it was after, both
   // where it was and where it is (the shade of two things over each other is laid in their order).
   const [a, b] = [was.objects, world.objects];
-  let s = 0;
-  while (s < a.length && s < b.length && a[s] === b[s]) s++;
-  let [ea, eb] = [a.length, b.length];
-  while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) [ea, eb] = [ea - 1, eb - 1];
+  const [s, ea, eb] = changedMiddle(a, b);
   const old = new Map<number, number>();
   for (let i = s; i < ea; i++) old.set(a[i].id, i);
   let last = -1;
@@ -2492,7 +2489,7 @@ export function lawnChanges(was: WorldStructure, world: WorldStructure): TexelRe
   }
   for (const j of old.values()) thing(a[j]);
   if (rects.length <= MOST_RECTS) return mergeRects(rects);
-  return [rects.reduce((r, q) => [Math.min(r[0], q[0]), Math.min(r[1], q[1]), Math.max(r[2], q[2]), Math.max(r[3], q[3])])];
+  return [rectBounds(rects)];
 }
 
 /** Whether a thing stands as it did, as far as the lawn goes (its kind, tiles, turn, size, offset, lift). */
@@ -2506,10 +2503,7 @@ function samePlace(a: ObjectPlacement, b: ObjectPlacement): boolean {
  */
 function changedKeys<T>(a: readonly T[], b: readonly T[], key: (t: T) => number, at: (t: T) => void): void {
   if (a === b) return;
-  let s = 0;
-  while (s < a.length && s < b.length && a[s] === b[s]) s++;
-  let [ea, eb] = [a.length, b.length];
-  while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) [ea, eb] = [ea - 1, eb - 1];
+  const [s, ea, eb] = changedMiddle(a, b);
   const count = new Map<number, { n: number; item: T }>();
   const tally = (t: T, by: number): void => {
     const k = key(t);
@@ -2521,6 +2515,15 @@ function changedKeys<T>(a: readonly T[], b: readonly T[], key: (t: T) => number,
   for (let i = s; i < ea; i++) tally(a[i], 1);
   for (let i = s; i < eb; i++) tally(b[i], -1);
   for (const c of count.values()) if (c.n) at(c.item);
+}
+
+/** Where `a` and `b` differ, past their ends that are the same objects: `a[s..ea]` and `b[s..eb]` (the ends not in). */
+function changedMiddle<T>(a: readonly T[], b: readonly T[]): [s: number, ea: number, eb: number] {
+  let s = 0;
+  while (s < a.length && s < b.length && a[s] === b[s]) s++;
+  let [ea, eb] = [a.length, b.length];
+  while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) [ea, eb] = [ea - 1, eb - 1];
+  return [s, ea, eb];
 }
 
 /** `rects` with those touching or overlapping merged into the rectangle round them. */

@@ -25,7 +25,7 @@ import { groundDepth, type WorldStructure } from '../../core/protocol';
 import { fillPoly } from '../../game/footprints';
 import { hash, smooth, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
-import type { TexelRect } from './groundShade';
+import { copyRows, rectBounds, type TexelRect } from './groundShade';
 
 /**
  * What goes into the map, each as a share of its channel's whole range (tone and dryness: of the way from
@@ -183,10 +183,10 @@ export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Arr
     const was = made && made.size === size ? made : undefined;
     bases.set(out, (made = { key, size, rects: new Set(world.plots.map(rectKey)), base: baseMap(world, tw, td, was) }));
   }
-  if (window) for (const [x0, z0, x1, z1] of window) for (let z = z0; z <= Math.min(z1, td - 1); z++) out.set(made.base.subarray((z * tw + x0) * 4, (z * tw + x1 + 1) * 4), (z * tw + x0) * 4);
+  if (window) copyRows(made.base, out, window, tw * 4);
   else out.set(made.base);
   // (Within the window, the box round it, if any: what stands further off than `far` tiles from it is passed over.)
-  const box = window?.reduce((b, r) => [Math.min(b[0], r[0]), Math.min(b[1], r[1]), Math.max(b[2], r[2]), Math.max(b[3], r[3])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const box = window && rectBounds(window);
   const far = (x0: number, z0: number, x1: number, z1: number): boolean => !!box && (x1 + 3 < box[0] || x0 - 3 > box[2] || z1 + 3 < box[1] || z0 - 3 > box[3]);
   const within = (x: number, z: number): boolean => !window || window.some((r) => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]);
   // (Never the outermost tiles: they stay as the land beyond the town.)

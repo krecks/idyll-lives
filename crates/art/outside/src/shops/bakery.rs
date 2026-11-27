@@ -266,7 +266,7 @@ pub fn bakery_case() -> Vec<Obj> {
                 } = f.at(x, deck + 0.006, 0.14);
                 let secs: Vec<Vec<P3>> = [(0.075, 0.0), (0.086, 0.028), (0.08, 0.03)]
                     .into_iter()
-                    .map(|(r, h)| fluted(r, bz + h, 14, 0.08, 3))
+                    .map(|(r, h)| fluted(r, bz + h, 14, 0.08, 3, 0.0))
                     .collect();
                 loft!(
                     format!("tart{i}"),
@@ -407,7 +407,7 @@ pub fn bakery_case() -> Vec<Obj> {
                     } = f.at(x + dx, 1.035, -0.24);
                     let secs: Vec<Vec<P3>> = [(0.022, 0.0), (0.03, 0.04)]
                         .into_iter()
-                        .map(|(r, h)| fluted(r, bz + h, 8, 0.12, 2))
+                        .map(|(r, h)| fluted(r, bz + h, 8, 0.12, 2, 0.0))
                         .collect();
                     loft!(
                         format!("cupcake{i}{j}"),

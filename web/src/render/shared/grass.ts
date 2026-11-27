@@ -21,7 +21,7 @@
 import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { RGB } from './environment';
 import { lawnMap } from './lawn';
-import { updateGroundShade, type TexelRect } from './groundShade';
+import { rectBounds, tileTexels, updateGroundShade, type TexelRect } from './groundShade';
 import { bareTiles, lawnMask, splitHalf, WIND, type LawnChange, type LawnMask } from './nature';
 import { fbm, smoothstep } from '../../game/noise';
 
@@ -322,7 +322,7 @@ export function townGrass(field: GrassField, world: WorldStructure, mask: LawnMa
   // What the grass is like, tile by tile (its tone, worn earth, mown or rough).
   field.lawn = lawnMap(world, bare, field.lawn, rects);
   // The shade on the ground round what stands on it.
-  const shaded = updateGroundShade(world, n, field.shade, rects && rects.map((r): TexelRect => [r[0] * n, r[1] * n, (r[2] + 1) * n - 1, (r[3] + 1) * n - 1]));
+  const shaded = updateGroundShade(world, n, field.shade, rects && rects.map((r) => tileTexels(r, n)));
   field.shade = shaded.shade;
   if (rects && !rects.length) return { tiles: [], shade: shaded.changed };
   const tiles = rects ?? [[0, 0, tw - 1, td - 1]];
@@ -368,7 +368,7 @@ function wallSegments(world: WorldStructure, tw: number, td: number, rects: read
     }
   };
   // (Only walls touching the box round `rects`.)
-  const [bx0, bz0, bx1, bz1] = rects.reduce((b, r) => [Math.min(b[0], r[0]), Math.min(b[1], r[1]), Math.max(b[2], r[2]), Math.max(b[3], r[3])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const [bx0, bz0, bx1, bz1] = rectBounds(rects);
   // (The ground storey's only: the other storeys' rows follow its, and their first row's walls would clear its far edge.)
   for (const e of world.walls) {
     if (e.x < bx0 - 1 || e.x > bx1 + 1 || e.z < bz0 - 1 || e.z > bz1 + 1) continue;

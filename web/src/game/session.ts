@@ -25,6 +25,7 @@ import { threadStats } from '../debug/threads';
 import { DEVLOG, devlog, devlogNextSample, devlogPaused, devlogSlowFrame, renderSample, SAMPLE_MS, SLOW_FRAME_MS } from '../debug/devlog';
 import type { CameraPose, Renderer, SimLook, WallMode } from '../render/types';
 import { carRowIsTaxi } from '../render/shared/cars';
+import { distanceToRect } from '../render/shared/chunks';
 import { WARM_LOTS, warmLots } from '../render/shared/focus';
 import { townView, type TownGoTo } from '../render/shared/townView';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
@@ -1878,7 +1879,7 @@ async function openSession(
       if (placement) {
         // (The nearest point of its footprint: a sofa or a bed is reached from any side of it.)
         const [w, d] = placedSize(content, placement);
-        if (near(Math.max(placement.x, Math.min(placement.x + w, me.x)), Math.max(placement.z, Math.min(placement.z + d, me.z)))) return openMenu(placement.id, x, y);
+        if (distanceToRect(me.x, me.z, placement.x, placement.z, w, d) <= ARM) return openMenu(placement.id, x, y);
       }
       toast('Nothing to use here.', 1500);
     },

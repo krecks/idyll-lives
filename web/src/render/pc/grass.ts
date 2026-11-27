@@ -14,6 +14,7 @@
 
 import { daylightByDefault } from './daylight';
 import * as pc from './engine';
+import { uploadTexels } from './poseTexture';
 import { withoutContact } from './post';
 import { Instances, type InstanceStream } from './instancing';
 import { GAME_FRONT_FACE, MaterialLibrary } from './materials';
@@ -22,7 +23,7 @@ import { GRASS_SHADER } from './shaders/grass';
 import type { WorldStructure } from '../../core/protocol';
 import { identity } from '../shared/math';
 import { GRASS, GRASS_PUSHERS, grassLod, gustNoise, townGrass, type GrassField, type GrassPusher, type GrassQuality } from '../shared/grass';
-import type { TexelRect } from '../shared/groundShade';
+import { copyRows, rectBounds, tileTexels, type TexelRect } from '../shared/groundShade';
 import type { LawnChange, LawnMask } from '../shared/nature';
 
 export type { GrassPusher, GrassQuality } from '../shared/grass';
@@ -311,14 +312,14 @@ export class Grass {
     } else {
       const n = GRASS.townTexels;
       // The texels whose mask or shade changed (a thing bought: a few metres of a big world's millions).
-      const rects = change.tiles && change.shade ? [...change.shade, ...change.tiles.map((r): TexelRect => [r[0] * n, r[1] * n, (r[2] + 1) * n - 1, (r[3] + 1) * n - 1])] : undefined;
+      const rects = change.tiles && change.shade ? [...change.shade, ...change.tiles.map((r) => tileTexels(r, n))] : undefined;
       if (!rects) {
         this.townTexels(this.town.lock() as Uint8Array, rects);
         this.town.unlock();
       } else if (rects.length) {
         // (Only their bounds up to the GPU: PlayCanvas's `unlock` sends the whole level, 13 MB on a 640 m world.)
         const level = this.townTexels(this.town.getSource() as unknown as Uint8Array, rects);
-        uploadRect(this.town, level, rectBounds(rects), 2);
+        if (!uploadTexels(this.town, level, rectBounds(rects), 2, 'RG', 'UNSIGNED_BYTE')) this.town.upload();
       }
       // The lawn's map, whole (its mips are made from it), and only when it changed (where it could have, `change.tiles`):
       // a thing bought indoors leaves it be.
@@ -461,23 +462,6 @@ export class Grass {
   }
 }
 
-/** The rectangle round all of `rects` (texels, last ones included). */
-function rectBounds(rects: readonly TexelRect[]): TexelRect {
-  const out: TexelRect = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const [i0, j0, i1, j1] of rects) {
-    out[0] = Math.min(out[0], i0);
-    out[1] = Math.min(out[1], j0);
-    out[2] = Math.max(out[2], i1);
-    out[3] = Math.max(out[3], j1);
-  }
-  return out;
-}
-
-/** `from`'s bytes within `tiles` (rectangles of `row` bytes a row, 4 a tile, last ones included) into `to`. */
-function copyRows(from: Uint8Array, to: Uint8Array, tiles: readonly TexelRect[], row: number): void {
-  for (const [x0, z0, x1, z1] of tiles) for (let z = z0; z <= z1; z++) to.set(from.subarray(z * row + x0 * 4, z * row + (x1 + 1) * 4), z * row + x0 * 4);
-}
-
 /** Whether `a` and `b` hold the same bytes (only within `tiles` if given: rectangles of `row` bytes a row, 4 a tile, last ones included). */
 function sameBytes(a: Uint8Array, b: Uint8Array, tiles: readonly TexelRect[] | null, row: number): boolean {
   if (a.length !== b.length) return false;
@@ -485,48 +469,4 @@ function sameBytes(a: Uint8Array, b: Uint8Array, tiles: readonly TexelRect[] | n
     for (let z = z0; z <= z1; z++) for (let i = z * row + x0 * 4; i < z * row + (x1 + 1) * 4; i++) if (a[i] !== b[i]) return false;
   }
   return true;
-}
-
-/**
- * What the rectangle upload reaches inside PlayCanvas 2.23 (pinned; `check:chunks` checks the names, as for
- * `poseTexture.ts`, whose band upload this follows): the WebGPU device's `GPUDevice`, the texture's `GPUTexture`
- * and GL object, and whether it is on the GPU yet.
- */
-interface TextureInternals {
-  impl: { gpuTexture?: GPUTexture | null; _glTexture?: WebGLTexture | null };
-  _needsUpload: boolean;
-}
-
-/**
- * Texels `rect` (last ones included) of `texture`'s level 0 (no mips), `data` (its CPU copy, `bytes` a texel), sent
- * to the GPU alone: WebGPU's `GPUQueue.writeTexture` (no row alignment asked of a queue write), WebGL2's
- * `texSubImage2D` with the copy's row length. A texture not on the GPU yet is sent whole by its first draw.
- * Only RG8 on WebGL2 (the town's mask): its format and type are named here.
- */
-function uploadRect(texture: pc.Texture, data: Uint8Array, rect: TexelRect, bytes: number): void {
-  const t = texture as pc.Texture & TextureInternals;
-  if (t._needsUpload) return;
-  const [i0, j0, i1, j1] = rect;
-  const [w, h] = [i1 - i0 + 1, j1 - j0 + 1];
-  const offset = (j0 * texture.width + i0) * bytes;
-  const device = texture.device;
-  if (device.isWebGPU) {
-    const gpu = t.impl.gpuTexture;
-    // SAFETY: PlayCanvas 2.23's WebGPU device keeps its `GPUDevice` in `wgpu` (tools/render/chunks.json).
-    if (gpu) (device as unknown as { wgpu: GPUDevice }).wgpu.queue.writeTexture({ texture: gpu, origin: [i0, j0, 0] }, data, { offset, bytesPerRow: texture.width * bytes, rowsPerImage: h }, { width: w, height: h });
-    else texture.upload();
-    return;
-  }
-  if (!(device instanceof pc.WebglGraphicsDevice) || !t.impl._glTexture) return void texture.upload();
-  // SAFETY: bound through the device's texture-unit cache and unpack state, so PlayCanvas's record stays true; the row
-  // length, which it never sets, is put back to 0 (tools/render/chunks.json).
-  device.activeTexture(0);
-  device.bindTexture(texture);
-  device.setUnpackFlipY(false);
-  device.setUnpackPremultiplyAlpha(false);
-  device.setUnpackAlignment(1);
-  const g = device.gl;
-  g.pixelStorei(g.UNPACK_ROW_LENGTH, texture.width);
-  g.texSubImage2D(g.TEXTURE_2D, 0, i0, j0, w, h, g.RG, g.UNSIGNED_BYTE, data, offset);
-  g.pixelStorei(g.UNPACK_ROW_LENGTH, 0);
 }

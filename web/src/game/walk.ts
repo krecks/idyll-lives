@@ -55,7 +55,7 @@ export function inFront(me: { x: number; z: number }, heading: number, x: number
   return d <= reach && (d < 0.3 || (dx * pmath.cos(heading) + dz * pmath.sin(heading)) / d >= pmath.cos(Math.PI / 6));
 }
 
-export interface WalkDeps {
+interface WalkDeps {
   bridge: SimBridge;
   renderer: Renderer;
   /** F: use or talk to what's at this point of the screen (CSS px). */

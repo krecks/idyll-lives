@@ -1189,7 +1189,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const known = this.props.built(key);
     if (known !== undefined) return known;
     // (Built, paused: those holding it are posed again, in its matrices: `stillKey`.)
-    void this.props.get(key, () => this.view.buildProp(key)).then(() => this.stillKey++);
+    void this.props.get(key, () => this.view.buildProp(key).finally(() => this.stillKey++));
     return null;
   }
 

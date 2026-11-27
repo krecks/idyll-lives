@@ -579,16 +579,11 @@ export class Street {
     if (!this.instancesDue) return;
     this.instancesDue = false;
     const batchesSpan = perfStart('street: batches');
-    // Every chunk's instances of a model, one list a model (chunk by chunk, in id order), and the chunks' own lists it
-    // was made from (`Placed.from`).
+    // Every chunk's lists of a model's instances (chunk by chunk, in id order: `Placed.from`), the foliage's first.
     const order = [...this.chunks.keys()].sort((a, b) => a - b);
-    const batches = new Map<string, Inst[]>((Object.values(FOLIAGE) as string[]).map((k) => [k, []]));
-    const from = new Map<string, Inst[][]>();
+    const from = new Map<string, Inst[][]>((Object.values(FOLIAGE) as string[]).map((k) => [k, []]));
     for (const id of order) {
       for (const [k, items] of this.chunks.get(id)!.shape.batches) {
-        let list = batches.get(k);
-        if (!list) batches.set(k, (list = []));
-        for (const i of items) list.push(i);
         if (!items.length) continue;
         let lists = from.get(k);
         if (!lists) from.set(k, (lists = []));
@@ -596,17 +591,16 @@ export class Street {
       }
     }
     // Models from the last build that aren't used now are hidden.
-    for (const [k, p] of this.placed) if (!batches.get(k)?.length) this.hide(p);
-    this.used = new Set([...batches].filter(([, items]) => items.length).map(([k]) => k));
+    for (const [k, p] of this.placed) if (!from.get(k)?.length) this.hide(p);
+    this.used = new Set([...from].filter(([, lists]) => lists.length).map(([k]) => k));
     // (Their far versions too, where drawn: a file of one that comes builds it again, `invalidate`. Here those the
     // last build drew, while this one awaits; `instances` adds those it draws now.)
     for (const [k, p] of this.placed) if (p.far && this.used.has(k)) this.used.add(farKey(k));
-    this.plants = [...batches].flatMap(([k, items]) => items.map(([x, z, s, sy, yaw, y = 0]): StreetPlant => ({ key: k, x, y, z, sx: s, sy, sz: k === FOLIAGE.hedge ? 1 : s, yaw })));
+    this.plants = [...from].flatMap(([k, lists]) => lists.flat().map(([x, z, s, sy, yaw, y = 0]): StreetPlant => ({ key: k, x, y, z, sx: s, sy, sz: k === FOLIAGE.hedge ? 1 : s, yaw })));
     let kept = 0;
-    for (const [k, items] of batches) {
-      if (!items.length) continue;
+    for (const [k, lists] of from) {
+      if (!lists.length) continue;
       // (Its copies as they were, from the same template: left as written.)
-      const lists = from.get(k)!;
       const p = this.placed.get(k);
       if (p && sameLists(p.from, lists) && this.templates.built(k) === p.template && (!p.far || this.templates.built(farKey(k)) === p.far)) {
         kept++;
@@ -617,7 +611,7 @@ export class Street {
         this.instancesDue = true;
         return;
       }
-      await perfTimeAsync(`street: batch ${k}`, () => this.instances(k, items, k === FOLIAGE.hedge, castsShadow(k), town.footprints.get(k), town.standIns.get(k), pace));
+      await perfTimeAsync(`street: batch ${k}`, () => this.instances(k, lists.flat(), k === FOLIAGE.hedge, castsShadow(k), town.footprints.get(k), town.standIns.get(k), pace));
       const now = this.placed.get(k);
       if (now) now.from = lists;
     }
@@ -1065,7 +1059,7 @@ export class Street {
       const panes = mine.filter((h) => h.up === lit).map((h) => paneData(h.panes));
       for (const l of lights) for (let k = 0; k < l.panes.length; k++) if (l.on[k] === lit && !l.panes[k].empty) panes.push(paneData(l.panes[k]));
       const data = concatMeshData(panes);
-      const part = this.house.planner.neighbourPanes([], lit);
+      const part = this.house.planner.neighbourPanes(lit);
       const entity = data && this.house.drawData(part, data, this.root);
       if (!entity) continue;
       this.dress(entity, false);
@@ -1286,7 +1280,7 @@ export class Street {
   }
 }
 
-/** Each set of panes' vertex arrays as the neighbours' glass draws them (`HousePlanner.neighbourPanes`: in its one colour). */
+/** Each set of panes' vertex arrays as the neighbours' glass draws them (`drawWindows`: in its one colour). */
 const paneArrays = new WeakMap<Geo, MeshData>();
 
 /** A set of panes' vertex arrays (`paneArrays`): made once, as the glass is drawn again whenever a light goes on or off. */

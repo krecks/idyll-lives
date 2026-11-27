@@ -635,7 +635,7 @@ function mergeSilhouettes(into: SilhouettePlan, s: SilhouettePlan, dy = 0): void
 /** How far either side of a traffic light's pole along the kerb nothing else stands (m: `WorldStructure.lightPoles`). */
 export const POLE_CLEAR = 1.5;
 /** How far past either end of a taxi bay along the kerb nothing stands (m: `WorldStructure.taxiBays`, where a work taxi parks up on the pavement). */
-export const BAY_CLEAR = 0.5;
+const BAY_CLEAR = 0.5;
 
 /** A part of `TownStreet.layoutKey`, strung once per object. */
 const keys = new WeakMap<object, string>();
@@ -870,6 +870,33 @@ export class TownStreet {
   /** What the street before handed on (`inherit`): its street's own, and how many road sides' kerbs (for the perf log and the tests). */
   readonly handedOn = { statics: false, kerbs: 0 };
 
+  /** The spans along `kerb` (road `r`'s side `side`) kept clear of what stands at the kerb (`planKerb`, `rankSpot`). */
+  private kerbMouths(r: number, side: 1 | -1, kerb: Kerb): [number, number][] {
+    const world = this.world;
+    // Mouths of garden paths and driveways on this side: keep them clear (a driveway's wider where
+    // the world's cars come and go: they swing across the sidewalk either side of it, `CAR_SWING`).
+    const mouths: [number, number][] = [];
+    for (const { p } of this.meeting.filter((m) => m.road === r && m.side === side)) {
+      const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
+      // (`world.cars` there or not, as `layoutKey` keys it: a car bought later finds the mouths clear.)
+      const swing = world.cars && Math.min(p.w, p.d) >= DRIVEWAY_MIN_WIDTH ? CAR_SWING : 0;
+      mouths.push([Math.min(...corners) - swing, Math.max(...corners) + swing]);
+    }
+    // The traffic lights' poles on this side (sim-core `traffic::Signal`): nothing else stands there.
+    for (const [x, z] of world.lightPoles ?? []) {
+      const near = this.index.nearest(x, z, 8);
+      if (near?.road !== r || near.side !== side) continue;
+      const s = kerb.along(x, z);
+      mouths.push([s - POLE_CLEAR, s + POLE_CLEAR]);
+    }
+    // The taxi bays on this side (sim-core `taxi::taxi_bays`): a work taxi parks up on the pavement there.
+    for (const [x, z, half] of this.baysOn(r, side)) {
+      const s = kerb.along(x, z);
+      mouths.push([s - half - BAY_CLEAR, s + half + BAY_CLEAR]);
+    }
+    return mouths;
+  }
+
   /** The taxi bays on road `r`'s side `side` (grouped once: a town has one by nearly every house). */
   private baysOn(r: number, side: 1 | -1): [number, number, number][] {
     const of = this.world.taxiBays;
@@ -996,23 +1023,8 @@ export class TownStreet {
     if (!(cs > 1 && cs < kerb.length - 1 && kerb.open(cs))) return null;
     // (Clear of the garden paths' and driveways' mouths and the light poles by 1.6 m, as `planKerb` keeps
     // its kerbside things: what it checks again where it plans the rank.)
-    const world = this.world;
     const blocked = (a: number, b: number) => cs > a - 1.6 && cs < b + 1.6;
-    for (const { p } of this.meeting.filter((m) => m.road === r && m.side === side)) {
-      const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
-      const swing = world.cars && Math.min(p.w, p.d) >= DRIVEWAY_MIN_WIDTH ? CAR_SWING : 0;
-      if (blocked(Math.min(...corners) - swing, Math.max(...corners) + swing)) return null;
-    }
-    for (const [x, z] of world.lightPoles ?? []) {
-      const near = this.index.nearest(x, z, 8);
-      if (near?.road !== r || near.side !== side) continue;
-      const at = kerb.along(x, z);
-      if (blocked(at - POLE_CLEAR, at + POLE_CLEAR)) return null;
-    }
-    for (const [x, z, half] of this.baysOn(r, side)) {
-      const at = kerb.along(x, z);
-      if (blocked(at - half - BAY_CLEAR, at + half + BAY_CLEAR)) return null;
-    }
+    if (this.kerbMouths(r, side, kerb).some(([a, b]) => blocked(a, b))) return null;
     const [cx, cz] = kerb.at(cs, -RANK_BACK);
     const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
     if (this.index.onRoad(cx, cz, 1, r) || !this.free(shelter, 0.2, NO_FOCUS)) return null;
@@ -1717,27 +1729,7 @@ export class TownStreet {
         return { L, kind: this.kindOf(L, focus), s0: Math.min(a, b), s1: Math.max(a, b), door: L.door === null ? null : along(at(L.door)), drive };
       })
       .sort((a, b) => a.s0 - b.s0);
-    // Mouths of garden paths and driveways on this side: keep them clear (a driveway's wider where
-    // the world's cars come and go: they swing across the sidewalk either side of it, `CAR_SWING`).
-    const mouths: [number, number][] = [];
-    for (const { p } of this.meeting.filter((m) => m.road === r && m.side === side)) {
-      const corners = [[p.x, p.z], [p.x + p.w, p.z], [p.x, p.z + p.d], [p.x + p.w, p.z + p.d]].map(([x, z]) => kerb.along(x, z));
-      // (`world.cars` there or not, as `layoutKey` keys it: a car bought later finds the mouths clear.)
-      const swing = world.cars && Math.min(p.w, p.d) >= DRIVEWAY_MIN_WIDTH ? CAR_SWING : 0;
-      mouths.push([Math.min(...corners) - swing, Math.max(...corners) + swing]);
-    }
-    // The traffic lights' poles on this side (sim-core `traffic::Signal`): nothing else stands there.
-    for (const [x, z] of world.lightPoles ?? []) {
-      const near = index.nearest(x, z, 8);
-      if (near?.road !== r || near.side !== side) continue;
-      const s = kerb.along(x, z);
-      mouths.push([s - POLE_CLEAR, s + POLE_CLEAR]);
-    }
-    // The taxi bays on this side (sim-core `taxi::taxi_bays`): a work taxi parks up on the pavement there.
-    for (const [x, z, half] of this.baysOn(r, side)) {
-      const s = kerb.along(x, z);
-      mouths.push([s - half - BAY_CLEAR, s + half + BAY_CLEAR]);
-    }
+    const mouths = this.kerbMouths(r, side, kerb);
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
     const used: number[] = [];
     const near = (s: number, m: number) => used.some((u) => Math.abs(u - s) < m);

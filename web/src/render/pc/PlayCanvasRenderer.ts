@@ -532,6 +532,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private worldHaze: LandHaze | null = null;
   private worldHazeFor: { scape: Landscape | null; version: number } = { scape: null, version: -1 };
   private worldHazeShown = false;
+  /** The game's landscape and its `landVersion` what stands on its surface was last put on (`regroundPlaced`). */
+  private readonly groundedFor: { scape: Landscape | null; version: number } = { scape: null, version: -2 };
   private townShot: TownShot | null = null;
   private townHighlight: LotHighlight | null = null;
   private townWorld: WorldStructure | null = null;
@@ -773,8 +775,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Whether the camera has caught up with the resident it follows (`keepUp`: then it stays near them). */
   private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
-  /** Walk mode: the resident row seen from (their eyes), the way they look (heading in game x/z, pitch up; rad). */
-  private walk: { index: number; heading: number; pitch: number; eye: { x: number; y: number; z: number }; seen: boolean } | null = null;
+  /** Walk mode (the resident row seen from, their eyes: `characters.unseen`): the way they look (heading in game x/z, pitch up; rad). */
+  private walk: { heading: number; pitch: number; eye: { x: number; y: number; z: number }; seen: boolean } | null = null;
   private framedView = '';
   /**
    * Whether a resident at ground point (x, z) on storey `k` is drawn: on the viewed lot (and just round
@@ -1029,10 +1031,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`. On a land the town
     // follows, on its roads and its lots' pads too.)
     this.characters.setGround((x, z) => this.lot.landscape?.heightAt(x, z) ?? 0);
-    // (The cars, the parked rides and the traffic lights only on a land the town follows: elsewhere at 0, as ever.)
-    this.cars.setGround(this.builtGround);
-    this.parkedRides.setGround(this.builtGround);
-    this.signals.setGround(this.builtGround);
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.lotRoot.addChild(this.storeyLayer);
@@ -1937,7 +1935,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.characters.unseen = index ?? -1;
     this.orbit.enabled = index === null;
     const heading = this.orbit.alpha + Math.PI;
-    this.walk = index === null ? null : { index, heading, pitch: 0, eye: { x: 0, y: 0, z: 0 }, seen: false };
+    this.walk = index === null ? null : { heading, pitch: 0, eye: { x: 0, y: 0, z: 0 }, seen: false };
     if (index === null) this.orbit.radius = Math.max(this.orbit.radius, 6);
     return heading;
   }
@@ -1952,7 +1950,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Walk mode: the eye where the walker's head is (the orbit's target goes with it, for what's built and lit round it). */
   private steerWalk(): void {
     const w = this.walk!;
-    w.seen = this.simHead(w.index, w.eye);
+    w.seen = this.simHead(this.characters.unseen, w.eye);
     if (!w.seen) return;
     w.eye.y -= 0.12;
     this.orbit.target.x = w.eye.x;
@@ -2284,10 +2282,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // landscape solves its surface again for this world, the one the street stands on too, and the land drawn again where
     // it moved.)
     const shaped = this.lot.landscape;
-    const taken = shaped?.heightField ? shaped.takeRoads(world) : [];
     // (Solved there and then: what was placed on the surface before, the other lots' gates and maybe the traffic
-    // lights' poles, stands on it again. The sun's shadows are taken again once everyone is home, `buildSims`.)
-    if (taken.length) this.regroundPlaced();
+    // lights' poles, stands on it again with the next frame, `regroundPlaced`. The sun's shadows are taken again once
+    // everyone is home, `buildSims`.)
+    const taken = shaped?.heightField ? shaped.takeRoads(world) : [];
     if (shaped && taken.length) void this.queueLand('land: roads taken', async () => {
       // (Behind the world's build and the warm-up, not in their way: on the way into a game, the land moved by a few
       // centimetres round its junctions.)
@@ -3121,6 +3119,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : (curr[layout.header.minute] ?? this.lastMinute);
     this.lastMinute = minute;
     this.lastWeekday = (Math.max(1, curr[layout.header.day] | 0) - 1) % 7;
+    this.regroundPlaced();
     if (this.townMode) return;
     // Which flats of the building in view may be shown open, asked again a few times a second.
     if (this.viewFlats.length && this.flatsOpen && frame.now - this.flatsAskedAt >= FLATS_ASK_MS) {
@@ -3882,15 +3881,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /**
    * The game's land shaped (a stroke done, undone or redone): the street stands on the landscape's surface (one surface
    * for the land and what stands on it) and plans again the chunks whose roads or lots moved; the viewed lot follows its
-   * pad (the datum); the traffic lights, the cars, the parked rides and the gates stand on it again; the still casters' shadows
-   * are taken again.
+   * pad (the datum); the still casters' shadows are taken again (the traffic lights, the cars, the parked rides and the
+   * gates stand on it again with the next frame, `regroundPlaced`).
    */
   private landUnderTown(scape: Landscape): void {
     const surface = scape.surface;
     this.sunShadows.moved();
     if (!surface || !this.builtWorld) return;
     if (this.street.landMoved(surface)) this.streamStreet();
-    this.regroundPlaced();
     const view = this.view;
     const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     if (at < 0) return;
@@ -3901,9 +3899,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * Those that look the ground up only when placed stand on the surface again (solved again: a land stroke, a world's
-   * roads taken on): the traffic lights' poles, the cars standing, the parked rides, the other lots' gates.
+   * roads taken on; once a frame, `update`, as the game's landscape or its `landVersion` changes): the traffic lights'
+   * poles, the cars standing, the parked rides, the other lots' gates. (Only on a land the town follows: elsewhere at 0,
+   * as ever.)
    */
   private regroundPlaced(): void {
+    const scape = this.lot.landscape;
+    const version = scape?.landVersion ?? -1;
+    if (this.groundedFor.scape === scape && this.groundedFor.version === version) return;
+    [this.groundedFor.scape, this.groundedFor.version] = [scape, version];
     this.signals.setGround(this.builtGround);
     this.cars.setGround(this.builtGround);
     this.parkedRides.setGround(this.builtGround);

@@ -44,18 +44,35 @@ pub(super) fn kerb_stamp(w: &World) -> u64 {
     h.finish().max(1)
 }
 
-/// Finds the stand (`stop_for`) of every household's house not yet found (all again when the
-/// driveways or the network have changed since, `kerb_stamp`).
+impl Kerbs {
+    /// Every plot's stand (`kerb_at`, no other taxi about) and the taxi bays from them
+    /// (`find_bays`), for the town as it is (`stamp`: `kerb_stamp`).
+    pub(super) fn find(w: &World, stamp: u64) -> Kerbs {
+        let mouths = drive_mouths(w);
+        let plots: Vec<_> = (0..w.plots.len() as u32)
+            .map(|plot| {
+                let door = w.plots[plot as usize].arrival_point().map(f32::to_bits);
+                let kerb = home_way(w, plot)
+                    .and_then(|way| kerb_at(&w.travel, &w.meta, way, &[], &mouths));
+                Some((door, kerb))
+            })
+            .collect();
+        let bays = find_bays(w, plots.iter().flatten().filter_map(|p| p.1));
+        Kerbs {
+            stamp,
+            mouths,
+            plots,
+            bays,
+        }
+    }
+}
+
+/// Finds the stand (`stop_for`) of every household's house not yet found (every plot's again
+/// when the driveways or the network have changed since, `kerb_stamp`).
 pub(super) fn warm_kerbs(w: &mut World) {
     let stamp = kerb_stamp(w);
     if w.taxis.kerbs.stamp != stamp {
-        let bays = find_bays(w);
-        w.taxis.kerbs = Kerbs {
-            stamp,
-            mouths: drive_mouths(w),
-            plots: Vec::new(),
-            bays,
-        };
+        w.taxis.kerbs = Kerbs::find(w, stamp);
     }
     for h in 0..w.households.len() {
         let Some(plot) = w.households[h].plot else {

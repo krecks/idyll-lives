@@ -75,16 +75,12 @@ pub(crate) fn leisure_eta_via(
         }
     };
     let ride = here.eta(travel, from, (plot, door), Mode::Car, walk);
-    let off_at = |mode: Mode| match plot {
-        Some(plot) => travel.door_entry(plot, door, mode),
-        None => travel.entry(door, mode),
-    };
     // (`kerb_walks`, by those entries.)
     let to_road = |p: [f32; 2], entry: Option<crate::travel::RoadPoint>| {
         entry.map_or(0.0, |r| crate::travel::dist(p, travel.graph.point(r)))
     };
     let kerbs = (to_road(from, here.on(travel, from, Mode::Car))
-        + to_road(door, off_at(Mode::Car)))
+        + to_road(door, travel.door_entry(plot, door, Mode::Car)))
         * KERB_WINDING
         / walk.max(0.1)
         + LEISURE_KERBS;
@@ -585,7 +581,7 @@ pub(crate) fn back_minutes(
         // noted, `Travel::door_entry`.)
         let car = crate::travel::Mode::Car;
         let on = ctx.travel.entry(pos, car);
-        let off = ctx.travel.door_entry(home, door, car);
+        let off = ctx.travel.door_entry(Some(home), door, car);
         let walk = sim.walk_per_minute(ctx.content);
         BACK_SLACK as f32 * crate::MINUTES_PER_TICK
             + ctx.travel.eta_via(pos, door, car, walk, || on, || off) * crate::travel::DRIVE_MINUTES
