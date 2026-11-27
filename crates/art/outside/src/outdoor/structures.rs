@@ -7,10 +7,23 @@ use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fsphere, settle};
 
-// --- O9: the carport: four posts, two beams and the rafters under its roof --------------------------------
+// --- O9: the carport: four posts, eaves beams, two trusses and the rafters under a pitched roof -----------------
+/// The roof's pitch (degrees from level), each side of the ridge.
+const CARPORT_PITCH: f64 = 20.0;
+
 pub fn carport() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    let (w, d, h) = (2.90, 4.90, 2.35);
+    let (sin, cos) = (
+        math::sin(CARPORT_PITCH.to_radians()),
+        math::cos(CARPORT_PITCH.to_radians()),
+    );
+    // posts 2.15 m to the eaves beams' underside (a car's clear height), the beams 0.18 deep on them
+    let (px, pz, h, beam) = (1.28, 2.30, 2.15, 0.18);
+    // the rafters' underside sits 2 cm into the beams' top at the posts' line
+    let ridge = h + beam - 0.02 + px * sin / cos;
+    // a point in one slope (`sx` the side): `s` down the slope from the ridge, `n` out of the rafters' top
+    let at = |sx: f64, s: f64, n: f64| (sx * (s * cos + n * sin), ridge - s * sin + n * cos);
+    let reach = 1.43 / cos; // the slope's length out to the eaves, the sheet 2 cm in from the footprint's edge
     for (i, (sx, sz)) in [(-1.0f64, -1.0f64), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
         .into_iter()
         .enumerate()
@@ -21,48 +34,139 @@ pub fn carport() -> Vec<Obj> {
             0.14,
             h,
             0.14,
-            (sx * (w / 2.0 - 0.07), h / 2.0, sz * (d / 2.0 - 0.07)),
+            (sx * px, h / 2.0, sz * pz),
             M.struct_timber,
             bevel = 0.008
+        );
+        // a knee brace from the post to the beam, inwards along the length
+        fbox!(
+            f,
+            format!("brace{i}"),
+            0.08,
+            0.62,
+            0.08,
+            (sx * px, h - 0.22, sz * (pz - 0.22)),
+            M.struct_timber,
+            rot = (-sz * 45.0, 0.0, 0.0),
+            bevel = 0.005
         );
     }
     for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
         fbox!(
             f,
             format!("beam{i}"),
-            0.12,
-            0.20,
-            d,
-            (sx * (w / 2.0 - 0.06), h + 0.10, 0),
+            0.14,
+            beam,
+            4.90,
+            (sx * px, h + beam / 2.0, 0),
             M.struct_timber,
             bevel = 0.008
         );
     }
-    for i in 0..5 {
-        let z = -d / 2.0 + 0.20 + i as f64 * (d - 0.40) / 4.0;
+    // a truss over each pair of posts: the tie beam across between the eaves beams and a king post up to the ridge
+    for (i, sz) in [-1.0f64, 1.0].into_iter().enumerate() {
         fbox!(
             f,
-            format!("rafter{i}"),
-            w,
-            0.12,
+            format!("tie{i}"),
+            2.0 * px - 0.14,
+            0.14,
+            0.08,
+            (0, h + beam - 0.07, sz * pz),
+            M.struct_timber,
+            bevel = 0.006
+        );
+        let top = ridge - 0.10;
+        let low = h + beam;
+        fbox!(
+            f,
+            format!("king{i}"),
             0.10,
-            (0, h + 0.26, z),
+            top - low,
+            0.08,
+            (0, (top + low) / 2.0, sz * pz),
             M.struct_timber,
             bevel = 0.006
         );
     }
     fbox!(
         f,
-        "roof",
-        w + 0.10,
-        0.05,
-        d + 0.10,
-        (0, h + 0.345, 0),
+        "ridge",
+        0.06,
+        0.20,
+        4.96,
+        (0, ridge - 0.10, 0),
+        M.struct_timber,
+        bevel = 0.006
+    );
+    for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+        let tilt = (0.0, -sx * CARPORT_PITCH, 0.0);
+        // the rafters, 0.6 m apart, notched over the ridge beam and the eaves beam
+        for k in 0..9 {
+            let z = -2.40 + k as f64 * 0.60;
+            let (x, y) = at(sx, reach / 2.0 + 0.02, -0.06);
+            fbox!(
+                f,
+                format!("rafter{i}{k}"),
+                reach - 0.02,
+                0.12,
+                0.05,
+                (x, y, z),
+                M.struct_timber,
+                rot = tilt,
+                bevel = 0.005
+            );
+        }
+        // the barge boards up each gable's edge, the fascia along the eaves, the roof sheet over them all
+        for (k, sz) in [-1.0f64, 1.0].into_iter().enumerate() {
+            let (x, y) = at(sx, reach / 2.0, -0.04);
+            fbox!(
+                f,
+                format!("barge{i}{k}"),
+                reach + 0.02,
+                0.18,
+                0.03,
+                (x, y, sz * 2.465),
+                M.struct_timber,
+                rot = tilt,
+                bevel = 0.006
+            );
+        }
+        let (x, y) = at(sx, reach, -0.05);
+        fbox!(
+            f,
+            format!("fascia{i}"),
+            0.03,
+            0.16,
+            4.96,
+            (x + sx * 0.015, y, 0),
+            M.struct_timber,
+            bevel = 0.006
+        );
+        let (x, y) = at(sx, reach / 2.0 + 0.01, 0.015);
+        fbox!(
+            f,
+            format!("roof{i}"),
+            reach + 0.06,
+            0.03,
+            5.00,
+            (x, y, 0),
+            M.struct_roof,
+            rot = tilt,
+            bevel = 0.006
+        );
+    }
+    fbox!(
+        f,
+        "ridgeCap",
+        0.20,
+        0.04,
+        5.00,
+        (0, ridge + 0.04, 0),
         M.struct_roof,
         bevel = 0.006
     );
-    settle!();
-    meshes()
+    // no clip moves a part: all of it is the still body
+    settle(&[join_all("body")])
 }
 
 // --- O9: the gazebo: four posts, its ring beam, the stepped roof with its finial and a bench along the back -----------------------

@@ -219,7 +219,7 @@ that move apart), reported to the owner.
 
 ## The garden's built things (2026-11-27)
 
-`carport` (3.00 × 2.72 × 5.00 m: four posts, two beams, five rafters and its roof sheet), `gazebo` (2.97 × 3.09 ×
+`carport` (2.95 × 2.84 × 5.00 m: four posts 2.15 m to the eaves beams (a car's clear height; the fascia's and the barge boards' lowest edge 2.13 m) with knee braces, a truss over each pair of posts (a tie beam and a king post up to the ridge beam), nine pairs of rafters 0.6 m apart, fascia boards along the eaves, barge boards up the gables and a roof sheet each side pitched 20° to a ridge cap along the 5 m length; joined into one `body`. One flat sheet on four posts, read as a table, before 2026-11-27), `gazebo` (2.97 × 3.09 ×
 2.96 m: four posts, a ring beam, two rails on three sides, a broad roof skirt, the lantern over it and its cap with
 a finial, and a bench along the back inside the rail), `pergola` (2.92 × 2.42 × 1.90 m: posts, two beams, five rafters), `awning` (1.90 × 0.40 × 0.91 m on the
 wall's face: a rail, five canvas slats stepping down to the front bar and the valance) and `solarPanels` (2.02 ×
@@ -228,8 +228,10 @@ A-frames (a short front post, a tall back post, a rafter, a foot rail and a brac
 are thin strips on the glass, 6 across and 10 up, so it reads as a solar array, not a table; joined into one `body`.
 Flat on four table legs, 0.86 m modules, before 2026-11-27). Timber and roof sheet, or frame and panels, map to 1–3 draw
 calls; none has a clip. The gazebo is joined into one `body` (2026-11-27: its 32 parts, the bench's
-included, were the gate's `unmoved` before). Their roofs are flat: the kit has no rotated slab here, so the gazebo's is a skirt with a
-lantern rather than a pitched roof, and the awning's slope is five stepped slats. The awning is declared with its
+included, were the gate's `unmoved` before). A sloped part is an `fbox!` with `rot`: placed by an `at(s, n)` helper
+(`s` along the slope, `n` out of its face) and turned about kernel x (`rot = (tilt, 0, 0)`, rising to the back: the
+solar array) or kernel y (`rot = (0, -sx * pitch, 0)` for the slope on game side `sx`: the carport). The gazebo's
+roof is still a flat skirt with a lantern and the awning's slope five stepped slats. The awning is declared with its
 own centre (0.025 m) because its parts' box is not centred on the tile.
 
 The gazebo's bench (in the timber, no draw call of its own): three boards with their top at 0.45 m from the back

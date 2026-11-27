@@ -111,7 +111,7 @@ pub fn family() -> Family {
                 .motions(motions(r#"{"uses": {"relax": "flames"}}"#))
                 .paint(&[("pit", "Bowl"), ("pit_stones", "Stones")]),
 
-            Model::new("carport", structures::carport, (3.00, 2.72, 5.00))
+            Model::new("carport", structures::carport, (2.952, 2.836, 5.00))
                 .key("model.carport")
                 .paint(&[("struct_timber", "Timber"), ("struct_roof", "Roof")]),
             Model::new("gazebo", structures::gazebo, (2.97, 3.10, 2.96))
