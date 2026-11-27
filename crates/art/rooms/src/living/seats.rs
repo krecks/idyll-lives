@@ -645,7 +645,7 @@ pub fn bean_bag() -> Vec<Obj> {
             }
             // the seat panel sewn into the dent, in its own colour
             let slot = o.mesh.slot(M.bag_seat);
-            let oval = |x: f64, y: f64| pow(x / 0.2, 2.0) + pow((y + 0.07) / 0.17, 2.0);
+            let oval = |x: f64, y: f64| pow(x / 0.18, 2.0) + pow((y + 0.14) / 0.1, 2.0);
             let mut seat = vec![false; o.mesh.faces.len()];
             for f in 0..o.mesh.faces.len() {
                 let corners = o.mesh.corners(f).to_vec();
@@ -654,8 +654,7 @@ pub fn bean_bag() -> Vec<Obj> {
                     c += o.mesh.verts[i as usize];
                 }
                 let c = c * (1.0 / corners.len() as f32);
-                let n = o.mesh.face_normal(f);
-                if c.z as f64 > 0.15 && n.z as f64 > 0.15 && oval(c.x as f64, c.y as f64) < 1.0 {
+                if c.z as f64 > 0.15 && oval(c.x as f64, c.y as f64) < 1.0 {
                     o.mesh.faces[f].mat = slot;
                     seat[f] = true;
                 }
@@ -680,7 +679,9 @@ pub fn bean_bag() -> Vec<Obj> {
                 }
                 let (x, y) = (v.x as f64, v.y as f64);
                 let k = 1.0 / 1e-6_f64.max(sqrt(oval(x, y)));
-                (v.x, v.y) = ((x * k) as f32, ((y + 0.07) * k - 0.07) as f32);
+                // (not far: on the steep back a row is long, and a vertex drawn all the way spikes)
+                let k = k.clamp(0.8, 1.2);
+                (v.x, v.y) = ((x * k) as f32, ((y + 0.14) * k - 0.14) as f32);
             }
         });
         jitter!(bag, 0.005, size = 0.16, seed = 2.0, up = 0.5);
