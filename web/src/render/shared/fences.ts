@@ -46,6 +46,18 @@ export interface GateLeaf {
   first: number;
   rest: Float32Array;
   restNormals: Float32Array;
+  /** The ground it stands on (m, `writeFences` `ground` at its middle; 0 without), and its posts (shared with a gate beside it). */
+  y: number;
+  posts: GatePost[];
+}
+
+/** A gate's post in the fences' mesh: its corner (x, z), the ground it stands on (m), its vertices (`count` from `first`). */
+export interface GatePost {
+  x: number;
+  z: number;
+  y: number;
+  first: number;
+  count: number;
 }
 
 /** The fences' geometry (plain finish, by vertex colour), their gates' leaves in it, and the hedges' instances. */
@@ -145,7 +157,15 @@ function writeAll(p: Painter, fences: readonly FenceEdge[], styles: readonly Fen
       first,
       rest: new Float32Array(p.geo.pos.slice(first * 3)),
       restNormals: new Float32Array(p.geo.nor.slice(first * 3)),
+      y,
+      posts: [],
     });
+  }
+  // (Each gate's posts, by corner: a land stroke moves them with it, `pc/fences.ts` `regroundGates`.)
+  const leavesAt = new Map<string, GateLeaf[]>();
+  for (const leaf of out.gates ?? []) {
+    const [cx, cz] = leaf.centre;
+    for (const key of leaf.axis === 'h' ? [`${cx - 0.5}:${cz}`, `${cx + 0.5}:${cz}`] : [`${cx}:${cz - 0.5}`, `${cx}:${cz + 0.5}`]) leavesAt.set(key, [...(leavesAt.get(key) ?? []), leaf]);
   }
   // Only where a fence drawn here ends (the others' posts, the lot in view's, are theirs to draw:
   // hidden with them over the basement).
@@ -157,8 +177,14 @@ function writeAll(p: Painter, fences: readonly FenceEdge[], styles: readonly Fen
     if ((post.style.kind === 'stone' || post.style.kind === 'hedge') && !post.gate) continue;
     // (Against a wall: the wall holds it; a post there would stand in the wall, its faces flickering in the wall's.)
     if (out.wallAt?.(post.x, post.z)) continue;
-    p.at(post.x, post.z, 0, ground ? ground(post.x, post.z) : 0);
+    const y = ground ? ground(post.x, post.z) : 0;
+    const first = p.geo.pos.length / 3;
+    p.at(post.x, post.z, 0, y);
     postAt(p, post.style.kind === 'hedge' ? HEDGE_GATE : post.style, post.gate);
+    const leaves = leavesAt.get(`${post.x}:${post.z}`);
+    if (!leaves) continue;
+    const gatePost: GatePost = { x: post.x, z: post.z, y, first, count: p.geo.pos.length / 3 - first };
+    for (const leaf of leaves) leaf.posts.push(gatePost);
   }
 }
 

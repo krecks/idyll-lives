@@ -28,7 +28,7 @@ import { BuildPreviews, mergeSurfaces } from './buildPreviews';
 import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
-import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
+import { buildFences, regroundGates, swingGate, type Fences, type GateLeaf } from './fences';
 import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
 import { backEdges, curtainsLetThrough, gardenPool, GardenPools, windowPools, type GardenPool } from './gardenPools';
@@ -671,6 +671,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private doors: { leaf: HouseDoor; open: number }[] = [];
   /** Gates in the fences' meshes, each with how far open it stands (0 shut, as drawn) and the side it opens to. */
   private gates: { fences: Fences; leaf: GateLeaf; open: number; towards: number }[] = [];
+  /** The other lots' gates (they swing: drawn here, not by the street), on their pads where the town follows the land. */
+  private townGates: Fences | null = null;
   /** The doors and gates that opened or fell shut since `doorSounds` was last called (at most `DOOR_SOUNDS`), and the list handed out then. */
   private doorsHeard: DoorSound[] = [];
   private doorsHanded: DoorSound[] = [];
@@ -2229,6 +2231,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         const ours = storey === 0;
         const fences = buildFences(this.app, ours ? this.lotRoot : this.root, list, this.deps.content.fenceStyles, { wallAt, ...(!ours && pads ? { ground: (x: number, z: number) => pads.at(x, z) } : {}) });
         if (!fences) continue;
+        if (!ours) this.townGates = fences;
         this.lotEntities.push({ entity: fences.entity, storey });
         for (const leaf of fences.gates) this.gates.push({ fences, leaf, open: 0, towards: 1 });
       }
@@ -2767,6 +2770,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roofs = [];
     this.doors = [];
     this.gates = [];
+    this.townGates = null;
     this.stairwells = [];
     this.lotRooms = null;
     this.walls = this.wallsLow = null;
@@ -3830,7 +3834,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /**
    * The game's land shaped (a stroke done, undone or redone): the street stands on the landscape's surface (one surface
    * for the land and what stands on it) and plans again the chunks whose roads or lots moved; the viewed lot follows its
-   * pad (the datum); the traffic lights, the cars and the parked rides stand on it again; the still casters' shadows
+   * pad (the datum); the traffic lights, the cars, the parked rides and the gates stand on it again; the still casters' shadows
    * are taken again.
    */
   private landUnderTown(scape: Landscape): void {
@@ -3838,10 +3842,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved();
     if (!surface || !this.builtWorld) return;
     if (this.street.landMoved(surface)) this.streamStreet();
-    // (Those that look the ground up only when placed: the traffic lights' poles, the cars standing, the parked rides.)
+    // (Those that look the ground up only when placed: the traffic lights' poles, the cars standing, the parked rides,
+    // the other lots' gates.)
     this.signals.setGround(this.builtGround);
     this.cars.setGround(this.builtGround);
     this.parkedRides.setGround(this.builtGround);
+    if (this.townGates) regroundGates(this.townGates, this.builtGround);
     const view = this.view;
     const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     if (at < 0) return;
