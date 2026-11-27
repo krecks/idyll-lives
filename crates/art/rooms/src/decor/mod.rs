@@ -199,6 +199,7 @@ pub fn family() -> Family {
                 .key("model.burglarAlarm")
                 .centre(0.0, -0.3995)
                 .on_wall()
+                .motions(motions(r#"{"idle": "blink"}"#))
                 .paint(&[("gadget_white", "Case"), ("gadget_dark", "Keypad")]),
             Model::new("shutters", fittings::shutters, (1.765, 0.765, 0.050))
                 .key("model.shutters")

@@ -174,9 +174,9 @@ Triangles 3,540 → 4,052 and 4,564 → 6,100 for the extra folds; the sizes are
 ## Wall fittings (2026-11-27)
 
 Five wall pieces joined the set: the venetian blinds (`blinds`), the coat hooks (`coatHooks`), the doorbell
-(`doorbell`), the burglar alarm's keypad (`burglarAlarm`) and the security camera (`cctvCamera`). The four still ones
-are one model of one or two finishes, so 1 draw call each: the hooks' board and brass, the bell's brass and button,
-the keypad's case and keys, the camera's housing and lens. All five are built at their real height on the wall's face
+(`doorbell`), the burglar alarm's keypad (`burglarAlarm`) and the security camera (`cctvCamera`). The hooks, the bell
+and the camera are still, one part each of two finishes, so 1 draw call each: the hooks' board and metal, the bell's
+brass and button, the camera's housing and lens. All five are built at their real height on the wall's face
 (`WALL`, −0.43 m) and declared `.on_wall()`; the blinds' two cords hang 3 cm in front of the slats, which is what sets
 their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, under the eaves.
 
@@ -189,6 +189,13 @@ their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, u
   silver button and a camera's lens (a video doorbell). The button's face stays 1.34 m up and 0.394 m behind the
   middle, where the renderer's `press` reaches (`clips/reach.ts`). 0.084 × 0.084 × 0.036 m, one part, 936 → 948
   triangles, 1 draw.
+- **Burglar alarm** (looked at again 2026-11-27): the armed light (`alarm_led`) glows red at night (`glow`) and
+  blinks near the camera (`blink`, `idle`, 2 s a round: pushed 11 mm back into the case from 1.5 to 1.95 s, as the
+  server rack's lights blink); at rest (on Low, far off) it stays lit. 2 draw calls (the case and keys, the light),
+  1 more at night for the glow; it was 1 and never lit. No bell box: the content said "a keypad and a box over the
+  door", but a bell box belongs high on the front outside, and stacked over the keypad inside one wall tile it would
+  read as two boxes, not as an alarm; the blinking light says alarm. The description is now "A keypad by the door:
+  the little light blinks all night."
 
 The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains). One part can't turn each slat about its
 own length, and a part a slat would cost a draw call each (9 in all), so the clip swaps two parts: the open slats

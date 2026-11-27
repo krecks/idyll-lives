@@ -3,7 +3,7 @@
 use super::common::{M, WALL};
 use artkit::kit;
 use artkit::math::{Axis, P3};
-use artkit::motion::{FLAT, flat};
+use artkit::motion::{Ease, FLAT, Path, flat, keys};
 use artkit::parts::{hinged, join, join_all, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
@@ -191,47 +191,73 @@ pub fn doorbell() -> Vec<Obj> {
 }
 
 // --- D4: the burglar alarm: the keypad by the door, its keys and its armed light ---------------------------
+// The light glows at night (`alarm_led`) and blinks all the time near the camera (`blink`, `idle`): pushed back into
+// the case for a moment every 2 s, as the server rack's lights blink. At rest (on Low, far off) it stays lit.
 pub fn burglar_alarm() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    fbox!(
-        f,
-        "case",
-        0.22,
-        0.28,
-        0.050,
-        (0, 1.70, WALL + 0.025),
-        M.gadget_white,
-        bevel = 0.008
-    );
-    fbox!(
-        f,
-        "keypad",
-        0.16,
-        0.13,
-        0.008,
-        (0, 1.66, WALL + 0.054),
-        M.gadget_dark,
-        bevel = 0.003
-    );
-    for r in 0..3 {
-        for c in 0..4 {
-            fbox!(
-                f,
-                format!("key{r}{c}"),
-                0.026,
-                0.020,
-                0.004,
-                (
-                    -0.051 + 0.034 * c as f64,
-                    1.700 - 0.036 * r as f64,
-                    WALL + 0.059
-                ),
-                M.gadget_white
-            );
+    let still = new_parts(|| {
+        fbox!(
+            f,
+            "case",
+            0.22,
+            0.28,
+            0.050,
+            (0, 1.70, WALL + 0.025),
+            M.gadget_white,
+            bevel = 0.008
+        );
+        fbox!(
+            f,
+            "keypad",
+            0.16,
+            0.13,
+            0.008,
+            (0, 1.66, WALL + 0.054),
+            M.gadget_dark,
+            bevel = 0.003
+        );
+        for r in 0..3 {
+            for c in 0..4 {
+                fbox!(
+                    f,
+                    format!("key{r}{c}"),
+                    0.026,
+                    0.020,
+                    0.004,
+                    (
+                        -0.051 + 0.034 * c as f64,
+                        1.700 - 0.036 * r as f64,
+                        WALL + 0.059
+                    ),
+                    M.gadget_white
+                );
+            }
         }
-    }
-    fsphere!(f, "led", 0.007, (0.085, 1.81, WALL + 0.052), M.alarm_led);
+    });
+    join(&still, "body", Some(P3::ZERO));
+    let at = (0.085, 1.81, WALL + 0.052);
+    let led = new_parts(|| {
+        fsphere!(f, "led", 0.007, at, M.alarm_led);
+    });
+    let led = join(&led, "led", Some(f.at(at.0, at.1, at.2)));
     settle!();
+    // (back 11 mm: the 7 mm bead, standing 2 mm proud of the case, all inside it)
+    let rest = led.location().y as f64;
+    let off = rest + 0.011;
+    let lin = Ease::Linear;
+    keys(
+        led,
+        "blink",
+        Path::Location,
+        1,
+        &[
+            (0.0, rest, lin),
+            (1.5, rest, lin),
+            (1.55, off, lin),
+            (1.95, off, lin),
+            (2.0, rest, lin),
+        ],
+    );
     meshes()
 }
 

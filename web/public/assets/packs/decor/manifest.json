@@ -791,7 +791,8 @@
       "url": "../../models/decor/burglarAlarm.glb",
       "materials": {
         "alarm_led": {
-          "finish": "material.finish.gloss"
+          "finish": "material.finish.gloss",
+          "glow": "#FF3A2A"
         },
         "gadget_dark": {
           "finish": "material.finish.satin"
@@ -799,6 +800,9 @@
         "gadget_white": {
           "finish": "material.finish.satin"
         }
+      },
+      "motions": {
+        "idle": "blink"
       },
       "paint": [
         {

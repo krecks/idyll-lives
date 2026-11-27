@@ -116,7 +116,7 @@ palette! { M:
     cam_lens = ("#16202B", gloss),
     bell_brass = ("#C9A04A", metal, roughness(0.25)), // the bell push: polished brass
     bell_push = ("#F1E8D4", ceramic),                 // its ivory button
-    alarm_led = ("#C0392B", gloss),
+    alarm_led = ("#E0362A", gloss, glow("#FF3A2A")),  // lit all night
     hall_glass = ("#AFC0C8", gloss),
 }
 
