@@ -1001,6 +1001,7 @@
     },
     {
       "id": "dishwasherCompact",
+      "how": { "wash": "rack", "clean": "rack" },
       "name": "Stainless dishwasher",
       "model": "model.dishwasherCompact",
       "footprint": [

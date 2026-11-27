@@ -687,6 +687,7 @@
     },
     {
       "id": "dishwasher",
+      "how": { "wash": "rack", "clean": "rack" },
       "name": "Dishwasher",
       "model": "model.dishwasher",
       "stations": [

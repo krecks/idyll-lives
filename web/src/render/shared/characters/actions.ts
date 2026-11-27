@@ -351,10 +351,6 @@ export const CROUCH_ONLY: readonly string[] = ['crouch'];
  * through its front.
  */
 export const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
-/** Down to a dishwasher's rack and up again, a thing put in or taken out each time (`wash`, `clean`). */
-const DISHWASHER_RACK = ['pickUp', 'interact', 'pickUp', 'idle'];
-/** Dishwashers: loaded and emptied bent down to the lower rack their open door slides out, not at the worktop. */
-export const DISHWASHERS = new Set(['dishwasher', 'dishwasherCompact']);
 /** Seated objects whose activity uses the hands on a desk / keys. */
 export const SIT_HANDS = new Set(['computerDesk', 'piano']);
 /** Standing object use: clip sequence (looped). */
@@ -635,11 +631,10 @@ export const ACTIONS: Record<string, ActionAnim> = {
     hands: HANDS.hold,
   },
   // (Seated at the dressing table, getting ready: brushing the hair in the mirror, clips/self.ts.)
-  // (Clearing away into a dishwasher: down to its rack with the dirty thing, `DISHWASHERS`.)
   wash: {
-    stand: (def) => (DISHWASHERS.has(def) ? DISHWASHER_RACK : ['spell', 'interact']),
+    stand: ['spell', 'interact'],
     upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''),
-    hands: (def) => (def === 'dressingTable' ? HANDS.grip : DISHWASHERS.has(def) ? HANDS.hold : HANDS.relaxed),
+    hands: (def) => (def === 'dressingTable' ? HANDS.grip : HANDS.relaxed),
   },
   // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
   shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
@@ -717,9 +712,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
           ? ['stir']
           : def.includes('laundry')
             ? ['spell', 'interact', 'pickUp']
-            : DISHWASHERS.has(def)
-              ? DISHWASHER_RACK
-              : ['interact', 'spell'],
+            : ['interact', 'spell'],
     hands: HANDS.hold,
     // (Ironing: the iron in the hand, the board's own hidden meanwhile, its `iron_off`.)
     prop: (def) => (def === IRONING_BOARD ? PROPS.iron : null),
@@ -826,6 +819,9 @@ export const MANNERS: Record<string, ActionAnim> = {
   high: { stand: ['interact', 'idle'] },
   // Down on the floor at it (`play`: toys at the box, as the play mat and the doll house).
   floor: { stand: ['kneel'] },
+  // Bent down to a dishwasher's lower rack its open door slides out, not at the worktop, a thing put in or taken out
+  // each time (`wash`, `clean`).
+  rack: { stand: ['pickUp', 'interact', 'pickUp', 'idle'], hands: HANDS.hold },
 };
 /** `actionOf`'s mannered entries, by tag and manner, made once. */
 const MANNERED = new Map<string, Map<string, ActionAnim>>();
