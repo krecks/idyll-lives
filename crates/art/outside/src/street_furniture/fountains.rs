@@ -1,7 +1,7 @@
 //! The drinking fountain and the town fountain: stone, and water that runs.
 
-use super::common::{far_keeping_feet, fluted, lobed, own, sweep_tube};
-use artkit::forms::Scale;
+use super::common::{SF, far_keeping_feet, fluted, lobed, own, sweep_tube};
+use artkit::forms::{Scale, smooth_outline};
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::motion::{Grow, Squash, grow, squash};
 use artkit::parts::{hinged, join, new_parts, settle_all};
@@ -238,125 +238,129 @@ const STREAM: [(f64, f64); 5] = [
     (0.73, WATER_Y),
 ];
 
-pub fn fountain_town() -> Vec<Obj> {
-    let m = own("fountainTown");
-    let f = GameFrame::new(0.0);
+/// The square basin: slab, walls on a plinth band with a raised panel a face between pilasters, a moulded coping with a
+/// rounded nose all round (its top the seat, `RIM`), the water.
+fn basin(f: &GameFrame, m: &SF) {
     let stone = m.body;
-    let still = new_parts(|| {
+    fbox!(
+        f,
+        "slab",
+        2.9,
+        0.06,
+        2.9,
+        (0, 0.03, 0),
+        m.granite,
+        bevel = 0.01
+    );
+    // the basin: its walls on a plinth band, a raised panel on each face between pilasters, a moulded coping
+    // with a rounded nose all round (its top the seat, `RIM`)
+    for s in [-1, 1] {
+        let sf = s as f64;
         fbox!(
             f,
-            "slab",
+            format!("wall_fb{s}"),
             2.9,
-            0.06,
-            2.9,
-            (0, 0.03, 0),
-            m.granite,
-            bevel = 0.01
-        );
-        // the basin: its walls on a plinth band, a raised panel on each face between pilasters, a moulded coping
-        // with a rounded nose all round (its top the seat, `RIM`)
-        for s in [-1, 1] {
-            let sf = s as f64;
-            fbox!(
-                f,
-                format!("wall_fb{s}"),
-                2.9,
-                0.4,
-                0.24,
-                (0, 0.26, sf * 1.33),
-                stone,
-                bevel = 0.012
-            );
-            fbox!(
-                f,
-                format!("wall_lr{s}"),
-                0.24,
-                0.4,
-                2.42,
-                (sf * 1.33, 0.26, 0),
-                stone,
-                bevel = 0.012
-            );
-            fbox!(
-                f,
-                format!("band_fb{s}"),
-                2.93,
-                0.06,
-                0.25,
-                (0, 0.09, sf * 1.335),
-                stone,
-                bevel = 0.01,
-                bevel_segments = 1
-            );
-            fbox!(
-                f,
-                format!("band_lr{s}"),
-                0.25,
-                0.06,
-                2.43,
-                (sf * 1.335, 0.09, 0),
-                stone,
-                bevel = 0.01,
-                bevel_segments = 1
-            );
-            for k in 0..3 {
-                let u = (k - 1) as f64 * 0.9;
-                fbox!(
-                    f,
-                    format!("panel_fb{s}{k}"),
-                    0.7,
-                    0.2,
-                    0.02,
-                    (u, 0.28, sf * 1.455),
-                    stone,
-                    bevel = 0.006,
-                    bevel_segments = 1
-                );
-                fbox!(
-                    f,
-                    format!("panel_lr{s}{k}"),
-                    0.02,
-                    0.2,
-                    0.7,
-                    (sf * 1.455, 0.28, u),
-                    stone,
-                    bevel = 0.006,
-                    bevel_segments = 1
-                );
-            }
-        }
-        let nose = [
-            (0.0, 0.0),
-            (-0.02, 0.006),
-            (-0.03, 0.025),
-            (-0.02, 0.044),
-            (0.0, 0.05),
-            (0.31, 0.05),
-            (0.32, 0.04),
-            (0.32, 0.0),
-        ];
-        kit_moulding!(
-            f,
-            "coping",
-            &[(1.45, 1.45), (-1.45, 1.45), (-1.45, -1.45), (1.45, -1.45)],
-            &nose,
+            0.4,
+            0.24,
+            (0, 0.26, sf * 1.33),
             stone,
-            at = RIM - 0.05,
-            plane = Facing::Top
+            bevel = 0.012
         );
         fbox!(
             f,
-            "basin_water",
+            format!("wall_lr{s}"),
+            0.24,
+            0.4,
             2.42,
-            0.02,
-            2.42,
-            (0, WATER_Y - 0.01, 0),
-            m.water
+            (sf * 1.33, 0.26, 0),
+            stone,
+            bevel = 0.012
         );
-        // the fountain: a moulded foot, a fluted column, the wide lower bowl gadrooned underneath with a rolled lip, a
-        // stem, the small top bowl and a knob
-        artkit::bevel::eased(revolve!(
-            "foot",
+        fbox!(
+            f,
+            format!("band_fb{s}"),
+            2.93,
+            0.06,
+            0.25,
+            (0, 0.09, sf * 1.335),
+            stone,
+            bevel = 0.01,
+            bevel_segments = 1
+        );
+        fbox!(
+            f,
+            format!("band_lr{s}"),
+            0.25,
+            0.06,
+            2.43,
+            (sf * 1.335, 0.09, 0),
+            stone,
+            bevel = 0.01,
+            bevel_segments = 1
+        );
+        for k in 0..3 {
+            let u = (k - 1) as f64 * 0.9;
+            fbox!(
+                f,
+                format!("panel_fb{s}{k}"),
+                0.7,
+                0.2,
+                0.02,
+                (u, 0.28, sf * 1.455),
+                stone,
+                bevel = 0.006,
+                bevel_segments = 1
+            );
+            fbox!(
+                f,
+                format!("panel_lr{s}{k}"),
+                0.02,
+                0.2,
+                0.7,
+                (sf * 1.455, 0.28, u),
+                stone,
+                bevel = 0.006,
+                bevel_segments = 1
+            );
+        }
+    }
+    let nose = [
+        (0.0, 0.0),
+        (-0.02, 0.006),
+        (-0.03, 0.025),
+        (-0.02, 0.044),
+        (0.0, 0.05),
+        (0.31, 0.05),
+        (0.32, 0.04),
+        (0.32, 0.0),
+    ];
+    kit_moulding!(
+        f,
+        "coping",
+        &[(1.45, 1.45), (-1.45, 1.45), (-1.45, -1.45), (1.45, -1.45)],
+        &nose,
+        stone,
+        at = RIM - 0.05,
+        plane = Facing::Top
+    );
+    fbox!(
+        f,
+        "basin_water",
+        2.42,
+        0.02,
+        2.42,
+        (0, WATER_Y - 0.01, 0),
+        m.water
+    );
+}
+
+/// The fountain in the middle: a moulded foot, a fluted column, the wide lower bowl gadrooned underneath with a rolled
+/// lip, a stem, the small top bowl and a knob.
+fn pedestal(f: &GameFrame, m: &SF) {
+    let stone = m.body;
+    artkit::bevel::eased(revolve!(
+        "foot",
+        &smooth_outline(
             &[
                 (0.0, 0.3),
                 (0.38, 0.3),
@@ -368,43 +372,47 @@ pub fn fountain_town() -> Vec<Obj> {
                 (0.2, 0.66),
                 (0.0, 0.66)
             ],
-            material = stone,
-            segments = 24
-        ));
-        revolve!(
-            "column_base",
-            &[
-                (0.0, 0.64),
-                (0.16, 0.64),
-                (0.16, 0.67),
-                (0.135, 0.7),
-                (0.0, 0.7)
-            ],
-            material = stone,
-            segments = 16
-        );
-        loft!(
-            "column",
-            &[
-                fluted(0.12, 0.69, 12, 0.1, 3, 0.0),
-                fluted(0.115, 1.13, 12, 0.1, 3, 0.0)
-            ],
-            material = stone
-        );
-        revolve!(
-            "capital",
-            &[
-                (0.0, 1.12),
-                (0.13, 1.12),
-                (0.15, 1.15),
-                (0.17, 1.2),
-                (0.0, 1.2)
-            ],
-            material = stone,
-            segments = 16
-        );
-        revolve!(
-            "bowl",
+            1,
+            false
+        ),
+        material = stone,
+        segments = 28
+    ));
+    revolve!(
+        "column_base",
+        &[
+            (0.0, 0.64),
+            (0.16, 0.64),
+            (0.16, 0.67),
+            (0.135, 0.7),
+            (0.0, 0.7)
+        ],
+        material = stone,
+        segments = 16
+    );
+    loft!(
+        "column",
+        &[
+            fluted(0.12, 0.69, 12, 0.1, 3, 0.0),
+            fluted(0.115, 1.13, 12, 0.1, 3, 0.0)
+        ],
+        material = stone
+    );
+    revolve!(
+        "capital",
+        &[
+            (0.0, 1.12),
+            (0.13, 1.12),
+            (0.15, 1.15),
+            (0.17, 1.2),
+            (0.0, 1.2)
+        ],
+        material = stone,
+        segments = 16
+    );
+    revolve!(
+        "bowl",
+        &smooth_outline(
             &[
                 (0.0, 1.18),
                 (0.2, 1.2),
@@ -417,42 +425,46 @@ pub fn fountain_town() -> Vec<Obj> {
                 (0.5, 1.44),
                 (0.0, 1.42)
             ],
-            material = stone,
-            segments = 24
-        );
-        let secs: Vec<_> = [(0.16, 1.19), (0.32, 1.255), (0.47, 1.335), (0.565, 1.4)]
-            .iter()
-            .map(|&(r, y)| lobed(r, y, 16, 0.12, 2))
-            .collect();
-        loft!("bowl_lobes", &secs, material = stone);
-        fcyl!(
-            f,
-            "bowl_water",
-            0.53,
-            0.02,
-            (0, BOWL_Y, 0),
-            m.water,
-            verts = 24
-        );
-        revolve!(
-            "stem",
-            &[
-                (0.0, 1.44),
-                (0.11, 1.44),
-                (0.1, 1.47),
-                (0.075, 1.52),
-                (0.062, 1.62),
-                (0.07, 1.72),
-                (0.062, 1.8),
-                (0.09, 1.85),
-                (0.1, 1.88),
-                (0.0, 1.88)
-            ],
-            material = stone,
-            segments = 14
-        );
-        artkit::bevel::eased(revolve!(
-            "top_bowl",
+            1,
+            false
+        ),
+        material = stone,
+        segments = 32
+    );
+    let secs: Vec<_> = [(0.16, 1.19), (0.32, 1.255), (0.47, 1.335), (0.565, 1.4)]
+        .iter()
+        .map(|&(r, y)| lobed(r, y, 16, 0.12, 2))
+        .collect();
+    loft!("bowl_lobes", &secs, material = stone);
+    fcyl!(
+        f,
+        "bowl_water",
+        0.53,
+        0.02,
+        (0, BOWL_Y, 0),
+        m.water,
+        verts = 24
+    );
+    revolve!(
+        "stem",
+        &[
+            (0.0, 1.44),
+            (0.11, 1.44),
+            (0.1, 1.47),
+            (0.075, 1.52),
+            (0.062, 1.62),
+            (0.07, 1.72),
+            (0.062, 1.8),
+            (0.09, 1.85),
+            (0.1, 1.88),
+            (0.0, 1.88)
+        ],
+        material = stone,
+        segments = 14
+    );
+    artkit::bevel::eased(revolve!(
+        "top_bowl",
+        &smooth_outline(
             &[
                 (0.0, 1.84),
                 (0.08, 1.85),
@@ -462,64 +474,79 @@ pub fn fountain_town() -> Vec<Obj> {
                 (0.21, 2.0),
                 (0.0, 1.97)
             ],
-            material = stone,
-            segments = 24
-        ));
-        let secs: Vec<_> = [(0.085, 1.852), (0.16, 1.895), (0.225, 1.945)]
+            1,
+            false
+        ),
+        material = stone,
+        segments = 24
+    ));
+    let secs: Vec<_> = [(0.085, 1.852), (0.16, 1.895), (0.225, 1.945)]
+        .iter()
+        .map(|&(r, y)| lobed(r, y, 12, 0.14, 2))
+        .collect();
+    loft!("top_lobes", &secs, material = stone);
+    revolve!(
+        "knob",
+        &[
+            (0.0, 1.97),
+            (0.05, 1.97),
+            (0.045, 1.99),
+            (0.07, 2.03),
+            (0.065, 2.07),
+            (0.04, 2.1),
+            (0.0, 2.114)
+        ],
+        material = stone,
+        segments = 12
+    );
+}
+
+/// The water spilling over the lips: streams curving out of the top bowl into the lower one, and out of the lower one
+/// into the basin, thinning as they fall.
+fn falls(f: &GameFrame, m: &SF) {
+    for k in 0..6 {
+        let a = (30 + 60 * k) as f64;
+        let pts: Vec<(f64, f64, f64)> = TRICKLE
             .iter()
-            .map(|&(r, y)| lobed(r, y, 12, 0.14, 2))
+            .map(|&(r, y)| (r * cosd(a), y, r * sind(a)))
             .collect();
-        loft!("top_lobes", &secs, material = stone);
-        revolve!(
-            "knob",
-            &[
-                (0.0, 1.97),
-                (0.05, 1.97),
-                (0.045, 1.99),
-                (0.07, 2.03),
-                (0.065, 2.07),
-                (0.04, 2.1),
-                (0.0, 2.114)
-            ],
-            material = stone,
-            segments = 12
+        fsweep!(
+            f,
+            format!("trickle{k}"),
+            &pts,
+            0.014,
+            m.spray,
+            verts = 5,
+            resolution = 2,
+            scale = [1.0, 0.95, 0.85, 0.75]
         );
-        // the water spilling over the lips: streams curving out of the top bowl into the lower one, and out of the
-        // lower one into the basin, thinning as they fall
-        for k in 0..6 {
-            let a = (30 + 60 * k) as f64;
-            let pts: Vec<(f64, f64, f64)> = TRICKLE
-                .iter()
-                .map(|&(r, y)| (r * cosd(a), y, r * sind(a)))
-                .collect();
-            fsweep!(
-                f,
-                format!("trickle{k}"),
-                &pts,
-                0.014,
-                m.spray,
-                verts = 5,
-                resolution = 2,
-                scale = [1.0, 0.95, 0.85, 0.75]
-            );
-        }
-        for k in 0..8 {
-            let a = 22.5 + (45 * k) as f64;
-            let pts: Vec<(f64, f64, f64)> = STREAM
-                .iter()
-                .map(|&(r, y)| (r * cosd(a), y, r * sind(a)))
-                .collect();
-            fsweep!(
-                f,
-                format!("stream{k}"),
-                &pts,
-                0.024,
-                m.spray,
-                verts = 5,
-                resolution = 2,
-                scale = [1.0, 0.95, 0.85, 0.75, 0.7]
-            );
-        }
+    }
+    for k in 0..8 {
+        let a = 22.5 + (45 * k) as f64;
+        let pts: Vec<(f64, f64, f64)> = STREAM
+            .iter()
+            .map(|&(r, y)| (r * cosd(a), y, r * sind(a)))
+            .collect();
+        fsweep!(
+            f,
+            format!("stream{k}"),
+            &pts,
+            0.024,
+            m.spray,
+            verts = 5,
+            resolution = 2,
+            scale = [1.0, 0.95, 0.85, 0.75, 0.7]
+        );
+    }
+}
+
+pub fn fountain_town() -> Vec<Obj> {
+    let m = own("fountainTown");
+    let f = GameFrame::new(0.0);
+    let still = new_parts(|| {
+        basin(&f, &m);
+        pedestal(&f, &m);
+        falls(&f, &m);
     });
     join(&still, "fountainTown", Some(P3::from((0, 0, 0))));
     // what moves: the jet on top, rising and falling, and the splashes where the streams land, bobbing with it

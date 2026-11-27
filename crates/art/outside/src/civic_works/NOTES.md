@@ -30,11 +30,11 @@ finishes: one draw.
 ## The car lift (3 × 5)
 
 A two-post lift (blue posts on foot plates, carriages, hydraulic rams, a control box with its buttons and cable, a
-chequer floor plate between the posts) holding a hatchback on its four arms, sills 1.27 m up. The car: a body drawn from
-the side with empty arches, a glasshouse of tinted glass leaning in to its roof (`tapered`) under a roof, spoiler and
-pillars in its colour, lamps, grille, plates (white at the front, yellow at the back), mirrors, door seams and handles;
-in its arches black liners, brake discs with red calipers, hubs with studs, struts and springs; under it an exhaust,
-silencer and tank. Its four wheels (alloys, five spokes, `alloy`): two stacked under its nose, one lying under its
+chequer floor plate between the posts) holding a hatchback on its four arms, sills 1.27 m up. The car (`car_shell`,
+`car_running_gear`, `car_ends_and_underside`): three lofts, smooth round sections along its length (`BODY`, `HOUSE`,
+`ROOF`: the body, the tinted glasshouse leaning in, the roof panel), spoiler and front pillars in its colour, lamps,
+grille, plates (white at the front, yellow at the back), mirrors, door seams and handles; on each flank a flat dark
+arch with a brake disc, red caliper, hub and a spring in it; under it an exhaust, silencer and tank. Its four wheels (`alloy`: plain tyre, dished rim, cap): two stacked under its nose, one lying under its
 tail, one leaning on the right post. One draw.
 
 ## The printing press (2 × 2)
@@ -123,3 +123,16 @@ engine 13,532 → 11,972, tyre rack 8,452 → 7,876.
 
 The fire engine's ladder gantries are 1.0 m long (1.3) and 0.45 m apart (0.6), so they stop short of the suction
 hoses beside them (the nearer at x -0.82) instead of running through them.
+
+## Rounder and cheaper (2026-11-27)
+
+The car lift's car was a ~380-line hand-drawn side outline bevelled all round (11,956 triangles with the lift, worst
+chord 21 mm); now three lofts (`BODY`, `HOUSE`, `ROOF` tables of stations) and a flat dark arch each side: the lift
+7,592 triangles, its far version 3,136. The roof is the top of a tall ellipse standing in the glass and the lofts' ends
+shrink, so no flat cap shows a hard edge. The lift's disc, hub, spring, silencer and pads no longer take `eased` (a
+bevelled twelve-sided cylinder cost ten times its quads; the gate only asked it of the pillars, rims, exhaust, arches,
+ram, pivots and floor plate); the wheels' tyres are plain and their windows gone. The
+fire engine's tyres and rims are 24 round (chord 4.3 mm, was 9.6; 12,548 triangles). The tyre rack's tyres are an
+octagon-section revolve (`rack_tyre`: 45-degree turns, sixteen round, smooth, no `eased`): 7,876, the same as before
+with a rounder section. The cement mixer's drum and its crust are
+rounded with `smooth_outline` (6,288, was 5,264).

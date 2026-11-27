@@ -14,7 +14,9 @@ and fingerpost on one 1 m tile.
 
 ## The models
 
-- **Dry-stone wall** (`walls.rs`, 2,944 triangles, one draw): six courses of field stones narrowing from 0.6 m at the
+- **Dry-stone wall** (`walls.rs`, 1,764 triangles since 2026-11-27: five courses of larger stones, 0.22 to 0.55 m long, each
+  dropped or set back a little with a dark heart behind so the chinks read, and seven cap stones of different widths and
+  heights; its numbers are named at the top of the file. Earlier: six courses of field stones narrowing from 0.6 m at the
   foot to 0.36 m under the coping (the batter: the West of Scotland DSWA's training wall is 1.4 m high, 70 cm at the
   base, 35 cm at the top), each stone its own length, a little lower than its course or set back, in the boulders'
   weathered greys (`garden_decor`'s rock colours); a coping of stones set on edge; lichen patches on the front face.

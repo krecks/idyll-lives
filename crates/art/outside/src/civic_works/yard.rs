@@ -2,6 +2,7 @@
 
 use super::common::{F, own_palette, tyre};
 use artkit::far::{is_low, low};
+use artkit::forms::smooth_outline;
 use artkit::math::{Axis, TAU, cos, degrees, pow, radians, sin};
 use artkit::parts::{Settle, join, join_all, new_parts, settle_all, settle_with};
 use artkit::py;
@@ -171,44 +172,52 @@ pub fn cement_mixer() -> Vec<Obj> {
     let drum = new_parts(|| {
         // the drum: a cone up from its gear end to the belly, a shoulder in to the mouth, the inside dark and crusted
         let n = low(32, 12);
-        artkit::bevel::eased(revolve!(
+        revolve!(
             "drum",
-            &[
-                (0.0, -0.32),
-                (0.13, -0.32),
-                (0.24, -0.24),
-                (0.3, -0.1),
-                (0.305, -0.02),
-                (0.3, 0.04),
-                (0.24, 0.16),
-                (0.16, 0.26),
-                (0.15, 0.3),
-                (0.13, 0.3),
-                (0.13, 0.26),
-                (0.22, 0.12),
-                (0.0, 0.06)
-            ],
+            &smooth_outline(
+                &[
+                    (0.0, -0.32),
+                    (0.13, -0.32),
+                    (0.24, -0.24),
+                    (0.3, -0.1),
+                    (0.305, -0.02),
+                    (0.3, 0.04),
+                    (0.24, 0.16),
+                    (0.16, 0.26),
+                    (0.15, 0.3),
+                    (0.13, 0.3),
+                    (0.13, 0.26),
+                    (0.22, 0.12),
+                    (0.0, 0.06)
+                ],
+                1,
+                false
+            ),
             at = (0, 0, 0),
             material = m.body,
             segments = n
-        ));
+        );
         // the cement dried on its inside: a thin shell just within it
-        artkit::bevel::eased(revolve!(
+        revolve!(
             "drum_crust",
-            &[
-                (0.0, 0.064),
-                (0.214, 0.122),
-                (0.126, 0.258),
-                (0.126, 0.296),
-                (0.116, 0.296),
-                (0.116, 0.255),
-                (0.2, 0.13),
-                (0.0, 0.075)
-            ],
+            &smooth_outline(
+                &[
+                    (0.0, 0.064),
+                    (0.214, 0.122),
+                    (0.126, 0.258),
+                    (0.126, 0.296),
+                    (0.116, 0.296),
+                    (0.116, 0.255),
+                    (0.2, 0.13),
+                    (0.0, 0.075)
+                ],
+                1,
+                false
+            ),
             at = (0, 0, 0),
             material = m.crust,
             segments = n
-        ));
+        );
         torus!(
             "lip_crust",
             0.142,
