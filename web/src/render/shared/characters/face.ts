@@ -464,7 +464,7 @@ export class FaceMixer {
 
   /**
    * Writes the strongest `MORPH_PAIRS` channels as (channel, weight) pairs at `out[o..]`
-   * (`MORPH_PAIRS * 2` floats), unused pairs zero.
+   * (`MORPH_PAIRS * 2` floats), unused pairs zero, after the used ones (the shader stops at the first).
    */
   write(out: Float32Array, o: number): void {
     const w = this.w;
