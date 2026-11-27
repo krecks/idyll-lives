@@ -878,12 +878,11 @@ fn the_shipped_content_reads() {
             && !actions.actions.contains("stand"),
         "{actions:?}"
     );
-    // A tag's seat, a function of the object (`write`) or none (`eat`); the rides by id; the sets a `sit` asks.
+    // A tag's seat, a plain clip (`write`: the near desks are the content's `near` manner now, 3311f1dc0) or none (`eat`); the rides by id.
     assert_eq!(actions.sits["type"], "'sitHands'");
-    assert!(actions.sits["write"].contains("NEAR_DESKS.has(def)"));
+    assert_eq!(actions.sits["write"], "'sitHands'");
     assert!(!actions.sits.contains_key("eat"));
     assert!(actions.rides.contains("swingSet"));
-    assert!(actions.sets["NEAR_DESKS"].contains("gloomy.journalDesk"));
     let sounds = review::action_sounds(
         &std::fs::read_to_string(format!("{root}/web/src/audio/world.ts")).unwrap(),
     )
