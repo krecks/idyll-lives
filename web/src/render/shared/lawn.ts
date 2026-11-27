@@ -25,6 +25,7 @@ import { groundDepth, type WorldStructure } from '../../core/protocol';
 import { fillPoly } from '../../game/footprints';
 import { hash, smooth, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
+import type { TexelRect } from './groundShade';
 
 /**
  * What goes into the map, each as a share of its channel's whole range (tone and dryness: of the way from
@@ -166,9 +167,10 @@ function signed(v: number): number {
 /**
  * The lawn's map of `world` now (`tw` × `td` tiles of 4 bytes, rows along x), into `into` when it is that
  * size (the same town again: its patches and stripes are kept). `bare`: the tiles no lawn grows on
- * (`bareTiles`).
+ * (`bareTiles`). `rects`: `into` was made for the same town and plots, and only these tiles (last ones
+ * included) could have changed since (`lawnChanges`): only they are made again.
  */
-export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Array): Uint8Array {
+export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Array, rects?: readonly TexelRect[] | null): Uint8Array {
   const M = LAWN_MAP;
   const [tw, td] = [world.width, groundDepth(world)];
   const out = into && into.length === tw * td * 4 ? into : new Uint8Array(tw * td * 4);
@@ -176,13 +178,19 @@ export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Arr
   const size = `${world.meta?.seed ?? 1}:${tw}x${td}:${JSON.stringify(world.meta?.centre?.map((c) => c.poly) ?? [])}`;
   const key = `${size}:${world.plots.map(rectKey).join(';')}`;
   let made = bases.get(out);
+  const window = made?.key === key && rects ? rects : null;
   if (!made || made.key !== key) {
     const was = made && made.size === size ? made : undefined;
     bases.set(out, (made = { key, size, rects: new Set(world.plots.map(rectKey)), base: baseMap(world, tw, td, was) }));
   }
-  out.set(made.base);
+  if (window) for (const [x0, z0, x1, z1] of window) for (let z = z0; z <= Math.min(z1, td - 1); z++) out.set(made.base.subarray((z * tw + x0) * 4, (z * tw + x1 + 1) * 4), (z * tw + x0) * 4);
+  else out.set(made.base);
+  // (Within the window, the box round it, if any: what stands further off than `far` tiles from it is passed over.)
+  const box = window?.reduce((b, r) => [Math.min(b[0], r[0]), Math.min(b[1], r[1]), Math.max(b[2], r[2]), Math.max(b[3], r[3])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const far = (x0: number, z0: number, x1: number, z1: number): boolean => !!box && (x1 + 3 < box[0] || x0 - 3 > box[2] || z1 + 3 < box[1] || z0 - 3 > box[3]);
+  const within = (x: number, z: number): boolean => !window || window.some((r) => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]);
   // (Never the outermost tiles: they stay as the land beyond the town.)
-  const inside = (x: number, z: number) => x > 0 && z > 0 && x < tw - 1 && z < td - 1;
+  const inside = (x: number, z: number) => x > 0 && z > 0 && x < tw - 1 && z < td - 1 && within(x, z);
   const add = (x: number, z: number, channel: number, amount: number): void => {
     if (!inside(x, z)) return;
     const o = (z * tw + x) * 4 + channel;
@@ -209,8 +217,9 @@ export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Arr
       }
     }
   };
-  for (const e of world.walls) foot(e, M.wall, 0);
+  for (const e of world.walls) if (!far(e.x, e.z, e.x, e.z)) foot(e, M.wall, 0);
   for (const e of world.fences ?? []) {
+    if (far(e.x, e.z, e.x, e.z)) continue;
     if (e.kind === 'gate') {
       // Feet through a gate.
       const [dx, dz] = e.axis === 'h' ? [0, 1] : [1, 0];
@@ -221,7 +230,7 @@ export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Arr
   const rooms = world.rooms;
   const outdoors = (x: number, z: number) => x >= 0 && z >= 0 && x < tw && z < td && rooms[z * world.width + x] === 0;
   for (const o of world.openings) {
-    if (o.kind !== 'door' || o.z > td || (o.axis === 'v' && o.z >= td)) continue;
+    if (o.kind !== 'door' || o.z > td || (o.axis === 'v' && o.z >= td) || far(o.x, o.z, o.x, o.z)) continue;
     const [dx, dz] = o.axis === 'h' ? [0, 1] : [1, 0];
     const [inX, inZ] = [o.x - dx, o.z - dz];
     for (const [x, z, s] of [[o.x, o.z, 1], [inX, inZ, -1]] as const) {
@@ -242,7 +251,7 @@ export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Arr
   }
   // Under and round the things that wear the lawn or stand in soil, and the darker grass under a tree.
   for (const o of world.objects) {
-    if (o.z >= td || !outdoors(o.x, o.z)) continue;
+    if (o.z >= td || far(o.x, o.z, o.x + o.w, o.z + o.d) || !outdoors(o.x, o.z)) continue;
     const kind = THINGS.find(([re]) => re.test(o.def))?.[1];
     if (!kind) continue;
     const amount = M[kind];

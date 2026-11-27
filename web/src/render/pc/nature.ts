@@ -50,7 +50,7 @@ import { padGeometry, padMask, padsOf } from '../shared/pads';
 import { LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
-import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask, type LawnPlacement, type Woods } from '../shared/nature';
+import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnChanges, lawnLayer, lawnMask, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnLayer, type LawnMask, type LawnPlacement, type Woods } from '../shared/nature';
 import { smoothstep } from '../../game/noise';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
@@ -112,8 +112,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private lawn: LawnLayer<Instances>[] = [];
   /** The lawn's grass (built with the rest; none before). */
   private grass: Grass | null = null;
-  /** What the lawn was last fitted to (`refreshLawn`). */
-  private lawnInputs: LawnInputs | null = null;
+  /** The world the lawn was last fitted to (`refreshLawn`). */
+  private lawnWorld: WorldStructure | null = null;
   /** What `refreshLawn` last hid, for the lawn built again since (`rebuild`). */
   private lawnMask: LawnMask | null = null;
   /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
@@ -396,15 +396,18 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    */
   refreshLawn(world: WorldStructure): void {
     this.world = world;
-    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do.)
-    const inputs = perfTime('lawn: inputs', () => lawnInputs(world));
-    if (this.lawnInputs && sameLawnInputs(this.lawnInputs, inputs)) return;
-    this.lawnInputs = inputs;
-    const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world)));
+    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do. Else made again
+    // only round what changed, all of it the first time.)
+    const was = this.lawnWorld;
+    const rects = was && perfTime('lawn: inputs', () => lawnChanges(was, world));
+    if (rects && !rects.length) return;
+    const change = was && rects ? { was, rects } : null;
+    this.lawnWorld = world;
+    const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world, this.lawnMask, rects)));
     perfTime('lawn: flowers', () => hideLawn(this.lawn, mask, uploadLawn));
     // (Its bare tiles kept for the birds, who ask next.)
-    const bare = perfTime('lawn: bare tiles', () => keepBareTiles(world, inputs, mask));
-    perfTime('lawn: grass', () => this.grass?.refresh(world, mask, bare));
+    const bare = perfTime('lawn: bare tiles', () => keepBareTiles(world, mask, change));
+    perfTime('lawn: grass', () => this.grass?.refresh(world, mask, bare, change));
   }
 
   /**

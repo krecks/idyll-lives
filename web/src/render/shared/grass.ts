@@ -22,7 +22,7 @@ import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { RGB } from './environment';
 import { lawnMap } from './lawn';
 import { updateGroundShade, type TexelRect } from './groundShade';
-import { bareTiles, lawnMask, splitHalf, WIND, type LawnMask } from './nature';
+import { bareTiles, lawnMask, splitHalf, WIND, type LawnChange, type LawnMask } from './nature';
 import { fbm, smoothstep } from '../../game/noise';
 
 /** Blades a patch at full density (`GRASS.perPatch`), and the draws: each a step of √2 sparser (`GRASS.lods`). */
@@ -288,99 +288,90 @@ function byte(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v * 255)));
 }
 
-/** What `townGrass` changed: the town tiles whose mask it made again and the shade's texels (null: all of them). */
+/** What `townGrass` changed: the town tiles whose mask it made again and the shade's texels (rectangles, last ones included; null: all of them). */
 export interface TownGrassChange {
-  tiles: Uint8Array | null;
+  tiles: TexelRect[] | null;
   shade: TexelRect[] | null;
 }
+
+/** The world each field's town mask was last made for (`townGrass`). */
+const madeFor = new WeakMap<GrassField, WorldStructure>();
 
 /**
  * The lawn as it grows on the town's ground now, into `field.town` (and the patches with any grass
  * again): none indoors (on a tile split by a diagonal wall, on its indoor half), under furniture,
  * on patios, streets, paths and fields, nor within `GRASS.wallClear` of a wall. And the lawn's map
  * (`field.lawn`, `shared/lawn.ts`) and the ground's shade (`field.shade`). `mask`, `bare`: the
- * world's `lawnMask` and `bareTiles`, if the caller has them. Says what it changed.
+ * world's `lawnMask` and `bareTiles`, if the caller has them. `change`: what changed since the world
+ * the field was last made for (`lawnChanges`): only its tiles are made again (a big world's mask is
+ * millions of texels); else, or since another world, all of them. Says what it changed.
  */
-export function townGrass(field: GrassField, world: WorldStructure, mask: LawnMask = lawnMask(world), bare: Uint8Array = bareTiles(world, mask)): TownGrassChange {
+export function townGrass(field: GrassField, world: WorldStructure, mask: LawnMask = lawnMask(world), bare: Uint8Array = bareTiles(world, mask), change?: LawnChange | null): TownGrassChange {
   const n = GRASS.townTexels;
   const [tw, td] = [world.width, groundDepth(world)];
   const W = tw * n;
   const D = td * n;
-  const town = field.town.length === W * D ? field.town : new Uint8Array(W * D);
+  const sized = field.town.length === W * D;
+  const town = sized ? field.town : new Uint8Array(W * D);
+  // (The ground's rows of the change's rectangles.)
+  const rects = sized && change && madeFor.get(field) === change.was ? change.rects.filter((r) => r[1] < td).map((r): TexelRect => [r[0], r[1], r[2], Math.min(td - 1, r[3])]) : null;
+  madeFor.set(field, world);
   field.town = town;
   field.townW = W;
   field.townD = D;
-  // What the grass is like, tile by tile (its tone, worn earth, mown or rough): again whatever changed.
-  field.lawn = lawnMap(world, bare, field.lawn);
-  // The shade on the ground round what stands on it (again only round what changed).
-  const shaded = updateGroundShade(world, n, field.shade);
+  // What the grass is like, tile by tile (its tone, worn earth, mown or rough).
+  field.lawn = lawnMap(world, bare, field.lawn, rects);
+  // The shade on the ground round what stands on it.
+  const shaded = updateGroundShade(world, n, field.shade, rects && rects.map((r): TexelRect => [r[0] * n, r[1] * n, (r[2] + 1) * n - 1, (r[3] + 1) * n - 1]));
   field.shade = shaded.shade;
-  const walls = wallSegments(world, tw, td);
-  // Only the tiles whose lawn could have changed since the last time (furniture, rooms, walls: a lot
-  // shown or edited), the whole town the first time: a big world's mask is millions of texels.
-  const wallKeys = new Map<number, string>();
-  for (const [t, segs] of walls) wallKeys.set(t, segs.map((g) => g.join(',')).join(';'));
-  const before = field.town === town && lawnState.get(field);
-  const tiles = new Uint8Array(tw * td);
-  let changed = 0;
-  const mark = (t: number): void => {
-    if (tiles[t]) return;
-    tiles[t] = 1;
-    changed++;
-  };
-  if (before && before.bare.length === bare.length) {
-    for (let t = 0; t < tw * td; t++) if (before.bare[t] !== bare[t]) mark(t);
-    for (const [t, key] of wallKeys) if (before.walls.get(t) !== key) mark(t);
-    for (const t of before.walls.keys()) if (!wallKeys.has(t)) mark(t);
-    // (A split tile's diagonal: what matters only where the tile is split, `bare` 2 or more.)
-    for (const [t, axis] of mask.splitAxis) if (t < tw * td && bare[t] > 1 && before.split.get(t) !== axis) mark(t);
-    for (const t of before.split.keys()) if (t < tw * td && bare[t] > 1 && !mask.splitAxis.has(t)) mark(t);
-  } else for (let t = 0; t < tw * td; t++) mark(t);
-  lawnState.set(field, { bare, walls: wallKeys, split: new Map(mask.splitAxis) });
-  const all = !before || changed === tw * td;
-  if (!changed) return { tiles: new Uint8Array(0), shade: shaded.changed };
-  for (let tz = 0; tz < td; tz++) {
-    for (let tx = 0; tx < tw; tx++) {
-      const t = tz * tw + tx;
-      if (!tiles[t]) continue;
-      for (let j = tz * n; j < (tz + 1) * n; j++) {
-        for (let i = tx * n; i < (tx + 1) * n; i++) {
-          const fx = (i + 0.5) / n;
-          const fz = (j + 0.5) / n;
-          let grows = bare[t] === 0;
-          if (bare[t] > 1) {
-            // A split tile: grass on its outdoor half only.
-            grows = splitHalf(mask.splitAxis.get(t) ?? 'dp', fx - tx, fz - tz) !== bare[t] - 2;
+  if (rects && !rects.length) return { tiles: [], shade: shaded.changed };
+  const tiles = rects ?? [[0, 0, tw - 1, td - 1]];
+  const walls = wallSegments(world, tw, td, tiles);
+  for (const [x0, z0, x1, z1] of tiles) {
+    for (let tz = z0; tz <= z1; tz++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const t = tz * tw + tx;
+        for (let j = tz * n; j < (tz + 1) * n; j++) {
+          for (let i = tx * n; i < (tx + 1) * n; i++) {
+            const fx = (i + 0.5) / n;
+            const fz = (j + 0.5) / n;
+            let grows = bare[t] === 0;
+            if (bare[t] > 1) {
+              // A split tile: grass on its outdoor half only.
+              grows = splitHalf(mask.splitAxis.get(t) ?? 'dp', fx - tx, fz - tz) !== bare[t] - 2;
+            }
+            if (grows && nearWall(walls.get(t), fx, fz)) grows = false;
+            town[j * W + i] = grows ? 255 : 0;
           }
-          if (grows && nearWall(walls.get(t), fx, fz)) grows = false;
-          town[j * W + i] = grows ? 255 : 0;
         }
       }
     }
   }
-  markPatches(field, all ? null : tiles);
-  return { tiles: all ? null : tiles, shade: shaded.changed };
+  markPatches(field, rects);
+  return { tiles: rects, shade: shaded.changed };
 }
 
-/** What each field's town mask was last made from (`townGrass`), by tile: its bare tiles, walls and split tiles' diagonals. */
-const lawnState = new WeakMap<GrassField, { bare: Uint8Array; walls: Map<number, string>; split: Map<number, string> }>();
-
-/** Wall edges and diagonals as segments, by the town tiles they pass through or touch. */
-function wallSegments(world: WorldStructure, tw: number, td: number): Map<number, [number, number, number, number][]> {
+/** Wall edges and diagonals as segments, by the town tiles they pass through or touch; only those of the tiles in `rects`. */
+function wallSegments(world: WorldStructure, tw: number, td: number, rects: readonly TexelRect[]): Map<number, [number, number, number, number][]> {
   const byTile = new Map<number, [number, number, number, number][]>();
   const add = (ax: number, az: number, bx: number, bz: number): void => {
     const seg: [number, number, number, number] = [ax, az, bx, bz];
-    for (let z = Math.max(0, Math.min(az, bz) - 1); z <= Math.min(td - 1, Math.max(az, bz)); z++) {
-      for (let x = Math.max(0, Math.min(ax, bx) - 1); x <= Math.min(tw - 1, Math.max(ax, bx)); x++) {
-        const i = z * tw + x;
-        const list = byTile.get(i);
-        if (list) list.push(seg);
-        else byTile.set(i, [seg]);
+    for (const [x0, z0, x1, z1] of rects) {
+      for (let z = Math.max(z0, Math.min(az, bz) - 1); z <= Math.min(z1, td - 1, Math.max(az, bz)); z++) {
+        for (let x = Math.max(x0, Math.min(ax, bx) - 1); x <= Math.min(x1, tw - 1, Math.max(ax, bx)); x++) {
+          const i = z * tw + x;
+          const list = byTile.get(i);
+          if (list) list.push(seg);
+          else byTile.set(i, [seg]);
+        }
       }
     }
   };
+  // (Only walls touching the box round `rects`.)
+  const [bx0, bz0, bx1, bz1] = rects.reduce((b, r) => [Math.min(b[0], r[0]), Math.min(b[1], r[1]), Math.max(b[2], r[2]), Math.max(b[3], r[3])], [Infinity, Infinity, -Infinity, -Infinity]);
   // (The ground storey's only: the other storeys' rows follow its, and their first row's walls would clear its far edge.)
   for (const e of world.walls) {
+    if (e.x < bx0 - 1 || e.x > bx1 + 1 || e.z < bz0 - 1 || e.z > bz1 + 1) continue;
     if (e.axis === 'h') {
       if (e.z <= td) add(e.x, e.z, e.x + 1, e.z);
     } else if (e.z < td) add(e.x, e.z, e.x, e.z + 1);
@@ -423,33 +414,21 @@ export function markGrassPatches(field: GrassField): void {
 }
 
 /**
- * Marks the patches with any grass (`field.patches`): all of them, or (`tiles`) only those near the town tiles
- * marked there, whose mask changed.
+ * Marks the patches with any grass (`field.patches`): all of them, or (`rects`) only those near the town tiles
+ * there (last ones included), whose mask changed.
  */
-function markPatches(field: GrassField, tiles: Uint8Array | null): void {
+function markPatches(field: GrassField, rects: readonly TexelRect[] | null): void {
   const p = GRASS.patch;
-  if (!tiles) {
+  if (!rects) {
     field.patches.fill(0);
     for (let j = 0; j < field.pd; j++) for (let i = 0; i < field.pw; i++) markPatch(field, i, j);
     return;
   }
   // (A patch reads the mask a texel past its edges: those a tile's change could reach, and one more each way.)
-  const tw = field.townW / GRASS.townTexels;
-  const todo = new Uint8Array(field.pw * field.pd);
-  for (let t = 0; t < tiles.length; t++) {
-    if (!tiles[t]) continue;
-    const [tx, tz] = [t % tw, Math.floor(t / tw)];
-    const i0 = Math.max(0, Math.floor((tx - field.x0) / p) - 1);
-    const i1 = Math.min(field.pw - 1, Math.floor((tx + 1 - field.x0) / p) + 1);
-    const j0 = Math.max(0, Math.floor((tz - field.z0) / p) - 1);
-    const j1 = Math.min(field.pd - 1, Math.floor((tz + 1 - field.z0) / p) + 1);
-    for (let j = j0; j <= j1; j++) {
-      for (let i = i0; i <= i1; i++) {
-        if (todo[j * field.pw + i]) continue;
-        todo[j * field.pw + i] = 1;
-        markPatch(field, i, j);
-      }
-    }
+  for (const [x0, z0, x1, z1] of rects) {
+    const [i0, j0] = [Math.max(0, Math.floor((x0 - field.x0) / p) - 1), Math.max(0, Math.floor((z0 - field.z0) / p) - 1)];
+    const [i1, j1] = [Math.min(field.pw - 1, Math.floor((x1 + 1 - field.x0) / p) + 1), Math.min(field.pd - 1, Math.floor((z1 + 1 - field.z0) / p) + 1)];
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) markPatch(field, i, j);
   }
 }
 
