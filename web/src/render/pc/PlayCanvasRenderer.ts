@@ -2244,6 +2244,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // it moved.)
     const shaped = this.lot.landscape;
     const taken = shaped?.heightField ? shaped.takeRoads(world) : [];
+    // (Solved there and then: what was placed on the surface before, the other lots' gates and maybe the traffic
+    // lights' poles, stands on it again. The sun's shadows are taken again once everyone is home, `buildSims`.)
+    if (taken.length) this.regroundPlaced();
     if (shaped && taken.length) void this.queueLand('land: roads taken', async () => {
       // (Behind the world's build and the warm-up, not in their way: on the way into a game, the land moved by a few
       // centimetres round its junctions.)
@@ -3843,18 +3846,24 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved();
     if (!surface || !this.builtWorld) return;
     if (this.street.landMoved(surface)) this.streamStreet();
-    // (Those that look the ground up only when placed: the traffic lights' poles, the cars standing, the parked rides,
-    // the other lots' gates.)
-    this.signals.setGround(this.builtGround);
-    this.cars.setGround(this.builtGround);
-    this.parkedRides.setGround(this.builtGround);
-    if (this.townGates) regroundGates(this.townGates, this.builtGround);
+    this.regroundPlaced();
     const view = this.view;
     const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     if (at < 0) return;
     const datum = surface.padY(at);
     this.applyDatum(datum);
     this.street.setLotY(datum);
+  }
+
+  /**
+   * Those that look the ground up only when placed stand on the surface again (solved again: a land stroke, a world's
+   * roads taken on): the traffic lights' poles, the cars standing, the parked rides, the other lots' gates.
+   */
+  private regroundPlaced(): void {
+    this.signals.setGround(this.builtGround);
+    this.cars.setGround(this.builtGround);
+    this.parkedRides.setGround(this.builtGround);
+    if (this.townGates) regroundGates(this.townGates, this.builtGround);
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {
