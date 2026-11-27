@@ -29,8 +29,9 @@ and fingerpost on one 1 m tile.
 - **Five-bar gate** (`gates.rs`): two oak posts with caps, five bars, two stiles, a diagonal brace and three iron
   hinges with a latch. The leaf is fixed shut; it is scenery, not an animated gate. 1.9 m: a small field gate (they
   are made 5 to 14 ft wide).
-- **Stone stile** (`walls.rs`): a length of the wall a course lower (0.96 m), with two through-stones standing out of
-  each face as steps, 0.3 m apart (BS 5709's step) and staggered, so the climb goes up one side and down the other.
+- **Stone stile** (`walls.rs`, 856 triangles; redone 2026-11-28): a short wall (three courses, 0.75 m, a dark heart)
+  with a flat cap stone on each end pier and a wide flat slab between them to cross on, two stone blocks built up
+  against each face as steps (0.27 m each, the lower one deeper), and an oak hand post up through one pier.
 - **Fingerpost** (`gates.rs`): an iron post on a stone footing with a ball finial and three white arms with pointed
   ends, 2.1 to 2.5 m up, at a T junction: two along the lane (0° and 180°) and one down the side lane (90°, to the
   front). The arms reach 0.5 m from the post, so the two along the lane span its tile (a real one's are 0.6 m and
@@ -52,7 +53,8 @@ and fingerpost on one 1 m tile.
 - **The gate does not open.** No interaction or clip; it matches the static field-boundary set.
 - **Content group.** The five objects are in `web/public/content/countryside.json` under the existing `community` /
   `countryside` group, so no new group, content file or `base.json` include is needed.
-- **Stile reworked (2026-11-27).** A step stile over a low stone wall (two courses and a coping, 0.45 m): an oak post
+- **Stile redone (2026-11-28)** as above (the oak treads on legs and the on-edge coping were unclear). Earlier:
+  **reworked (2026-11-27).** A step stile over a low stone wall (two courses and a coping, 0.45 m): an oak post
   at each end and an oak tread on legs against each face (0.25 m up, 0.25 m down). The through-stones are gone; the
   model now also paints `oak` ("Wood").
 

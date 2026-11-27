@@ -40,7 +40,7 @@ pub fn family() -> Family {
             Model::new("gate", gates::gate, (1.9, 1.35, 0.21))
                 .tolerance(0.03)
                 .paint(&[("oak", "Wood")]),
-            Model::new("stile", walls::stile, (0.94, 0.96, 0.9))
+            Model::new("stile", walls::stile, (0.95, 1.25, 0.9))
                 .tolerance(0.03)
                 .paint(&[("stone", "Stone"), ("oak", "Wood")]),
             Model::new("fingerpost", gates::fingerpost, (0.99, 2.70, 0.62))
