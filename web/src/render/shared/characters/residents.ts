@@ -435,8 +435,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private clock = 0;
   /** Frames posed (`update`): those far off are posed in full on their turn (`FAR_EVERY`, staggered by row). */
   private frameNo = 0;
-  /** Every resident posed in full every frame (`FAR_EVERY` off: to compare, from the console or a test). */
+  /** Every resident posed in full every frame (`FAR_EVERY` and the paused frames' `stillKey` off: to compare, from the console or a test). */
   everyFrame = false;
+  /**
+   * Paused, what residents are posed by: counted up whenever it changes (the snapshots and how far between them,
+   * the world, the tables, a prop built) and every frame the game runs. A resident posed in full twice at the same count
+   * (`stillAt`, `stillTwice`) is posed the same again, nothing of theirs moving: left as they are while it holds,
+   * the camera hasn't changed what of them is posed (`stillFlags`: `poseFar`, the face's morphs) and nothing moves
+   * them on the wall's clock (a voice line, a director).
+   */
+  private stillKey = 0;
+  private readonly stillAt = new Float64Array(MAX_CHARACTERS).fill(-1);
+  private readonly stillTwice = new Uint8Array(MAX_CHARACTERS);
+  private readonly stillFlags = new Uint8Array(MAX_CHARACTERS);
+  /** The paused frame's snapshots (their header and rows) and how far between them, as last compared (`stillKey`). */
+  private readonly stillFrame = { prev: new Float32Array(0), curr: new Float32Array(0), alpha: NaN, steps: NaN };
 
   /** Fixed-step playback: the animation's clock and the frames posed back to 0, so the same frames pose everyone the same. */
   restartClock(): void {
@@ -511,7 +524,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
           const keys = this.props.invalidate(url);
           if (!keys.length) return;
           this.props.hideStale();
-          const dispose = () => this.props.disposeStale();
+          // (Paused, those holding them are posed again: `stillKey`.)
+          const dispose = () => {
+            this.props.disposeStale();
+            this.stillKey++;
+          };
           void Promise.all(keys.map((key) => this.props.get(key, () => this.view.buildProp(key)))).then(dispose, dispose);
         })
       : () => {};
@@ -973,6 +990,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
       return { def: o.def, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, ride, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
+    this.stillKey++;
     this.restful.clear();
     for (const o of objects) {
       if (!o.restful) continue;
@@ -1012,6 +1030,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const set = this.set;
     const base = this.sims.find(Boolean);
     if (!set || !base) return;
+    this.stillKey++;
     const count = this.sims.length;
     const clips = ['idle', 'walk', 'talk', 'foldArms', 'idle', 'walk'];
     // Young adults of both genders in a T-shirt, trousers and sneakers.
@@ -1127,6 +1146,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   clear(): void {
     // (The next game's residents start on a clock of their own: what they do doesn't hang on how long this one ran.)
     this.restartClock();
+    this.stillKey++;
     this.sims = [];
     this.ghosts = [];
     this.restful.clear();
@@ -1168,7 +1188,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private prop(key: string): P | null {
     const known = this.props.built(key);
     if (known !== undefined) return known;
-    void this.props.get(key, () => this.view.buildProp(key));
+    // (Built, paused: those holding it are posed again, in its matrices: `stillKey`.)
+    void this.props.get(key, () => this.view.buildProp(key)).then(() => this.stillKey++);
     return null;
   }
 
@@ -1847,6 +1868,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.changeAction = layout.actions.indexOf('change');
     }
     const hasAction = k.action !== undefined && k.object !== undefined;
+    // Paused with nothing new to pose by: those posed twice since are left as posed (`stillKey`).
+    const paused = frameDt === 0 && playRate === 0 && this.debugRate === null && !stalled && !this.everyFrame && !this.force && !this.faceDebug;
+    if (!paused || !this.sameFrame(frame, H + count * S)) this.stillKey++;
 
     // Group conversations: those listening in (role 3, the one who started it as partner), and
     // the middle of each group, everyone in it counted.
@@ -1889,7 +1913,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const cx = curr[o + k.x];
       const cz = this.groundRow(curr[o + k.z]);
       // The hand out to a door's handle (the renderer's `doorHand`: the leaf's swing is timed to it).
-      if (rig) rig.doorHand = doorHand ? doorHand[i] : 0;
+      const door = doorHand ? doorHand[i] : 0;
+      const doorSame = rig?.doorHand === door;
+      if (rig) rig.doorHand = door;
       const pz = this.groundRow(prev[o + k.z]);
       const ch = k.height !== undefined ? curr[o + k.height] : 0;
       let tx = cx;
@@ -1986,6 +2012,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
         if (rig) rig.cover = 0;
         this.visible[i] = 0;
+        // (Paused, shown again: posed twice afresh before they're left as posed, `stillKey`.)
+        this.stillAt[i] = -1;
         // (Shown again: on the ground where they are then, not eased there from where they were.)
         this.landY[i] = NaN;
         if (rig) rig.visible = false;
@@ -2016,6 +2044,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
         continue;
       }
+      // Paused, posed twice already by what's the same now (`stillKey`): posed the same again, so left as they are. Not
+      // those the carry-along above leaves out either (others' poses hang on theirs, or their frame's blanket, hand prop
+      // and seed are gathered as they're posed).
+      const flags = this.poseFar[i] | (this.facePx[i] >= MORPH_PX ? 2 : 0);
+      if (paused && this.stillTwice[i] && this.stillAt[i] === this.stillKey && this.stillFlags[i] === flags && doorSame && rig.visible && !rig.speech && !this.directions[i] && curr[o + k.pose] !== Pose.Lie && rig.walkT < 0 && rig.cuddleBaby < 0 && this.heldBy[i] < 0 && !this.onPadOf[i] && !this.handProp[i]) {
+        if (this.mountId[i] >= 0) this.riddenNow.add(this.mountId[i]);
+        continue;
+      }
+      this.stillTwice[i] = this.stillAt[i] === this.stillKey ? 1 : 0;
+      this.stillAt[i] = this.stillKey;
+      this.stillFlags[i] = flags;
       // (Posed in full: as far on as the frames since it last was.)
       const dt = Math.min(FAR_LAG, frameDt + rig.lag);
       rig.lag = 0;
@@ -3295,6 +3334,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The tables seats face, with what is in front of them (`tableRooms`), by seat id: set with each world. */
   setTables(tables: Map<number, TableRoom>): void {
     this.tables = tables;
+    this.stillKey++;
     this.seatIds.clear();
     for (const [id] of tables) {
       const o = this.objectById.get(id);
@@ -4631,6 +4671,23 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.shadowPosed = shadowed || this.castGained;
     this.castGained = false;
     if (lo >= 0) this.view.uploadPoseRows(lo, hi - lo + 1);
+  }
+
+  /** Whether the frame's snapshots (their first `n` floats) and how far between them are the last paused frame's; kept for the next. */
+  private sameFrame(frame: FrameState, n: number): boolean {
+    const was = this.stillFrame;
+    let same = frame.alpha === was.alpha && frame.steps === was.steps && was.prev.length === n;
+    // (A NaN the same as a NaN: an unused field.)
+    for (let j = 0; same && j < n; j++) {
+      const [a, b, c, d] = [frame.prev[j], was.prev[j], frame.curr[j], was.curr[j]];
+      same = (a === b || (a !== a && b !== b)) && (c === d || (c !== c && d !== d));
+    }
+    if (same) return true;
+    if (was.prev.length !== n) [was.prev, was.curr] = [new Float32Array(n), new Float32Array(n)];
+    was.prev.set(frame.prev.subarray(0, n));
+    was.curr.set(frame.curr.subarray(0, n));
+    [was.alpha, was.steps] = [frame.alpha, frame.steps];
+    return false;
   }
 
   /** The seat a sitting Sim is on: the object they use if it's a seat, else the seat under them
