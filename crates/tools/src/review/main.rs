@@ -2,11 +2,11 @@
 
 use super::*;
 
-pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] [--check] [--update-baseline] [--seed-baseline] | uses [--md <dir>] [--check] | colours [--all] [--check] | facets [--all] [--check] | edges [--all] [--check] [keys] | texels [--all] [--check] [keys]";
+pub const USAGE: &str = "usage: cargo review sizes [--md <dir>] [--check] [--update-baseline] [--seed-baseline] | uses [--md <dir>] [--check] [--update-baseline] [--seed-baseline] | colours [--all] [--check] | facets [--all] [--check] | edges [--all] [--check] [keys] | texels [--all] [--check] [keys]";
 
 /// `cargo review <sizes|uses> [--md <dir>] [--check]`: the exit code (2: usage, or no reference for
 /// `sizes`; 1: an object of no kind, a `species` that isn't one, or `--check` found a row the baseline doesn't
-/// hold or a hard flag, a use the renderer can't play).
+/// hold or a hard flag, a use the renderer can't play, or a counted flag of `uses` past the baseline).
 pub fn main(args: &[String]) -> i32 {
     if args.first().map(String::as_str) == Some("colours") {
         return crate::colours::main(&args[1..]);
@@ -61,13 +61,17 @@ pub fn main(args: &[String]) -> i32 {
                 (text, files, code.max(baselined(&s.paths, &rows, args)?))
             }
             Some("uses") => {
-                let actions = action_keys(&s.read("web/src/render/shared/characters/actions.ts")?)
-                    .map_err(|e| format!("actions.ts: {e}"))?;
+                let renderer =
+                    Renderer::parse(&s.read("web/src/render/shared/characters/actions.ts")?)
+                        .map_err(|e| format!("actions.ts: {e}"))?;
                 let sounds = action_sounds(&s.read("web/src/audio/world.ts")?)
                     .map_err(|e| format!("world.ts: {e}"))?;
                 let motions = motions(&s.paths)?;
                 let (text, files, hard) =
-                    uses(&objects, &motions, &actions, &sounds, reference.as_ref());
+                    uses(&objects, &motions, &renderer, &sounds, reference.as_ref());
+                let sections =
+                    use_sections(&objects, &motions, &renderer, &sounds, reference.as_ref());
+                let counted = ratchet(&s.paths, "uses", &sections, args)?;
                 let hard = if check { hard } else { Vec::new() };
                 let code = if hard.is_empty() {
                     0
@@ -81,7 +85,7 @@ pub fn main(args: &[String]) -> i32 {
                     }
                     1
                 };
-                (text, files, code)
+                (text, files, code.max(counted))
             }
             _ => {
                 eprintln!("{USAGE}");

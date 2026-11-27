@@ -219,8 +219,8 @@ pub(super) fn run_gate(
     let mut stale = Vec::new();
     let seen: HashSet<&str> = checked.iter().map(String::as_str).collect();
     for check in baseline.checks() {
-        // (The built world's sections are its own gate's: `built`.)
-        if built::CHECKS.contains(&check) {
+        // (The built world's sections are its own gate's: `built`; `cargo review uses`' its own.)
+        if built::CHECKS.contains(&check) || crate::review::USES_CHECKS.contains(&check) {
             continue;
         }
         if !COUNTED.contains(&check) {

@@ -52,11 +52,11 @@ const USES_HEAD: &str = "| Object | Kind | Uses (id:anim) | Pose | Minutes | Eff
 pub fn uses(
     objects: &[Object],
     motions: &BTreeMap<String, Value>,
-    actions: &BTreeSet<String>,
+    renderer: &Renderer,
     sounds: &BTreeMap<String, String>,
     reference: Option<&Reference>,
 ) -> (String, BTreeMap<String, String>, Vec<String>) {
-    let flagged = flagged(objects, motions, actions, sounds, reference);
+    let flagged = flagged(objects, motions, renderer, sounds, reference);
     let hard: Vec<String> = flagged
         .iter()
         .flat_map(|(o, _, flags)| {
@@ -187,7 +187,7 @@ pub fn uses(
 fn flagged<'a>(
     objects: &'a [Object],
     motions: &BTreeMap<String, Value>,
-    actions: &BTreeSet<String>,
+    renderer: &Renderer,
     sounds: &BTreeMap<String, String>,
     reference: Option<&'a Reference>,
 ) -> Vec<(&'a Object, Option<&'a str>, Vec<Flag>)> {
@@ -206,8 +206,44 @@ fn flagged<'a>(
                 owners: &owners,
                 kind,
             };
-            let flags = use_flags(o, motions.get(&o.model), actions, &medians, decor, &heard);
+            let flags = use_flags(o, motions.get(&o.model), renderer, &medians, decor, &heard);
             (o, kind, flags)
+        })
+        .collect()
+}
+
+/// What `cargo review uses --check` ratchets by the baseline: each object's counted flags (`Flag::section`), a
+/// section of `USES_CHECKS` each.
+pub fn use_sections(
+    objects: &[Object],
+    motions: &BTreeMap<String, Value>,
+    renderer: &Renderer,
+    sounds: &BTreeMap<String, String>,
+    reference: Option<&Reference>,
+) -> Vec<Section<'static>> {
+    let flagged = flagged(objects, motions, renderer, sounds, reference);
+    USES_CHECKS
+        .iter()
+        .zip(&FLAG_COLUMNS[FLAG_COLUMNS.len() - USES_CHECKS.len()..])
+        .map(|(check, what)| Section {
+            check,
+            what,
+            tallies: flagged
+                .iter()
+                .map(|(o, _, flags)| {
+                    let here: Vec<String> = flags
+                        .iter()
+                        .filter(|f| f.section() == Some(check))
+                        .map(Flag::text)
+                        .collect();
+                    Tally {
+                        id: o.id.clone(),
+                        count: Some(here.len() as u64),
+                        text: here.join("; "),
+                        error: None,
+                    }
+                })
+                .collect(),
         })
         .collect()
 }

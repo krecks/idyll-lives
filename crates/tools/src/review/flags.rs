@@ -26,7 +26,19 @@ pub enum Flag {
         sound: String,
         kind: String,
     },
+    /// A `how` whose manner `MANNERS` has no entry for.
+    Manner { tag: String, manner: String },
+    /// A use that plays a `motions.uses` or `loops` clip but sounds of nothing, and isn't `"none"` by choice.
+    Silent { using: String },
+    /// Over a window (`overWindow`), shut at dusk with neither `motions.night` nor `sounds.shut`.
+    NoShut,
+    /// A seated use whose `sit` is the desk's hands (`sitHands`) on a thing with no top for them (`Object::top`).
+    DeskHands { using: String, anim: String },
 }
+
+/// The baseline's sections (tools/art/gate-baseline.json) `cargo review uses --check` ratchets, by object id,
+/// in `Flag::section`'s order.
+pub const USES_CHECKS: [&str; 4] = ["uses.manner", "uses.sound", "uses.shut", "uses.hands"];
 
 impl Flag {
     /// The column it is counted in.
@@ -38,17 +50,33 @@ impl Flag {
             Flag::NoOpen { .. } => "opens, no motions.open",
             Flag::Duration { .. } => "duration",
             Flag::OddSound { .. } => "odd sound",
+            Flag::Manner { .. } => "how not in MANNERS",
+            Flag::Silent { .. } => "clip, no sound",
+            Flag::NoShut => "overWindow, no shut",
+            Flag::DeskHands { .. } => "sat, desk hands",
+        }
+    }
+
+    /// The baseline section it is counted in (`USES_CHECKS`): it came into the gate after the objects it finds.
+    pub fn section(&self) -> Option<&'static str> {
+        match self {
+            Flag::Manner { .. } => Some(USES_CHECKS[0]),
+            Flag::Silent { .. } => Some(USES_CHECKS[1]),
+            Flag::NoShut => Some(USES_CHECKS[2]),
+            Flag::DeskHands { .. } => Some(USES_CHECKS[3]),
+            _ => None,
         }
     }
 
     /// Whether the gate fails on it: a use the renderer can't play, a `motions` key no use answers to,
     /// or a model that opens without a clip. A missing use, a duration and a sound are the reviewer's to
-    /// weigh — a table with no use of its own is still a table the sim uses as a station.
+    /// weigh — a table with no use of its own is still a table the sim uses as a station. The counted ones
+    /// (`section`) fail by the baseline instead.
     pub fn hard(&self) -> bool {
         !matches!(
             self,
             Flag::NoUse | Flag::Duration { .. } | Flag::OddSound { .. }
-        )
+        ) && self.section().is_none()
     }
 
     pub fn text(&self) -> String {
@@ -70,18 +98,35 @@ impl Flag {
             Flag::OddSound { using, sound, kind } => {
                 format!("{using}: sounds `{sound}`, which only a {kind} sounds")
             }
+            Flag::Manner { tag, manner } => {
+                format!("`how.{tag}` is `{manner}`, which `MANNERS` has no entry for")
+            }
+            Flag::Silent { using } => format!(
+                "{using}: plays a `motions` clip but sounds of nothing (a `sound`, or `\"none\"` for silence)"
+            ),
+            Flag::NoShut => {
+                "over a window, but shuts at dusk with no `motions.night` and no `sounds.shut`"
+                    .into()
+            }
+            Flag::DeskHands { using, anim } => format!(
+                "{using}: sat at `{anim}` with the desk's hands (`sitHands`), but it has no top for them (`surface`, `seatAt`, `layer: surface`)"
+            ),
         }
     }
 }
 
 /// The columns of `Flag::column`, in order.
-pub const FLAG_COLUMNS: [&str; 6] = [
+pub const FLAG_COLUMNS: [&str; 10] = [
     "no use",
     "anim not in ACTIONS",
     "motions key",
     "opens, no motions.open",
     "duration",
     "odd sound",
+    "how not in MANNERS",
+    "clip, no sound",
+    "overWindow, no shut",
+    "sat, desk hands",
 ];
 
 /// What a use's duration is compared with: the uses with the same animation (a night's sleep with sleeps, a nap
@@ -119,8 +164,7 @@ pub fn tag_medians(objects: &[Object]) -> BTreeMap<String, f32> {
         .collect()
 }
 
-/// What looks wrong in `object`'s uses: `motions` is its model's (None: none), `actions` the renderer's action
-/// tags, `medians` the minutes per `like_key` (`tag_medians`), and `decor` whether its kind expects no use.
+/// What looks wrong in `object`'s uses: `motions` is its model's (None: none), `renderer` the renderer's tables, `medians` the minutes per `like_key` (`tag_medians`), and `decor` whether its kind expects no use.
 /// What a use's sound is weighed against: the tag map (`ACTION_SOUNDS`), the sounds only one kind makes
 /// (`sound_owners`) and this object's kind.
 pub struct Sounds<'a> {

@@ -48,6 +48,7 @@ runs it again in `ll-tools`' tests: the tree has 0 errors.
 | `flipped` | faces over 1 cm² have normals turned against their winding (lit as if from behind) |
 | `flat` | a part flattened at rest shows its flat shape (crates/art/README.md, trap "Grown from nothing") |
 | `unplayed` | a clip plays for no use |
+| `unmoved` | where a model has more than one still part, a part but the one named `body` that no clip moves (a lid or a door left without its clip, or pieces never joined into the body); not one it carries (`_aside`), the part its content object takes in the hand (`held.part`), a held `tool.*`, a bird or a vehicle (their parts are moved by code). Counted against the baseline |
 | `cubic` | a clip has cubic-spline keys (played as straight lines) |
 | `cameras`, `lights` | the file has cameras or lights (the game drops them) |
 | `mirror` | mirror glass is see-through or isn't flat |
@@ -70,7 +71,11 @@ its count gets its findings as warnings; more, or any in a model the file doesn'
 new models are strict from the start. Fewer fail as stale until `cargo check-glb --update-baseline` lowers the
 entry: it only lowers counts and takes keys out, never raises or adds, so the file only shrinks. A check with no
 section is strict for every model. An entry that `accept`s a counted check takes its findings instead, and the
-file may keep none for it. `reference` is `cargo review sizes --check`'s, by object id (its own `--update-baseline`).
+file may keep none for it. `reference` is `cargo review sizes --check`'s, by object id (its own `--update-baseline`); `uses.manner`,
+`uses.sound`, `uses.shut` and `uses.hands` are `cargo review uses --check`'s, the same way (`review::USES_CHECKS`: a
+`how` no `MANNERS` entry answers, a use playing a `motions.uses`/`loops` clip with no sound and no `"none"`, an
+`overWindow` thing with neither `motions.night` nor `sounds.shut`, a seated use on the desk's hands, `sitHands`, with
+no top for them: content `surface`, `seatAt` or `layer: surface`).
 
 **Warnings** are what only an eye can judge, and the budgets' aims: a loop that ends turned (a fan a quarter round),
 a part turning over 12° in 1/60 s, a use's clip over 3 s, draw calls over the aim (3 for the still model, one more

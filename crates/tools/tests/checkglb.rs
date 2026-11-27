@@ -65,8 +65,11 @@ fn the_committed_baseline_is_in_its_format() {
     assert_eq!(baseline.text(), text);
     let known = known_keys(&paths).unwrap();
     for check in baseline.checks() {
-        // (The built world's are by sample, held by `cargo check-glb --built`: tools/ci-local.sh `built`.)
-        if ll_tools::checkglb::built::CHECKS.contains(&check) {
+        // (The built world's are by sample, held by `cargo check-glb --built`: tools/ci-local.sh `built`; `cargo
+        // review uses`' by object.)
+        if ll_tools::checkglb::built::CHECKS.contains(&check)
+            || ll_tools::review::USES_CHECKS.contains(&check)
+        {
             continue;
         }
         assert!(COUNTED.contains(&check), "{check}");
