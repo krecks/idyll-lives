@@ -205,6 +205,8 @@ export const STEP_IN: Record<string, StepIn> = {
   // balls; down at the play tent's door, crawling in to play on its mat and back out.
   ballPit: { by: bySize(BALL_PIT), over: BALL_PIT[0].fit.over },
   playTent: { by: bySize(PLAY_TENT) },
+  // The playhouse is walked into the same way, its door a metre out from its middle.
+  playhouse: { by: [[0, [PLAY_TENT[0].clip], { to: 1.1 }]] },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 export const LANE_SEQ = new Map<string, readonly string[]>();
