@@ -190,7 +190,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const pads = this.surface ? perfTime('nature: pads', () => this.padDraws(app, parent, grounds)) : { slabs: [], edges: [] };
     draws.push(...pads.slabs, ...pads.edges);
     this.grounds = grounds;
-    this.pads = pads;
     if (this.seaSheet) draws.push((this.sheet = perfTime('nature: water', () => this.water(app, parent))));
     // (A height field's water above the sea's level: its own, tile by tile.)
     if (this.heightField) for (let k = 0; k < this.tiles.length; k++) draws.push(...this.pond(k));
@@ -225,9 +224,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return { positions, colors };
   }
 
-  /** The terrain's draws (a big world's tiles, else the one), the pads' and the country roads' (and what draws those), as built: what `relay` draws again. */
+  /** The terrain's draws (a big world's tiles, else the one) and the country roads' (and what draws those), as built: what `relay` draws again (the pads': `padGroups`). */
   private grounds: pc.Entity[] = [];
-  private pads: { slabs: pc.Entity[]; edges: pc.Entity[] } = { slabs: [], edges: [] };
   private roadDraws: pc.Entity[] = [];
   private roadBuilder: RoadBuilder | null = null;
 
@@ -258,7 +256,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const dirty = this.padsChanged(changed?.rect ?? null);
     const pads = perfTime('nature: pads', () => this.padDraws(app, parent, this.grounds, dirty), dirty ? `${dirty.size} tiles` : 'all');
     const old = [...pads.gone, ...this.roadDraws];
-    this.pads = pads;
     await pace?.();
     if (!this.host) {
       for (const e of pads.made) e.destroy();
@@ -350,7 +347,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.flowerSquares = [];
     for (const e of this.others) e.destroy();
     this.grounds = [];
-    this.pads = { slabs: [], edges: [] };
     this.padGroups.clear();
     this.padList = [];
     this.roadDraws = [];
@@ -782,7 +778,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.builtMoved = false;
       await pace?.();
       if (!this.host) return null;
-      perfTime('land: pads and roads', () => this.redrawBuilt());
+      perfTime('land: pads and roads', () => this.redrawBuilt(box));
     }
     const grass = this.grass?.grassField;
     if (grass) {
@@ -809,14 +805,20 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     map.lay(this.tiles.map((t) => t.mi));
   }
 
-  /** The pads and the country roads drawn again, whole, on the surface as it is now (the land moved them: `landDone`). */
-  private redrawBuilt(): void {
+  /**
+   * The pads and the country roads drawn again on the surface as it is now (the land moved them: `landDone`): the pads
+   * in the ground tiles over `box` (m: where the ground was shaded again, so the slabs take its colours) and those
+   * round a pad that moved (`padsChanged`), the rest kept; the roads whole (one draw of them all).
+   */
+  private redrawBuilt(box: [number, number, number, number]): void {
     if (!this.host || !this.surface) return;
     const { app, parent } = this.host;
-    const old = [...this.pads.slabs, ...this.pads.edges, ...this.roadDraws];
-    const pads = (this.pads = this.padDraws(app, parent, this.grounds));
+    const dirty = this.padsChanged(null);
+    if (dirty) for (const k of this.tilesIn(box)) dirty.add(k);
+    const pads = this.padDraws(app, parent, this.grounds, dirty);
+    const old = [...pads.gone, ...this.roadDraws];
     this.roadDraws = this.roadBuilder ? this.roadBuilder(this.roads, parent) : [];
-    const fresh = [...pads.slabs, ...pads.edges, ...this.roadDraws];
+    const fresh = [...pads.made, ...this.roadDraws];
     const gone = new Set(old);
     this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
     this.drawsChanged(fresh, old);
@@ -1260,7 +1262,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    * of each per ground tile.
    */
   /**
-   * The ground tiles whose pads are to be drawn again for the surface as it is now (`relay`): those within reach of
+   * The ground tiles whose pads are to be drawn again for the surface as it is now (`relay`, `landDone`): those within reach of
    * a lot whose pad came, went or moved since they were drawn, and those over `land` (land rect: where the land
    * changed). Null: all of them (none drawn yet).
    */

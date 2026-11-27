@@ -248,10 +248,16 @@ function layCell(g: Geo, x: number, z: number, s: number, t: number, c: number, 
 /** Each paving's chunk keys (`streetGroundKey` without the viewed lot), by chunk. */
 const keysOf = new WeakMap<TownPaving, Map<number, string>>();
 
-/** The chunks the paved ground has a share in (the street plans them, `TownStreet.chunkIds`). */
-export function streetGroundChunks(world: StreetGroundWorld): number[] {
+/** Each paving's chunks (`streetGroundChunks`), and the ground's size they were found over. */
+const chunksOf = new WeakMap<TownPaving, { w: number; d: number; ids: readonly number[] }>();
+
+/** The chunks the paved ground has a share in (the street plans them, `TownStreet.chunkIds`, at every build). */
+export function streetGroundChunks(world: StreetGroundWorld): readonly number[] {
   const paving = townPaving(world);
   const [w, d] = groundOf(world);
+  // (A paving is made once and never changed, `townPaving`: its chunks over a ground of that size stay.)
+  const known = chunksOf.get(paving);
+  if (known && known.w === w && known.d === d) return known.ids;
   const tiles = paving.tiles(w, d);
   const ids = new Set<number>();
   // (A chunk with a paved tile: its rows looked along a tile at a time.)
@@ -264,7 +270,9 @@ export function streetGroundChunks(world: StreetGroundWorld): number[] {
     }
   }
   for (const id of shares(paving).keys()) ids.add(id);
-  return [...ids];
+  const out = [...ids];
+  chunksOf.set(paving, { w, d, ids: out });
+  return out;
 }
 
 /**

@@ -154,6 +154,8 @@ export class Grass {
   private readonly colour: pc.Texture;
   private town: pc.Texture;
   private lawn: pc.Texture;
+  /** The lawn's map as last sent to the GPU (`refresh`: sent again only when it changed). */
+  private lawnSent: Uint8Array;
   /** The residents pushing it (`setPushers`: x, z, strength each). */
   private readonly push = new Float32Array(GRASS_PUSHERS * 4);
   /**
@@ -193,6 +195,7 @@ export class Grass {
     this.colour = new pc.Texture(device, { name: 'grassColour', width: field.w, height: field.d, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [field.colour] });
     this.town = this.townTexture();
     this.lawn = this.lawnTexture();
+    this.lawnSent = field.lawn.slice();
     this.area = new Float32Array([field.x0, field.z0, 1 / field.w, 1 / field.d]);
     this.townSize[2] = field.margin;
     this.townSize[3] = field.margin + GRASS.toneFade;
@@ -302,16 +305,26 @@ export class Grass {
       this.town = this.townTexture();
       this.lawn.destroy();
       this.lawn = this.lawnTexture();
+      this.lawnSent = this.field.lawn.slice();
     } else {
       // The texels whose mask or shade changed (a thing bought: a few metres of a big world's millions).
       const rects = change.tiles && change.shade ? [...change.shade, ...tileRects(change.tiles, this.field.townW / GRASS.townTexels, GRASS.townTexels)] : undefined;
-      if (!rects || rects.length) {
+      if (!rects) {
         this.townTexels(this.town.lock() as Uint8Array, rects);
         this.town.unlock();
+      } else if (rects.length) {
+        // (Only their bounds up to the GPU: PlayCanvas's `unlock` sends the whole level, 13 MB on a 640 m world.)
+        const level = this.townTexels(this.town.getSource() as unknown as Uint8Array, rects);
+        uploadRect(this.town, level, rectBounds(rects), 2);
       }
-      const lawn = this.lawn.lock() as Uint8Array;
-      lawn.set(this.field.lawn);
-      this.lawn.unlock();
+      // The lawn's map, whole (its mips are made from it), and only when it changed: a thing bought indoors leaves it be.
+      const lawn = this.field.lawn;
+      if (!sameBytes(lawn, this.lawnSent)) {
+        const level = this.lawn.lock() as Uint8Array;
+        if (level !== lawn) level.set(lawn);
+        this.lawn.unlock();
+        this.lawnSent = lawn.slice();
+      }
     }
     this.setTown();
     this.stale = true;
@@ -454,4 +467,67 @@ function tileRects(tiles: Uint8Array, tw: number, n: number): TexelRect[] {
     out.push([x0 * n, z * n, (x1 + 1) * n - 1, (z + 1) * n - 1]);
   }
   return out;
+}
+
+/** The rectangle round all of `rects` (texels, last ones included). */
+function rectBounds(rects: readonly TexelRect[]): TexelRect {
+  const out: TexelRect = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [i0, j0, i1, j1] of rects) {
+    out[0] = Math.min(out[0], i0);
+    out[1] = Math.min(out[1], j0);
+    out[2] = Math.max(out[2], i1);
+    out[3] = Math.max(out[3], j1);
+  }
+  return out;
+}
+
+/** Whether `a` and `b` hold the same bytes. */
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/**
+ * What the rectangle upload reaches inside PlayCanvas 2.23 (pinned; `check:chunks` checks the names, as for
+ * `poseTexture.ts`, whose band upload this follows): the WebGPU device's `GPUDevice`, the texture's `GPUTexture`
+ * and GL object, and whether it is on the GPU yet.
+ */
+interface TextureInternals {
+  impl: { gpuTexture?: GPUTexture | null; _glTexture?: WebGLTexture | null };
+  _needsUpload: boolean;
+}
+
+/**
+ * Texels `rect` (last ones included) of `texture`'s level 0 (no mips), `data` (its CPU copy, `bytes` a texel), sent
+ * to the GPU alone: WebGPU's `GPUQueue.writeTexture` (no row alignment asked of a queue write), WebGL2's
+ * `texSubImage2D` with the copy's row length. A texture not on the GPU yet is sent whole by its first draw.
+ * Only RG8 on WebGL2 (the town's mask): its format and type are named here.
+ */
+function uploadRect(texture: pc.Texture, data: Uint8Array, rect: TexelRect, bytes: number): void {
+  const t = texture as pc.Texture & TextureInternals;
+  if (t._needsUpload) return;
+  const [i0, j0, i1, j1] = rect;
+  const [w, h] = [i1 - i0 + 1, j1 - j0 + 1];
+  const offset = (j0 * texture.width + i0) * bytes;
+  const device = texture.device;
+  if (device.isWebGPU) {
+    const gpu = t.impl.gpuTexture;
+    // SAFETY: PlayCanvas 2.23's WebGPU device keeps its `GPUDevice` in `wgpu` (tools/render/chunks.json).
+    if (gpu) (device as unknown as { wgpu: GPUDevice }).wgpu.queue.writeTexture({ texture: gpu, origin: [i0, j0, 0] }, data, { offset, bytesPerRow: texture.width * bytes, rowsPerImage: h }, { width: w, height: h });
+    else texture.upload();
+    return;
+  }
+  if (!(device instanceof pc.WebglGraphicsDevice) || !t.impl._glTexture) return void texture.upload();
+  // SAFETY: bound through the device's texture-unit cache and unpack state, so PlayCanvas's record stays true; the row
+  // length, which it never sets, is put back to 0 (tools/render/chunks.json).
+  device.activeTexture(0);
+  device.bindTexture(texture);
+  device.setUnpackFlipY(false);
+  device.setUnpackPremultiplyAlpha(false);
+  device.setUnpackAlignment(1);
+  const g = device.gl;
+  g.pixelStorei(g.UNPACK_ROW_LENGTH, texture.width);
+  g.texSubImage2D(g.TEXTURE_2D, 0, i0, j0, w, h, g.RG, g.UNSIGNED_BYTE, data, offset);
+  g.pixelStorei(g.UNPACK_ROW_LENGTH, 0);
 }
