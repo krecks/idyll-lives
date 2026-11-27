@@ -26,3 +26,16 @@ test('a resident walking into a held reflection nobody was in draws it again', (
   // Walking in front of it: drawn again.
   expect(due(2)).toBe(true);
 });
+
+test("a reflection draws again as often as its glass is big on screen, never more often than the preset's rate", async () => {
+  const { mirrorPeriod } = await import('../src/render/pc/mirrors');
+  // High (no rate): a small glass about 12 times a second, a big one in every frame, one between the two in between.
+  expect(mirrorPeriod(0.01, 0)).toBeCloseTo(1000 / 12);
+  expect(mirrorPeriod(0.5, 0)).toBe(0);
+  const mid = mirrorPeriod(0.085, 0);
+  expect(mid).toBeGreaterThan(0);
+  expect(mid).toBeLessThan(1000 / 12);
+  // Low and Medium (10 a second): their rate holds however big the glass.
+  expect(mirrorPeriod(0.01, 100)).toBe(100);
+  expect(mirrorPeriod(0.5, 100)).toBe(100);
+});

@@ -32,7 +32,8 @@
  * the last picture): again when the camera moves, the mirror moves (a cabinet's door), a resident in its
  * view moves, or the renderer says something else changed (`changed`: the sun, the lamps, things placed
  * or moving, a door swinging, a fan turning, a fire's or a screen's flicker), with a `rate` (Low and
- * Medium) at most that many times a second, without one (High) in the frame it changed. A held
+ * Medium) at most that many times a second, without one (High) in the frame it changed, and a small glass
+ * on screen at most `SMALL_RATE` times a second at every preset (`mirrorPeriod`). A held
  * reflection is looked up through the camera it was drawn for, so it stays on the glass while the camera
  * moves on (only its parallax lags, until the next draw). The picking that places the glasses and ranks
  * them runs only on the frames that may draw one. What moves only for the eye (the plants' sway, the
@@ -82,6 +83,22 @@ const MARGIN = 0.3;
 /** A resident's box round their head top: half its width, and how far it reaches down (m). */
 const RESIDENT_HALF = 0.4;
 const RESIDENT_DOWN = 1.9;
+/**
+ * How often a reflection draws again by its glass's share of the screen (its rectangle's area, as last drawn): a
+ * glass of `SMALL_SHARE` or less at most `SMALL_RATE` times a second, one of `BIG_SHARE` or more in every frame
+ * something in it changed, in between in between (the preset's `rate`, if lower, holds still). A small glass's
+ * parallax lagging a few frames isn't seen; a big one's is.
+ */
+const SMALL_SHARE = 0.02;
+const BIG_SHARE = 0.15;
+const SMALL_RATE = 12;
+
+/** The least time (ms) between two draws of a reflection whose glass covered `share` of the screen, under a preset's `period` (0: none). */
+export function mirrorPeriod(share: number, period: number): number {
+  const t = Math.min(1, Math.max(0, (share - SMALL_SHARE) / (BIG_SHARE - SMALL_SHARE)));
+  return Math.max(period, (1000 / SMALL_RATE) * (1 - t));
+}
+
 /** Milliseconds a draw may come before it is due (frames don't land on the time exactly). */
 const EARLY = 4;
 /** The camera counts as moved past this change in any of its view × projection's numbers. */
@@ -136,8 +153,10 @@ interface Reflection {
   owner: Item | null;
   drawnFace: Float32Array;
   drawnViewProj: Float32Array;
-  /** When the next draw is due (`frameNow()`), held to `rate`. */
+  /** When the next draw is due (`frameNow()`), held to `rate` and to its glass's size on screen (`mirrorPeriod`). */
   due: number;
+  /** Its glass's share of the screen when last drawn (0..1: its rectangle's area). */
+  share: number;
   /** Who it is being drawn for now, and something in it changed since it was drawn. */
   next: Item | null;
   dirty: boolean;
@@ -334,6 +353,7 @@ export class Mirrors {
       next: null,
       dirty: true,
       drawing: false,
+      share: 1,
       planes: new Float32Array(20),
       planeCount: 0,
       shows: new Float32Array(4),
@@ -523,8 +543,9 @@ export class Mirrors {
       }
       if (this.stale || !same(item.face, r.drawnFace, STILL) || this.seenMoving(r, viewProj, residents)) r.dirty = true;
       if (r.dirty && now >= r.due - EARLY) {
-        // Steady at `rate` while it keeps changing; after a still spell, not two draws in a row.
-        r.due = Math.max(r.due + period, now + period * 0.75);
+        // Steady at its rate while it keeps changing; after a still spell, not two draws in a row.
+        const every = mirrorPeriod(r.share, period);
+        r.due = Math.max(r.due + every, now + every * 0.75);
         this.draw(r, item);
       }
     }
@@ -710,6 +731,7 @@ export class Mirrors {
     const py1 = Math.min(th, Math.ceil(((Math.min(1, y1) + 1) / 2) * th) + PAD);
     if (px1 <= px0 || py1 <= py0) return;
     r.rect.set(px0 / tw, py0 / th, (px1 - px0) / tw, (py1 - py0) / th);
+    r.share = r.rect.z * r.rect.w;
     r.camera.rect = r.rect;
     r.camera.scissorRect = r.rect;
     // The projection narrowed to that rectangle (the viewport puts it back where it was).
