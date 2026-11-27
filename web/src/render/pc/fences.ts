@@ -2,7 +2,8 @@
  * Fences and gates the player builds on PlayCanvas: one mesh of every fence edge in its style, as
  * `shared/fences.ts` writes it (posts on the grid corners they share, a gate a framed leaf between
  * two stout posts), in the plain finish. A gate swings open for someone going through it
- * (`swingGate`) by moving its vertices in the one mesh: no draw of its own.
+ * (`swingGate`) by moving its vertices in the one mesh: no draw of its own, only its leaf's vertices
+ * sent up again, the mesh's box made once round every leaf swung open.
  */
 
 import * as pc from './engine';
@@ -17,11 +18,12 @@ export type { GateLeaf } from '../shared/fences';
 export interface Fences {
   entity: pc.Entity;
   gates: GateLeaf[];
-  /** The mesh, and its vertices as last uploaded (the leaves' are written into them as they swing). */
+  /** The mesh (its vertex buffer's copy on the CPU: the leaves' vertices are written into it as they swing). */
   mesh: pc.Mesh;
-  positions: Float32Array;
-  normals: Float32Array;
 }
+
+/** How far a leaf's corner swinging may stand past its box shut and open (m): a leaf is thin, its arc hardly bulges. */
+const SWING_PAD = 0.05;
 
 /**
  * Builds the mesh of all fences and gates under `parent` (null when there are none). Hedges are the
@@ -40,8 +42,25 @@ export function buildFences(
   const data = plan.geo.meshData({ colors: true });
   const mesh = meshFrom(app.graphicsDevice, data, plan.gates.length > 0 ? 'dynamic' : 'static');
   if (!mesh) return null;
+  // (Its box round the leaves standing open either way, made once: a swing then leaves it be.)
+  if (plan.gates.length) {
+    const [min, max] = [mesh.aabb.getMin().clone(), mesh.aabb.getMax().clone()];
+    for (const gate of plan.gates) {
+      for (const towards of [1, -1]) {
+        const { pos } = swungGate(gate, 1, towards);
+        for (let i = 0; i < pos.length; i += 3) {
+          min.set(Math.min(min.x, pos[i]), Math.min(min.y, pos[i + 1]), Math.min(min.z, pos[i + 2]));
+          max.set(Math.max(max.x, pos[i]), Math.max(max.y, pos[i + 1]), Math.max(max.z, pos[i + 2]));
+        }
+      }
+    }
+    const pad = new pc.Vec3(SWING_PAD, SWING_PAD, SWING_PAD);
+    const box = new pc.BoundingBox();
+    box.setMinMax(min.sub(pad), max.add(pad));
+    mesh.aabb = box;
+  }
   const entity = drawMesh(parent, 'fences', mesh, MaterialLibrary.for(app).plainFinish(), { castShadows: true });
-  return { entity, gates: plan.gates, mesh, positions: data.positions, normals: data.normals };
+  return { entity, gates: plan.gates, mesh };
 }
 
 /**
@@ -50,10 +69,23 @@ export function buildFences(
  */
 export function swingGate(fences: Fences, gate: GateLeaf, open: number, towards: number): void {
   const { pos, nor } = swungGate(gate, open, towards);
-  fences.positions.set(pos, gate.first * 3);
-  fences.normals.set(nor, gate.first * 3);
-  fences.mesh.setPositions(fences.positions);
-  fences.mesh.setNormals(fences.normals);
-  // (Its box follows the leaves standing open.)
-  fences.mesh.update(pc.PRIMITIVE_TRIANGLES, true);
+  writeLeaf(fences.mesh.vertexBuffer, pc.SEMANTIC_POSITION, gate.first, pos);
+  writeLeaf(fences.mesh.vertexBuffer, pc.SEMANTIC_NORMAL, gate.first, nor);
+}
+
+/** A leaf's `values` (x, y, z a vertex, from vertex `first`) into `vb`'s copy of stream `semantic`, and that span alone sent up: not the whole town's gates. */
+function writeLeaf(vb: pc.VertexBuffer, semantic: string, first: number, values: Float32Array): void {
+  const e = vb.format.elements.find((el) => el.name === semantic);
+  if (!e) return;
+  const copy = vb.lock();
+  const floats = copy instanceof ArrayBuffer ? new Float32Array(copy) : new Float32Array(copy.buffer, copy.byteOffset, copy.byteLength >> 2);
+  const start = e.offset + first * e.stride;
+  const n = values.length / 3;
+  for (let v = 0; v < n; v++) {
+    const o = (start + v * e.stride) / 4;
+    floats[o] = values[v * 3];
+    floats[o + 1] = values[v * 3 + 1];
+    floats[o + 2] = values[v * 3 + 2];
+  }
+  vb.unlock(start, (n - 1) * e.stride + 12);
 }
