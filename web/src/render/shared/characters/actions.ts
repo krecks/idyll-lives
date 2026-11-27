@@ -333,10 +333,8 @@ export const PUSH_ONLY: readonly string[] = ['push'];
 export const TOWEL_OUT = 0.8;
 /** Things stood on holding their grips (content `stand`): the vibration plate, its clip in a size per height (`PLATE_HOLD`). */
 export const GRIPPED: Record<string, readonly { clip: string; min: number }[]> = { 'lazy.vibePlate': PLATE_HOLD };
-/** Relaxing on foot (`ACTIONS.relax`): standing about, the arms folded now and then; at a fire (`WARM_AT`), the hands held out to it and rubbed. */
+/** Relaxing on foot (`ACTIONS.relax`): standing about, the arms folded now and then. */
 export const RELAX_STAND: readonly string[] = ['idle', 'foldArms'];
-export const WARM_HANDS: readonly string[] = ['warmHands'];
-export const WARM_AT = new Set(['firePit']);
 /** Showering (`ACTIONS.shower`), a grown-up's and a child's. */
 export const SHOWER_ONLY: readonly string[] = ['shower'];
 export const SHOWER_SMALL: readonly string[] = ['showerChild'];
@@ -576,18 +574,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
   eat: { stand: ['eat', 'idle'], upper: 'eat', hands: HANDS.hold, prop: (_, plate, _seated, carried) => biteOf(plate, carried) },
   // Sips from a mug (coffee, tea), spaced out.
   drink: { stand: ['drink', 'holdCup', 'holdCup'], upper: 'drink', between: 'holdCup', hands: HANDS.hold, prop: PROPS.mug },
-  cook: {
-    // (At an appliance on a counter, the microwave, the toaster: at it, not down at the floor.)
-    stand: (def) => (def === 'microwave' || def === 'breakfastCounter' ? ['spell', 'interact'] : ['spell', 'interact', 'spell', 'pickUp']),
-    sit: 'sitHands',
-    hands: HANDS.hold,
-  },
-  // (Seated at the dressing table, getting ready: brushing the hair in the mirror, clips/self.ts.)
-  wash: {
-    stand: ['spell', 'interact'],
-    upper: (def) => (def === 'dressingTable' ? 'brushHair' : ''),
-    hands: (def) => (def === 'dressingTable' ? HANDS.grip : HANDS.relaxed),
-  },
+  cook: { stand: ['spell', 'interact', 'spell', 'pickUp'], sit: 'sitHands', hands: HANDS.hold },
+  wash: { stand: ['spell', 'interact'], upper: '', hands: HANDS.relaxed },
   // Washing the hair, turning round, soaping, rinsing (clips/uses.ts; a child turns only the chest).
   shower: { stand: (_, height) => (height < SHOWER_CHILD ? SHOWER_SMALL : SHOWER_ONLY), hands: HANDS.open },
   bath: { hands: HANDS.open },
@@ -595,30 +583,20 @@ export const ACTIONS: Record<string, ActionAnim> = {
   sleep: { hands: HANDS.open },
   nap: { hands: HANDS.open },
   sit: { hands: HANDS.open },
-  // (At a fire on foot, warming the hands at it: `WARM_AT`.)
-  // (Beside the massage table, giving the massage: the hands at work on the one lying there.)
-  relax: { stand: (def) => (WARM_AT.has(def) ? WARM_HANDS : def === 'massageTable' ? ['interact', 'spell'] : RELAX_STAND), hands: HANDS.open },
+  relax: { stand: RELAX_STAND, hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   // (At a desk with a pen.)
   write: { stand: ['interact', 'spell'], sit: 'sitHands', hands: HANDS.hold, prop: PROPS.pen },
   // (The book in the hands.)
   read: { stand: ['lantern'], upper: 'lantern', hands: HANDS.hold, prop: PROPS.book },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
-  // Darts thrown and the table-tennis bat swung (mimed, closed hands: `clips/games.ts`); the pool table and the foosball
-  // rods have their clips in `STEP_IN`; toys down on the floor at the box; crouched at the low train table, the hands at
-  // its track; other games (the arcade's panel) the hands busy at it.
-  play: {
-    stand: (def) =>
-      def === 'dartboard' ? ['dartThrow'] : def === 'pingPongTable' ? ['pingPong'] : def === 'trainTable' ? ['crouch'] : ['spell'],
-    sit: 'sitHands',
-    hands: (def) => (def === 'dartboard' || def === 'pingPongTable' || def === 'poolTable' || def === 'foosball' ? HANDS.grip : HANDS.keys),
-    prop: (def) => (def === 'dartboard' ? PROPS.dart : def === 'pingPongTable' ? PROPS.bat : def === 'poolTable' ? PROPS.cue : null),
-  },
+  // Games (the arcade's panel): the hands busy at it.
+  play: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   // Keys and drums on the desk-hands clip; a cello is held upright between the knees.
   music: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   paint: { stand: ['spell', 'interact', 'spell'], hands: HANDS.hold },
   // (The plate-smash bin, the bouldering wall and the yoga mat have their clips in `STEP_IN`.)
-  exercise: { stand: ['jog'], sit: 'sitHands', hands: (def) => (def === 'yogaMat' ? HANDS.open : HANDS.grip) },
+  exercise: { stand: ['jog'], sit: 'sitHands', hands: HANDS.grip },
   run: { stand: ['jog'], hands: HANDS.grip },
   lift: { stand: ['pickUp'], hands: HANDS.grip },
   dance: { stand: ['dance'], hands: HANDS.relaxed },
@@ -633,32 +611,16 @@ export const ACTIONS: Record<string, ActionAnim> = {
   // The baby picked up out of the crib and held (`CUDDLE`).
   // (Fed from a bottle at the crib: what the feed holds, `PROP_ITEMS`.)
   cuddle: { stand: ['idle'], hands: HANDS.relaxed, prop: (_, plate) => (plate === 'babyBottle' ? PROPS.babyBottle : null) },
-  // Spoon-feeding the baby in the high chair, from beside it: the hand out to the baby's mouth and back. On a park bench,
-  // seed scattered for the birds from a bag on the lap.
-  feed: {
-    stand: ['interact', 'idle', 'interact', 'spell'],
-    sit: 'sit',
-    upper: (def) => (def === 'parkBench' ? 'scatter' : ''),
-    hands: HANDS.hold,
-    prop: (def) => (def === 'parkBench' ? PROPS.seed : null),
-  },
+  // Spoon-feeding the baby in the high chair, from beside it: the hand out to the baby's mouth and back.
+  feed: { stand: ['interact', 'idle', 'interact', 'spell'], sit: 'sit', upper: '', hands: HANDS.hold },
   // At the changing table, the baby on the pad (`CHANGE`): the hands busy over them.
   change: { stand: ['interact', 'spell'], hands: HANDS.relaxed },
   harvest: { stand: ['harvest', 'plant'], hands: HANDS.hold },
   prune: { stand: ['interact', 'spell', 'interact'], hands: HANDS.grip, prop: PROPS.secateurs },
   garden: { stand: ['harvest', 'plant'], hands: HANDS.hold },
-  tinker: {
-    // (The longcase clock wound at its trunk door, its weights' chains: no stoop to the floor.)
-    stand: (def) => (def === 'grandfatherClock' ? ['interact', 'spell'] : ['interact', 'spell', 'pickUp']),
-    sit: 'sitHands',
-    hands: HANDS.grip,
-  },
-  look: {
-    // (At the telescope bent down to its eyepiece: `STEP_IN`. At the town fountain, a coin tossed in for a wish.)
-    stand: (def) => (def === 'fountainTown' ? ['toss', 'idle', 'foldArms'] : ['idle', 'foldArms']),
-    hands: HANDS.relaxed,
-    prop: (def) => (def === 'fountainTown' ? PROPS.coin : null),
-  },
+  tinker: { stand: ['interact', 'spell', 'pickUp'], sit: 'sitHands', hands: HANDS.grip },
+  // (At the telescope bent down to its eyepiece: `STEP_IN`.)
+  look: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
   // Down to low flowers / up into a tree's crown (`activityPose` turns the head).
   smell: { stand: ['crouch'], hands: HANDS.relaxed },
   admire: { stand: ['idle', 'foldArms'], hands: HANDS.relaxed },
@@ -668,8 +630,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
   phoneScreen: { stand: ['phoneText'], sit: 'sit', upper: 'phoneText', hands: HANDS.hold, prop: PROPS.phoneHeld },
   listen: { stand: ['idle', 'foldArms'], hands: HANDS.open },
   meditate: { stand: ['idle'], hands: HANDS.open },
-  // (A coin into the giving jar.)
-  idle: { stand: (def) => (def === 'kind.givingJar' ? ['interact', 'idle'] : ['idle']), hands: HANDS.relaxed, prop: (def) => (def === 'kind.givingJar' ? PROPS.jarCoin : null) },
+  idle: { stand: ['idle'], hands: HANDS.relaxed },
   // A visitor at the front door: a knock, then waiting.
   knock: { stand: ['interact', 'idle'], hands: HANDS.relaxed },
   // Cooking, step by step (content `recipes`): ingredients from the fridge, chopping on the board,
@@ -720,8 +681,29 @@ export const MANNERS: Record<string, ActionAnim> = {
   raised: { stand: ['harvest'] },
   watering: { stand: ['water'], prop: PROPS.wateringCan },
   mist: { stand: ['water'], prop: () => null },
-  // Standing at it, the hands at work at its height, no stoop to the floor (`garden` at the bird feeder's box on its post).
+  // Standing at it, the hands at work at its height, no stoop to the floor (`garden` at the bird feeder's box on its
+  // post; `tinker` at the longcase clock's trunk door, its weights' chains; `relax` beside the massage table, the hands at
+  // work on the one lying there); at an appliance on a counter (`cook` at the microwave, the toaster).
   upright: { stand: ['interact', 'spell'] },
+  counter: { stand: ['spell', 'interact'] },
+  // Seated at the dressing table, getting ready (`wash`): brushing the hair in the mirror (clips/self.ts).
+  hair: { upper: 'brushHair', hands: HANDS.grip },
+  // At a fire on foot (`relax`), warming the hands at it, held out to it and rubbed.
+  warm: { stand: ['warmHands'] },
+  // Games (`play`): darts thrown and the table-tennis bat swung (mimed, closed hands: `clips/games.ts`); the pool table's
+  // cue and the foosball rods gripped (their clips in `STEP_IN`); crouched at the low train table, the hands at its track.
+  darts: { stand: ['dartThrow'], hands: HANDS.grip, prop: PROPS.dart },
+  bat: { stand: ['pingPong'], hands: HANDS.grip, prop: PROPS.bat },
+  cue: { hands: HANDS.grip, prop: PROPS.cue },
+  grip: { hands: HANDS.grip },
+  crouch: { stand: ['crouch'] },
+  // Open hands (`exercise` on the yoga mat, its clip in `STEP_IN`).
+  open: { hands: HANDS.open },
+  // On a park bench (`feed`), seed scattered for the birds from a bag on the lap.
+  seed: { upper: 'scatter', prop: PROPS.seed },
+  // A coin tossed in for a wish (`look` at the town fountain), or put in (`idle` at the giving jar).
+  wish: { stand: ['toss', 'idle', 'foldArms'], prop: PROPS.coin },
+  coin: { stand: ['interact', 'idle'], prop: PROPS.jarCoin },
   // Nothing in the hand (`prune` at the bonsai, shaped with wire by hand).
   handsFree: { prop: () => null },
   // Sport (`exercise`): punching a bag; a fitness game's dance and punches; shooting at a hoop, the basketball in the

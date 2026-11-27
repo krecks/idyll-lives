@@ -146,6 +146,7 @@
     },
     {
       "id": "kind.givingJar",
+      "how": { "idle": "coin" },
       "name": "Community giving jar",
       "model": "model.kind.givingJar",
       "footprint": [

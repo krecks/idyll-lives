@@ -35,6 +35,7 @@
     },
     {
       "id": "parkBench",
+      "how": { "feed": "seed" },
       "name": "Long park bench",
       "model": "model.parkBench",
       "footprint": [
@@ -288,6 +289,7 @@
     },
     {
       "id": "fountainTown",
+      "how": { "look": "wish" },
       "name": "Town fountain",
       "model": "model.fountainTown",
       "footprint": [
@@ -616,6 +618,7 @@
     },
     {
       "id": "pingPongTable",
+      "how": { "play": "bat" },
       "name": "Ping-pong table",
       "model": "model.pingPongTable",
       "footprint": [

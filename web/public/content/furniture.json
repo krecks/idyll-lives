@@ -526,6 +526,7 @@
     },
     {
       "id": "microwave",
+      "how": { "cook": "counter" },
       "name": "Microwave counter",
       "model": "model.microwave",
       "stations": [
@@ -623,6 +624,7 @@
     },
     {
       "id": "breakfastCounter",
+      "how": { "cook": "counter" },
       "name": "Breakfast counter",
       "model": "model.breakfastCounter",
       "stations": [
@@ -2535,6 +2537,7 @@
     },
     {
       "id": "dressingTable",
+      "how": { "wash": "hair" },
       "name": "Dressing table",
       "model": "model.dressingTable",
       "footprint": [
@@ -3826,6 +3829,7 @@
     },
     {
       "id": "poolTable",
+      "how": { "play": "cue" },
       "name": "Pool table",
       "model": "model.poolTable",
       "footprint": [
@@ -3885,6 +3889,7 @@
     },
     {
       "id": "foosball",
+      "how": { "play": "grip" },
       "name": "Foosball table",
       "model": "model.foosball",
       "footprint": [
@@ -3944,6 +3949,7 @@
     },
     {
       "id": "dartboard",
+      "how": { "play": "darts" },
       "name": "Dartboard",
       "model": "model.dartboard",
       "footprint": [
@@ -4109,6 +4115,7 @@
     },
     {
       "id": "yogaMat",
+      "how": { "exercise": "open" },
       "name": "Yoga mat",
       "model": "model.yogaMat",
       "footprint": [
@@ -4435,6 +4442,7 @@
     },
     {
       "id": "grandfatherClock",
+      "how": { "tinker": "upright" },
       "name": "Grandfather clock",
       "model": "model.grandfatherClock",
       "footprint": [
@@ -5027,6 +5035,7 @@
     },
     {
       "id": "firePit",
+      "how": { "relax": "warm" },
       "name": "Fire pit",
       "model": "model.firePit",
       "footprint": [

@@ -242,6 +242,7 @@
     },
     {
       "id": "trainTable",
+      "how": { "play": "crouch" },
       "name": "Train table",
       "model": "model.trainTable",
       "footprint": [
