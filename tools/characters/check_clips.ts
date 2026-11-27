@@ -66,12 +66,12 @@ const { CLIMB, CLIMB_LANES, climbClip, FOUNTAIN } = await import('../../web/src/
 const { BOULDER, FOOS, FOOS_LANES, foosClip, POOL, SMASH } = await import('../../web/src/render/shared/characters/clips/games.ts');
 const { feetDown, legTurn, perch, SEAT_FIT, seatSize } = await import('../../web/src/render/shared/characters/seatFit.ts');
 const { FLOOR_SITS } = await import('../../web/src/render/shared/characters/clips/seated.ts');
-const { BALL_PIT, PLAY_TENT } = await import('../../web/src/render/shared/characters/clips/play.ts');
+const { BALL_PIT, HOUSE_PLAY, PLAY_TENT } = await import('../../web/src/render/shared/characters/clips/play.ts');
 /** Seats whose top ends short of a child's knees (characters.ts `Seat.front`, `perch`). */
 const DEEP: [string, any][] = Object.entries(JSON.parse(readFileSync(new URL('../../web/src/render/shared/characters/furniture.json', import.meta.url), 'utf8')).seats).filter(([, s]: [string, any]) => s.front !== undefined) as [string, any][];
-const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE, SWING_S } = await import('../../web/src/render/shared/characters/clips/rides.ts');
+const { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, ROW, ROW_S, SLIDE, SWING_S } = await import('../../web/src/render/shared/characters/clips/rides.ts');
 const { CUT_ROSE, EYEPIECE, LECTERN, PICK_APPLE, PICK_HIGH, PICK_LEMON, SHOWER_CHILD } = await import('../../web/src/render/shared/characters/clips/uses.ts');
-const { BOARD, CLOCK, FEEDER, PUT_AWAY } = await import('../../web/src/render/shared/characters/clips/reach.ts');
+const { BOARD, CHEST, CLOCK, FEEDER, PRESS, PUT_AWAY } = await import('../../web/src/render/shared/characters/clips/reach.ts');
 const { SHOT, STREET_SHOT } = await import('../../web/src/render/shared/characters/clips/shot.ts');
 const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/shared/characters/clips/low.ts');
 const { TURN_ANGLES, turnClip, turnDef, turnSeconds, turnShare } = await import('../../web/src/render/shared/characters/clips/locomotion.ts');
@@ -92,9 +92,10 @@ const laned = (sizes: any[], lanes: readonly number[], name: (clip: string, lane
 /**
  * The clips made in sizes (the tallest first), as characters.ts `STEP_IN` uses them, with whether they loop and their
  * length (s): the fountain's, the climbing frame's and the games' (clips/street.ts, games.ts); children's play (play.ts);
- * the slide's round, the bunk's ladder and the rides (rides.ts); the telescope's eyepiece, the fruit trees and the
- * shower, a child's without the turn (uses.ts); reaching up to the wall cupboards, the clock, the feeder and the
- * whiteboard, the hoop shot and the low tops (reach.ts, shot.ts, low.ts).
+ * the slide's round, the bunk's ladder, the rides and the rowing machine (rides.ts); the telescope's eyepiece, the fruit
+ * trees and the shower, a child's without the turn (uses.ts); reaching up to the wall cupboards, the clock, the feeder
+ * and the whiteboard, into the chest freezer and to the doorbell, the hoop shot and the low tops (reach.ts, shot.ts,
+ * low.ts).
  */
 const SIZED: [sizes: Sized, loop: boolean, seconds: number][] = [
   [one(FOUNTAIN), true, 3],
@@ -105,6 +106,7 @@ const SIZED: [sizes: Sized, loop: boolean, seconds: number][] = [
   [one(BOULDER), true, 16],
   [one(BALL_PIT), true, 12],
   [one(PLAY_TENT), true, 24],
+  [one(HOUSE_PLAY), true, 24],
   [one(SLIDE), true, 14],
   [one(BUNK_UP), false, 7],
   [one(BUNK_DOWN), false, 6.5],
@@ -113,6 +115,7 @@ const SIZED: [sizes: Sized, loop: boolean, seconds: number][] = [
   [one(RIDE_SEESAW), true, 2.8],
   [one(RIDE_ROUND), true, 2.4],
   [one(RIDE_SWING), true, SWING_S],
+  [one(ROW), true, ROW_S],
   [one(EYEPIECE), true, 6],
   [one(PICK_APPLE), false, 3.3],
   [one(PICK_LEMON), false, 3.3],
@@ -124,6 +127,8 @@ const SIZED: [sizes: Sized, loop: boolean, seconds: number][] = [
   [one(CLOCK), true, 4.5],
   [one(FEEDER), true, 4],
   [one(BOARD), true, 6],
+  [one(CHEST), true, 6.4],
+  [one(PRESS), true, 4],
   [one(SHOT), true, 3.2],
   [one(STREET_SHOT), true, 3.2],
   [one(KNEEL_TABLE), true, 6],
@@ -139,7 +144,7 @@ const SOCIAL: Record<string, number> = {
 };
 /** Every clip the runtime plays (characters.ts ACTIONS / choose, reactions.ts) and whether it loops. */
 const RUNTIME: Record<string, boolean> = {
-  idle: true, talk: true, walk: true, jog: true, jogAlong: true, runAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true,
+  idle: true, talk: true, walk: true, jog: true, jogAlong: true, runAlong: true, sit: true, sitTalk: true, sitDown: false, standUp: false, sitHands: true, sitHandsNear: true, sitHandsFar: true, sitTieShoes: true,
   // On the floor (clips/seated.ts FLOOR_SITS): cross-legged on a cushion, on the ground against a trunk.
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, true], [`sitDown${name}`, false], [`standUp${name}`, false]])),
   interact: false, pickUp: false, dance: true, punchJab: false, punchCross: false, hit: false, kneel: true, crouch: true,
@@ -161,7 +166,7 @@ const RUNTIME: Record<string, boolean> = {
 const PHASE2: Record<string, boolean> = { lie: true, chop: true, stir: true, flip: true, drink: false, carry: true, carryOne: true, wave: false };
 /** Lengths (s) from the plan's clip table; within 15%. */
 const LENGTH: Record<string, number> = {
-  idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, runAlong: 0.6, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, interact: 2.0, pickUp: 0.87,
+  idle: 2.5, talk: 2.9, walk: 1.1, jog: 0.7, jogAlong: 0.7, runAlong: 0.6, sit: 1.7, sitTalk: 2.9, sitDown: 1.33, standUp: 1.07, sitHands: 1.7, sitHandsNear: 1.7, sitHandsFar: 1.7, sitTieShoes: 8, interact: 2.0, pickUp: 0.87,
   ...Object.fromEntries(FLOOR_SITS.flatMap(({ name }: any) => [[`sit${name}`, 1.7], [`sitDown${name}`, 1.6], [`standUp${name}`, 1.47]])),
   dance: 1.0, punchJab: 0.87, punchCross: 1.0, hit: 0.33, kneel: 5.2, crouch: 2.9, eat: 1.33, eatFork: 1.33, water: 3.8, harvest: 2.5, pick: 3, plant: 2.8, foldArms: 2.5,
   yes: 2.5, no: 2.5, phone: 2.9, lantern: 2.5, rail: 2.5, spell: 2.1, push: 2.7, babyLieAsleep: 9, babyLieAwake: 6,
@@ -450,6 +455,8 @@ function checkSeatedAndLying(sk: Skeleton, restAnkle: number): void {
     const seatedAt: [string, number][] = [
       ['sitTalk', 0],
       ['sitHands', 0],
+      ['sitTieShoes', 0],
+      ['sitTieShoes', 60],
       ['scatter', 0],
       ...SIT_LOW.map(({ clip }: any): [string, number] => [clip, 0]),
       ['sitDown', -1],

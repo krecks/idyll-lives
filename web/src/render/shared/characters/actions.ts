@@ -8,9 +8,9 @@
 import { BOULDER, DART_IN_HAND, FOOS, FOOS_LANES, POOL, SMASH, YOGA_AT, foosClip } from './clips/games';
 import { KNEEL_LANES, KNEEL_TABLE } from './clips/low';
 import { TOSS_LET_GO } from './clips/props';
-import { BALL_PIT, PLAY_TENT } from './clips/play';
-import { BOARD, CLOCK, CUPBOARD_OF, FEEDER, PUT_AWAY } from './clips/reach';
-import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, SLIDE } from './clips/rides';
+import { BALL_PIT, HOUSE_PLAY, PLAY_TENT } from './clips/play';
+import { BOARD, CHEST, CHEST_TO, CLOCK, CUPBOARD_OF, FEEDER, PRESS, PUT_AWAY } from './clips/reach';
+import { BUNK_DOWN, BUNK_UP, RIDE_HORSE, RIDE_ROUND, RIDE_SEESAW, RIDE_SPRING, RIDE_SWING, ROW, SLIDE } from './clips/rides';
 import { SHOT, STREET_SHOT } from './clips/shot';
 import { CLIMB, CLIMB_LANES, FOUNTAIN, type Size, climbClip } from './clips/street';
 import { CUT_ROSE, EYEPIECE, LECTERN, PICK_APPLE, PICK_HIGH, PICK_LEMON, PLATE_HOLD, SHOWER_CHILD } from './clips/uses';
@@ -69,7 +69,9 @@ export const DEFAULT_FADE = 0.25;
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
  * the blender on a counter, the chemistry bench pushed back on its tile, onto the dumbbell rack's mat, the
- * giving jar, up to the ironing board. (A thing stepped in to, `STEP_IN`, has its step instead.) Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
+ * giving jar, up to the ironing board, the toes at the chest freezer (its clips are fitted from there, `CHEST_TO`). (A
+ * thing stepped in to, `STEP_IN`, has its step instead.) Back from the statue, to look up at it. In beside the high
+ * chair, to feed the baby in it.
  */
 export const STAND_BACK: Record<string, number> = {
   highChair: -0.5,
@@ -91,6 +93,7 @@ export const STAND_BACK: Record<string, number> = {
   'kind.givingJar': -0.4,
   townStatue: 0.8,
   ironingBoard: -0.3,
+  chestFreezer: CHEST_TO - 1,
 };
 /**
  * Things hugged (the giant teddy, sitting on the floor): the hugger crouches down to it this far (m) from
@@ -202,9 +205,14 @@ export const STEP_IN: Record<string, StepIn> = {
   'garden.apple:eat': { by: bySize(PICK_APPLE, (clip) => [clip, ...EAT_FRUIT]) },
   'garden.lemonTree:harvest': { by: bySize(PICK_LEMON) },
   // Children's play (`clips/play.ts`): over the ball pit's rim into its middle, wading, jumping and sitting in the
-  // balls; down at the play tent's door, crawling in to play on its mat and back out.
+  // balls; down at the play tent's door (and the playhouse's), crawling in to play on its mat and back out.
   ballPit: { by: bySize(BALL_PIT), over: BALL_PIT[0].fit.over },
   playTent: { by: bySize(PLAY_TENT) },
+  playhouse: { by: bySize(HOUSE_PLAY) },
+  // Up to the doorbell on the wall, as to the whiteboard, its press the manner's (`press`, by height: `clips/reach.ts`);
+  // up to the coat hooks, a coat hung up on them as things are put away up in a wall cupboard (`high`).
+  doorbell: { by: bySize(PRESS, () => []) },
+  'coatHooks:fetch': { by: [[0, [], { to: -0.05 }]] },
 };
 /** One clip played alone (`StepIn.perLane`), by name. */
 export const LANE_SEQ = new Map<string, readonly string[]>();
@@ -264,6 +272,8 @@ export const RIDES: Record<string, Ride> = {
   seesaw: { sizes: RIDE_SEESAW },
   merryGoRound: { sizes: RIDE_ROUND },
   swingSet: { sizes: RIDE_SWING, sync: true },
+  // (Sat on its seat, which carries them; the stroke in time with its `stroke` loop.)
+  rowingMachine: { sizes: ROW, sync: true },
 };
 /**
  * The upper bunk's ladder (`BUNKS`): getting into the upper bunk the sleeper climbs up it from the tile in front
@@ -338,9 +348,11 @@ export const RELAX_STAND: readonly string[] = ['idle', 'foldArms'];
 /** Showering (`ACTIONS.shower`), a grown-up's and a child's. */
 export const SHOWER_ONLY: readonly string[] = ['shower'];
 export const SHOWER_SMALL: readonly string[] = ['showerChild'];
-/** Picking the apples (`ACTIONS.harvest` at a fruit tree): the size for a picker's height (m), the tallest first. */
-const PICK_HIGH_SEQ = PICK_HIGH.map(({ clip, min }) => [min, [clip]] as const);
-const pickHigh = (height: number): readonly string[] => (PICK_HIGH_SEQ.find(([min]) => height >= min) ?? PICK_HIGH_SEQ[PICK_HIGH_SEQ.length - 1])[1];
+/** A use sequence of one clip in sizes (the tallest first): the size for the user's height (m). */
+function sized(sizes: readonly { clip: string; min: number }[]): (def: string, height: number) => readonly string[] {
+  const seqs = sizes.map(({ clip, min }) => [min, [clip]] as const);
+  return (_, height) => (seqs.find(([min]) => height >= min) ?? seqs[seqs.length - 1])[1];
+}
 /** Crouched down (to hug the teddy, `HUGGED`). */
 export const CROUCH_ONLY: readonly string[] = ['crouch'];
 /** Seated objects whose activity uses the hands on a desk / keys. */
@@ -676,7 +688,7 @@ export const MANNERS: Record<string, ActionAnim> = {
   // house plant watered from a can; misted, no can (the terrarium, the bonsai's leaves, the hose reel's nozzle mimed).
   waist: { stand: ['pick'] },
   soil: { stand: ['plant', 'kneel'] },
-  bough: { stand: (_, height) => pickHigh(height) },
+  bough: { stand: sized(PICK_HIGH) },
   staked: { stand: ['harvest', 'water'] },
   raised: { stand: ['harvest'] },
   watering: { stand: ['water'], prop: PROPS.wateringCan },
@@ -704,6 +716,13 @@ export const MANNERS: Record<string, ActionAnim> = {
   // A coin tossed in for a wish (`look` at the town fountain), or put in (`idle` at the giving jar).
   wish: { stand: ['toss', 'idle', 'foldArms'], prop: PROPS.coin },
   coin: { stand: ['interact', 'idle'], prop: PROPS.jarCoin },
+  // Into the chest freezer (`fetch`): the lid lifted, bent over the rim and down into the well, up again, the lid let down
+  // (`clips/reach.ts`, by height, from `STAND_BACK`).
+  chest: { stand: sized(CHEST) },
+  // The doorbell rung (`knock`): a short press with the fingertips, by height, up at the wall (`STEP_IN`).
+  press: { stand: sized(PRESS), hands: HANDS.open },
+  // Sat on a bench putting shoes on (`sit` at the hall stand): bent down tying each in turn (`clips/seated.ts`).
+  shoes: { sit: 'sitTieShoes', hands: HANDS.hold },
   // Nothing in the hand (`prune` at the bonsai, shaped with wire by hand).
   handsFree: { prop: () => null },
   // Sport (`exercise`): punching a bag; a fitness game's dance and punches; shooting at a hoop, the basketball in the

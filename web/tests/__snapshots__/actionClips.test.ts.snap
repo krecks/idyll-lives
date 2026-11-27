@@ -57,7 +57,11 @@ exercise | yogaMat | stand=jog sit=sitHands upper=- hands=0.85 prop=-
 feed | * | stand=interact,idle,interact,spell sit=sit upper= hands=0.35 prop=-
 feed | parkBench | stand=interact,idle,interact,spell sit=sit upper=scatter hands=0.35 prop=seed
 fetch | * | stand=interact,pickUp,idle sit=- upper=- hands=0.35 prop=-
+fetch | chestFreezer | @child stand=chestFetch112 sit=- upper=- hands=0.35 prop=-
+fetch | chestFreezer | @teen stand=chestFetch147 sit=- upper=- hands=0.35 prop=-
+fetch | chestFreezer | @adult stand=chestFetch177 sit=- upper=- hands=0.35 prop=-
 fetch | chinaCabinet | stand=interact,idle sit=- upper=- hands=0.35 prop=-
+fetch | coatHooks | stand=interact,idle sit=- upper=- hands=0.35 prop=-
 fetch | wallCabinet | stand=interact,idle sit=- upper=- hands=0.35 prop=-
 fetch | wallCabinetCorner | stand=interact,idle sit=- upper=- hands=0.35 prop=-
 fetch | wallCabinetGlass | stand=interact,idle sit=- upper=- hands=0.35 prop=-
@@ -79,6 +83,9 @@ harvest | garden.strawberries | stand=plant,kneel sit=- upper=- hands=0.35 prop=
 idle | * | stand=idle sit=- upper=- hands=0.6 prop=-
 idle | kind.givingJar | stand=interact,idle sit=- upper=- hands=0.6 prop=jarCoin
 knock | * | stand=interact,idle sit=- upper=- hands=0.6 prop=-
+knock | doorbell | @child stand=pressBell112 sit=- upper=- hands=0.85 prop=-
+knock | doorbell | @teen stand=pressBell147 sit=- upper=- hands=0.85 prop=-
+knock | doorbell | @adult stand=pressBell177 sit=- upper=- hands=0.85 prop=-
 lift | * | stand=pickUp sit=- upper=- hands=0.1 prop=-
 listen | * | stand=idle,foldArms sit=- upper=- hands=0.85 prop=-
 look | * | stand=idle,foldArms sit=- upper=- hands=0.6 prop=-
@@ -125,6 +132,7 @@ shower | * | @teen stand=shower sit=- upper=- hands=0.85 prop=-
 shower | * | @adult stand=shower sit=- upper=- hands=0.85 prop=-
 sing | * | stand=talk sit=- upper=- hands=0.6 prop=-
 sit | * | stand=- sit=- upper=- hands=0.85 prop=-
+sit | hallStand | stand=- sit=sitTieShoes upper=- hands=0.35 prop=-
 sleep | * | stand=- sit=- upper=- hands=0.85 prop=-
 smell | * | stand=crouch sit=- upper=- hands=0.6 prop=-
 smell | garden.cosmos | stand=pick sit=- upper=- hands=0.6 prop=-

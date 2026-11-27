@@ -2,7 +2,7 @@
  * Children's play inside things (`STEP_IN` in characters.ts steps them in and out): in the ball pit (over its rim,
  * wading and jumping in the balls, down to sit in them tossing balls up, and up again) and in the play tent
  * (down on hands and knees at its door, crawling in, sitting back on the heels to play on its mat, and crawling
- * back out). One size each, for a child (1.12 m: the share `s` of the reference body, `sizes` in street.ts); the
+ * back out; the same in the playhouse, through its doorway). One size each, for a child (1.12 m: the share `s` of the reference body, `sizes` in street.ts); the
  * objects' numbers in metres divided by `s` give the clip's.
  */
 
@@ -102,9 +102,17 @@ function pitPose(f: PitFit): (p: number) => PoseSpec {
  * middle with the door in it (0.32 m wide at the foot, 0.56 m high), a mat on its floor (3 cm). The child kneels
  * down at the door (the feet `to` m out), crawls in `crawl` m (the hips to the middle) and sits back on the heels.
  */
-type TentFit = Fit & { crawl: number };
+type TentFit = Fit & { crawl: number; floor?: number };
 export const PLAY_TENT: Size<TentFit>[] = sizes('tentPlay', [0.63], (s) => ({ s, to: 0.66, crawl: 0.64 }));
+/**
+ * The playhouse (`model.playhouse`, 2 × 2): its front 0.85 m from the middle with a doorway 0.66 m wide and 1.05 m
+ * high in it, its floor 0.06 m up (`floor`, climbed onto crawling in over the sill). Knelt down as far out of the
+ * door as at the tent's, crawled in to its middle.
+ */
+export const HOUSE_PLAY: Size<TentFit>[] = sizes('housePlay', [0.63], (s) => ({ s, to: 1.11, crawl: 1.09, floor: 0.06 }));
 const TENT_S = 24;
+/** The tent's crawl: this far (m) in this long (s), in four steps; a longer one as long for its length, in as many more. */
+const TENT_CRAWL = { m: 0.64, s: 3, steps: 4 };
 /** On hands and knees (the yoga's table, a child's): the pelvis, its pitch, the hands ahead. */
 const TABLE = { at: [0, -0.48, 0.32] as Vec, hip: 85, hands: 0.8 };
 const SEATED = { at: [0, -0.62, -0.02] as Vec, hip: -2 };
@@ -122,13 +130,16 @@ function gait(t: number, t0: number, t1: number, n: number, half: number): [numb
 function tentPose(f: TentFit): (p: number) => PoseSpec {
   const d = f.crawl / f.s;
   // In, then out (the same steps backwards).
-  const IN: [number, number] = [1.8, 4.8];
-  const OUT: [number, number] = [20, 23];
+  const go = TENT_CRAWL.s * (f.crawl / TENT_CRAWL.m);
+  const IN: [number, number] = [1.8, 1.8 + go];
+  const OUT: [number, number] = [23 - go, 23];
+  const steps = Math.round(TENT_CRAWL.steps * (f.crawl / TENT_CRAWL.m));
+  // The floor's height (the clip's m).
+  const floor = (f.floor ?? 0) / f.s;
   return (p) => {
     const t = p * TENT_S;
     const going = t < 12 ? IN : OUT;
     const way = (k: number) => (t < 12 ? k : 1 - k);
-    const steps = 4;
     // The body's way in (or out), even; each limb's in its steps, the left hand with the right knee.
     const fk = Math.max(0, Math.min(1, (t - going[0]) / (going[1] - going[0])));
     const reach = way(t < going[0] ? 0 : fk) * d;
@@ -144,36 +155,39 @@ function tentPose(f: TentFit): (p: number) => PoseSpec {
     // Down to hands and knees, back onto the heels inside, forward again, up outside.
     const k4 = (keys: readonly Key<number>[]) => track<number>(keys, t);
     const down = k4([[0, 0], [0.7, 0.5], [1.6, 1], [19.9, 1], [23.2, 1], [23.6, 0.5], [24, 0]]);
-    const sat = k4([[0, 0], [5, 0], [5.8, 1], [19, 1], [19.8, 0]]);
+    const sat = k4([[0, 0], [IN[1] + 0.2, 0], [IN[1] + 1, 1], [OUT[0] - 1, 1], [OUT[0] - 0.2, 0]]);
+    // (Up onto the floor over the first half metre in; a foot, while the other limb steps: still as it rises.)
+    const onto = (k: number): Vec => [0, floor * smooth(Math.min(1, (k * f.s) / 0.5)), 0];
+    const up = onto(reach);
     const stood: Vec = [0, 0, 0];
     const crouched: Vec = [0, -0.42, -0.06];
     const table: Vec = addV(TABLE.at, [0, 0, reach]);
     const seated: Vec = addV(SEATED.at, [0, 0, d]);
     const mix = (a: Vec, b: Vec, u: number): Vec => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
-    const pelvis = mix(down < 0.5 ? mix(stood, crouched, down * 2) : mix(crouched, table, (down - 0.5) * 2), seated, sat);
+    const pelvis = addV(mix(down < 0.5 ? mix(stood, crouched, down * 2) : mix(crouched, table, (down - 0.5) * 2), seated, sat), up);
     const hip = (down < 0.5 ? 30 * down * 2 : 30 + (TABLE.hip - 30) * (down - 0.5) * 2) * (1 - sat) + SEATED.hip * sat;
     // Playing, sat back: the hands busy on the mat in front, the head down to them; a look up now and then.
     const play = sat * (0.5 + 0.5 * Math.sin((t / 1.4) * TAU));
     const lookUp = sat * Math.max(0, 1 - Math.abs(t - 12.5) / 1.2);
     // From the feet (crouched) onto the knees and the tops of the feet, the knees then stepping in (or out) in turn.
     const kneel = smooth(Math.max(0, Math.min(1, (down - 0.5) * 2)));
-    const ankle = (z: number): Vec => mix([0, 0, 0], addV(KNEEL, [0, 0, z]), kneel);
+    const ankle = (z: number, other: number): Vec => addV(mix([0, 0, 0], addV(KNEEL, [0, 0, z]), kneel), onto(other));
     const b: Body = {
       at: pelvis,
       hip,
       bend: -6 * (1 - sat) + 8 * sat,
       head: [-6 * (1 - sat) + (22 - 34 * lookUp) * sat, 10 * Math.sin((t / 5) * TAU) * sat, 0],
       breath: t / 4,
-      l: ankle(kl),
-      r: ankle(kr),
+      l: ankle(kl, kr),
+      r: ankle(kr, kl),
       fl: kneel > 0.5 ? FLAT : [0, -4, 0],
       fr: kneel > 0.5 ? FLAT : [0, 4, 0],
       kl: [0, -0.3 * kneel, 1],
       kr: [0, -0.3 * kneel, 1],
     };
     const pose = body(b);
-    const onFloor = (z: number, lift: number, sx: number): Vec => [sx * 0.2, 0.03 + 0.05 * lift, TABLE.hands + z];
-    const toys = (sx: number): Vec => [sx * (0.12 + 0.05 * play), 0.12 + 0.06 * (sx < 0 ? play : 1 - play), d + 0.42];
+    const onFloor = (z: number, lift: number, sx: number): Vec => [sx * 0.2, 0.03 + 0.05 * lift + up[1], TABLE.hands + z];
+    const toys = (sx: number): Vec => [sx * (0.12 + 0.05 * play), 0.12 + 0.06 * (sx < 0 ? play : 1 - play) + up[1], d + 0.42];
     const hand = (sx: number, z: number, lift: number): Vec => {
       const floor = onFloor(z, lift, sx);
       const knees: Vec = [sx * 0.14, 0.62, 0.3];
@@ -191,6 +205,6 @@ function tentPose(f: TentFit): (p: number) => PoseSpec {
 export function playClips(): ClipDef[] {
   return [
     ...BALL_PIT.map(({ clip, fit }) => cycle(clip, { seconds: PIT_S, loop: true, hands: 'open' }, pitPose(fit))),
-    ...PLAY_TENT.map(({ clip, fit }) => cycle(clip, { seconds: TENT_S, loop: true, hands: 'open' }, tentPose(fit))),
+    ...[...PLAY_TENT, ...HOUSE_PLAY].map(({ clip, fit }) => cycle(clip, { seconds: TENT_S, loop: true, hands: 'open' }, tentPose(fit))),
   ];
 }

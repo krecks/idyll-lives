@@ -30,7 +30,7 @@ export const EYEPIECE: Size[] = sizes('eyepiece', SHARES_181, (s) => ({ s, to: 0
  * m behind the feet and moved `side` m to the left (to bring the right eye over the eyepiece); the face
  * kept `gaze` degrees below level; the feet planted a little apart.
  */
-function stoopBody(bend: number, back: number, side: number, p: number, gaze: number): PoseSpec {
+export function stoopBody(bend: number, back: number, side: number, p: number, gaze: number): PoseSpec {
   const b = breathe(p, 0.7);
   const hip = 0.55 * bend;
   const lean = bend - hip;

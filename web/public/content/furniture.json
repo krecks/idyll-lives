@@ -5890,6 +5890,7 @@
     },
     {
       "id": "coatHooks",
+      "how": { "fetch": "high" },
       "name": "Coat hooks",
       "model": "model.coatHooks",
       "footprint": [
@@ -5902,7 +5903,9 @@
       "layer": "wall",
       "decor": 0.2,
       "description": "A row of hooks on a painted board: coats, bags and keys by the door.",
-      "interactions": []
+      "interactions": [
+        { "id": "hangCoat", "label": "Hang up a coat", "anim": "fetch", "minutes": 1 }
+      ]
     },
     {
       "id": "playhouse",
@@ -5915,6 +5918,7 @@
       "price": 480,
       "category": "outdoor",
       "freeRotation": true,
+      "stages": ["child"],
       "group": "play",
       "outdoors": true,
       "decor": 0.3,
@@ -5952,7 +5956,8 @@
       "approach": "side",
       "seat": {
         "height": 0.25,
-        "forward": 0
+        "forward": 0,
+        "facing": "back"
       },
       "description": "A sliding seat and a handle on a chain: rowing works the whole body.",
       "interactions": [
@@ -5981,6 +5986,7 @@
     },
     {
       "id": "doorbell",
+      "how": { "knock": "press" },
       "name": "Doorbell",
       "model": "model.doorbell",
       "footprint": [
@@ -6059,6 +6065,7 @@
     },
     {
       "id": "hallStand",
+      "how": { "sit": "shoes" },
       "name": "Hall stand",
       "model": "model.hallStand",
       "footprint": [
@@ -6070,7 +6077,9 @@
       "group": "ornaments",
       "decor": 0.4,
       "description": "A mirror, a rail of hooks and a bench with a shoe shelf: the last thing you touch on the way out.",
-      "interactions": []
+      "interactions": [
+        { "id": "tieShoes", "label": "Put on shoes", "anim": "sit", "pose": "sit", "minutes": 2 }
+      ]
     }
   ]
 }

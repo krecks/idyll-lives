@@ -1214,6 +1214,7 @@
     },
     {
       "id": "chestFreezer",
+      "how": { "fetch": "chest" },
       "name": "Chest freezer",
       "model": "model.chestFreezer",
       "stores": true,

@@ -8,9 +8,9 @@
  * Every seated clip shares that pelvis, the thighs about level and the feet flat on the floor.
  */
 
-import { clip, cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
+import { clip, cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, bump, hangArms, stand, TAU } from './idle';
-import { armIK, axisAngle, footIK, lerpV, mul, onBody, sub, toEuler, world, wrist } from './ik';
+import { armIK, axisAngle, footIK, lerpV, mul, onBody, pointOn, sub, toEuler, world, wrist } from './ik';
 
 /** Pelvis offset when seated (reference skeleton), and the left foot's offset from its rest place. */
 export const SEAT_MOVE: Vec = [0, -0.348, -0.19];
@@ -297,6 +297,27 @@ export const FORK_BITE: Vec = [0.07, 1.4, 0.3];
 /** Where the cup is held between sips (the palm, m, reference skeleton standing; the seated upper layer the same about the shoulder). */
 export const CUP_HELD: Vec = [0.12, 1.15, 0.27];
 
+/**
+ * Putting shoes on, sat on a bench (the hall stand's): bent down over the knees, the right foot lifted and drawn in
+ * on its toes, both hands at its shoe pulling the laces and tying them; up, and the same at the left. (The foot is
+ * lifted before it moves, so that it doesn't slide on the floor.)
+ */
+function tieShoesPose(p: number): PoseSpec {
+  const right = p < 0.5;
+  const q = (p % 0.5) * 2;
+  const down = bump(q, 0.06, 0.9, 0.2);
+  const body = seatedBody({ breath: p, depth: 0.5, lean: 62 * down, tilt: -6 + 30 * down, head: [8 * down, (right ? -8 : 8) * down, 0] });
+  const side = right ? 'r' : 'l';
+  const sx = right ? 1 : -1;
+  const foot: Vec = [sx * -SEAT_FEET[0], 0.07 * Math.min(1, down * 3), SEAT_FEET[2] - 0.1 * down * down];
+  const pose: PoseSpec = { ...body, ...footIK(side, foot, body, { foot: [28 * down, sx * 6, 0] }) };
+  const shoe = pointOn(pose, `foot_${side}`, [0, 0.04, 0.07]);
+  const pull = 0.025 * Math.sin(q * TAU * 5) * down;
+  const at = (s: 'l' | 'r'): Vec => [shoe[0] + (s === 'l' ? -0.05 : 0.05), shoe[1] + 0.05 + (s === side ? pull : -pull), shoe[2] + 0.02];
+  const tie = (s: 'l' | 'r') => armIK(s, at(s), pose, { palm: true, pole: [s === 'l' ? -0.8 : 0.8, -0.2, -0.4], pronate: 70, hand: wrist(s, -15, 0) });
+  return { ...pose, ...mix(lap(body), { ...tie('l'), ...tie('r') }, down) };
+}
+
 export function seatedClips(): ClipDef[] {
   const low: Vec = [0.11, 1.03, 0.27];
   const mouth: Vec = [0.035, 1.5, 0.17];
@@ -327,6 +348,7 @@ export function seatedClips(): ClipDef[] {
     cycle('sitHands', { seconds: 50 / 30, loop: true }, (p) => deskPose(p)),
     cycle('sitHandsNear', { seconds: 50 / 30, loop: true }, nearDeskPose),
     cycle('sitHandsFar', { seconds: 50 / 30, loop: true }, farDeskPose),
+    cycle('sitTieShoes', { seconds: 8, loop: true }, tieShoesPose),
     clip('eat', { seconds: 40 / 30, loop: false }, [
       [0, () => eatPose(0, low, [0, 0, 0], 0)],
       [0.32, () => eatPose(0.32, mouth, [-4, 0, 0], 4), 'smooth'],
