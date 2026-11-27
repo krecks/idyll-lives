@@ -20,6 +20,7 @@ pub(crate) mod common;
 mod fire;
 mod leisure;
 mod seats;
+pub(crate) mod structures;
 mod tables;
 
 use common::M;
@@ -109,6 +110,24 @@ pub fn family() -> Family {
                 .key("model.firePit")
                 .motions(motions(r#"{"uses": {"relax": "flames"}}"#))
                 .paint(&[("pit", "Bowl"), ("pit_stones", "Stones")]),
+
+            Model::new("carport", structures::carport, (3.00, 2.72, 5.00))
+                .key("model.carport")
+                .paint(&[("struct_timber", "Timber"), ("struct_roof", "Roof")]),
+            Model::new("gazebo", structures::gazebo, (2.97, 3.10, 2.96))
+                .key("model.gazebo")
+                .paint(&[("struct_timber", "Timber"), ("struct_roof", "Roof")]),
+            Model::new("pergola", structures::pergola, (2.92, 2.42, 1.90))
+                .key("model.pergola")
+                .paint(&[("struct_timber", "Timber")]),
+            Model::new("awning", structures::awning, (1.90, 0.395, 0.91))
+                .key("model.awning")
+                .centre(0.0, 0.025)
+                .on_wall()
+                .paint(&[("awning_stripe", "Canvas"), ("panel_frame", "Frame")]),
+            Model::new("solarPanels", structures::solar_panels, (1.76, 0.650, 1.66))
+                .key("model.solarPanels")
+                .paint(&[("panel_frame", "Frame"), ("panel_glass", "Panels")]),
         ],
         "The outdoor things (crates/art/outside/src/outdoor, built by cargo art). Listed in the base manifest's \
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The \

@@ -133,3 +133,8 @@ No change to the build: its soft boxes take the shared form's new shape (the sof
 Built in Rust since 2026-11-18 (`cargo art bedroom_storage`), proved against the last Blender build (`ref/blender`). The pulls, knobs, frame-and-panel
 fronts and bent paths are artkit's kit. The palette's `box` is `M.box_` in the code (`box` is
 Rust's word), named `box` in the file and the pack.
+
+## The shoe rack (2026-11-27)
+
+`shoeRack` is four oak legs, three slatted shelves and a top, all in one finish: 1 draw call, 0.90 × 0.56 × 0.30 m.
+It stands free of the wall like the hamper, so it needs no `centre`.

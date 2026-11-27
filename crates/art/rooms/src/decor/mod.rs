@@ -18,6 +18,7 @@ use artkit::json::Json;
 
 mod clock;
 mod common;
+mod fittings;
 mod hearth;
 mod ornaments;
 mod textiles;
@@ -172,6 +173,45 @@ pub fn family() -> Family {
             Model::new("rugPattern", textiles::rug_pattern, (2.84, 0.024, 1.86))
                 .key("model.rugPattern")
                 .paint(&[("rug_ground", "Rug")]),
+            Model::new("blinds", fittings::blinds, (0.90, 0.806, 0.070))
+                .key("model.blinds")
+                .centre(0.0, -0.3975)
+                .on_wall()
+                .paint(&[("blind_slat", "Slats"), ("blind_rail", "Head rail")]),
+            Model::new("coatHooks", fittings::coat_hooks, (0.90, 0.14, 0.12))
+                .key("model.coatHooks")
+                .centre(0.0, -0.37)
+                .on_wall()
+                .paint(&[("hook_board", "Board"), ("gadget_chrome", "Hooks")]),
+            Model::new("doorbell", fittings::doorbell, (0.10, 0.16, 0.036))
+                .key("model.doorbell")
+                .centre(0.0, -0.412)
+                .on_wall()
+                .paint(&[("gilt", "Brass"), ("gadget_chrome", "Button")]),
+            Model::new("burglarAlarm", fittings::burglar_alarm, (0.22, 0.28, 0.061))
+                .key("model.burglarAlarm")
+                .centre(0.0, -0.3995)
+                .on_wall()
+                .paint(&[("gadget_white", "Case"), ("gadget_dark", "Keypad")]),
+            Model::new("shutters", fittings::shutters, (0.89, 0.765, 0.058))
+                .key("model.shutters")
+                .centre(0.0, -0.391)
+                .on_wall()
+                .paint(&[("blind_rail", "Panels"), ("hook_board", "Frame")]),
+            Model::new("hallStand", fittings::hall_stand, (0.90, 1.80, 0.35))
+                .key("model.hallStand")
+                .centre(0.0, -0.255)
+                .on_wall()
+                .paint(&[
+                    ("oak", "Wood"),
+                    ("gadget_chrome", "Hooks"),
+                    ("hall_glass", "Mirror"),
+                ]),
+            Model::new("cctvCamera", fittings::cctv_camera, (0.11, 0.14, 0.351))
+                .key("model.cctvCamera")
+                .centre(0.0, -0.2545)
+                .on_wall()
+                .paint(&[("gadget_white", "Housing"), ("cam_lens", "Lens")]),
         ],
         "The decor (crates/art/rooms/src/decor, built by cargo art): wall art and clocks, ornaments, curtains and \
              rugs. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one \

@@ -162,3 +162,15 @@ takes `round_angle`), the fridges' drawer and crisper fronts are bevelled, and t
 breaker strip where the cut meets the shell's rounded front. The mini fridge's jar is 7 cm and the apple on it a small
 one, so with what stands on it it is 0.965 m, a mini fridge's height (`cargo review sizes`). The wine fridge's and the
 French-door fridge's fourth draw call is a moving part each (a glass door and a rack, three doors): left as it is.
+
+## The freezers (2026-11-27)
+
+`chestFreezer` and `uprightFreezer` join the fridges, built from the same palette (`body`, `chrome`, `trim`) plus
+`liner` for the inside, so each is 4 draw calls. Both are shells rather than solid boxes: the walls, the floor and a
+liner block inside, so that an opened lid or door shows an interior instead of a blank face. The chest freezer is a
+low box whose lid is hinged along its back edge and lifted with `swing` about the model's X axis, 85° up and no
+further (a lid that leans back past vertical would stand in the wall); its footprint is 2 × 1 (it is wider than it
+is deep). The upright one is a tall cabinet whose door is hinged on its left and swung 100° about Z, with three
+baskets on the liner behind it. Each declares one motion in `mod.rs` — `lid_open` and `door_open` — played by the
+`frozenTreat` interaction; the resident's own animation is still the shared `fetch`, so no new clip is added to
+`base.json`.

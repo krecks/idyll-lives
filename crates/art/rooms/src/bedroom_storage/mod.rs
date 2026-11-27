@@ -15,6 +15,7 @@ use artkit::family::{Family, Model, motions};
 
 mod common;
 mod large;
+mod shoe;
 mod small;
 
 // Open while the resident changes into another outfit (content `changesOutfit`), shut as they leave.
@@ -126,6 +127,9 @@ pub fn family() -> Family {
                 .centre(0.0, -0.1162)
                 .motions(motions(CHANGE_DOORS))
                 .paint(&[("mahogany", "Body"), ("brass", "Handles")]),
+            Model::new("shoeRack", shoe::shoe_rack, (0.90, 0.56, 0.30))
+                .key("model.shoeRack")
+                .paint(&[("oak", "Wood")]),
         ],
         "The bedroom storage (crates/art/rooms/src/bedroom_storage, built by cargo art): the nightstands, the \
          blanket chest, the laundry hamper and the bed-end bench (BR2), and the dressers, chests and wardrobes (BR3). \

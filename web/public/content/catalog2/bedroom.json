@@ -608,6 +608,21 @@
           "autonomous": false
         }
       ]
+    },
+    {
+      "id": "shoeRack",
+      "name": "Shoe rack",
+      "model": "model.shoeRack",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 55,
+      "category": "bedroom",
+      "group": "storage",
+      "decor": 0.2,
+      "description": "Slatted shelves for shoes, by the door or at the foot of the bed.",
+      "interactions": []
     }
   ]
 }

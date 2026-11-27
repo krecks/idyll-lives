@@ -1203,6 +1203,88 @@
       "decor": 0.4,
       "description": "Two oak shelves with jars, plates and a pot of herbs.",
       "interactions": []
+    },
+    {
+      "id": "chestFreezer",
+      "name": "Chest freezer",
+      "model": "model.chestFreezer",
+      "stores": true,
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 550,
+      "category": "kitchen",
+      "fillsWall": true,
+      "group": "appliances",
+      "stations": [
+        "ingredients"
+      ],
+      "description": "A wide lid over a deep well of frozen food: room for a whole shop, if you can find it again.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
+      "interactions": [
+        {
+          "id": "frozenTreat",
+          "publicCost": 4,
+          "label": "Get some ice cream",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "iceCream",
+            "minutes": 6
+          },
+          "effects": {
+            "hunger": 0.12,
+            "fun": 0.18
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "uprightFreezer",
+      "name": "Upright freezer",
+      "model": "model.uprightFreezer",
+      "stores": true,
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 750,
+      "category": "kitchen",
+      "fillsWall": true,
+      "group": "appliances",
+      "stations": [
+        "ingredients"
+      ],
+      "description": "Drawers of frozen food, standing where a second fridge would.",
+      "sounds": {
+        "fetch": "fridgeDoor"
+      },
+      "interactions": [
+        {
+          "id": "frozenTreat",
+          "publicCost": 4,
+          "label": "Get some ice cream",
+          "anim": "fetch",
+          "minutes": 2,
+          "eat": {
+            "item": "iceCream",
+            "minutes": 6
+          },
+          "effects": {
+            "hunger": 0.12,
+            "fun": 0.18
+          },
+          "tags": [
+            "food"
+          ]
+        }
+      ]
     }
   ]
 }

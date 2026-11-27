@@ -18,6 +18,7 @@ use artkit::palette;
 mod bike;
 mod common;
 mod mat;
+mod row;
 mod sauna;
 mod spa;
 mod treadmill;
@@ -99,6 +100,9 @@ pub fn family() -> Family {
                 .motions(json!({"uses": {"sauna": {"clip": "door_open", "hold": 1.5, "out": 1.5}}}))
                 .palette(sauna::palette())
                 .paint(&[("body", "Wood"), ("trim", "Trim")]),
+            Model::new("rowingMachine", row::rowing_machine, (0.56, 0.542, 1.70))
+                .key("model.rowingMachine")
+                .paint(&[("body", "Frame"), ("pads", "Seat"), ("steel", "Rail")]),
         ],
         "The home gym and wellness at home (crates/art/things/src/fitness, built by cargo art). Listed in the base \
          manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish \

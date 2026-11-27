@@ -159,3 +159,10 @@ nodes come out `roll` before `mat` (the order they are made).
 ## Measured as the piece (2026-11-25)
 
 `dumbbells`: the rubber floor mat in front of the rack is set aside (`parts::aside`, `mat_aside`): drawn as before, not the rack's size; `cargo review sizes` measures the rack 0.44 m deep (was 0.93 with the mat).
+
+## The rowing machine (2026-11-27)
+
+`rowingMachine` is the housing with its fan cage and footplate, two rails on the floor, the seat on its carriage,
+the handle on its cable and the rear foot. Frame, seat, rail, dark and chrome map to 1 draw call. It is 0.56 ×
+0.54 × 1.70 m in a 1 × 2 footprint with the seat at 0.25 m (what the content's `seat` says). No clip: the resident
+rows on the seat with the `exercise` animation, as on the bike.

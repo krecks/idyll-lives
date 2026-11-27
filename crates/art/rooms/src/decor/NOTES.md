@@ -170,3 +170,20 @@ closer (3.75 cm in the wide pairs, 5 cm in the window pair, where they were 6 an
 across the folds' fronts (over 2× on 22–34 % of it, finer, never coarser, which the play camera does not show). The
 tabs are built as wide as drawn tabs (stretched along the rail) and gathered with the panel to their old shape.
 Triangles 3,540 → 4,052 and 4,564 → 6,100 for the extra folds; the sizes are the same.
+
+## Wall fittings (2026-11-27)
+
+Five wall pieces joined the set: the venetian blinds (`blinds`), the coat hooks (`coatHooks`), the doorbell
+(`doorbell`), the burglar alarm's keypad (`burglarAlarm`) and the security camera (`cctvCamera`). Each is a still
+model of one or two finishes, so each is 1 draw call: the blinds' slats and rails, the hooks' board and brass, the
+bell's brass and button, the keypad's case and keys, the camera's housing and lens. All five are built at their real
+height on the wall's face (`WALL`, −0.43 m) and declared `.on_wall()`; the blinds' two cords hang 3 cm in front of
+the slats, which is what sets their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, under
+the eaves.
+
+`shutters` is the other window covering: two louvred panels that meet at the middle of the window, each a frame of
+two stiles and two rails over a back panel with six louvres proud of it, and two chrome straps where they would
+hinge. Its 5.8 cm depth is the louvres' 4.5 cm plus the straps, and it sits 1 cm off the wall's face. `hallStand` is
+the whole hall in one piece: an oak board 1.7 m tall carrying a mirror in its top half, three chrome hooks under it,
+and a bench with two front legs and a shoe shelf at 12 cm. Both are still models of three finishes.
+

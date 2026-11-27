@@ -31,6 +31,7 @@ mod desk;
 mod doll;
 mod easels;
 mod horse;
+mod house;
 mod mat;
 mod pit;
 mod plush;
@@ -168,6 +169,10 @@ palette! { M:
     paint_blue = ("#3E8EDE", matte),
     paint_green = ("#5BAE6A", matte),
     paint_yellow = ("#F2C14E", matte),
+    // the playhouse's boards, roof, trim and window
+    ph_board = ("#E4C9A8", satin),
+    ph_roof = ("#8C4A3C", satin),
+    ph_glass = ("#9FB8C4", gloss),
 }
 
 const F: GameFrame = GameFrame::new(0.0);
@@ -285,6 +290,10 @@ pub fn family() -> Family {
                 .centre(0.0, 0.0)
                 .motions(json!({"uses": {"paint": "painting"}}))
                 .paint(&[("easel", "Easel")]),
+
+            Model::new("playhouse", house::playhouse, (1.94, 1.71, 1.84))
+                .key("model.playhouse")
+                .paint(&[("ph_board", "Boards"), ("ph_roof", "Roof")]),
         ],
         "The kids' things (crates/art/things/src/kids, built by cargo art): the crib, the beds and the \
          high chair, the toys, and the kids' study and art things. Listed in the base manifest's \

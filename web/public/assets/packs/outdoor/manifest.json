@@ -652,6 +652,115 @@
           "label": "Stones"
         }
       ]
+    },
+    "model.carport": {
+      "type": "model",
+      "url": "../../models/outdoor/carport.glb",
+      "materials": {
+        "struct_roof": {
+          "finish": "material.finish.satin"
+        },
+        "struct_timber": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "struct_timber",
+          "label": "Timber"
+        },
+        {
+          "material": "struct_roof",
+          "label": "Roof"
+        }
+      ]
+    },
+    "model.gazebo": {
+      "type": "model",
+      "url": "../../models/outdoor/gazebo.glb",
+      "materials": {
+        "struct_roof": {
+          "finish": "material.finish.satin"
+        },
+        "struct_timber": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "struct_timber",
+          "label": "Timber"
+        },
+        {
+          "material": "struct_roof",
+          "label": "Roof"
+        }
+      ]
+    },
+    "model.pergola": {
+      "type": "model",
+      "url": "../../models/outdoor/pergola.glb",
+      "materials": {
+        "struct_timber": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "struct_timber",
+          "label": "Timber"
+        }
+      ]
+    },
+    "model.awning": {
+      "type": "model",
+      "url": "../../models/outdoor/awning.glb",
+      "materials": {
+        "awning_stripe": {
+          "finish": "material.finish.satin"
+        },
+        "awning_stripe2": {
+          "finish": "material.finish.satin"
+        },
+        "panel_frame": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "awning_stripe",
+          "label": "Canvas"
+        },
+        {
+          "material": "panel_frame",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.solarPanels": {
+      "type": "model",
+      "url": "../../models/outdoor/solarPanels.glb",
+      "materials": {
+        "panel_frame": {
+          "finish": "material.finish.metal"
+        },
+        "panel_glass": {
+          "finish": "material.finish.gloss"
+        },
+        "struct_roof": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "panel_frame",
+          "label": "Frame"
+        },
+        {
+          "material": "panel_glass",
+          "label": "Panels"
+        }
+      ]
     }
   }
 }

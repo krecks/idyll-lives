@@ -5849,6 +5849,207 @@
       },
       "description": "Festoon bulbs between two posts.",
       "interactions": []
+    },
+    {
+      "id": "blinds",
+      "name": "Venetian blinds",
+      "model": "model.blinds",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 65,
+      "category": "decor",
+      "overWindow": true,
+      "group": "textiles",
+      "layer": "wall",
+      "decor": 0.4,
+      "description": "Slatted blinds on a cord: hang them over a window and tilt them against the afternoon sun.",
+      "interactions": []
+    },
+    {
+      "id": "coatHooks",
+      "name": "Coat hooks",
+      "model": "model.coatHooks",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 30,
+      "category": "decor",
+      "group": "ornaments",
+      "layer": "wall",
+      "decor": 0.2,
+      "description": "A row of hooks on a painted board: coats, bags and keys by the door.",
+      "interactions": []
+    },
+    {
+      "id": "playhouse",
+      "name": "Playhouse",
+      "model": "model.playhouse",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 480,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "play",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A little wooden house with a door and a window: children keep house in it for hours.",
+      "interactions": [
+        {
+          "id": "play",
+          "label": "Play house",
+          "anim": "play",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.45
+          },
+          "tags": [
+            "entertainment",
+            "toys",
+            "outdoors"
+          ],
+          "skills": {
+            "creativity": 0.06
+          }
+        }
+      ]
+    },
+    {
+      "id": "rowingMachine",
+      "name": "Rowing machine",
+      "model": "model.rowingMachine",
+      "footprint": [
+        1,
+        2
+      ],
+      "price": 700,
+      "category": "fitness",
+      "approach": "side",
+      "seat": {
+        "height": 0.25,
+        "forward": 0
+      },
+      "description": "A sliding seat and a handle on a chain: rowing works the whole body.",
+      "interactions": [
+        {
+          "id": "row",
+          "label": "Row",
+          "anim": "exercise",
+          "minutes": 45,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.1,
+            "energy": -0.3,
+            "hygiene": -0.3
+          },
+          "tags": [
+            "training",
+            "fitness",
+            "sport"
+          ],
+          "skills": {
+            "endurance": 0.28,
+            "strength": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "doorbell",
+      "name": "Doorbell",
+      "model": "model.doorbell",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "decor",
+      "group": "wall",
+      "layer": "wall",
+      "decor": 0.2,
+      "description": "A brass bell push by the front door.",
+      "interactions": [
+        {
+          "id": "ring",
+          "label": "Ring the bell",
+          "anim": "knock",
+          "minutes": 1,
+          "effects": {
+            "fun": 0.02
+          },
+          "tags": [
+            "entertainment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "burglarAlarm",
+      "name": "Burglar alarm",
+      "model": "model.burglarAlarm",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 120,
+      "category": "decor",
+      "group": "wall",
+      "layer": "wall",
+      "decor": 0.1,
+      "description": "A keypad and a box over the door: the little light blinks all night.",
+      "interactions": []
+    },
+    {
+      "id": "cctvCamera",
+      "name": "Security camera",
+      "model": "model.cctvCamera",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "decor",
+      "group": "wall",
+      "layer": "wall",
+      "decor": 0.1,
+      "description": "A small camera on a bracket, watching the path.",
+      "interactions": []
+    },
+    {
+      "id": "shutters",
+      "name": "Window shutters",
+      "model": "model.shutters",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 110,
+      "category": "decor",
+      "group": "textiles",
+      "decor": 0.35,
+      "layer": "wall",
+      "overWindow": true,
+      "description": "Two louvred panels that close over the window when the sun is too much.",
+      "interactions": []
+    },
+    {
+      "id": "hallStand",
+      "name": "Hall stand",
+      "model": "model.hallStand",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 150,
+      "category": "decor",
+      "group": "ornaments",
+      "decor": 0.4,
+      "description": "A mirror, a rail of hooks and a bench with a shoe shelf: the last thing you touch on the way out.",
+      "interactions": []
     }
   ]
 }

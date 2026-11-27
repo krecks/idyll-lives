@@ -715,6 +715,179 @@
       "accept": {
         "footprint": "the rail runs past the window, its opening plus a gathered panel each side, so the open curtains stack on the wall beside the glass (decor.md, M-decor-02)"
       }
+    },
+    "model.blinds": {
+      "type": "model",
+      "url": "../../models/decor/blinds.glb",
+      "materials": {
+        "blind_rail": {
+          "finish": "material.finish.satin"
+        },
+        "blind_slat": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "blind_slat",
+          "label": "Slats"
+        },
+        {
+          "material": "blind_rail",
+          "label": "Head rail"
+        }
+      ]
+    },
+    "model.coatHooks": {
+      "type": "model",
+      "url": "../../models/decor/coatHooks.glb",
+      "materials": {
+        "gadget_chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "hook_board": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "hook_board",
+          "label": "Board"
+        },
+        {
+          "material": "gadget_chrome",
+          "label": "Hooks"
+        }
+      ]
+    },
+    "model.doorbell": {
+      "type": "model",
+      "url": "../../models/decor/doorbell.glb",
+      "materials": {
+        "cam_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "gadget_chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "gilt": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "gilt",
+          "label": "Brass"
+        },
+        {
+          "material": "gadget_chrome",
+          "label": "Button"
+        }
+      ]
+    },
+    "model.burglarAlarm": {
+      "type": "model",
+      "url": "../../models/decor/burglarAlarm.glb",
+      "materials": {
+        "alarm_led": {
+          "finish": "material.finish.gloss"
+        },
+        "gadget_dark": {
+          "finish": "material.finish.satin"
+        },
+        "gadget_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "gadget_white",
+          "label": "Case"
+        },
+        {
+          "material": "gadget_dark",
+          "label": "Keypad"
+        }
+      ]
+    },
+    "model.cctvCamera": {
+      "type": "model",
+      "url": "../../models/decor/cctvCamera.glb",
+      "materials": {
+        "cam_lens": {
+          "finish": "material.finish.gloss"
+        },
+        "gadget_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "gadget_white",
+          "label": "Housing"
+        },
+        {
+          "material": "cam_lens",
+          "label": "Lens"
+        }
+      ]
+    },
+    "model.shutters": {
+      "type": "model",
+      "url": "../../models/decor/shutters.glb",
+      "materials": {
+        "blind_rail": {
+          "finish": "material.finish.satin"
+        },
+        "gadget_chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "hook_board": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "blind_rail",
+          "label": "Panels"
+        },
+        {
+          "material": "hook_board",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.hallStand": {
+      "type": "model",
+      "url": "../../models/decor/hallStand.glb",
+      "materials": {
+        "gadget_chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "hall_glass": {
+          "finish": "material.finish.gloss"
+        },
+        "hook_board": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        },
+        {
+          "material": "gadget_chrome",
+          "label": "Hooks"
+        },
+        {
+          "material": "hall_glass",
+          "label": "Mirror"
+        }
+      ]
     }
   }
 }

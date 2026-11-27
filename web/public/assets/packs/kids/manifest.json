@@ -964,6 +964,34 @@
           "label": "Easel"
         }
       ]
+    },
+    "model.playhouse": {
+      "type": "model",
+      "url": "../../models/kids/playhouse.glb",
+      "materials": {
+        "house_trim": {
+          "finish": "material.finish.satin"
+        },
+        "ph_board": {
+          "finish": "material.finish.satin"
+        },
+        "ph_glass": {
+          "finish": "material.finish.gloss"
+        },
+        "ph_roof": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "ph_board",
+          "label": "Boards"
+        },
+        {
+          "material": "ph_roof",
+          "label": "Roof"
+        }
+      ]
     }
   }
 }

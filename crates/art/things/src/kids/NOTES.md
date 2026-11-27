@@ -130,3 +130,10 @@ The beds' duvets are rumpled by the form as the bedroom's are (2.5 cm folds 24 c
 `trainTable`: the layout on the board (track, tunnel, station, the little town) is set aside (`parts::aside`, `layout_aside`): drawn as before, not the table's size; `cargo review sizes` measures the table with its train, 0.54 m high (was 0.68).
 
 `crib`: the changing chest 1 cm taller, its pad at 0.85 m (its top 0.853 m, in the crib kind's 0.85–0.95 for the changing top; it was 0.844).
+
+## The playhouse (2026-11-27)
+
+`playhouse` is a board hut: a floor, three walls, a front of two panels with a doorway between them under its
+header, corner posts, a window and a roof slab with its ridge. Four finishes (boards, roof, trim, glass) map to
+1 draw call. It is 1.96 × 1.70 × 1.84 m, inside its 2 × 2 footprint, and has no clip: the `play` use is the
+sandbox's, which needs no door.

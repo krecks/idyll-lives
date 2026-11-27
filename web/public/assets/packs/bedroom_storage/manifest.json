@@ -588,6 +588,21 @@
           "label": "Handles"
         }
       ]
+    },
+    "model.shoeRack": {
+      "type": "model",
+      "url": "../../models/bedroom_storage/shoeRack.glb",
+      "materials": {
+        "oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        }
+      ]
     }
   }
 }

@@ -88,6 +88,13 @@ palette! { M:
     tub_cover = ("#5A5F66", satin),      // its insulated cover
     water = ("#5FB4C2", gloss),
     foam = ("#E6F4F6", gloss),           // bubbles on the water
+    // the garden's built things: timber, roof sheet, panels, awning canvas
+    struct_timber = ("#7E6247", satin),
+    struct_roof = ("#4A4E52", satin),
+    panel_glass = ("#22313D", gloss),
+    panel_frame = ("#9AA0A6", metal),
+    awning_stripe = ("#E7DFCC", satin),
+    awning_stripe2 = ("#B8623F", satin),
 }
 
 pub const F: GameFrame = GameFrame::new(0.0);

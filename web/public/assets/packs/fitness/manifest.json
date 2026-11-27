@@ -321,6 +321,41 @@
           "label": "Trim"
         }
       ]
+    },
+    "model.rowingMachine": {
+      "type": "model",
+      "url": "../../models/fitness/rowingMachine.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "pads": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Frame"
+        },
+        {
+          "material": "pads",
+          "label": "Seat"
+        },
+        {
+          "material": "steel",
+          "label": "Rail"
+        }
+      ]
     }
   }
 }

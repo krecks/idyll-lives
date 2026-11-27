@@ -936,6 +936,92 @@
           "feeling": "garden.neatLawn"
         }
       ]
+    },
+    {
+      "id": "carport",
+      "name": "Carport",
+      "model": "model.carport",
+      "footprint": [
+        3,
+        5
+      ],
+      "price": 1900,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A timber frame with a pitched roof: the car keeps dry without a garage.",
+      "interactions": []
+    },
+    {
+      "id": "gazebo",
+      "name": "Gazebo",
+      "model": "model.gazebo",
+      "footprint": [
+        3,
+        3
+      ],
+      "price": 1500,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "decor",
+      "outdoors": true,
+      "decor": 0.6,
+      "description": "A white timber gazebo with a pitched roof: a shady place to sit out of the sun.",
+      "interactions": []
+    },
+    {
+      "id": "pergola",
+      "name": "Pergola",
+      "model": "model.pergola",
+      "footprint": [
+        3,
+        2
+      ],
+      "price": 850,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "decor",
+      "outdoors": true,
+      "decor": 0.5,
+      "description": "Crossed beams on four posts, for climbers to grow over.",
+      "interactions": []
+    },
+    {
+      "id": "awning",
+      "name": "Awning",
+      "model": "model.awning",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 320,
+      "category": "outdoor",
+      "overWindow": true,
+      "group": "decor",
+      "layer": "wall",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A striped canvas awning on a frame: shade for the window or the door below.",
+      "interactions": []
+    },
+    {
+      "id": "solarPanels",
+      "name": "Solar panels",
+      "model": "model.solarPanels",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 2400,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A bank of panels on a ground frame, tilted at the sun.",
+      "interactions": []
     }
   ],
   "feelings": [

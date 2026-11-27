@@ -749,6 +749,64 @@
           "label": "Trim"
         }
       ]
+    },
+    "model.chestFreezer": {
+      "type": "model",
+      "url": "../../models/kitchen/chestFreezer.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
+      ]
+    },
+    "model.uprightFreezer": {
+      "type": "model",
+      "url": "../../models/kitchen/uprightFreezer.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.gloss"
+        },
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Body"
+        },
+        {
+          "material": "chrome",
+          "label": "Handles"
+        },
+        {
+          "material": "trim",
+          "label": "Plinth"
+        }
+      ]
     }
   }
 }

@@ -106,6 +106,16 @@ palette! { M:
     rug_edge = ("#3E5470", fabric),
     rug_motif = ("#E9C46A", fabric),
     rug_accent = ("#F2E6CC", fabric),
+    // the wall fittings: blinds, hooks and the door's gadgets
+    blind_slat = ("#EFE9DC", satin),
+    blind_rail = ("#D6D0C2", satin),
+    hook_board = ("#3E5C48", satin),
+    gadget_white = ("#E9E9E4", satin),
+    gadget_dark = ("#3A3E44", satin),
+    gadget_chrome = ("#C9CDD2", chrome),
+    cam_lens = ("#16202B", gloss),
+    alarm_led = ("#C0392B", gloss),
+    hall_glass = ("#AFC0C8", gloss),
 }
 
 pub const F: GameFrame = GameFrame::new(0.0);
