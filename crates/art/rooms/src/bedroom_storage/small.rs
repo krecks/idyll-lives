@@ -421,31 +421,13 @@ pub fn nightstand_round() -> Vec<Obj> {
             bevel = 0.003,
             bevel_segments = 1
         );
-        for y in [0.358, 0.482] {
-            torus!(
-                format!("groove{}", float_repr(y)),
-                0.256,
-                0.004,
-                at = F.at(0, y, z),
-                material = M.plinth,
-                major_segments = 36,
-                minor_segments = 4
-            );
-        }
-        // the drawer's front: the band's front third, between two seams
-        for a in [-35, 35] {
-            let af = a as f64;
-            fbox!(
-                F,
-                format!("seam{a}"),
-                0.004,
-                0.118,
-                0.006,
-                (0.257 * sind(af), 0.42, z + 0.257 * cosd(af)),
-                M.plinth,
-                rot = (0, 0, -a)
-            );
-        }
+        // the drawer's front: a curved panel of the drum's own clay, standing a hair proud of the band
+        let arc: Vec<(f64, f64)> = (0..=8)
+            .map(|i| 55.0 + 70.0 * f64::from(i) / 8.0)
+            .map(|a| (0.2605 * cosd(a), z + 0.2605 * sind(a)))
+            .chain((0..=8).rev().map(|i| 55.0 + 70.0 * f64::from(i) / 8.0).map(|a| (0.2565 * cosd(a), z + 0.2565 * sind(a))))
+            .collect();
+        fextrude!(F, "drawer", &arc, 0.1, (0, 0.42, 0), M.clay, plane = Facing::Top, bevel = 0.003, bevel_segments = 1);
         kit::knob!(F, "knob", 0, 0.42, z + 0.255, 0.0125, M.brass); // (2.5 cm: the drum stays a nightstand's depth)
         revolve!(
             "top",

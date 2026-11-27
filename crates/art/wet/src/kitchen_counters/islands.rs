@@ -332,9 +332,9 @@ fn bar(
         f,
         "body",
         bw,
-        0.98,
+        1.0,
         0.5,
-        (bx, 0.49, -0.12),
+        (bx, 0.5, -0.12),
         body,
         bevel = 0.01
     );
@@ -355,16 +355,6 @@ fn bar(
         smooth = true,
         bevel = 0.0015,
         bevel_segments = 1
-    );
-    fbox!(
-        f,
-        "ledge",
-        bw,
-        0.04,
-        0.26,
-        (bx, 0.92, -0.36),
-        top,
-        bevel = 0.006
     );
     let n = py::int(bw / 0.1);
     for i in 0..n {
@@ -461,7 +451,7 @@ fn bar(
             &side,
             0.06,
             (0.47, 0, 0),
-            top,
+            body,
             plane = Facing::Side,
             smooth = true,
             bevel = 0.003,
