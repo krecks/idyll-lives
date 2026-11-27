@@ -4,6 +4,7 @@
   "objects": [
     {
       "id": "hotHeaded.heavyBag",
+      "how": { "exercise": "punch" },
       "name": "Heavy punching bag",
       "model": "model.hotHeaded.heavyBag",
       "footprint": [1, 1],

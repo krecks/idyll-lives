@@ -509,14 +509,10 @@ export const PROPS = {
  * (`ACTIONS[tag].prop`, by the plate), not carried: the baby's bottle, fed with the baby in the arms.
  */
 export const PROP_ITEMS = new Set(['babyBottle']);
-/** The ironing board: ironed at with the iron in the hand (`ACTIONS.clean`). */
-const IRONING_BOARD = 'ironingBoard';
 /** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk, the whiteboard with a marker. */
 const BRUSHED = new Set(['easel', 'kidsEasel']);
 /** Children's desks and their little table: written and drawn at with a pencil (`ACTIONS.write`). */
 const KIDS_DESKS = new Set(['kidsDesk', 'kidsChair']);
-/** Basketball hoops, played with the ball in the hands (`ACTIONS.exercise`). */
-const HOOPS = new Set(['basketballHoop', 'energetic.streetballHoop']);
 /** What is drunk from what (`drinkProp`): wine from a glass, a cold drink from the can, at a bar a tumbler; else a mug (coffee, tea). */
 const WINE = new Set(['wineFridge', 'wineGlasses']);
 const CANS = new Set(['fridge', 'fridgeFrenchDoor', 'fridgeRetro', 'fridgeMiniRetro', 'fridgeMini', 'fridgeBuiltIn', 'vendingDrink', 'slob.gamingRecliner']);
@@ -665,48 +661,21 @@ export const ACTIONS: Record<string, ActionAnim> = {
     prop: (def) => (def === 'dartboard' ? PROPS.dart : def === 'pingPongTable' ? PROPS.bat : def === 'poolTable' ? PROPS.cue : null),
   },
   // Keys and drums on the desk-hands clip; a cello is held upright between the knees.
-  music: { stand: ['spell'], sit: (def) => (def.includes('cello') ? 'sit' : 'sitHands'), hands: HANDS.keys },
+  music: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   paint: {
     stand: ['spell', 'interact', 'spell'],
     hands: HANDS.hold,
     prop: (def) => (def === 'kidsChalkboard' ? PROPS.chalk : def === 'whiteboard' ? PROPS.marker : BRUSHED.has(def) ? PROPS.paintbrush : null),
   },
   // (The plate-smash bin, the bouldering wall and the yoga mat have their clips in `STEP_IN`.)
-  exercise: {
-    stand: (def) =>
-      def.includes('Bag')
-        ? ['punchJab', 'punchCross']
-        : def.includes('fitnessGame')
-          ? ['dance', 'punchJab', 'punchCross']
-          : def.includes('streetball') || def === 'basketballHoop'
-            ? ['pickUp', 'interact']
-            : // Stretching (and, `choose`, bouncing and vibrating): the idle with `activityPose` on top.
-              def.includes('sunrise')
-              ? ['idle']
-              : ['jog'],
-    sit: 'sitHands',
-    hands: (def) => (def === 'yogaMat' ? HANDS.open : HANDS.grip),
-    prop: (def) => (HOOPS.has(def) ? PROPS.basketball : null),
-  },
+  exercise: { stand: ['jog'], sit: 'sitHands', hands: (def) => (def === 'yogaMat' ? HANDS.open : HANDS.grip) },
   run: { stand: ['jog'], hands: HANDS.grip },
   lift: { stand: ['pickUp'], hands: HANDS.grip },
   dance: { stand: ['dance'], hands: HANDS.relaxed },
   talk: { stand: ['talk'], hands: HANDS.relaxed },
   // At the mic stand (`STEP_IN`), the hands free.
   sing: { stand: ['talk'], hands: HANDS.relaxed },
-  clean: {
-    stand: (def) =>
-      def.includes('Mop') || def.includes('Vacuum') || def === 'lawnMower'
-        ? ['push']
-        : def === IRONING_BOARD
-          ? ['stir']
-          : def.includes('laundry')
-            ? ['spell', 'interact', 'pickUp']
-            : ['interact', 'spell'],
-    hands: HANDS.hold,
-    // (Ironing: the iron in the hand, the board's own hidden meanwhile, its `iron_off`.)
-    prop: (def) => (def === IRONING_BOARD ? PROPS.iron : null),
-  },
+  clean: { stand: ['interact', 'spell'], hands: HANDS.hold },
   // Gardening, by task (older content and packs: `garden`).
   water: { stand: ['water'], hands: HANDS.hold, prop: PROPS.wateringCan },
   // Kneeling at the soil.
@@ -812,6 +781,19 @@ export const MANNERS: Record<string, ActionAnim> = {
   upright: { stand: ['interact', 'spell'] },
   // Nothing in the hand (`prune` at the bonsai, shaped with wire by hand).
   handsFree: { prop: () => null },
+  // Sport (`exercise`): punching a bag; a fitness game's dance and punches; shooting at a hoop, the basketball in the
+  // hands; stretching (and, `choose`, bouncing and vibrating): the idle with `activityPose` on top.
+  punch: { stand: ['punchJab', 'punchCross'] },
+  workout: { stand: ['dance', 'punchJab', 'punchCross'] },
+  hoop: { stand: ['pickUp', 'interact'], prop: PROPS.basketball },
+  stretch: { stand: ['idle'] },
+  // Seated with the instrument held upright between the knees, not at the desk-hands clip (`music`: a cello).
+  knees: { sit: 'sit' },
+  // Cleaning (`clean`): a mower or a mop pushed; laundry sorted, loaded and lifted out; ironing, the iron in the hand
+  // (the board's own hidden meanwhile, its `iron_off`).
+  push: { stand: ['push'] },
+  laundry: { stand: ['spell', 'interact', 'pickUp'] },
+  iron: { stand: ['stir'], prop: PROPS.iron },
 };
 /** `actionOf`'s mannered entries, by tag and manner, made once. */
 const MANNERED = new Map<string, Map<string, ActionAnim>>();

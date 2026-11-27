@@ -80,6 +80,7 @@
     },
     {
       "id": "energetic.streetballHoop",
+      "how": { "exercise": "hoop" },
       "name": "Streetball hoop",
       "model": "model.energetic.streetballHoop",
       "outdoors": true,

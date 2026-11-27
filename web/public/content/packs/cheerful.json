@@ -164,6 +164,7 @@
     },
     {
       "id": "cheerful.sunriseLamp",
+      "how": { "exercise": "stretch" },
       "name": "Sunrise stretch lamp",
       "model": "model.cheerful.sunriseLamp",
       "stand": { "height": 0.008 },

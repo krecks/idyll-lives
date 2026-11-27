@@ -570,6 +570,7 @@
     },
     {
       "id": "basketballHoop",
+      "how": { "exercise": "hoop" },
       "name": "Basketball hoop",
       "model": "model.basketballHoop",
       "footprint": [

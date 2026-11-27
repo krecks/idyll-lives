@@ -899,6 +899,7 @@
     },
     {
       "id": "lawnMower",
+      "how": { "clean": "push" },
       "name": "Push lawnmower",
       "model": "model.lawnMower",
       "footprint": [

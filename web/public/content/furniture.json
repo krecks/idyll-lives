@@ -2933,6 +2933,7 @@
     },
     {
       "id": "laundryWasher",
+      "how": { "clean": "laundry" },
       "name": "Washing machine",
       "model": "model.laundryWasher",
       "footprint": [
@@ -2985,6 +2986,7 @@
     },
     {
       "id": "laundryDryer",
+      "how": { "clean": "laundry" },
       "name": "Tumble dryer",
       "model": "model.laundryDryer",
       "footprint": [

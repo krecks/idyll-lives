@@ -332,6 +332,7 @@
     },
     {
       "id": "laundryBasket",
+      "how": { "clean": "laundry" },
       "name": "Laundry basket",
       "model": "model.laundryBasket",
       "footprint": [
@@ -490,6 +491,7 @@
     },
     {
       "id": "ironingBoard",
+      "how": { "clean": "iron" },
       "name": "Ironing board and iron",
       "model": "model.ironingBoard",
       "footprint": [

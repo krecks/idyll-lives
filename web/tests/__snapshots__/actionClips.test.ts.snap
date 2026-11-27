@@ -22,7 +22,6 @@ clean | laundryHamper | stand=spell,interact,pickUp sit=- upper=- hands=0.35 pro
 clean | laundryWasher | stand=spell,interact,pickUp sit=- upper=- hands=0.35 prop=-
 clean | lawnMower | stand=push sit=- upper=- hands=0.35 prop=-
 clean | neat.laundryCenter | stand=spell,interact,pickUp sit=- upper=- hands=0.35 prop=-
-clean | neat.robotVacuumDock | stand=push sit=- upper=- hands=0.35 prop=-
 clean | neat.steamMopDock | stand=push sit=- upper=- hands=0.35 prop=-
 cook | * | stand=spell,interact,spell,pickUp sit=sitHands upper=- hands=0.35 prop=-
 cook | breakfastCounter | stand=spell,interact sit=sitHands upper=- hands=0.35 prop=-
@@ -50,8 +49,6 @@ drink | wineGlasses | stand=drink,holdCup,holdCup sit=- upper=drink hands=0.35 p
 eat | * | stand=eat,idle sit=- upper=eat hands=0.35 prop=-
 exercise | * | stand=jog sit=sitHands upper=- hands=0.1 prop=-
 exercise | basketballHoop | stand=pickUp,interact sit=sitHands upper=- hands=0.1 prop=basketball
-exercise | beanBag | stand=punchJab,punchCross sit=sitHands upper=- hands=0.1 prop=-
-exercise | beanBagKids | stand=punchJab,punchCross sit=sitHands upper=- hands=0.1 prop=-
 exercise | cheerful.sunriseLamp | stand=idle sit=sitHands upper=- hands=0.1 prop=-
 exercise | couchPotato.fitnessGame | stand=dance,punchJab,punchCross sit=sitHands upper=- hands=0.1 prop=-
 exercise | energetic.streetballHoop | stand=pickUp,interact sit=sitHands upper=- hands=0.1 prop=basketball
