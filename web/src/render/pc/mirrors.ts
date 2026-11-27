@@ -28,14 +28,14 @@
  *   in gamma space times 0.92, plus a hint of the glass's own tint, taken back to linear (the image
  *   processing comes after, on the whole picture).
  *
- * With a `rate` (Low and Medium) a reflection is drawn on demand and held in between ("held": its
- * camera is off and its target keeps the last picture): again when the camera moves, the mirror moves
- * (a cabinet's door), a resident in its view moves, or the renderer says something else changed
- * (`changed`: the sun, the lamps, things placed or moving), at most `rate` times a second. A held
- * reflection is looked up through the camera it was drawn for, so it stays on the glass while the
- * camera moves on (only its parallax lags, until the next draw). The picking that places the glasses
- * and ranks them runs only on the frames that may draw one. Without a rate (High) every reflection is
- * drawn every frame.
+ * A reflection is drawn on demand and held in between ("held": its camera is off and its target keeps
+ * the last picture): again when the camera moves, the mirror moves (a cabinet's door), a resident in its
+ * view moves, or the renderer says something else changed (`changed`: the sun, the lamps, things placed
+ * or moving), with a `rate` (Low and Medium) at most that many times a second, without one (High) in the
+ * frame it changed. A held reflection is looked up through the camera it was drawn for, so it stays on
+ * the glass while the camera moves on (only its parallax lags, until the next draw). The picking that
+ * places the glasses and ranks them runs only on the frames that may draw one. What moves only for the
+ * eye (the plants' sway, the water's flow) stands still in a held reflection until the next draw.
  *
  * Mirrors follow their object's instance matrix each frame, so things popping in, hidden storeys,
  * things on walls cut away and objects being moved need nothing extra. A reflection's target (and
@@ -61,7 +61,7 @@ export interface MirrorQuality {
   scale: number;
   /** Multisampling of a reflection (1: none). */
   samples: number;
-  /** At most this many draws of a reflection a second, each when something in it changed; 0: every frame. */
+  /** At most this many draws of a reflection a second, each when something in it changed; 0: in every frame something did. */
   rate: number;
 }
 
@@ -445,10 +445,10 @@ export class Mirrors {
     this.viewProjNow();
     const viewProj = this.viewProjGame;
     const period = this.quality.rate > 0 ? 1000 / this.quality.rate : 0;
-    // A reflection draws again at most `rate` times a second: until one is due, nothing it shows
-    // can have changed in a way that matters, so the glasses keep their place and their held
-    // reflection, and the picking that would re-place them waits for the frame that draws.
-    if (period && !this.stale && !this.due(now, viewProj, residents)) return;
+    // A reflection draws again only when something it shows changed, at most `rate` times a second:
+    // until one is due, the glasses keep their place and their held reflection, and the picking that
+    // would re-place them waits for the frame that draws.
+    if (!this.stale && !this.due(now, viewProj, residents)) return;
     const cam = this.game.entity;
     const p = cam.getPosition();
     const eye = this.eye;
@@ -515,8 +515,8 @@ export class Mirrors {
         }
       }
       if (!r) continue;
-      // Every frame (High); held: drawn again at once for another mirror; when something in it changed, once it's due.
-      if (!period || r.owner !== item) {
+      // Held: drawn again at once for another mirror; when something in it changed, once it's due (at once without a rate).
+      if (r.owner !== item) {
         this.draw(r, item);
         continue;
       }
