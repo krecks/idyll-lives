@@ -3,6 +3,8 @@
 
 use artkit::family::Family;
 
+mod common;
+
 pub mod garden_decor;
 pub mod garden_things;
 pub mod ground;

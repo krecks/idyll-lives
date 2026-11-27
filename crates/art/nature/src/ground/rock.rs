@@ -1,113 +1,18 @@
 //! The woods' rock: boulders roughened, split and cut off flat under the ground.
 
 use super::M;
-use artkit::edit::{NgonMethod, QuadMethod, holes_fill, triangulate};
+use crate::common::{cut, lump, stone};
 use artkit::far::low;
 use artkit::materials::Mat;
-use artkit::math::{M4, V3, v3};
+use artkit::math::v3;
 use artkit::noise::noise;
 use artkit::parts::{join_all, measure};
 use artkit::scene::Obj;
-use artkit::{bisect_plane, boulder};
 
 /// Game (x, depth): the old part's middle.
 pub const ROCK_CENTRE: (f64, f64) = (0.085, 0.01);
 /// The rock's lumps reach this far under the ground: it is cut flat there.
 pub const GROUND: f64 = -0.115;
-
-/// Cuts `obj` (in place) by the world's plane through `co` facing `no`, dropping what lies in front of it and
-/// closing the cut with a face of its own: the ground. The cut face is drawn flat. What is left is all triangles.
-pub fn cut(obj: Obj, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
-    cut_in(obj, obj.matrix_world(), co.into(), no.into())
-}
-
-/// `cut` by a plane in the part's own frame, wherever it stands: a fracture across a stone.
-pub fn cut_own(obj: Obj, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
-    cut_in(obj, M4::IDENTITY, co.into(), no.into())
-}
-
-/// `cut` by the plane through `co` facing `no` in the frame `world` takes the part's points into.
-fn cut_in(obj: Obj, world: M4, co: V3, no: V3) -> Obj {
-    obj.edit(|o| o.mesh.transform(&world));
-    let edges = bisect_plane!(obj, co, no, clear_outer = true);
-    if !edges.is_empty() {
-        let made = holes_fill(obj, &edges);
-        obj.edit(|o| {
-            for f in made {
-                o.mesh.faces[f].smooth = false;
-            }
-        });
-    }
-    triangulate(obj, QuadMethod::Beauty, NgonMethod::Beauty);
-    obj.edit(|o| o.mesh.transform(&world.inverted().unwrap_or(M4::IDENTITY)));
-    obj
-}
-
-/// Roughens a boulder's surface with finer noise than `boulder`'s (its own metres, before its scale).
-pub fn lump(obj: Obj, amount: f64, scale: f64, seed: f64) {
-    obj.edit(|o| {
-        for v in &mut o.mesh.verts {
-            let p = *v * scale + v3(seed, -seed, seed * 0.5);
-            *v *= 1.0 + amount * noise(p);
-        }
-    });
-}
-
-/// A boulder `top` high (Blender z), roughened (`rough`: its noise and how lumpy it is; `grain`: and pitted finer
-/// still, metres), with `fractures` (direction, depth: how far in from its outside, metres) cut flat across it, then
-/// cut off flat at `ground` (Blender z), where it goes into the ground (the garden decor's stones too).
-#[allow(clippy::too_many_arguments)]
-pub fn stone(
-    name: &str,
-    radius: f64,
-    at: (f64, f64, f64),
-    material: Mat,
-    scale: (f64, f64, f64),
-    seed: f64,
-    top: f64,
-    subdivisions: usize,
-    fractures: &[((f64, f64, f64), f64)],
-    grain: f64,
-    rough: (f64, f64),
-    ground: f64,
-) -> Obj {
-    let o = boulder!(
-        name,
-        radius,
-        at = at,
-        material = material,
-        scale = (1, 1, 1),
-        seed = seed,
-        noise = rough.0,
-        subdivisions = subdivisions
-    );
-    lump(o, rough.1, 4.0, seed);
-    if grain != 0.0 {
-        lump(o, grain, 14.0, seed + 5.1);
-    }
-    o.edit(|p| p.mesh.transform(&M4::diagonal(scale.into())));
-    for &(direction, depth) in fractures {
-        let n = V3::from(direction).normalized();
-        let reach = o.read(|p| {
-            p.mesh
-                .verts
-                .iter()
-                .map(|v| v.dot(n))
-                .fold(f64::NEG_INFINITY, f64::max)
-        });
-        cut_own(o, n * (reach - depth), n);
-    }
-    o.edit(|p| {
-        let highest = p
-            .mesh
-            .verts
-            .iter()
-            .map(|v| v.z)
-            .fold(f32::NEG_INFINITY, f32::max);
-        p.loc.z = (top - highest as f64) as f32;
-    });
-    cut(o, (0, 0, ground), (0, 0, -1))
-}
 
 /// Colours a stone's weathered faces (its rounded ones, not the fresh flat breaks): lichen in patches on what
 /// faces the sky (smooth noise over `cover`), and the damp, earthy band where it goes into the ground.
@@ -226,6 +131,7 @@ pub fn rock() -> Vec<Obj> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use artkit::boulder;
     use artkit::mesh::{Mesh, edge};
     use artkit::scene;
     use std::collections::BTreeMap;

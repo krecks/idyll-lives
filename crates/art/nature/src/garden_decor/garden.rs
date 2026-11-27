@@ -2,7 +2,7 @@
 
 use super::M;
 use super::common::on_top;
-use crate::ground::rock::stone;
+use crate::common::stone;
 use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
 use artkit::math::{P3, TAU, cos, degrees, sin};

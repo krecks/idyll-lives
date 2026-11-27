@@ -1,6 +1,6 @@
 //! What the garden things are built from.
 
-use crate::ground::common::mesh;
+use crate::common::mesh;
 use artkit::json::{self, Json};
 use artkit::materials::Mat;
 use artkit::math::V3;

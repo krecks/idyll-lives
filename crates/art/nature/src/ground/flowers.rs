@@ -1,7 +1,8 @@
 //! The lawn's wildflowers and its drifts: daisies, buttercups, violets and fallen petals.
 
 use super::M;
-use super::common::{SKY, blade, mesh, stem};
+use super::common::{SKY, blade, stem};
+use crate::common::mesh;
 use artkit::far::{is_low, low};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, TAU, V3, atan2, cos, degrees, pow, radians, sin, sqrt, v3};
