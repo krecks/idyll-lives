@@ -120,7 +120,7 @@ pub fn family() -> Family {
             Model::new("pergola", structures::pergola, (2.92, 2.42, 1.90))
                 .key("model.pergola")
                 .paint(&[("struct_timber", "Timber")]),
-            Model::new("awning", structures::awning, (1.90, 0.395, 0.91))
+            Model::new("awning", structures::awning, (1.90, 0.645, 0.93))
                 .key("model.awning")
                 .centre(0.0, 0.025)
                 .on_wall()

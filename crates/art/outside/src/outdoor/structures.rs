@@ -5,7 +5,7 @@ use artkit::math;
 use artkit::parts::{join_all, settle};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fsphere, settle};
+use artkit::{fbox, fcone, fcyl, fsphere, settle};
 
 // --- O9: the carport: four posts, eaves beams, two trusses and the rafters under a pitched roof -----------------
 /// The roof's pitch (degrees from level), each side of the ridge.
@@ -474,72 +474,136 @@ pub fn pergola() -> Vec<Obj> {
     meshes()
 }
 
-// --- O9: the awning: a rail on the wall, its slats stepping down to the front bar and the valance ---------
+// --- O9: the awning: a head rail on the wall, one striped canvas sloping down and out on two side arms, a
+// scalloped valance along its front edge ---------------------------------------------------------------------------
+/// The canvas's slope (degrees from level), down and out from the wall.
+const AWNING_SLOPE: f64 = 25.0;
+
 pub fn awning() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let back = -0.43;
+    let (sin, cos) = (
+        math::sin(AWNING_SLOPE.to_radians()),
+        math::cos(AWNING_SLOPE.to_radians()),
+    );
+    // where the canvas leaves the head rail's front: high enough that the scallops end 0.3 m under a window's 2.1 m head
+    let (top, wall) = (2.42, back + 0.07);
+    // a point in the canvas: `s` down the slope from the rail, `n` out of its top face
+    let at = |s: f64, n: f64| (top - s * sin + n * cos, wall + s * cos + n * sin);
+    let tilt = (AWNING_SLOPE, 0.0, 0.0);
+    let len = 0.84 / cos;
+    let stripe = |k: usize| {
+        if k.is_multiple_of(2) {
+            M.awning_stripe
+        } else {
+            M.awning_stripe2
+        }
+    };
     fbox!(
         f,
         "rail",
         1.90,
-        0.07,
+        0.08,
         0.070,
-        (0, 2.18, back + 0.035),
+        (0, top, back + 0.035),
         M.panel_frame,
         bevel = 0.006
     );
-    for i in 0..5 {
-        let y = 2.160 - 0.035 * i as f64;
-        let z = back + 0.100 + 0.175 * i as f64;
+    // the canvas: ten stripes side by side, each its own strip, so no two faces lie on one another
+    let (n, width) = (10, 0.19);
+    for k in 0..n {
+        let x = -0.95 + width * (k as f64 + 0.5);
+        let (y, z) = at(len / 2.0, 0.004);
         fbox!(
             f,
-            format!("slat{i}"),
-            1.88,
-            0.030,
-            0.200,
-            (0, y, z),
-            if i % 2 == 0 {
-                M.awning_stripe
-            } else {
-                M.awning_stripe2
-            },
-            bevel = 0.006
+            format!("canvas{k}"),
+            width,
+            0.008,
+            len,
+            (x, y, z),
+            stripe(k),
+            rot = tilt,
+            bevel = 0
         );
     }
+    // the arms under its two edges, a strut to each from a plate on the wall below, the bar along the front
     for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+        let x = sx * 0.92;
+        let (y, z) = at(len / 2.0, -0.02);
         fbox!(
             f,
             format!("arm{i}"),
-            0.05,
-            0.05,
-            0.86,
-            (sx * 0.90, 2.00, back + 0.470),
+            0.035,
+            0.035,
+            len,
+            (x, y, z),
             M.panel_frame,
-            bevel = 0.006
+            rot = tilt,
+            bevel = 0.004
+        );
+        let foot = (top - 0.50, back + 0.03);
+        let (ty, tz) = at(len * 0.6, -0.035);
+        let (dy, dz) = (ty - foot.0, tz - foot.1);
+        fbox!(
+            f,
+            format!("strut{i}"),
+            0.025,
+            0.025,
+            math::sqrt(dy * dy + dz * dz),
+            (x, (ty + foot.0) / 2.0, (tz + foot.1) / 2.0),
+            M.panel_frame,
+            rot = (-math::atan2(dy, dz).to_degrees(), 0.0, 0.0),
+            bevel = 0.003
+        );
+        fbox!(
+            f,
+            format!("plate{i}"),
+            0.06,
+            0.10,
+            0.02,
+            (x, foot.0, back + 0.01),
+            M.panel_frame,
+            bevel = 0.004
         );
     }
+    let (fy, fz) = at(len, -0.02);
     fbox!(
         f,
         "bar",
         1.90,
-        0.06,
-        0.06,
-        (0, 1.97, back + 0.880),
+        0.04,
+        0.04,
+        (0, fy, fz),
         M.panel_frame,
-        bevel = 0.006
-    );
-    fbox!(
-        f,
-        "valance",
-        1.90,
-        0.14,
-        0.020,
-        (0, 1.89, back + 0.880),
-        M.awning_stripe,
         bevel = 0.004
     );
-    settle!();
-    meshes()
+    // the valance: the stripes carried down the front, each ending in a scallop set 1 mm behind it
+    let (vy, vz) = (fy + 0.02, fz + 0.025);
+    for k in 0..n {
+        let x = -0.95 + width * (k as f64 + 0.5);
+        fbox!(
+            f,
+            format!("valance{k}"),
+            width,
+            0.12,
+            0.006,
+            (x, vy - 0.06, vz),
+            stripe(k),
+            bevel = 0
+        );
+        fcyl!(
+            f,
+            format!("scallop{k}"),
+            width / 2.0,
+            0.004,
+            (x, vy - 0.12, vz - 0.006),
+            stripe(k),
+            verts = 16,
+            rot = (90, 0, 0)
+        );
+    }
+    // no clip moves a part: all of it is the still body
+    settle(&[join_all("body")])
 }
 
 // --- O9: the solar array: two 60-cell modules tilted at the sun on a low braced ground frame -------------
