@@ -74,7 +74,7 @@ describe("the lamps' changes", () => {
     const draw = { destroyed: false, enabled: true, setAll() {}, update() {} };
     const fire = { draw, colors: new Float32Array(4), rooms: [0], lamps: [-1], ids: [5], screen: false, glass: false, base: new Float32Array([1]) };
     const lot = Object.setPrototypeOf(
-      { glows: [fire], motion: { burning: () => true, update: () => ({ moved: false }) }, camera: { getPosition: () => ({ x: 0, y: 0, z: 0 }) }, eye: {}, screenOn: new Set(), flickerTime: 0, flickerAt: 0 },
+      { glows: [fire], motion: { burning: () => true, update: () => ({ moved: false, ambient: false }) }, camera: { getPosition: () => ({ x: 0, y: 0, z: 0 }) }, eye: {}, screenOn: new Set(), flickerTime: 0, flickerAt: 0 },
       LotContents.prototype,
     ) as { update(frame: unknown): boolean };
     const frame = (now: number, speed: number) => ({ now, curr: [speed], layout: { header: { speed: 0 }, actions: [] } });
