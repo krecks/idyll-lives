@@ -62,10 +62,9 @@ impl Line {
     }
 
     /// The finished clip's mouth shapes, flat: `[segments, energy frames, times…, visemes…,
-    /// energy…]` (see `voice::VisemeTrack::flat`); empty before `finish`.
-    #[wasm_bindgen(getter)]
-    pub fn visemes(&self) -> Vec<f32> {
-        self.visemes.clone()
+    /// energy…]` (see `voice::VisemeTrack::flat`), taken: empty before `finish` and after a first call.
+    pub fn visemes(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.visemes)
     }
 }
 
@@ -82,16 +81,15 @@ impl Voice {
     /// A line with pitch and size for its output (clamped to what sounds right); the model sets the speed.
     pub fn line(&self, text: &str, pitch: f32, depth: f32) -> Line {
         Line {
-            inner: self.g2p.line(
-                text,
-                VoiceParams {
-                    speed: 1.0,
-                    pitch,
-                    depth,
-                },
-            ),
+            inner: self.g2p.line(text, VoiceParams { pitch, depth }),
             visemes: Vec::new(),
         }
+    }
+
+    /// Words of `text` not in the dictionary (they are guessed): for checking the shipped dictionary.
+    #[wasm_bindgen(js_name = unknownWords)]
+    pub fn unknown_words(&self, text: &str) -> Vec<String> {
+        self.g2p.unknown_words(text)
     }
 }
 
