@@ -1,7 +1,8 @@
 //! The crumb-proof beanbag, the snack-stash nightstand and the command-couch gaming recliner, and the controller
 //! lying by two of them.
 
-use super::common::{_bake, _box, _can, _chip_bag, _place, _wrapper, M};
+use super::common::{_bake, _can, _chip_bag, _place, _wrapper, M};
+use crate::common::_box;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;

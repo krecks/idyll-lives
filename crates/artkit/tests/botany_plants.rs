@@ -5,7 +5,7 @@
 mod common;
 
 use artkit::botany::{
-    self, _fit_with_part, _flower, _with_part, MEADOW_FLOWERS, SHRUB, ShrubMass, fiddle, fit_to,
+    self, _fit_with_part, _flower, _with_part, MEADOW_FLOWERS, ShrubMass, fiddle, fit_to,
     hedge_top, lupin_spike, raised_bed, sword,
 };
 use artkit::far::{far_of, is_low, low};
@@ -15,7 +15,7 @@ use artkit::parts::{join_all, new_parts, settle};
 use artkit::rand::Random;
 use artkit::scene::{self, Obj};
 use artkit::{
-    _crop, _put, arc, blade, cone, cube, cut_leaf, dome, dots, florets, hedge_block, leaf,
+    _crop, _put, arc, blade, cone, cube, cut_leaf, dome, dots, florets, leaf,
     leafy_shrub, lobed, lump, mound, normals, on_masses, outline, perch, perches, pinnate, rays,
     ribbed, rose_head, rose_leaf, rosettes, slits, soil_top, sphere, spiral, stalk, star, stem,
     tulip_head, twig, vessel,
@@ -2248,20 +2248,6 @@ fn bush_flowering() {
     settle(&[still]);
 }
 
-/// families/plants.py's clipped hedge segment of the streets.
-fn street_hedge() {
-    let p = botany::palette(&[
-        ("leaf", SHRUB[1]),
-        ("leaf_light", SHRUB[2]),
-        ("stem", SHRUB[3]),
-    ]);
-    hedge_block!(&p, 1.547, 1.019, 0.85, seed = 134);
-    let still = join_all("hedge");
-    perches!(6, 134, &hedge_top(0.915), per = 6, up = (0.6, 1.4));
-    keep_found();
-    settle(&[still]);
-}
-
 /// families/plants.py's rose bush: canes from a leafy base, compound leaves along them, a rose on each, the one at
 /// the front cut by a prune.
 fn rosebush() {
@@ -2365,10 +2351,10 @@ fn rosebush() {
     );
 }
 
-/// The models built whole, fitted and joined.
-const MODELS: [&str; 6] = [
+/// The models built whole, fitted and joined. (The street hedge and `hedge_block` are no longer here: fa481d5d3
+/// rebuilt them as leaf clumps, which Blender's goldens never had.)
+const MODELS: [&str; 5] = [
     "bush_flowering",
-    "street_hedge",
     "rosebush",
     "tulips",
     "veg_patch",
@@ -2534,16 +2520,7 @@ fn shrubs(name: &str, p: &Palette) -> Option<Ret> {
             ret.extend(seen);
             return Some(ret);
         }
-        "hedge_block" => {
-            let q = botany::palette(&[
-                ("leaf", SHRUB[1]),
-                ("leaf_light", SHRUB[2]),
-                ("stem", SHRUB[3]),
-            ]);
-            hedge_block!(&q, 1.546, 1.12, 0.92, seed = 137);
-        }
         "bush_flowering" => bush_flowering(),
-        "street_hedge" => street_hedge(),
         "rosebush" => rosebush(),
         other => panic!("no case {other:?}"),
     }
@@ -2565,7 +2542,7 @@ fn shrubs_and_hedges_are_blenders_fitted_joined_and_settled_with_their_perches()
         ..Hold::default()
     };
     let n = check("botany_shrubs.txt", shrubs, hold, &mut off);
-    assert!(n >= 24, "{n} cases");
+    assert!(n >= 20, "{n} cases");
     assert!(off.moved * 4 < off.points, "{off:?}");
 }
 

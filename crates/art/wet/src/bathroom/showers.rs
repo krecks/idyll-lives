@@ -23,25 +23,36 @@ use artkit::{fbox, fcyl, fextrude, fsweep, grow, slide};
 const SHOWER_SLIDE: f64 = 0.41;
 const STALL_GATHER: f64 = 0.32;
 
+/// The 0.9 m cubicle's floor and tiled back and side, both showers' start: a tray (its `lip` and corner `square`
+/// count) with the drain grate at `(x, y, z)`, and walls from the tray's `floor` to `top` (`(wall thickness, tile)`).
+fn cubicle_base(
+    f: &GameFrame,
+    floor: f64,
+    top: f64,
+    (lip, square): (f64, i32),
+    (dx, dy, dz): (f64, f64, f64),
+    (thick, tile): (f64, f64),
+) {
+    tray(f, "tray", 0.9, 0.9, floor, M.tray, lip, 0.012, square);
+    grate(f, "drain", dx, dy, dz, 0.09, 0.09, M.fittings, 5, true);
+    kit::tiled_walls!(
+        f,
+        (-0.45, 0.45),
+        (-0.45, 0.45),
+        (floor, top),
+        thick,
+        tile,
+        0.005,
+        M.grout,
+        M.tile
+    );
+}
+
 pub fn shower() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let top = 2.15;
     let still = new_parts(|| {
-        tray(&f, "tray", 0.9, 0.9, 0.058, M.tray, 0.035, 0.012, 10);
-        grate(
-            &f, "drain", 0.1, 0.047, 0.1, 0.09, 0.09, M.fittings, 5, true,
-        );
-        kit::tiled_walls!(
-            &f,
-            (-0.45, 0.45),
-            (-0.45, 0.45),
-            (0.058, top),
-            0.03,
-            0.3,
-            0.005,
-            M.grout,
-            M.tile
-        );
+        cubicle_base(&f, 0.058, top, (0.035, 10), (0.1, 0.047, 0.1), (0.03, 0.3));
         // a glass side, and a fixed panel in front (the sliding door, inside it, is its own part)
         fbox!(
             f,
@@ -218,20 +229,13 @@ pub fn shower_stall() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let rail = 1.95;
     let still = new_parts(|| {
-        tray(&f, "tray", 0.9, 0.9, 0.08, M.tray, 0.045, 0.012, 14);
-        grate(
-            &f, "drain", 0.05, 0.069, 0.05, 0.09, 0.09, M.fittings, 5, true,
-        );
-        kit::tiled_walls!(
+        cubicle_base(
             &f,
-            (-0.45, 0.45),
-            (-0.45, 0.45),
-            (0.08, 2.08),
-            0.04,
-            0.25,
-            0.005,
-            M.grout,
-            M.tile
+            0.08,
+            2.08,
+            (0.045, 14),
+            (0.05, 0.069, 0.05),
+            (0.04, 0.25),
         );
         // an L-shaped rail at the open sides, bent round the corner; the curtain hangs along the whole side, and its
         // front is its own part

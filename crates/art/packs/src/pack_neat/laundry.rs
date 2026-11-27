@@ -1,7 +1,7 @@
 //! The stacked laundry centre and the rainfall steam shower.
 
 use super::common::{_bottle, _towels, M, TOWELS, WALL};
-use crate::pack_slob::common::_box;
+use crate::common::_box;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;

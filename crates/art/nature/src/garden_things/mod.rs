@@ -19,6 +19,7 @@ use artkit::json;
 mod birds;
 pub mod common;
 mod lights;
+mod planter_box;
 mod pond;
 mod yard;
 
@@ -46,8 +47,8 @@ pub fn family() -> Family {
                 }))
                 .paint(&[("body", "Stones")])),
             own(
-                Model::new("planterBox", birds::planterBox, (0.94, 0.623, 0.504))
-                    .centre(0.0, birds::PLANTER_C)
+                Model::new("planterBox", planter_box::planter_box, (0.94, 0.623, 0.504))
+                    .centre(0.0, planter_box::PLANTER_C)
                     .key("model.planterBox")
                     .far_low()
                     .paint(&[("body", "Box")]),
@@ -59,7 +60,7 @@ pub fn family() -> Family {
             ),
             own(Model::new(
                 "birdFeederPole",
-                birds::birdFeederPole,
+                birds::bird_feeder_pole,
                 (0.85, 1.912, 0.271),
             )
             .centre(0.0, -0.1694)
@@ -67,7 +68,7 @@ pub fn family() -> Family {
             .motions(json!({"uses": {"birdwatch": "bird"}}))
             .paint(&[("body", "Pole"), ("feeder", "Feeders")])),
             own(
-                Model::new("dogHouse", yard::dogHouse, (0.983, 0.975, 0.994))
+                Model::new("dogHouse", yard::dog_house, (0.983, 0.975, 0.994))
                     .centre(0.0, -0.003)
                     .key("model.dogHouse")
                     .paint(&[("body", "House"), ("roof", "Roof")]),
@@ -75,19 +76,21 @@ pub fn family() -> Family {
             own(Model::new("sundial", yard::sundial, (0.36, 0.962, 0.36))
                 .key("model.sundial")
                 .paint(&[("body", "Plinth"), ("dial", "Dial")])),
+            own(Model::new(
+                "steppingStones",
+                yard::stepping_stones,
+                (0.592, 0.04, 2.537),
+            )
+            .key("model.steppingStones")
+            .paint(&[("body", "Stones")])),
             own(
-                Model::new("steppingStones", yard::steppingStones, (0.592, 0.04, 2.537))
-                    .key("model.steppingStones")
-                    .paint(&[("body", "Stones")]),
-            ),
-            own(
-                Model::new("lampPost", lights::lampPost, (0.32, 2.735, 0.32))
+                Model::new("lampPost", lights::lamp_post, (0.32, 2.735, 0.32))
                     .key("model.lampPost")
                     .far_ratio(0.25)
                     .paint(&[("body", "Post"), ("lantern", "Lantern")]),
             ),
             own(
-                Model::new("stringLights", lights::stringLights, (1.97, 2.37, 0.246))
+                Model::new("stringLights", lights::string_lights, (1.97, 2.37, 0.246))
                     .key("model.stringLights")
                     .motions(json!({"idle": "sway"}))
                     .paint(&[("body", "Posts"), ("bulb", "Bulbs")]),

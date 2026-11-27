@@ -425,7 +425,7 @@ const TILE_ROOF: f64 = 1.5;
 
 const TILE_PLASTER: f64 = 2.0;
 
-const TILE_SIDEWALK: f64 = 1.0 / 0.556;
+const TILE_SIDEWALK: f64 = 2.8;
 
 const TILE_ROAD: f64 = 5.0;
 
@@ -532,7 +532,7 @@ const ROOF_COURSES: i64 = 11;
 const LAMINATE_JOINTS: usize = 1;
 
 /// Sidewalk slabs along and across a tile.
-const SIDEWALK_SLABS: (i64, i64) = (3, 6);
+const SIDEWALK_SLABS: (i64, i64) = (2, 2);
 
 /// Parquet blocks (m, joints included): three herringbone repeats (a block's length times √2) along the tile,
 /// fifteen (its width times √2) up it.

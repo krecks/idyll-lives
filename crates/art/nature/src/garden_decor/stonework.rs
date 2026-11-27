@@ -1,6 +1,6 @@
 //! The cast and carved stone: the bird bath, the fountain and the lantern.
 
-use super::common::{_eased, _hex, _petals, _scalloped};
+use super::common::{eased, hex_ring, petals, scalloped};
 use super::{F, M};
 use artkit::kit;
 use artkit::math::{PI, TAU, cos, cosd, p3, radians, sin, sind};
@@ -88,7 +88,7 @@ pub fn birdbath() -> Vec<Obj> {
     ];
     loft!(
         "bowl",
-        &_scalloped(&rows, 12.0, 0.025, 48, 0.7),
+        &scalloped(&rows, 12.0, 0.025, 48, 0.7),
         material = M.stone,
         angle = 70
     );
@@ -247,7 +247,7 @@ pub fn fountain() -> Vec<Obj> {
     ];
     loft!(
         "bowl2",
-        &_scalloped(&rows, 8.0, 0.04, 32, 0.66),
+        &scalloped(&rows, 8.0, 0.04, 32, 0.66),
         material = M.stone,
         angle = 70
     );
@@ -371,10 +371,10 @@ pub fn fountain() -> Vec<Obj> {
 const EASE: f64 = 0.005;
 
 pub fn lantern() -> Vec<Obj> {
-    // (each corner of the cut stone eased: `_eased`)
-    let hex = |r: f64, z: f64| _eased(&_hex(r, z, 6, None, 0.0, 0.0), 1, EASE);
+    // (each corner of the cut stone eased: `eased`)
+    let hex = |r: f64, z: f64| eased(&hex_ring(r, z, 6, None, 0.0, 0.0), 1, EASE);
     let roof = |r: f64, z: f64, flat: f64, lift: f64| {
-        _eased(&_hex(r, z, 12, Some(flat), lift, 0.0), 2, EASE)
+        eased(&hex_ring(r, z, 12, Some(flat), lift, 0.0), 2, EASE)
     };
     loft!(
         "base",
@@ -389,7 +389,7 @@ pub fn lantern() -> Vec<Obj> {
     );
     loft!(
         "base_petals",
-        &_petals(0.165, 0.11, 0.09, 0.14, 12, 0.12),
+        &petals(0.165, 0.11, 0.09, 0.14, 12, 0.12),
         material = M.stone_dark,
         angle = 60
     );
@@ -411,7 +411,7 @@ pub fn lantern() -> Vec<Obj> {
         segments = 16
     );
     // the petals' rim rolled over into their top (out and up, then in), no turn of 60° in it: carved stone
-    let mut petals = _petals(0.09, 0.17, 0.48, 0.535, 12, 0.12);
+    let mut petals = petals(0.09, 0.17, 0.48, 0.535, 12, 0.12);
     for (k, dz) in [(1.0041, 0.004), (0.9906, 0.0073)] {
         let rim: Vec<_> = petals[1]
             .iter()

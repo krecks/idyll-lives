@@ -45,7 +45,7 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
         w,
         m.rubber,
         None,
-        Some(if inner { low(16, 12) } else { low(24, 16) }),
+        Some(low(24, 16)), // 24 round a 0.5 m tyre: its chord within 4.3 mm
         Axis::X,
     );
     if inner {
@@ -65,7 +65,7 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
         at = F.at(x, FE_R, z),
         material = m.steel,
         rot = (0, -90 * s, 0),
-        segments = low(16, 12)
+        segments = low(24, 12)
     );
     if is_low() {
         return;

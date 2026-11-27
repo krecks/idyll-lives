@@ -58,6 +58,11 @@ const KNOWN: &[(&str, &str, &str)] = &[
         "material.road",
         "arm 102 px/m: a 512 px arm map over the 5 m tile",
     ),
+    (
+        "density",
+        "material.sidewalk",
+        "albedo 183 px/m, normal 183 px/m, arm 183 px/m: 512 px maps over the 2.8 m tile of 1.4 m slabs",
+    ),
 ];
 
 /// A set's committed maps.

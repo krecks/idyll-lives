@@ -20,9 +20,11 @@ use artkit::json::Json;
 mod clock;
 mod common;
 mod fittings;
+mod hangers;
 mod hearth;
-mod ornaments;
+mod statues;
 mod textiles;
+mod vases;
 mod wall;
 
 use common::M;
@@ -102,32 +104,28 @@ pub fn family() -> Family {
             )))
             .draws(5)
             .paint(&[("walnut", "Case"), ("dial", "Face")]),
-            Model::new("vaseTall", ornaments::vase_tall, (0.329, 1.27, 0.224))
+            Model::new("vaseTall", vases::vase_tall, (0.329, 1.27, 0.224))
                 .key("model.vaseTall")
                 .paint(&[("ceramic", "Body")]),
-            Model::new(
-                "urnPorcelain",
-                ornaments::urn_porcelain,
-                (0.36, 0.62, 0.363),
-            )
-            .key("model.urnPorcelain")
-            .paint(&[("porcelain", "Body")]),
-            Model::new("vasePedestal", ornaments::vase_pedestal, (0.4, 1.6, 0.4))
+            Model::new("urnPorcelain", vases::urn_porcelain, (0.36, 0.62, 0.363))
+                .key("model.urnPorcelain")
+                .paint(&[("porcelain", "Body")]),
+            Model::new("vasePedestal", vases::vase_pedestal, (0.4, 1.6, 0.4))
                 .key("model.vasePedestal")
                 .paint(&[("vase_blue", "Vase"), ("stone", "Pedestal")]),
-            Model::new("bustMarble", ornaments::bust_marble, (0.44, 1.539, 0.44))
+            Model::new("bustMarble", statues::bust_marble, (0.44, 1.539, 0.44))
                 .key("model.bustMarble")
                 .paint(&[("marble", "Bust"), ("stone", "Plinth")]),
-            Model::new("statueCat", ornaments::statue_cat, (0.311, 0.598, 0.41))
+            Model::new("statueCat", statues::statue_cat, (0.311, 0.598, 0.40))
                 .key("model.statueCat")
                 .paint(&[("concrete", "Body")]),
-            Model::new("statueHorse", ornaments::statue_horse, (0.46, 1.41, 0.44))
+            Model::new("statueHorse", statues::statue_horse, (0.46, 1.41, 0.44))
                 .key("model.statueHorse")
                 .paint(&[("bronze", "Body")]),
-            Model::new("coatRack", ornaments::coat_rack, (0.431, 1.788, 0.355))
+            Model::new("coatRack", hangers::coat_rack, (0.431, 1.788, 0.355))
                 .key("model.coatRack")
                 .paint(&[("oak", "Body")]),
-            Model::new("hangingPlant", ornaments::hanging_plant, (0.46, 1.83, 0.46))
+            Model::new("hangingPlant", hangers::hanging_plant, (0.46, 1.83, 0.46))
                 .key("model.hangingPlant")
                 .on_wall()
                 .motions(motions(r#"{"uses": {"water": "sway"}, "hold": 0.8}"#))

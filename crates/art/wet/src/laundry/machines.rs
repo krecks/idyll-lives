@@ -22,7 +22,15 @@ const ZERO: P3 = P3 {
 
 /// The still cabinet: the body under a top panel, a recessed plinth, the control strip with a soap drawer or a
 /// filter, a program knob in its ring of settings, a display and buttons, the rubber bellows round the porthole.
-fn cabinet(f: &GameFrame, led: Mat, dryer: bool, _ring: Mat) {
+fn cabinet(f: &GameFrame, led: Mat, dryer: bool) {
+    shell(f);
+    control_strip(f, led);
+    seal(f);
+    foot(f, dryer);
+}
+
+/// The body under its top panel on a recessed plinth.
+fn shell(f: &GameFrame) {
     artkit::soft!(
         f,
         "cabinet",
@@ -59,6 +67,11 @@ fn cabinet(f: &GameFrame, led: Mat, dryer: bool, _ring: Mat) {
         ZERO,
     );
     fbox!(f, "kick", 0.5, 0.012, 0.002, (0, 0.035, 0.1405), M.dark);
+}
+
+/// The control strip: the soap drawer (washer) or the water tank (dryer), the display, the buttons and the
+/// program knob.
+fn control_strip(f: &GameFrame, led: Mat) {
     rbox(
         f,
         "strip",
@@ -179,7 +192,10 @@ fn cabinet(f: &GameFrame, led: Mat, dryer: bool, _ring: Mat) {
             if k % 3 != 0 { M.dark } else { led }
         );
     }
-    // the bellows: a rubber lip round the opening, behind the door
+}
+
+/// The bellows: a rubber lip round the opening, behind the door.
+fn seal(f: &GameFrame) {
     front_disc(
         f,
         "seal",
@@ -198,6 +214,10 @@ fn cabinet(f: &GameFrame, led: Mat, dryer: bool, _ring: Mat) {
         M.dark,
         24,
     );
+}
+
+/// The dryer's vents along the foot, or the washer's filter.
+fn foot(f: &GameFrame, dryer: bool) {
     if dryer {
         // the vents along the foot, the condenser's hatch beside them
         for (k, y) in [0.075, 0.1, 0.125].into_iter().enumerate() {
@@ -377,7 +397,7 @@ fn machine(dryer: bool) -> Vec<Obj> {
         (M.led, M.door)
     };
     let still = new_parts(|| {
-        cabinet(f, led, dryer, ring);
+        cabinet(f, led, dryer);
         front_disc(
             f,
             "knob",

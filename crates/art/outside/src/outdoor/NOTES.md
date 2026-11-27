@@ -12,7 +12,7 @@ every lot's outdoor objects whole, and these have no far version. Helpers (`comm
 `kit::tube!`), `bar` (a rounded-rect section swept), `plank` (an outline placed like a `kit::board`), `side_slab`, `slab`, `cup`, `jug`,
 `bottle`, and `jitter`, which wobbles with `noise()` so a jittered model is the same on every run (in Blender the
 shared jitter was not: the fire pit's centre moved 2 mm and failed the size check); `mosaic` (`tables.rs`),
-`cast_end` (`seats.rs`), `flame` and `log` (`fire.rs`).
+`cast_end` (`seats/bench.rs`), `flame` and `log` (`fire.rs`).
 
 2026-10-21 (authenticity review, Phase 4): the park bench's and the picnic table's heights, the bistro set's
 chairs, the garden bench, the hammock, the porch swing's seat, the swing set's frame, the hot tub's cover and bench
@@ -102,7 +102,7 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
 - **Hammock** (`hammock`): a 2.8 m wooden stand on its 1 × 3 tiles (Q-07; it was 1.86 m on 1 × 2, lain in
   folded); the sling (a sagging striped mesh 0.74 m wide, spreader bars, ropes, a pillow) is hinged on the line
   through the hooks (1.1 m). `sway` rocks it ±8° in 2 s, a loop for swing and doze, and the resident rides it
-  (`ride`). They lie in the sling's dip (`furniture.json` `beds.hammock.sling`, its heights from `leisure.rs`'s `sling` and
+  (`ride`). They lie in the sling's dip (`furniture.json` `beds.hammock.sling`, its heights from `leisure/hammock.rs`'s `sling` and
   `SLING_*`: 0.52 m in the middle, 0.84 at the spreader bars ±0.98, the pillow 0.78 towards the head), the head
   on the pillow and the feet inside the spreader bar. A changed sling needs those numbers changed too; the two pack
   hammocks have theirs.

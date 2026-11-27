@@ -1,6 +1,6 @@
 //! The dog house, the sundial and the stepping stones.
 
-use super::common::{_own, _prism, F, M};
+use super::common::{F, M, own, prism};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{TAU, V3, atan2, cos, cosd, degrees, pow, sin, sind, v3};
@@ -15,7 +15,7 @@ use artkit::{boulder, fbox, fcyl, fextrude, fsphere, fsweep, revolve, rod, sweep
 /// A letter of the dog's name in strokes, `size` tall, its middle at game (x, y), on the face at depth z. Game x
 /// runs to the viewer's left seen from the front, so the strokes and the letters' order are mirrored to read
 /// right.
-fn _letter(ch: char, x: f64, y: f64, z: f64, size: f64, material: Mat) {
+fn letter(ch: char, x: f64, y: f64, z: f64, size: f64, material: Mat) {
     let (s, t) = (size, 0.008);
     type Stroke = ((f64, f64), (f64, f64));
     let strokes: &[Stroke] = match ch {
@@ -50,9 +50,8 @@ fn _letter(ch: char, x: f64, y: f64, z: f64, size: f64, material: Mat) {
     }
 }
 
-#[allow(non_snake_case)]
-pub fn dogHouse() -> Vec<Obj> {
-    let m = _own("dogHouse");
+pub fn dog_house() -> Vec<Obj> {
+    let m = own("dogHouse");
     let (zc, d) = (-0.03, 0.84); // the old part's body: 0.8 wide, centred 3-4 cm back
     let front = zc + d / 2.0;
     let slope = degrees(atan2(0.28, 0.4));
@@ -69,7 +68,7 @@ pub fn dogHouse() -> Vec<Obj> {
         bevel = 0.008,
         bevel_segments = 1
     );
-    _prism(
+    prism(
         "house",
         &[
             (-0.4, 0.04),
@@ -285,7 +284,7 @@ pub fn dogHouse() -> Vec<Obj> {
         bevel_segments = 1
     );
     for (i, ch) in "REX".chars().enumerate() {
-        _letter(
+        letter(
             ch,
             (1.0 - i as f64) * 0.06,
             0.6,
@@ -358,7 +357,7 @@ pub fn dogHouse() -> Vec<Obj> {
 
 // --- the sundial (1x1): a copper dial with its gnomon on a stone baluster ---------------------------------------
 pub fn sundial() -> Vec<Obj> {
-    let m = _own("sundial");
+    let m = own("sundial");
     // two square steps, their top edges chamfered, a few patches of lichen on them
     fbox!(
         F,
@@ -577,9 +576,8 @@ const STONES: [(f64, f64, f64, i32); 4] = [
 ];
 const STONE_H: f64 = 0.04;
 
-#[allow(non_snake_case)]
-pub fn steppingStones() -> Vec<Obj> {
-    let m = _own("steppingStones");
+pub fn stepping_stones() -> Vec<Obj> {
+    let m = own("steppingStones");
     let mut rng = Random::new(31);
     for (i, (x, z, d, r)) in STONES.into_iter().enumerate() {
         let n = i as f64;

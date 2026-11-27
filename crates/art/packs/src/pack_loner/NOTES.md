@@ -113,3 +113,5 @@ are its moving dial and antenna (`dial_aside`, `antenna_aside`, still played by 
 × 0.93 × 0.68 m, the desk and chair. The bonsai on the bonsai bench is `aside` (`bonsai`), its trimmed twig too
 (`twig_aside`, still played by `trim` and `mist`): the bench measures 0.86 × 1.11 × 0.75 m, its back board's rail at
 1.11 m. No draw call more (2026-11-25).
+
+- 2026-11-27: soloSauna: door frame, vent slots on both side walls, a lamp and hood on the back wall.

@@ -12,13 +12,50 @@ use artkit::{forms::eased, shapes::AUTO_WIDTH};
 // --- the neighbourly baking counter (2x1): a cream retro range beside a sage counter laid with bakes --------
 const RANGE: (f64, f64, f64, f64) = (0.6, 0.62, 0.92, 0.6); // x, width, hob height, depth
 
-pub fn neighbourly_oven() -> Vec<Obj> {
-    let f = &GameFrame::new(0.0);
-    let (rx, rw, rh, rd) = RANGE;
-    let zf = WALL + rd; // the range's front
-    let (cx0, cx1) = (-0.91, rx - rw / 2.0 - 0.01);
-    let (cw, cxm, cd) = (cx1 - cx0, (cx0 + cx1) / 2.0, 0.56);
-    let still = new_parts(|| {
+/// The baking counter's measures: the range's, and the counter's beside it.
+struct Layout {
+    f: GameFrame,
+    rx: f64,
+    rw: f64,
+    rh: f64,
+    rd: f64,
+    zf: f64,
+    cx0: f64,
+    cx1: f64,
+    cw: f64,
+    cxm: f64,
+    cd: f64,
+}
+
+impl Layout {
+    fn new() -> Self {
+        let (rx, rw, rh, rd) = RANGE;
+        let (cx0, cx1) = (-0.91, rx - rw / 2.0 - 0.01);
+        let (cw, cxm, cd) = (cx1 - cx0, (cx0 + cx1) / 2.0, 0.56);
+        Layout {
+            f: GameFrame::new(0.0),
+            rx,
+            rw,
+            rh,
+            rd,
+            zf: WALL + rd,
+            cx0,
+            cx1,
+            cw,
+            cxm,
+            cd,
+        }
+    }
+}
+
+/// The counter: a recessed plinth, the carcass, three shaker doors with brass knobs, a butcher-block top.
+fn counter(l: &Layout) -> Vec<Obj> {
+    let f = &l.f;
+    let cx0 = l.cx0;
+    let cw = l.cw;
+    let cxm = l.cxm;
+    let cd = l.cd;
+    new_parts(|| {
         // the counter: a recessed plinth, the carcass, three shaker doors with brass knobs, a butcher-block top
         fbox!(
             f,
@@ -96,9 +133,14 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 M.crust_dark
             );
         }
-    });
-    // the bakes on the worktop: drawn, not the counter's size
-    let bakes = new_parts(|| {
+    })
+}
+
+/// The bakes on the worktop: drawn, not the counter's size.
+fn bakes(l: &Layout) -> Vec<Obj> {
+    let f = &l.f;
+    let cxm = l.cxm;
+    new_parts(|| {
         let top = 0.905; // the worktop's top
         // the bakes: a lattice pie, a wire rack of biscuits with the rolling pin in front, a pink cake on its stand; the
         // worktop's right end, by the range, is left free (a patch of flour on it) for the cook's mixing bowl or board and
@@ -350,11 +392,17 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             segments = 8,
             rings = 5
         );
-    });
-    // a beadboard back rising from the worktop's back (a dresser's), carrying the shelf with three jars: it stands
-    // free or on the wall (2026-10-21: the shelf hung on the air over a free-standing counter); a wall shelf, drawn
-    // with the counter, not its size
-    let shelf = new_parts(|| {
+    })
+}
+
+/// A beadboard back rising from the worktop's back, carrying the shelf with three jars; drawn with the counter, not its size.
+fn shelf(l: &Layout) -> Vec<Obj> {
+    let f = &l.f;
+    let cx0 = l.cx0;
+    let cx1 = l.cx1;
+    let cw = l.cw;
+    let cxm = l.cxm;
+    new_parts(|| {
         let top = 0.905; // the worktop's top
         fbox!(
             f,
@@ -471,9 +519,18 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 M.porcelain
             );
         }
-    });
-    aside(&shelf, "shelf");
-    let range = new_parts(|| {
+    })
+}
+
+/// The range: an enamel body, a hob with four burners under cast-iron grates, a backguard, a knob panel, a chrome rail.
+fn range(l: &Layout) -> Vec<Obj> {
+    let f = &l.f;
+    let rx = l.rx;
+    let rw = l.rw;
+    let rh = l.rh;
+    let rd = l.rd;
+    let zf = l.zf;
+    new_parts(|| {
         // the range: an enamel body, a hob with four burners under cast-iron grates, a backguard with a clock, a knob
         // panel, a chrome rail, a stock pot (the gingham tea towel is the door's, over its handle)
         fbox!(
@@ -663,9 +720,16 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             verts = 8,
             round = 1
         );
-    });
-    // the stock pot on the hob: drawn, not the counter's size
-    let pot = new_parts(|| {
+    })
+}
+
+/// The stock pot on the hob: drawn, not the counter's size.
+fn pot(l: &Layout) -> Vec<Obj> {
+    let f = &l.f;
+    let rx = l.rx;
+    let rh = l.rh;
+    let rd = l.rd;
+    new_parts(|| {
         let (sx, sz) = (rx + 0.15, WALL + rd / 2.0 - 0.12);
         kit::turned!(
             f,
@@ -730,13 +794,16 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 round = 1
             );
         }
-    });
-    join(&[still, range].concat(), "body", Some(P3::ZERO));
-    aside(&bakes, "bakes");
-    aside(&pot, "pot");
-    // The oven door, hinged on its foot: `oven_open` drops it forward while a pie or treats bake. A window in a raised
-    // frame, a chrome bar handle on stand-offs.
-    let door = new_parts(|| {
+    })
+}
+
+/// The oven door, hinged on its foot: a window in a raised frame, a chrome bar handle on stand-offs, the tea towel over it.
+fn oven_door(l: &Layout) -> Vec<Obj> {
+    let f = &l.f;
+    let rx = l.rx;
+    let rw = l.rw;
+    let zf = l.zf;
+    new_parts(|| {
         fbox!(
             f,
             "oven_door",
@@ -833,7 +900,26 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 M.towel_check
             );
         }
-    });
+    })
+}
+
+pub fn neighbourly_oven() -> Vec<Obj> {
+    let l = &Layout::new();
+    let (f, rx, zf) = (&l.f, l.rx, l.zf);
+    let still = counter(l);
+    // the bakes on the worktop: drawn, not the counter's size
+    let bakes = bakes(l);
+    // a beadboard back rising from the worktop's back (a dresser's): it stands free or on the wall
+    let shelf = shelf(l);
+    aside(&shelf, "shelf");
+    let range = range(l);
+    // the stock pot on the hob: drawn, not the counter's size
+    let pot = pot(l);
+    join(&[still, range].concat(), "body", Some(P3::ZERO));
+    aside(&bakes, "bakes");
+    aside(&pot, "pot");
+    // The oven door, hinged on its foot: `oven_open` drops it forward while a pie or treats bake.
+    let door = oven_door(l);
     let door = hinged(join(&door, "oven_door", None), f.at(rx, 0.13, zf - 0.02));
     let objs = settle!(centre = false);
     swing!(door, "oven_open", 85.0, seconds = 0.8, axis = Axis::X);

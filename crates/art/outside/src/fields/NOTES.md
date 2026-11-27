@@ -14,7 +14,9 @@ and fingerpost on one 1 m tile.
 
 ## The models
 
-- **Dry-stone wall** (`walls.rs`, 2,944 triangles, one draw): six courses of field stones narrowing from 0.6 m at the
+- **Dry-stone wall** (`walls.rs`, 1,764 triangles since 2026-11-27: five courses of larger stones, 0.22 to 0.55 m long, each
+  dropped or set back a little with a dark heart behind so the chinks read, and seven cap stones of different widths and
+  heights; its numbers are named at the top of the file. Earlier: six courses of field stones narrowing from 0.6 m at the
   foot to 0.36 m under the coping (the batter: the West of Scotland DSWA's training wall is 1.4 m high, 70 cm at the
   base, 35 cm at the top), each stone its own length, a little lower than its course or set back, in the boulders'
   weathered greys (`garden_decor`'s rock colours); a coping of stones set on edge; lichen patches on the front face.
@@ -50,3 +52,11 @@ and fingerpost on one 1 m tile.
 - **The gate does not open.** No interaction or clip; it matches the static field-boundary set.
 - **Content group.** The five objects are in `web/public/content/countryside.json` under the existing `community` /
   `countryside` group, so no new group, content file or `base.json` include is needed.
+- **Stile reworked (2026-11-27).** A step stile over a low stone wall (two courses and a coping, 0.45 m): an oak post
+  at each end and an oak tread on legs against each face (0.25 m up, 0.25 m down). The through-stones are gone; the
+  model now also paints `oak` ("Wood").
+
+## Hedgerow (2026-11-27)
+
+The hedgerow's block is `hedge_block` with `rough = 1`: an uneven top of swollen clumps, five bare saplings with leaf
+sprays standing out of it to 1.45 m, and nine haws (red, on `foliage`). 3,006 triangles, one draw.

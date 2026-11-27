@@ -184,3 +184,9 @@ moulding (at 30°: their mitres), the phone box's pediments, the lamp's collar, 
 traffic light's backboard rim, the bin's label and the post box's times frame. The bin's pressed ribs slope at
 under 60° to its face (their flanks were steep enough to read as cut edges). The phone box door's panes are an
 opaque blue-grey gloss (`pane`): see-through, the door was a fourth draw call.
+
+## Statue and fountain rebuilt (2026-11-27)
+
+`townStatue`'s one 400-line function is `plinth`, `figure`, `head` and `arms`; the arms are 14-sided with five steps a
+sweep and round shoulders. `fountainTown`'s is `basin`, `pedestal` and `falls`; the foot and the two bowls are
+`smooth_outline`d (one Chaikin pass) so their profiles curve, 28, 32 and 24 round.

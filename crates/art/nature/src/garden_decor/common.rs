@@ -5,7 +5,7 @@ use artkit::math::{P3, PI, TAU, V3, cos, p3, radians, sin, v3};
 
 /// Loft rings for a turned body whose rim is scalloped: `rows` (radius, height), each ring's radius waving by
 /// `depth` (a fraction) round `lobes` lobes, fading in from rows at or above `scallop_from` height.
-pub fn _scalloped(
+pub fn scalloped(
     rows: &[(f64, f64)],
     lobes: f64,
     depth: f64,
@@ -34,7 +34,7 @@ pub fn _scalloped(
 /// A loop round the lantern's axis at height `z`: a hexagon `r` to its corners (corners to the sides, flats to
 /// the front and back), or with `n` 12 its corners and the middles of its flats (`flat`: their radius; `lift`:
 /// the corners raised, a roof's upturned eaves); `phase` turns it (degrees).
-pub fn _hex(r: f64, z: f64, n: usize, flat: Option<f64>, lift: f64, phase: f64) -> Vec<P3> {
+pub fn hex_ring(r: f64, z: f64, n: usize, flat: Option<f64>, lift: f64, phase: f64) -> Vec<P3> {
     let mut out = Vec::new();
     for j in 0..n {
         let a = radians(phase + (360 * j) as f64 / n as f64);
@@ -55,7 +55,7 @@ pub fn _hex(r: f64, z: f64, n: usize, flat: Option<f64>, lift: f64, phase: f64) 
 
 /// `ring` with every `every`th point from the first (its corners) cut in two, `cut` along each side from it: a
 /// cut stone's corner eased, its turn split in two (a hexagon's 60° into two of 30°: no hard edge).
-pub fn _eased(ring: &[P3], every: usize, cut: f64) -> Vec<P3> {
+pub fn eased(ring: &[P3], every: usize, cut: f64) -> Vec<P3> {
     let n = ring.len();
     let mut out = Vec::with_capacity(n + n / every);
     for (j, &p) in ring.iter().enumerate() {
@@ -76,7 +76,7 @@ pub fn _eased(ring: &[P3], every: usize, cut: f64) -> Vec<P3> {
 
 /// A ring of carved lotus petals from radius r0 at z0 to r1 at z1: rings of `n` x 3 points, each petal's middle
 /// proud by `depth` (a fraction), its edges a little in.
-pub fn _petals(r0: f64, r1: f64, z0: f64, z1: f64, n: usize, depth: f64) -> Vec<Vec<P3>> {
+pub fn petals(r0: f64, r1: f64, z0: f64, z1: f64, n: usize, depth: f64) -> Vec<Vec<P3>> {
     let ring = |r: f64, z: f64| -> Vec<P3> {
         let mut out = Vec::new();
         for j in 0..3 * n {
@@ -97,7 +97,7 @@ pub fn _petals(r0: f64, r1: f64, z0: f64, z1: f64, n: usize, depth: f64) -> Vec<
 }
 
 /// Where lines straight down through `points` (x, y) first meet what is built so far, `sink` below it.
-pub fn _on_top(points: &[(f64, f64)], sink: f64) -> Vec<V3> {
+pub fn on_top(points: &[(f64, f64)], sink: f64) -> Vec<V3> {
     let rays = Rays::of_scene();
     points
         .iter()
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn a_hexagon_of_twelve_has_its_flats_in_and_its_corners_lifted() {
-        let ring = _hex(0.2, 1.0, 12, Some(0.15), 0.03, 0.0);
+        let ring = hex_ring(0.2, 1.0, 12, Some(0.15), 0.03, 0.0);
         assert_eq!(ring.len(), 12);
         assert!((ring[0].x - 0.2).abs() < 1e-12 && (ring[0].z - 1.03).abs() < 1e-12);
         assert!(((ring[1].x * ring[1].x + ring[1].y * ring[1].y).sqrt() - 0.15).abs() < 1e-12);
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn an_eased_hexagon_cuts_each_corner_in_two() {
-        let ring = _eased(&_hex(0.2, 0.0, 6, None, 0.0, 0.0), 1, 0.005);
+        let ring = eased(&hex_ring(0.2, 0.0, 6, None, 0.0, 0.0), 1, 0.005);
         assert_eq!(ring.len(), 12);
         // the corner at (0.2, 0) becomes two points 5 mm from it, along its two sides
         for p in &ring[..2] {
@@ -129,7 +129,7 @@ mod tests {
             assert!((d - 0.005).abs() < 1e-12);
         }
         assert_eq!(
-            _eased(&_hex(0.2, 0.0, 12, Some(0.17), 0.0, 0.0), 2, 0.005).len(),
+            eased(&hex_ring(0.2, 0.0, 12, Some(0.17), 0.0, 0.0), 2, 0.005).len(),
             18
         );
     }

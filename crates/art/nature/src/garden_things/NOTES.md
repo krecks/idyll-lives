@@ -6,7 +6,7 @@ Decor, the two lights to Outdoor › Lights).
 
 A family of its own rather than more of the outdoor family (`crates/art/outside/src/outdoor`): OU3 and OU4 went there at the same
 time, and this kept the three apart. Each model has its own `body` colour and finish (stones, a wooden box, a cream birdhouse, a
-red kennel, iron), so each build makes its own palette (`common::_own`), as the street furniture's do.
+red kennel, iron), so each build makes its own palette (`common::own`), as the street furniture's do.
 
 - **Garden pond** (`garden.pond`, 2x2): fifteen big coping stones lapping over the water's edge, each an irregular
   slab lofted through a smoothed outline (in at its foot, chamfered to its top, jittered), fifteen smaller ones set
@@ -90,7 +90,7 @@ and the clips bench at 0, 0.5 s and open, no errors; not played in a house again
 Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). Each model names its
 materials in a palette of its own (the family's colours and its own `body`: `common::palette_of`); the lamp post's
 far version is artkit's decimation of it (`far_ratio`), held to the decimated far versions' rule. The bulbs are held
-to the content's `light.height` as the build runs (`_near_light`, the content read when the tool is compiled). The
+to the content's `light.height` as the build runs (`near_light`, the content read when the tool is compiled). The
 stones' own random numbers are seeded from a float as Python's `random.seed` seeded the old script's (`Random::from_float`).
 
 ## The gate's edges and texels (2026-11-25)

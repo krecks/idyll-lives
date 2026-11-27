@@ -31,6 +31,7 @@ mod bookcases;
 mod common;
 mod seats;
 mod sectionals;
+mod shelf_parts;
 mod shelves;
 mod side_tables;
 mod sofas;
@@ -141,7 +142,7 @@ palette! { M:
     bin_hole = ("#3A3530", matte),
     // the display cabinet, in a plain finish (as its ornaments): its door's brass and glass draw on their own
     vitrine = ("#7A5234", satin),
-    vitrine_back = ("#E8E2D6", satin),
+    vitrine_back = ("#4A5A5E", satin),
     shelf_glass = ("#CFDCDF", gloss), // its shelves: plain, so its door is the only glass
     book_e = ("#2B2B2E", satin),
     book_f = ("#D8D2C4", satin),

@@ -90,7 +90,7 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 
 | Model | Size (w × h × d) | Triangles | Draws | Moving parts | Clips (uses) |
 |---|---|---|---|---|---|
-| `model.fridgeMini` | 0.600 × 1.000 × 0.605 m | 3,868 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
+| `model.fridgeMini` | 0.600 × 0.870 × 0.605 m | 3,284 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
 | `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.664 m | 5,960 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s (frozen treat) |
 | `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.756 m | 6,884 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s (frozen treat) |
 | `model.fridgeRetro` | 0.720 × 1.640 × 0.722 m | 4,662 | 3 | door; the chrome lever inside it (`attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
@@ -99,8 +99,8 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 
 What each has since the detail pass (2026-10-22), on the fridge's pattern (doors with seals, liners, bins and stock):
 - **fridgeMini**: sides rounded on their edges, a vented kick plate, an ice box with a flap and grip, a trimmed shelf, a
-  crisper with a grip cut in its front; a gable-top carton, a bottle and apples (with stalks) inside; a chopping board
-  with a hanging hole, a jar and an apple on top; the door rounded (`soft!`), a badge, a one-piece bar handle, its
+  crisper with a grip cut in its front; a gable-top carton, a bottle and apples (with stalks) inside; the top bare
+  (the chopping board, jar and apple that stood on it read as clutter, removed 2026-11-27); the door rounded (`soft!`), a badge, a one-piece bar handle, its
   seal, liner and two bins with bottles, a can and a jar.
 - **fridgeBuiltIn**: shaker cabinet fronts (frame round a recessed, lightly puffed panel), a cornice with a cove
   moulding swept round it, a vented kick plate; a water dispenser set into the fridge door (trim, recess, paddle,
@@ -160,7 +160,7 @@ No hard edge shows unbevelled any more (`cargo review edges`: 26 → 0). The sin
 wall (`bowl`), the herb pots' rims are eased, the wine fridge's round bar pulls shade round (`crate::common::pull`
 takes `round_angle`), the fridges' drawer and crisper fronts are bevelled, and the retro fridge's opening has a liner
 breaker strip where the cut meets the shell's rounded front. The mini fridge's jar is 7 cm and the apple on it a small
-one, so with what stands on it it is 0.965 m, a mini fridge's height (`cargo review sizes`). The wine fridge's and the
+one (since removed with the board), the model is now 0.87 m, a mini fridge's height (`cargo review sizes`). The wine fridge's and the
 French-door fridge's fourth draw call is a moving part each (a glass door and a rack, three doors): left as it is.
 
 ## The freezers (2026-11-27)
@@ -188,3 +188,5 @@ freezer's door or lid clip — `lid_open` (1.2 s) and `door_open` (1.2 s, `BackO
 one's `drawer_open` (0.6 s, 14 cm out) starts 0.9 s in, once the door is past 90°, and is held 1.6 s, so it is back
 in before the door shuts (the opened door's liner clears the drawer's front by 2 cm). The resident's own animation
 is the shared `fetch`, so no new clip is added to `base.json`.
+
+- **chestFreezer** (2026-11-27): the rim is a frame (it was a slab that hid the liner) and two wire baskets hang on it, seen when the lid is up. The lid already has its handle; the upright freezer already has real drawers, so it is unchanged.

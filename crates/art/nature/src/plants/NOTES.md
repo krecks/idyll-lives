@@ -332,3 +332,10 @@ herb planter 3 cm lower (under the planter kind's 0.99). The cosmos's kind lists
 pink and white rays. Left outside: the potted plant (`model.plant`, a bushy young arrowhead plant 0.52 m of plant and
 0.79 m across against the kind's climbing 0.9-1.8 m and 0.3-0.6 m: a redesign), and the bonsai, measured with its
 stand against the tabletop kind.
+
+## Clumped foliage (2026-11-27)
+
+`hedge_block` (artkit) now lays rows of flat, lumpy leaf clumps in three greens over a hedge's top and both faces
+(the tufts are gone), and `hedge` and `streetHedge` share one builder (`clipped_hedge`). The boxwood is a ball of 24
+such clumps, the lavender a green clump with 30 taller, thicker flower spikes (greens were grey). Triangles:
+hedge 2,196, streetHedge 1,944, boxwood 2,280, lavender 2,128 (far versions keep a third of the clumps).

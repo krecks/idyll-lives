@@ -14,7 +14,7 @@ group. The keys are unchanged.
   triangles but drew all of them, where the old part's thin cones are mostly degenerate tips and hidden caps:
   it measured 0.9 ms more GPU time on WebGL (0.4 on WebGPU) over the village from afar (`render.mjs`, `wide`,
   Medium); the ribbons measure the same as the old part. The blades are flat-shaded with their normals bent
-  towards the sky (`_mesh`'s `sky`, custom normals): near upright, they drew dark against the lawn from above,
+  towards the sky (`mesh`'s `sky`, custom normals): near upright, they drew dark against the lawn from above,
   where the old part's cones read light.
 - **Wildflowers** (`model.flowers`): on about one tile in seventeen and a tenth of the scatter round the town, one mesh
   over the whole landscape. Five low leaves (ribbons as above), three kinked stems and three five-petalled heads (a
@@ -41,7 +41,7 @@ group. The keys are unchanged.
 
 - **Patches** (`model.flowers.daisies`, `.buttercups`, `.violets`, 2026-11-12): where the lawn's flowers gather on a
   mown plot (`lawns`, `FLOWER_PATCHES`), by the thousand, so they are light: five or six heads on a disc half a
-  metre across, each the top of a flower only (a fan of petals and a flat eye laid on it, `_head`: under 3
+  metre across, each the top of a flower only (a fan of petals and a flat eye laid on it, `head`: under 3
   triangles a petal), 4 to 9 cm up, at the tips of the blades (the gate's `float`, accepted), with no stem (the
   blades would hide one; a sliver of a stem drew as a dark mark beside each head from the street) and no leaves.
   Every face's normal is bent to the sky, as the blades' are: a head is 4 to 7 px from the play camera, and shaded
@@ -77,7 +77,7 @@ group. The keys are unchanged.
   white (left out far off). All still `foliage`, one draw.
 - **Rock**: both boulders on finer spheres (`low(4, 1)`, `low(3, 1)`), pitted finer still (`grain`), five breaks on the
   big one and two on the small; lichen in pale grey-green patches on the faces turned to the sky, the damp earthy band
-  at the foot (`_weather`; new plain colours `lichen`, `soil`), and two pebbles half sunk at its foot, inside its box,
+  at the foot (`weather`; new plain colours `lichen`, `soil`), and two pebbles half sunk at its foot, inside its box,
   so it is centred where it was. Its far version, the one the woods draw, is the same file as before (56 triangles,
   no patches: one would take a whole face).
 - **Marker**: unchanged. It is a glyph the game draws unlit with an inverted-hull outline worked out from its normals;
@@ -91,6 +91,6 @@ The spare `model.stove`, `model.plantSmall` and `model.ceilingLamp` went at the 
 the game, its content, the crates or the tools drew them.
 
 Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). A
-stone's cut is `rock::_cut` (artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`), and a stone's fractures
+stone's cut is `rock::cut` (artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`), and a stone's fractures
 are cut where it was made, at the origin. The blades' and heads' sky normals are kept a corner at a time
 (`common::sky_normals`).

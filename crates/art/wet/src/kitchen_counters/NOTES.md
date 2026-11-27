@@ -106,7 +106,7 @@ What each model has now:
 - **wallCabinetGlass**: glazed doors in one frame each with a glazing bar, tumblers, wine glasses, a glass carafe,
   plates and bowls.
 - **wallCabinetCorner**: a shaker door, open oak shelves rounded at their outer corner, mugs, plates, a potted plant.
-- **rangeHood**: a canopy sloping up to a two-piece chimney, keys and a display on its trim, a slotted grease
+- **rangeHood**: a canopy sloping up to one tapering, round-cornered flue, keys and a display on its trim, a slotted grease
   filter and two lamps under it.
 - **spiceRack**: an arched board with a hanging hole, brass rails on posts in one piece, lofted jars with lids.
 - **potRail**: a rail with ball ends on arms from wall plates, S-hooks, two frying pans, a lidded saucepan on a bail
@@ -159,7 +159,7 @@ near the dome's top); about the rim's back edge, the gate had its dome 6.2 cm in
 | `model.wallCabinet` | 0.980 × 0.732 × 0.380 m | 3,752 (was 1,880) | 3,752 | two doors | `doors_open` 0.8 s (putting clean things away: `fetch` at its cupboard station, `hold` 1.5 s) |
 | `model.wallCabinetGlass` | 0.960 × 0.720 × 0.408 m | 3,640 (was 2,460) | 3,640 | the right glass door | `door_open` 0.8 s (as the wall cabinet) |
 | `model.wallCabinetCorner` | 0.960 × 0.723 × 0.408 m | 3,776 (was 1,832) | 3,776 | the door | `door_open` 0.8 s (as the wall cabinet) |
-| `model.rangeHood` | 0.900 × 0.712 × 0.515 m | 1,184 (was 648) | 1,184 | — | static |
+| `model.rangeHood` | 0.900 × 0.712 × 0.515 m | 1,084 | 1,084 | — | static |
 | `model.spiceRack` | 0.520 × 0.440 × 0.105 m | 3,744 (was 2,268) | 3,744 | — | static |
 | `model.potRail` | 0.908 × 0.546 × 0.220 m | 3,372 (was 1,236) | 3,372 | — | static |
 | `model.kitchenShelfWall` | 0.900 × 0.757 × 0.240 m | 3,456 (was 1,476) | 3,456 | — | static |
@@ -231,3 +231,5 @@ base unit's height (reported).
 ## Measured as the piece (2026-11-25)
 
 `counterCorner`: the utensil crock on the worktop is set aside (`parts::aside`, `crock_aside`): drawn as before, not the counter's size, so `cargo review sizes` measures the counter (1.00 × 0.95 × 0.93 m; it was 1.26 m high with the crock).
+
+- 2026-11-27: bars lost the detached back ledge, the body is flush under the top, the bar end's side is walnut like the body.

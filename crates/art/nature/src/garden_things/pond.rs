@@ -1,7 +1,7 @@
 //! The garden pond (2x2): a stone-edged pool with lilies and reeds, ripples, and a koi that comes up.
 
-use super::common::{_own, F, M};
-use crate::ground::common::_mesh;
+use super::common::{F, M, own};
+use crate::common::mesh;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
@@ -25,7 +25,7 @@ const KOI: (f64, f64) = (0.18, 0.12);
 /// A flat stone: an irregular rounded outline `r` across its radius (stretched sx by sz), `h` thick, its
 /// edges chamfered and its faces a little uneven, its middle at game `at`, turned `yaw` degrees.
 #[allow(clippy::too_many_arguments)]
-fn _flag(
+fn flag(
     name: &str,
     r: f64,
     at: (f64, f64, f64),
@@ -72,7 +72,7 @@ fn _flag(
 
 /// The koi, nose to game +x (its node turns it): a lofted white body with an orange saddle and crown, a fanned
 /// tail, a dorsal fin and two pectoral fins.
-fn _koi(x: f64, y: f64, z: f64) {
+fn koi(x: f64, y: f64, z: f64) {
     let m = M();
     // (along, half width, half height): nose to the tail's root
     let rows = [
@@ -166,7 +166,7 @@ fn _koi(x: f64, y: f64, z: f64) {
 }
 
 /// A frog squatting on a lily pad at game (x, y, z), looking `turn` degrees round from the front.
-fn _frog(x: f64, y: f64, z: f64, turn: f64) {
+fn frog(x: f64, y: f64, z: f64, turn: f64) {
     let m = M();
     let (c, s) = (cosd(turn), sind(turn));
     let at = |u: f64, v: f64, w: f64| (x + v * s + u * c, y + w, z + v * c - u * s);
@@ -240,7 +240,7 @@ fn _frog(x: f64, y: f64, z: f64, turn: f64) {
 }
 
 pub fn pond() -> Vec<Obj> {
-    let m = _own("pond");
+    let m = own("pond");
     let mut rng = Random::new(101);
     let still = new_parts(|| {
         let (rx, rz) = POND;
@@ -284,7 +284,7 @@ pub fn pond() -> Vec<Obj> {
             let r = rng.uniform(0.17, 0.2);
             let (x, z) = ((rx - 0.03) * cos(a), (rz - 0.03) * sin(a));
             let h = rng.uniform(0.07, 0.09);
-            _flag(
+            flag(
                 &format!("stone{i}"),
                 r,
                 (x, WATER_Y + h / 2.0 - 0.025, z),
@@ -302,7 +302,7 @@ pub fn pond() -> Vec<Obj> {
             let r = rng.uniform(0.1, 0.13);
             let (x, z) = ((rx + 0.06) * cos(a), (rz + 0.08) * sin(a));
             let h = rng.uniform(0.04, 0.055);
-            _flag(
+            flag(
                 &format!("back_stone{i}"),
                 r,
                 (x, h / 2.0, z),
@@ -342,7 +342,7 @@ pub fn pond() -> Vec<Obj> {
         .into_iter()
         .enumerate()
         {
-            _pad(
+            pad(
                 &format!("pad{i}"),
                 r,
                 (x, WATER_Y + 0.003, z),
@@ -389,7 +389,7 @@ pub fn pond() -> Vec<Obj> {
             material = m.lily,
             segments = 8
         );
-        _frog(0.0, WATER_Y + 0.006, 0.3, 25.0);
+        frog(0.0, WATER_Y + 0.006, 0.3, 25.0);
         // reeds and dwarf reedmace (Typha minima, a garden pond's: under 0.75 m) at the back left, rising out of the
         // shallows by the stones
         for i in 0..11 {
@@ -549,7 +549,7 @@ pub fn pond() -> Vec<Obj> {
     // the koi, under the surface at rest (the opaque water hides it); it rises until its back is out
     let (x, z) = KOI;
     let y = 0.035;
-    let fish = new_parts(|| _koi(x, y, z));
+    let fish = new_parts(|| koi(x, y, z));
     let koi = hinged(join(&fish, "koi", None), F.at(x, y, z));
     // heading a little to the front (a node turn, not baked)
     koi.edit(|o| o.rot.z = radians(25.0) as f32);
@@ -584,7 +584,7 @@ pub fn pond() -> Vec<Obj> {
 
 /// A lily pad: a thin disc `r` across with a notch cut to its middle, its rim turned up a little, lying at game
 /// `at`.
-fn _pad(name: &str, r: f64, at: (f64, f64, f64), yaw: f64, material: Mat, n: usize) -> Obj {
+fn pad(name: &str, r: f64, at: (f64, f64, f64), yaw: f64, material: Mat, n: usize) -> Obj {
     let gap = 0.5;
     let (mut top, mut bottom): (Vec<V3>, Vec<V3>) = (Vec::new(), Vec::new());
     for i in 0..=n {
@@ -608,7 +608,7 @@ fn _pad(name: &str, r: f64, at: (f64, f64, f64), yaw: f64, material: Mat, n: usi
         ]);
     }
     faces.extend([vec![ct, cb, m, 0], vec![ct, n, m + n, cb]]);
-    let obj = _mesh(name, verts, &faces, material, false, 0.0, false);
+    let obj = mesh(name, verts, &faces, material, false, 0.0, false);
     obj.set_location(F.at(at.0, at.1, at.2));
     obj.set_rotation((0.0, 0.0, yaw));
     obj

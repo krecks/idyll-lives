@@ -11,6 +11,7 @@
 use artkit::family::{Family, Model, motions};
 
 mod common;
+mod dressing_table;
 mod mirrors;
 
 use common::M;
@@ -27,7 +28,7 @@ pub fn family() -> Family {
             // its own size: the pouf it carries stands out in front of the kneehole (0.86 m is the table's own depth)
             Model::new(
                 "dressingTable",
-                mirrors::dressing_table,
+                dressing_table::dressing_table,
                 (0.86, 1.533, 0.418),
             )
             .key("model.dressingTable")
@@ -35,7 +36,7 @@ pub fn family() -> Family {
             // getReady (the `wash` tag) slides the right drawer out to the seat, and back after a while
             .motions(motions(&format!(
                 r#"{{"uses": {{"getReady": "drawer_open"}}, "hold": {}}}"#,
-                artkit::json::float_repr(mirrors::DRAWER_HOLD)
+                artkit::json::float_repr(dressing_table::DRAWER_HOLD)
             )))
             .paint(&[("table", "Table"), ("table_frame", "Frame")]),
             Model::new("mirrorWall", mirrors::mirror_wall, (0.62, 0.97, 0.09))

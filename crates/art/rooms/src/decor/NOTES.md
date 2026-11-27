@@ -229,3 +229,8 @@ middle (0.13 m off the board). A still model of three finishes.
 and `shutters` ended with `settle!()`, which stood them on the floor: in the game they hung at the foot of the wall
 (found in a headless play check). They now settle as the wall clock does (`settle!(centre = false, floor = false)`),
 built at their heights; blinds and shutters take their measured centre (0, -0.395). The awning (outdoor) the same.
+## Cat lofted (2026-11-27)
+
+`statueCat`: the body is one loft (haunch, back, neck) instead of rump/chest/neck spheres; the chin, whisker pads,
+lids and toes are gone; the front legs grow out of the chest and end in a paw sitting on the floor. Depth 0.41 ->
+0.40 m.

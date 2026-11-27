@@ -1,68 +1,13 @@
 //! What the ground cover is built from: meshes made by hand, a blade and a stem.
 
+use crate::common::mesh;
 use artkit::far::low;
 use artkit::materials::Mat;
 use artkit::math::{TAU, V3, cos, radians, sin, v3};
-use artkit::mesh::Mesh;
-use artkit::normals::custom_from_verts;
-use artkit::scene::{self, Obj};
+use artkit::scene::Obj;
 
-/// How far a blade's or leaf's normals bend to the sky (`_mesh`).
+/// How far a blade's or leaf's normals bend to the sky (`mesh`).
 pub const SKY: f64 = 1.5;
-
-/// A part from points (Blender metres) and faces, normals outward. `sky` bends every face's normal that far
-/// towards straight up (normals of its own: the shape stays), as a lawn's grass is shaded, so near-upright blades
-/// take the light the ground round them does rather than drawing dark from above. `recalc` false keeps the faces
-/// wound as given (a ribbon's two sides, which have no outside to turn to).
-pub fn _mesh(
-    name: impl AsRef<str>,
-    verts: Vec<V3>,
-    faces: &[Vec<u32>],
-    material: Mat,
-    smooth: bool,
-    sky: f64,
-    recalc: bool,
-) -> Obj {
-    let mut mesh = Mesh::from_pydata(verts, faces);
-    if recalc {
-        mesh.recalc_normals();
-    }
-    mesh.set_material(Some(material));
-    for f in &mut mesh.faces {
-        f.smooth = smooth;
-    }
-    if sky != 0.0 {
-        mesh.normals = Some(sky_normals(&mesh, sky));
-    }
-    scene::add(name.as_ref(), mesh)
-}
-
-/// A normal a corner for a mesh of flat faces, each face's bent `sky` towards straight up, as Blender keeps the
-/// normals a mesh is given for its corners.
-fn sky_normals(mesh: &Mesh, sky: f64) -> Vec<V3> {
-    let up = v3(0, 0, 1);
-    // each face on points of its own: a corner of a flat face is kept in that face's frame alone
-    let mut apart = Mesh {
-        verts: mesh.loops.iter().map(|&v| mesh.verts[v as usize]).collect(),
-        ..Mesh::default()
-    };
-    let mut given = Vec::with_capacity(mesh.loops.len());
-    for (f, face) in mesh.faces.iter().enumerate() {
-        assert!(!face.smooth, "normals bent to the sky are a flat face's");
-        let corners: Vec<u32> = (face.start..face.start + face.len).collect();
-        apart.push_face(&corners, face.mat, false);
-        let normal = mesh.face_normal(f);
-        // (Never past the face's side: the game winds each triangle by its normals, models.ts `pushTri`.)
-        let k = if normal.z >= 0.0 {
-            sky
-        } else {
-            sky.min(0.7 / -(normal.z as f64))
-        };
-        let n = (normal + up * k).normalized();
-        given.extend(std::iter::repeat_n(n, face.len as usize));
-    }
-    custom_from_verts(&apart, &given)
-}
 
 /// A grass blade (or a flower's leaf) from `base` (game x, depth) on the ground, `width` across there, leaning
 /// `lean` degrees from upright towards `yaw` (degrees round from game +x) and bending `bend` more by its tip,
@@ -144,7 +89,7 @@ pub fn blade(
     );
     // Flat, its normals bent to the sky: upright, its faces drew dark against the lawn from above.
     let both = [side.clone(), side].concat();
-    _mesh(name, both, &faces, material, false, SKY, false)
+    mesh(name, both, &faces, material, false, SKY, false)
 }
 
 // ---- the wildflowers -------------------------------------------------------------------------------------------
@@ -186,7 +131,7 @@ pub fn stem(
             faces.push(vec![i * 3 + j, i * 3 + k, (i + 1) * 3 + k, (i + 1) * 3 + j]);
         }
     }
-    _mesh(name, verts, &faces, material, true, 0.0, true)
+    mesh(name, verts, &faces, material, true, 0.0, true)
 }
 
 #[cfg(test)]
@@ -194,6 +139,7 @@ mod tests {
     use super::*;
     use artkit::far::far_of;
     use artkit::materials::Mat;
+    use artkit::scene;
 
     const LEAF: Mat = Mat::new("leaf", "#5E8436", "foliage");
 

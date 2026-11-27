@@ -389,7 +389,7 @@ pub fn laundry_basket() -> Vec<Obj> {
 // --- what's carried: the basket of washing, a piece held up to fold ------------------------------------------
 
 /// An oval wicker basket carried in both arms, heaped with washing: a tub widening to its rim, woven bands round
-/// it, a hand hole at each end and the washing crumpled above the rim. Its base is where it rests on the palms.
+/// it, and the washing crumpled above the rim. Its base is where it rests on the palms.
 pub fn washing_basket() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     new_parts(|| {
@@ -449,19 +449,6 @@ pub fn washing_basket() -> Vec<Obj> {
             verts = 5,
             closed = true
         );
-        for s in [-1, 1] {
-            // the hand hole: a dark slot under the rim at each end
-            fbox!(
-                f,
-                format!("hole{s}"),
-                0.004,
-                0.026,
-                0.07,
-                (s as f64 * 0.193, 0.135, 0),
-                M.dark,
-                rot = (0, 0, s * 9)
-            );
-        }
         // the washing heaped in it
         sphere!(
             "heap",
@@ -469,8 +456,8 @@ pub fn washing_basket() -> Vec<Obj> {
             at = f.at(0, 0.17, 0),
             material = M.wash_c,
             scale = (1, 0.66, 0.42),
-            segments = 14,
-            rings = 7
+            segments = 20,
+            rings = 10
         );
         for (k, (m, x, z, r)) in [
             (M.wash_a, -0.07, 0.03, 0.08),

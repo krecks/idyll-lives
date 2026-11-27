@@ -684,9 +684,11 @@ mod tests {
     fn every_set_tiles() {
         // (The organic sets' maps: `organic_maps_tile`.)
         for set in SETS.iter().filter(|s| !organic::NAMES.contains(&s.name)) {
-            let Surface { height, albedo, .. } = generate(set.name, 128);
-            let hs = seam_f64(&height.v, 128, 128);
-            let hm = max_step_f64(&height.v, 128, 128);
+            // (The sidewalk's 2.8 m tile has 1.4 m slabs: at 128 px a 2 mm joint is sub-pixel, aliased, so it is drawn at 512.)
+            let n = if set.name == "sidewalk" { 512 } else { 128 };
+            let Surface { height, albedo, .. } = generate(set.name, n);
+            let hs = seam_f64(&height.v, n, n);
+            let hm = max_step_f64(&height.v, n, n);
             // The wrap column is one ordinary sample step from the first column, so allow it to be
             // a hair above the busiest interior step (a hard seam is far larger than this).
             assert!(
@@ -694,8 +696,8 @@ mod tests {
                 "{}: height seam {hs} > interior {hm}",
                 set.name
             );
-            let cs = seam_u8(&albedo.px, 128, 128, 3);
-            let cm = max_step_u8(&albedo.px, 128, 128, 3);
+            let cs = seam_u8(&albedo.px, n, n, 3);
+            let cm = max_step_u8(&albedo.px, n, n, 3);
             assert!(
                 cs <= cm + 1,
                 "{}: albedo seam {cs} > interior {cm}",

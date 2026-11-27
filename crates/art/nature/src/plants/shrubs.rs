@@ -136,16 +136,22 @@ pub fn bush_flowering() -> Vec<Obj> {
 /// Clipped hedge segment of the streets and hedged lots: the garden hedge's block, still (rows overlap, street.ts
 /// spaces them about 1.05 m apart).
 pub fn street_hedge() -> Vec<Obj> {
-    let p = palette(&[
-        ("leaf", SHRUB[1]),
-        ("leaf_light", SHRUB[2]),
-        ("stem", SHRUB[3]),
-    ]);
     // 1.55 x 1.0 x 0.85 m over all, as its old part
-    hedge_block!(&p, 1.547, 1.019, 0.85, seed = 134);
-    let still = join_all("hedge");
+    let (_, still) = clipped_hedge((1.547, 1.019, 0.85), 134);
     perches!(6, 134, &hedge_top(0.915), per = 6, up = (0.6, 1.4));
     settle(&[still])
+}
+
+/// The block both hedges share: clumps of clipped leaves on stems (`hedge_block`), as one part (its palette too).
+fn clipped_hedge((w, h, d): (f64, f64, f64), seed: i64) -> (Palette, Obj) {
+    let p = palette(&[
+        ("leaf", SHRUB[0]),
+        ("leaf_light", SHRUB[2]),
+        ("leaf_dark", "#38622F"),
+        ("stem", SHRUB[3]),
+    ]);
+    hedge_block!(&p, w, h, d, seed = seed);
+    (p, join_all("hedge"))
 }
 
 /// Boxwood ball: a clipped ball of small leaves, a little lumpy where the shears went round, on a few stems; a few
@@ -175,7 +181,7 @@ pub fn boxwood() -> Vec<Obj> {
         }
         let ball = florets!(
             "ball",
-            0.36,
+            0.3,
             (0, 0, 0.04),
             p.get("leaf"),
             bumps = 5.0,
@@ -187,30 +193,32 @@ pub fn boxwood() -> Vec<Obj> {
         );
         // where the shears went round
         jitter!(ball, 0.03, size = 0.3, seed = 2.0);
-        florets!(
-            "ball2",
-            0.16,
-            (0.1, 0.1, 0.46),
-            p.get("leaf_light"),
-            bumps = 4.0,
-            amount = 0.06,
-            flat = 0.7,
-            segments = 10,
-            rings = 6,
-            seed = 3.0
-        );
-        florets!(
-            "ball3",
-            0.14,
-            (-0.18, -0.12, 0.36),
-            p.get("leaf_dark"),
-            bumps = 4.0,
-            amount = 0.06,
-            flat = 0.75,
-            segments = 10,
-            rings = 6,
-            seed = 4.0
-        );
+        // the clipped leaf clumps: flat mounds over the ball's upper two thirds, in three greens, so it reads as
+        // dense small leaves and not a smooth dome
+        let mut rng = Random::new(135);
+        let cols = [p.get("leaf_light"), p.get("leaf"), p.get("leaf_dark")];
+        for i in 0..low(24, 12) {
+            let t = 0.93 - 1.5 * (i as f64 + 0.5) / low(24, 12) as f64;
+            let ring = (1.0 - t * t).sqrt();
+            let a = i as f64 * 2.4 + rng.uniform(-0.2, 0.2);
+            let r = rng.uniform(0.07, 0.09);
+            let (x, y, z) = (
+                0.31 * ring * cos(a),
+                0.31 * ring * sin(a),
+                0.32 + 0.31 * t - r * 0.8,
+            );
+            lump!(
+                format!("clump{i}"),
+                r,
+                (x, y, z),
+                cols[i % 3],
+                scale = (1.2, 1.2, 0.8),
+                noise = 0.35,
+                seed = i as f64 * 1.3,
+                segments = low(7, 5),
+                rings = low(5, 3)
+            );
+        }
     });
     fit_to(&made, 0.69, 0.71, 0.72);
     let still = join_all("boxwood");
@@ -323,13 +331,7 @@ pub fn topiary_cone() -> Vec<Obj> {
 /// Clipped hedge: a squared-off block of small leaves with a rounded top on bare stems; shaggy sprigs along it,
 /// which a trim takes off.
 pub fn garden_hedge() -> Vec<Obj> {
-    let p = palette(&[
-        ("leaf", SHRUB[1]),
-        ("leaf_light", SHRUB[2]),
-        ("stem", SHRUB[3]),
-    ]);
-    hedge_block!(&p, 1.546, 1.12, 0.92, seed = 137);
-    let still = join_all("hedge");
+    let (p, still) = clipped_hedge((1.546, 1.12, 0.92), 137);
     perches!(6, 137, &hedge_top(1.12), per = 6, up = (0.6, 1.4));
     let at = (0.1, 0.0, 1.06);
     _with_part(

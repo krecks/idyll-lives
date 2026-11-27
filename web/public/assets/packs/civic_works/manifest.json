@@ -104,9 +104,6 @@
         "go": {
           "finish": "material.finish.gloss"
         },
-        "ink": {
-          "finish": "material.finish.matte"
-        },
         "iron": {
           "finish": "material.finish.metal"
         },

@@ -1,117 +1,22 @@
 //! The woods' rock: boulders roughened, split and cut off flat under the ground.
 
 use super::M;
-use artkit::edit::{NgonMethod, QuadMethod, holes_fill, triangulate};
+use crate::common::{cut, lump, stone};
 use artkit::far::low;
 use artkit::materials::Mat;
-use artkit::math::{M4, V3, v3};
+use artkit::math::v3;
 use artkit::noise::noise;
 use artkit::parts::{join_all, measure};
 use artkit::scene::Obj;
-use artkit::{bisect_plane, boulder};
 
 /// Game (x, depth): the old part's middle.
 pub const ROCK_CENTRE: (f64, f64) = (0.085, 0.01);
 /// The rock's lumps reach this far under the ground: it is cut flat there.
 pub const GROUND: f64 = -0.115;
 
-/// Cuts `obj` (in place) by the world's plane through `co` facing `no`, dropping what lies in front of it and
-/// closing the cut with a face of its own: the ground. The cut face is drawn flat. What is left is all triangles.
-pub fn _cut(obj: Obj, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
-    cut_in(obj, obj.matrix_world(), co.into(), no.into())
-}
-
-/// `_cut` by a plane in the part's own frame, wherever it stands: a fracture across a stone.
-pub fn _cut_own(obj: Obj, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
-    cut_in(obj, M4::IDENTITY, co.into(), no.into())
-}
-
-/// `_cut` by the plane through `co` facing `no` in the frame `world` takes the part's points into.
-fn cut_in(obj: Obj, world: M4, co: V3, no: V3) -> Obj {
-    obj.edit(|o| o.mesh.transform(&world));
-    let edges = bisect_plane!(obj, co, no, clear_outer = true);
-    if !edges.is_empty() {
-        let made = holes_fill(obj, &edges);
-        obj.edit(|o| {
-            for f in made {
-                o.mesh.faces[f].smooth = false;
-            }
-        });
-    }
-    triangulate(obj, QuadMethod::Beauty, NgonMethod::Beauty);
-    obj.edit(|o| o.mesh.transform(&world.inverted().unwrap_or(M4::IDENTITY)));
-    obj
-}
-
-/// Roughens a boulder's surface with finer noise than `boulder`'s (its own metres, before its scale).
-pub fn _lump(obj: Obj, amount: f64, scale: f64, seed: f64) {
-    obj.edit(|o| {
-        for v in &mut o.mesh.verts {
-            let p = *v * scale + v3(seed, -seed, seed * 0.5);
-            *v *= 1.0 + amount * noise(p);
-        }
-    });
-}
-
-/// A boulder `top` high (Blender z), roughened (`rough`: its noise and how lumpy it is; `grain`: and pitted finer
-/// still, metres), with `fractures` (direction, depth: how far in from its outside, metres) cut flat across it, then
-/// cut off flat at `ground` (Blender z), where it goes into the ground (the garden decor's stones too).
-#[allow(clippy::too_many_arguments)]
-pub fn _stone(
-    name: &str,
-    radius: f64,
-    at: (f64, f64, f64),
-    material: Mat,
-    scale: (f64, f64, f64),
-    seed: f64,
-    top: f64,
-    subdivisions: usize,
-    fractures: &[((f64, f64, f64), f64)],
-    grain: f64,
-    rough: (f64, f64),
-    ground: f64,
-) -> Obj {
-    let o = boulder!(
-        name,
-        radius,
-        at = at,
-        material = material,
-        scale = (1, 1, 1),
-        seed = seed,
-        noise = rough.0,
-        subdivisions = subdivisions
-    );
-    _lump(o, rough.1, 4.0, seed);
-    if grain != 0.0 {
-        _lump(o, grain, 14.0, seed + 5.1);
-    }
-    o.edit(|p| p.mesh.transform(&M4::diagonal(scale.into())));
-    for &(direction, depth) in fractures {
-        let n = V3::from(direction).normalized();
-        let reach = o.read(|p| {
-            p.mesh
-                .verts
-                .iter()
-                .map(|v| v.dot(n))
-                .fold(f64::NEG_INFINITY, f64::max)
-        });
-        _cut_own(o, n * (reach - depth), n);
-    }
-    o.edit(|p| {
-        let highest = p
-            .mesh
-            .verts
-            .iter()
-            .map(|v| v.z)
-            .fold(f32::NEG_INFINITY, f32::max);
-        p.loc.z = (top - highest as f64) as f32;
-    });
-    _cut(o, (0, 0, ground), (0, 0, -1))
-}
-
 /// Colours a stone's weathered faces (its rounded ones, not the fresh flat breaks): lichen in patches on what
 /// faces the sky (smooth noise over `cover`), and the damp, earthy band where it goes into the ground.
-fn _weather(obj: Obj, seed: f64, lichen: Mat, soil: Mat, cover: f64) {
+fn weather(obj: Obj, seed: f64, lichen: Mat, soil: Mat, cover: f64) {
     let world = obj.matrix_world();
     obj.edit(|o| {
         let (lichen, soil) = (o.mesh.slot(lichen), o.mesh.slot(soil));
@@ -151,7 +56,7 @@ pub fn rock() -> Vec<Obj> {
     ];
     // (Far off, an icosahedron, its corners on the round and its faces inside it: a little wider to fill the same
     // box.)
-    let main = _stone(
+    let main = stone(
         "rock_main",
         0.5,
         (0.0, 0.0, 0.0),
@@ -165,7 +70,7 @@ pub fn rock() -> Vec<Obj> {
         (0.26, 0.08),
         GROUND,
     );
-    let side = _stone(
+    let side = stone(
         "rock_side",
         0.25,
         (-0.42, -0.22, 0.0),
@@ -183,8 +88,8 @@ pub fn rock() -> Vec<Obj> {
         GROUND,
     );
     if low(true, false) {
-        _weather(main, 1.3, M.lichen, M.soil, 0.25);
-        _weather(side, 3.7, M.lichen, M.soil, 0.1);
+        weather(main, 1.3, M.lichen, M.soil, 0.25);
+        weather(side, 3.7, M.lichen, M.soil, 0.1);
     }
     let (lo, hi) = measure(&[main, side]);
     if low(true, false) {
@@ -193,7 +98,7 @@ pub fn rock() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            let peb = _stone(
+            let peb = stone(
                 &format!("pebble{k}"),
                 r,
                 (x, y, 0.0),
@@ -207,7 +112,7 @@ pub fn rock() -> Vec<Obj> {
                 (0.26, 0.08),
                 GROUND,
             );
-            _weather(peb, sd, M.lichen, M.soil, 0.6);
+            weather(peb, sd, M.lichen, M.soil, 0.6);
         }
     }
     // Centred where the old part's lumps are (game x 8.5 cm, depth 1 cm), by hand: a far version is built
@@ -226,6 +131,7 @@ pub fn rock() -> Vec<Obj> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use artkit::boulder;
     use artkit::mesh::{Mesh, edge};
     use artkit::scene;
     use std::collections::BTreeMap;
@@ -246,10 +152,10 @@ mod tests {
     fn a_cut_stone_is_closed_triangles_behind_the_plane() {
         scene::reset();
         let stone = boulder!("stone", 0.3, seed = 1.5, subdivisions = 2);
-        _lump(stone, 0.08, 4.0, 1.5);
+        lump(stone, 0.08, 4.0, 1.5);
         let no = v3(0.3, -0.2, 1).normalized();
-        _cut(stone, no * 0.4, no);
-        _cut(stone, (0, 0, 0.1), (0, 0, -1));
+        cut(stone, no * 0.4, no);
+        cut(stone, (0, 0, 0.1), (0, 0, -1));
         stone.read(|o| {
             assert!(o.mesh.faces.iter().all(|f| f.len == 3));
             assert!(

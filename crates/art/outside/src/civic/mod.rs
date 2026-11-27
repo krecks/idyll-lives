@@ -13,12 +13,17 @@
 
 use artkit::family::{Family, Model};
 
+mod altar;
 pub(crate) mod common;
 mod counters;
 mod desks;
-mod rest;
+mod lockers;
+mod luggage_trolley;
+mod mannequin;
 mod seats;
 mod shop;
+mod vault_door;
+mod wall_bars;
 
 use common::M;
 
@@ -76,29 +81,33 @@ pub fn family() -> Family {
                 .key("model.atm")
                 .centre(0.0, -0.11)
                 .paint(&[("atm", "Cabinet"), ("fascia", "Fascia")]),
-            Model::new("wallBars", rest::wall_bars, (0.95, 2.5, 0.25))
+            Model::new("wallBars", wall_bars::wall_bars, (0.95, 2.5, 0.25))
                 .key("model.wallBars")
                 .centre(0.0, -0.305)
                 .on_wall()
                 .paint(&[("oak", "Wood")]),
-            Model::new("altar", rest::altar, (1.92, 1.692, 0.85))
+            Model::new("altar", altar::altar, (1.92, 1.692, 0.85))
                 .key("model.altar")
                 .paint(&[("stone", "Stone"), ("frontal", "Frontal")]),
-            Model::new("lockerRow", rest::locker_row, (1.92, 1.845, 0.454))
+            Model::new("lockerRow", lockers::locker_row, (1.92, 1.845, 0.454))
                 .key("model.lockerRow")
                 .centre(0.0, -0.203)
                 .paint(&[("locker", "Doors"), ("frame", "Frame")]),
-            Model::new("mannequin", rest::mannequin, (0.547, 1.755, 0.4))
+            Model::new("mannequin", mannequin::mannequin, (0.547, 1.755, 0.4))
                 .key("model.mannequin")
                 .paint(&[
                     ("cloth1", "Jacket"),
                     ("cloth2", "Trousers"),
                     ("dummy", "Dummy"),
                 ]),
-            Model::new("luggageTrolley", rest::luggage_trolley, (0.9, 1.874, 0.54))
-                .key("model.luggageTrolley")
-                .paint(&[("brass", "Frame"), ("carpet", "Carpet")]),
-            Model::new("vaultDoor", rest::vault_door, (1.92, 1.92, 0.316))
+            Model::new(
+                "luggageTrolley",
+                luggage_trolley::luggage_trolley,
+                (0.9, 1.874, 0.54),
+            )
+            .key("model.luggageTrolley")
+            .paint(&[("brass", "Frame"), ("carpet", "Carpet")]),
+            Model::new("vaultDoor", vault_door::vault_door, (1.92, 1.92, 0.316))
                 .key("model.vaultDoor")
                 .centre(0.0, -0.272)
                 .on_wall()

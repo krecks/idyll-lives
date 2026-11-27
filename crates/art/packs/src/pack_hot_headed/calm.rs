@@ -1,6 +1,7 @@
 //! The cool-down meditation cushion, the grudge-to-gratitude writing desk and the glacier cold-plunge tub.
 
-use super::common::{M, fluted};
+use super::common::M;
+use crate::common::fluted;
 use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{P3, PI, cosd, pow, sin, sind};

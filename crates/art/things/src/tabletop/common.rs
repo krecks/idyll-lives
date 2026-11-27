@@ -223,6 +223,17 @@ impl Row for (f64, f64, f64) {
     }
 }
 
+/// The profile rows (r, z) with `res` - 1 more on a Catmull-Rom curve between each pair: a belly or bowl that a few
+/// rows would leave angular, its rows kept. Call it on the smooth part of a profile, not across a sharp rim.
+pub fn spline(rows: &[(f64, f64)], res: usize) -> Vec<(f64, f64)> {
+    let pts: Vec<V3> = rows.iter().map(|&(r, z)| V3::from((r, z, 0.0))).collect();
+    forms::catmull(&pts, res, false)
+        .0
+        .iter()
+        .map(|p| (p.x as f64, p.y as f64))
+        .collect()
+}
+
 /// `turned`'s options.
 #[derive(Clone, Debug)]
 pub struct Turned {

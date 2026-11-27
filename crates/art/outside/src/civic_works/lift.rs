@@ -6,12 +6,12 @@ use super::common::{F, arc, own_palette, tyre};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
-use artkit::math::{Axis, M4, TAU, atan2, cos, degrees, radians, sin};
+use artkit::math::{Axis, P3, atan2, degrees, radians};
 use artkit::parts::{join, join_all, new_parts, settle_all};
 use artkit::place::Facing;
 use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{cube, fbox, fcyl, fextrude, fsweep, kit_tube, revolve};
+use artkit::{cube, fbox, fcyl, fextrude, fsweep, kit_tube, loft, revolve, ring};
 
 own_palette! { LIFT:
     body = ("#2F5F9E", gloss),        // the lift: its posts, carriages and arms
@@ -30,169 +30,132 @@ pub const CAR_RA: f64 = -1.25; // its rear axle's depth
 pub const CAR_WR: f64 = 0.31; // its wheels' radius
 pub const CAR_BELT: f64 = 0.94; // its waist line, over its own ground
 
-/// Draws `objs` in towards the middle the higher they are, from none at game height y0 to `k` of their x at y1:
-/// a car's glasshouse leaning in to its roof (tumblehome).
-pub fn tapered(objs: &[Obj], y0: f64, y1: f64, k: f64) {
-    for &o in objs {
-        let mw: M4 = o.matrix_world();
-        let inv = mw.inverted().expect("a part's matrix inverts");
-        o.edit(|part| {
-            for v in part.mesh.verts.iter_mut() {
-                let mut p = mw * *v;
-                let f = ((p.z as f64 - y0) / (y1 - y0)).clamp(0.0, 1.0);
-                p.x = (p.x as f64 * (1.0 - k * f)) as f32;
-                *v = inv * p;
-            }
-        });
-    }
+// The hatchback's stations, rear to front: (depth, half width, underside, top), game metres over the car's own
+// ground (`CAR_Y`). Each is one rounded section of a loft, so the body is smooth and cheap.
+const BODY: [(f64, f64, f64, f64); 8] = [
+    (-1.97, 0.78, 0.24, 0.86),
+    (-1.92, 0.84, 0.19, 0.93),
+    (-1.6, 0.86, 0.17, 0.95),
+    (0.0, 0.86, 0.17, 0.94),
+    (1.0, 0.86, 0.17, 0.93),
+    (1.5, 0.85, 0.17, 0.85),
+    (1.86, 0.82, 0.2, 0.7),
+    (1.97, 0.76, 0.27, 0.58),
+];
+// The glasshouse's, over the waist line: (depth, half width, top).
+const HOUSE: [(f64, f64, f64); 8] = [
+    (0.98, 0.76, 0.96),
+    (0.6, 0.73, 1.2),
+    (0.3, 0.68, 1.4),
+    (-0.5, 0.66, 1.45),
+    (-1.45, 0.64, 1.44),
+    (-1.75, 0.62, 1.36),
+    (-1.88, 0.6, 1.12),
+    (-1.9, 0.58, 1.0),
+];
+const LOFT_SMOOTH: f64 = 80.0; // shaded smooth round every turn under this (degrees): no hard edge to bevel
+const CYL_BEVEL: f64 = 0.004; // the chamfer on a cylinder's rims (a pixel at the play camera)
+const SECTION_VERTS: usize = 16; // points round each section
+const BODY_SQUARE: f64 = 4.0; // how square the body's sections are (2 an ellipse)
+const HOUSE_SQUARE: f64 = 3.0; // the glasshouse's, rounder
+const ROOF_SQUARE: f64 = 2.0; // the roof's: an ellipse
+// the roof's stations: (depth, half width, depth of section): the top of a tall ellipse standing in the glass, so
+// only a smooth cap shows over it; its ends shrunk, no wide flat cap
+const ROOF: [(f64, f64, f64); 6] = [
+    (0.42, 0.04, 0.02),
+    (0.36, 0.3, 0.12),
+    (0.2, 0.5, 0.22),
+    (-1.0, 0.52, 0.25),
+    (-1.5, 0.46, 0.2),
+    (-1.58, 0.04, 0.02),
+];
+const ROOF_TOP: f64 = 1.475; // the roof panel's top
+const ARCH_R: f64 = 0.36; // the empty wheel arches' radius
+const ARCH_CUT: f64 = 0.17; // where an arch opens at the sill
+
+/// One loft section: a rounded loop at `z`, `hw` either side of the middle, from `y0` to `y1` (game).
+fn section(z: f64, hw: f64, (y0, y1): (f64, f64), square: f64) -> Vec<P3> {
+    ring!(hw, (y1 - y0) / 2.0, verts = SECTION_VERTS, square = square)
+        .iter()
+        .map(|p| F.at(p.x, (y0 + y1) / 2.0 + p.y, z))
+        .collect()
 }
 
-/// The hatchback, lifted: a body drawn from the side, its arches empty, a glasshouse of tinted glass leaning in
-/// under a roof in the car's colour, pillars, lamps, plates, mirrors, the brakes and springs in its empty arches and
-/// an exhaust under it.
-pub fn car(m: &LIFT) {
+/// The painted shell and its glasshouse: the body and the roof lofted smooth, the glass tinted under it.
+fn car_shell(m: &LIFT) {
     let y = CAR_Y;
-    let paint = m.car;
-    let mut lower = vec![(-1.93, y + 0.17)];
-    lower.extend(
-        arc(CAR_RA, CAR_WR, 0.36, 0.17, low(12, 6))
-            .into_iter()
-            .map(|(z, yy)| (z, yy + y)),
+    let body: Vec<_> = BODY
+        .iter()
+        .map(|&(z, hw, lo, hi)| section(z, hw, (y + lo, y + hi), BODY_SQUARE))
+        .collect();
+    loft!("car_body", &body, material = m.car, angle = LOFT_SMOOTH);
+    let house: Vec<_> = HOUSE
+        .iter()
+        .map(|&(z, hw, top)| section(z, hw, (y + CAR_BELT - 0.04, y + top), HOUSE_SQUARE))
+        .collect();
+    loft!(
+        "car_glass",
+        &house,
+        material = m.tinted,
+        angle = LOFT_SMOOTH
     );
-    lower.extend(
-        arc(CAR_FA, CAR_WR, 0.36, 0.17, low(12, 6))
-            .into_iter()
-            .map(|(z, yy)| (z, yy + y)),
-    );
-    lower.extend([
-        (1.9, y + 0.17),
-        (1.96, y + 0.28),
-        (1.98, y + 0.52),
-        (1.93, y + 0.65),
-        (1.62, y + 0.76),
-        (1.0, y + 0.93),
-        (-1.86, y + CAR_BELT + 0.01),
-        (-1.95, y + 0.9),
-        (-1.97, y + 0.6),
-        (-1.95, y + 0.3),
-    ]);
-    fextrude!(
+    let roof: Vec<_> = ROOF
+        .iter()
+        .map(|&(z, hw, t)| section(z, hw, (y + ROOF_TOP - t, y + ROOF_TOP), ROOF_SQUARE))
+        .collect();
+    loft!("car_roof", &roof, material = m.car, angle = LOFT_SMOOTH);
+    fbox!(
         F,
-        "car_body",
-        &lower,
-        2.0 * CAR_HALF,
-        (0, 0, 0),
-        paint,
-        plane = Facing::Side,
-        bevel = low(0.05, 0.0),
-        bevel_segments = low(3, 1)
+        "car_spoiler",
+        1.2,
+        0.03,
+        0.18,
+        (0, y + 1.47, -1.56),
+        m.car,
+        bevel = low(0.012, 0.0),
+        bevel_segments = 1
     );
-    let house = new_parts(|| {
-        let top = [
-            (0.96, y + 0.92),
-            (0.3, y + 1.42),
-            (-1.45, y + 1.44),
-            (-1.8, y + 1.32),
-            (-1.9, y + 0.92),
-        ];
-        fextrude!(
+    for s in [-1, 1] {
+        let x = s as f64 * 0.7;
+        // the front pillars, from the scuttle up to the roof's front corners
+        artkit::bevel::eased(fsweep!(
             F,
-            "car_glass",
-            &top,
-            1.6,
-            (0, 0, 0),
-            m.tinted,
-            plane = Facing::Side,
+            format!("a_pillar{s}"),
+            &[(x, y + 0.95, 0.99), (x * 0.72, y + 1.42, 0.3)],
+            0,
+            m.car,
+            profile = rounded_rect(0.07, 0.03, 0.0, 1),
+            up = (0, 0, 1)
+        ));
+        fbox!(
+            F,
+            format!("car_mirror{s}"),
+            0.11,
+            0.09,
+            0.12,
+            (s as f64 * 0.88, y + 1.0, 0.85),
+            m.car,
             bevel = low(0.02, 0.0),
             bevel_segments = 1
         );
-        fextrude!(
-            F,
-            "car_roof",
-            &[
-                (0.36, y + 1.4),
-                (0.3, y + 1.47),
-                (-1.45, y + 1.475),
-                (-1.56, y + 1.44),
-                (-1.5, y + 1.4)
-            ],
-            1.64,
-            (0, 0, 0),
-            paint,
-            plane = Facing::Side,
-            bevel = low(0.025, 0.0),
-            bevel_segments = low(2, 1)
-        );
-        fbox!(
-            F,
-            "car_spoiler",
-            1.3,
-            0.03,
-            0.18,
-            (0, y + 1.47, -1.53),
-            paint,
-            bevel = low(0.012, 0.0),
-            bevel_segments = 1
-        );
-        for s in [-1, 1] {
-            let x = s as f64 * 0.805;
-            artkit::bevel::eased(fsweep!(
-                F,
-                format!("a_pillar{s}"),
-                &[(x, y + 0.92, 0.97), (x, y + 1.43, 0.3)],
-                0,
-                paint,
-                profile = rounded_rect(0.07, 0.03, 0.0, 1),
-                up = (0, 0, 1)
-            ));
-            fbox!(
-                F,
-                format!("b_pillar{s}"),
-                0.02,
-                0.5,
-                0.09,
-                (x, y + 1.17, -0.18),
-                paint
-            );
-            artkit::bevel::eased(fextrude!(
-                F,
-                format!("c_pillar{s}"),
-                &[
-                    (-1.25, y + 0.93),
-                    (-1.42, y + 1.43),
-                    (-1.82, y + 1.31),
-                    (-1.9, y + 0.93)
-                ],
-                0.014,
-                (x, 0, 0),
-                paint,
-                plane = Facing::Side
-            ));
-            fbox!(
-                F,
-                format!("sill_trim{s}"),
-                0.014,
-                0.025,
-                1.0,
-                (x, y + 0.935, 0.4),
-                m.chrome
-            );
-        }
-    });
-    tapered(&house, y + 0.92, y + 1.48, 0.17);
+    }
+}
+
+/// What shows in the empty arches and along the sides: a dark arch on each flank, and in it the brake disc, hub and
+/// caliper, a strut with its spring; the doors' seams and handles.
+fn car_running_gear(m: &LIFT) {
+    let y = CAR_Y;
     for s in [-1, 1] {
         let sf = s as f64;
-        let xs = sf * (CAR_HALF + 0.004);
         if !is_low() {
             for z in [0.98, -0.17, -1.22] {
-                // the doors' seams
                 fbox!(
                     F,
                     format!("car_seam{s}{}", float_repr(z)),
                     0.004,
                     0.62,
                     0.008,
-                    (xs, y + 0.6, z),
+                    (sf * (CAR_HALF + 0.001), y + 0.6, z),
                     m.dark
                 );
             }
@@ -203,119 +166,79 @@ pub fn car(m: &LIFT) {
                     0.012,
                     0.025,
                     0.13,
-                    (xs + sf * 0.004, y + 0.84, z),
+                    (sf * (CAR_HALF + 0.004), y + 0.84, z),
                     m.chrome
                 );
             }
         }
-        fbox!(
-            F,
-            format!("car_mirror{s}"),
-            0.11,
-            0.09,
-            0.12,
-            (sf * 0.88, y + 1.0, 0.85),
-            paint,
-            bevel = low(0.02, 0.0),
-            bevel_segments = 1
-        );
-        // the empty arches: black liners, and the brakes, hubs and springs left on the axles
         for zc in [CAR_FA, CAR_RA] {
             let zcs = float_repr(zc);
-            let pts: Vec<(f64, f64, f64)> = arc(zc, CAR_WR, 0.345, 0.2, low(10, 5))
+            // the arch: a flat dark D on the flank, its round top the wheel's
+            let arch: Vec<(f64, f64)> = arc(zc, CAR_WR, ARCH_R, ARCH_CUT, low(14, 8))
                 .into_iter()
-                .map(|(z, yy)| (sf * 0.74, yy + y, z))
+                .map(|(z, yy)| (z, yy + y))
                 .collect();
-            fsweep!(
+            fextrude!(
                 F,
-                format!("liner{s}{zcs}"),
-                &pts,
-                0,
+                format!("arch{s}{zcs}"),
+                &arch,
+                0.03,
+                (sf * (CAR_HALF - 0.005), 0, 0),
                 m.plastic,
-                profile = [
-                    (-0.004, -0.12),
-                    (0.004, -0.12),
-                    (0.004, 0.12),
-                    (-0.004, 0.12)
-                ],
-                up = (0, 0, 1)
+                plane = Facing::Side,
+                bevel = low(CYL_BEVEL, 0.0),
+                bevel_segments = 1
             );
-            artkit::bevel::eased(fcyl!(
+            fcyl!(
                 F,
                 format!("disc{s}{zcs}"),
                 0.14,
                 0.022,
-                (sf * 0.76, y + CAR_WR, zc),
+                (sf * 0.78, y + CAR_WR, zc),
                 m.steel,
                 rot = (0, 90, 0),
-                verts = low(20, 8)
-            ));
-            artkit::bevel::eased(fcyl!(
+                verts = low(20, 8),
+            );
+            fcyl!(
                 F,
                 format!("hub{s}{zcs}"),
                 0.065,
                 0.06,
-                (sf * 0.77, y + CAR_WR, zc),
+                (sf * 0.79, y + CAR_WR, zc),
                 m.iron,
                 rot = (0, 90, 0),
-                verts = low(12, 6)
-            ));
+                verts = low(12, 6),
+            );
             fbox!(
                 F,
                 format!("caliper{s}{zcs}"),
                 0.06,
                 0.1,
                 0.09,
-                (sf * 0.765, y + CAR_WR + 0.06, zc - 0.11),
+                (sf * 0.785, y + CAR_WR + 0.06, zc - 0.11),
                 m.red_lens,
                 bevel = low(0.015, 0.0),
                 bevel_segments = 1
             );
             if !is_low() {
-                for k in 0..4 {
-                    let a = TAU * k as f64 / 4.0 + 0.4;
-                    fcyl!(
-                        F,
-                        format!("stud{s}{zcs}{k}"),
-                        0.009,
-                        0.04,
-                        (sf * 0.8, y + CAR_WR + 0.045 * sin(a), zc + 0.045 * cos(a)),
-                        m.chrome,
-                        rot = (0, 90, 0),
-                        verts = 6
-                    );
-                }
                 fcyl!(
                     F,
-                    format!("strut{s}{zcs}"),
-                    0.03,
+                    format!("spring{s}{zcs}"),
+                    0.05,
                     0.4,
                     (sf * 0.64, y + CAR_WR + 0.24, zc),
                     m.iron,
-                    verts = 8
+                    verts = 12,
                 );
-                artkit::bevel::eased(fcyl!(
-                    F,
-                    format!("spring{s}{zcs}"),
-                    0.055,
-                    0.22,
-                    (sf * 0.64, y + CAR_WR + 0.26, zc),
-                    m.iron,
-                    verts = 10
-                ));
             }
-            fbox!(
-                F,
-                format!("arm_lower{s}{zcs}"),
-                0.32,
-                0.04,
-                0.06,
-                (sf * 0.58, y + CAR_WR - 0.02, zc),
-                m.iron
-            );
         }
     }
-    // its front and back: lamps, grille, plates (white at the front, yellow at the back), bumpers' lower lips
+}
+
+/// Its front and back: lamps, grille, plates (white at the front, yellow at the back), and under it an exhaust,
+/// silencer and tank.
+fn car_ends_and_underside(m: &LIFT) {
+    let y = CAR_Y;
     for s in [-1, 1] {
         let sf = s as f64;
         artkit::bevel::eased(fextrude!(
@@ -346,9 +269,7 @@ pub fn car(m: &LIFT) {
         0.12,
         0.02,
         (0, y + 0.45, 1.975),
-        m.dark,
-        bevel = low(0.01, 0.0),
-        bevel_segments = 1
+        m.dark
     );
     fbox!(
         F,
@@ -368,19 +289,6 @@ pub fn car(m: &LIFT) {
         (0, y + 0.5, -1.975),
         m.yellow
     );
-    if !is_low() {
-        for (k, (yy, z)) in [(0.3, 1.983), (0.5, -1.983)].into_iter().enumerate() {
-            fbox!(
-                F,
-                format!("plate_text{k}"),
-                0.4,
-                0.045,
-                0.004,
-                (0, y + yy, z),
-                m.ink
-            );
-        }
-    }
     fbox!(
         F,
         "car_underbody",
@@ -405,7 +313,7 @@ pub fn car(m: &LIFT) {
         m.steel,
         round = low(2, 1)
     ));
-    artkit::bevel::eased(fcyl!(
+    fcyl!(
         F,
         "silencer",
         0.1,
@@ -413,8 +321,8 @@ pub fn car(m: &LIFT) {
         (0.35, y + 0.18, -1.35),
         m.steel,
         rot = (90, 0, 0),
-        verts = low(12, 6)
-    ));
+        verts = low(12, 6),
+    );
     fbox!(
         F,
         "fuel_tank",
@@ -422,13 +330,19 @@ pub fn car(m: &LIFT) {
         0.12,
         0.5,
         (-0.2, y + 0.22, -0.75),
-        m.iron,
-        bevel = low(0.03, 0.0),
-        bevel_segments = 1
+        m.iron
     );
 }
 
-/// A car wheel off its car: the tyre on a silver alloy rim, five dark windows between its spokes and a centre
+/// The hatchback, lifted: a smooth lofted body and roof over a glasshouse of tinted glass, dark arches on its
+/// flanks with the brakes and springs in them, lamps, plates, mirrors, an exhaust under it.
+pub fn car(m: &LIFT) {
+    car_shell(m);
+    car_running_gear(m);
+    car_ends_and_underside(m);
+}
+
+/// A car wheel off its car: the tyre on a silver alloy rim, dished, and a centre
 /// cap, its face to the front, its middle at the game origin. One object, placed by its caller.
 pub fn alloy(name: &str, m: &LIFT) -> Obj {
     let parts = new_parts(|| {
@@ -440,8 +354,8 @@ pub fn alloy(name: &str, m: &LIFT) -> Obj {
             CAR_WR,
             0.2,
             m.rubber,
-            if is_low() { None } else { Some(2) },
-            Some(low(24, 12)),
+            None,
+            Some(low(20, 10)),
             Axis::Z,
         );
         artkit::bevel::eased(revolve!(
@@ -457,31 +371,8 @@ pub fn alloy(name: &str, m: &LIFT) -> Obj {
             at = F.at(0, 0, 0),
             material = m.alloy,
             rot = (90, 0, 0),
-            segments = low(24, 10)
+            segments = low(20, 10)
         ));
-        if !is_low() {
-            for k in 0..5 {
-                let a = TAU * k as f64 / 5.0;
-                let mut win: Vec<(f64, f64)> = [-0.32, 0.32]
-                    .iter()
-                    .map(|&d| (0.055 * cos(a + d), 0.055 * sin(a + d)))
-                    .collect();
-                win.extend(
-                    [0.36, 0.0, -0.36]
-                        .iter()
-                        .map(|&d| (0.165 * cos(a + d), 0.165 * sin(a + d))),
-                );
-                fextrude!(
-                    F,
-                    format!("{name}_window{k}"),
-                    &win,
-                    0.006,
-                    (0, 0, 0.0995),
-                    m.dark,
-                    plane = Facing::Front
-                );
-            }
-        }
         fcyl!(
             F,
             format!("{name}_cap"),
@@ -490,7 +381,9 @@ pub fn alloy(name: &str, m: &LIFT) -> Obj {
             (0, 0, 0.1),
             m.chrome,
             rot = (90, 0, 0),
-            verts = low(12, 6)
+            verts = low(12, 6),
+            bevel = low(CYL_BEVEL, 0.0),
+            bevel_segments = 1
         );
     });
     join(&parts, name, Some((0, 0, 0).into()))
@@ -565,15 +458,17 @@ pub fn lift_post(s: i32, m: &LIFT) {
         bevel = low(0.01, 0.0),
         bevel_segments = 1
     );
-    artkit::bevel::eased(fcyl!(
+    fcyl!(
         F,
         format!("ram{s}"),
         0.04,
         CL_POST_H - 0.3,
         (x + sf * 0.0, (CL_POST_H - 0.3) / 2.0 + 0.05, -0.19),
         m.steel,
-        verts = low(12, 6)
-    ));
+        verts = low(12, 6),
+        bevel = low(CYL_BEVEL, 0.0),
+        bevel_segments = 1
+    );
     fcyl!(
         F,
         format!("ram_rod{s}"),
@@ -604,7 +499,7 @@ pub fn lift_post(s: i32, m: &LIFT) {
                 (x, y, 0.275),
                 mat,
                 rot = (90, 0, 0),
-                verts = low(12, 6)
+                verts = low(12, 6),
             );
         }
         kit_tube!(
@@ -647,15 +542,17 @@ pub fn lift_arm(s: i32, t: i32, m: &LIFT) {
         material = m.steel,
         rot = (0, 0, yaw)
     );
-    artkit::bevel::eased(fcyl!(
+    fcyl!(
         F,
         format!("pivot{s}{t}"),
         0.05,
         0.12,
         (x0, CL_ARMS, z0),
         m.iron,
-        verts = low(12, 6)
-    ));
+        verts = low(12, 6),
+        bevel = low(CYL_BEVEL, 0.0),
+        bevel_segments = 1
+    );
     fcyl!(
         F,
         format!("pad_stem{s}{t}"),
@@ -665,15 +562,15 @@ pub fn lift_arm(s: i32, t: i32, m: &LIFT) {
         m.chrome,
         verts = low(8, 6)
     );
-    artkit::bevel::eased(fcyl!(
+    fcyl!(
         F,
         format!("pad{s}{t}"),
         0.07,
         0.035,
         (x1, CL_ARMS + 0.1, z1),
         m.rubber,
-        verts = low(12, 8)
-    ));
+        verts = low(12, 8),
+    );
 }
 
 pub fn car_lift() -> Vec<Obj> {
@@ -685,15 +582,17 @@ pub fn car_lift() -> Vec<Obj> {
         }
     }
     // the floor plate between the posts over the hoses and cables: a low ramp of chequer plate
-    artkit::bevel::eased(fextrude!(
+    fextrude!(
         F,
         "floor_plate",
         &[(-0.17, 0.0), (0.17, 0.0), (0.12, 0.03), (-0.12, 0.03)],
         2.0 * CL_POST - 0.44,
         (0, 0, 0),
         m.steel,
-        plane = Facing::Side
-    ));
+        plane = Facing::Side,
+        bevel = low(CYL_BEVEL, 0.0),
+        bevel_segments = 1
+    );
     car(m);
     // the wheels: two stacked under its nose, one lying under its tail, one leaning on the right post
     for (k, (x, y, z, rx, rz)) in [

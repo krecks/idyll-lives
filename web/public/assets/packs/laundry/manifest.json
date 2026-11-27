@@ -264,9 +264,6 @@
       "type": "model",
       "url": "../../models/laundry/washingBasket.glb",
       "materials": {
-        "dark": {
-          "finish": "material.finish.satin"
-        },
         "wash_a": {
           "finish": "material.finish.satin"
         },

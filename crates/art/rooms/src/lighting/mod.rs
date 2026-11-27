@@ -15,8 +15,10 @@ use artkit::family::{Family, Model, motions};
 
 mod ceiling;
 mod common;
+mod fan_track;
 mod standing;
 mod table;
+mod wall_lights;
 
 use common::M;
 
@@ -66,7 +68,7 @@ pub fn family() -> Family {
             // its box's middle; the blades' axis is on the tile's
             model!(
                 "ceilingFan",
-                ceiling::ceiling_fan,
+                fan_track::ceiling_fan,
                 (0.905, 0.385, 0.951),
                 &[("white", "Body"), ("blade", "Blades")]
             )
@@ -75,21 +77,21 @@ pub fn family() -> Family {
             .motions(motions(r#"{"idle": "blades_turn"}"#)),
             model!(
                 "trackLights",
-                ceiling::track_lights,
+                fan_track::track_lights,
                 (0.94, 0.296, 0.19),
                 &[("white", "Body"), ("iron", "Shade")]
             )
             .on_wall(),
             model!(
                 "paperLantern",
-                ceiling::paper_lantern,
+                fan_track::paper_lantern,
                 (0.543, 0.681, 0.543),
                 &[("paper", "Paper"), ("rib", "Ribs")]
             )
             .on_wall(),
             model!(
                 "wallSconce",
-                standing::wall_sconce,
+                wall_lights::wall_sconce,
                 (0.2, 0.25, 0.27),
                 &[("brass", "Body"), ("shade", "Shade")]
             )
@@ -97,7 +99,7 @@ pub fn family() -> Family {
             .centre(0.0, -0.295),
             model!(
                 "wallLampArm",
-                standing::wall_lamp_arm,
+                wall_lights::wall_lamp_arm,
                 (0.2, 0.296, 0.424),
                 &[("iron", "Body"), ("shade_metal", "Shade")]
             )
@@ -105,7 +107,7 @@ pub fn family() -> Family {
             .centre(0.0, -0.218),
             model!(
                 "wallLightOutdoor",
-                standing::wall_light_outdoor,
+                wall_lights::wall_light_outdoor,
                 (0.22, 0.327, 0.11),
                 &[("iron", "Body"), ("lens", "Shade")]
             )

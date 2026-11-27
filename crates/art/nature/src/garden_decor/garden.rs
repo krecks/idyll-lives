@@ -1,8 +1,8 @@
 //! The gnome, the wheelbarrow planter and the boulders.
 
 use super::M;
-use super::common::_on_top;
-use crate::ground::rock::_stone;
+use super::common::on_top;
+use crate::common::stone;
 use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
 use artkit::math::{P3, TAU, cos, degrees, sin};
@@ -580,7 +580,7 @@ pub fn wheelbarrow() -> Vec<Obj> {
 pub fn boulder() -> Vec<Obj> {
     // The two smaller stones huddle on one side of the big one (front and back of it, they read as a head and a
     // tail).
-    _stone(
+    stone(
         "boulder_main",
         0.34,
         (-0.06, 0.02, 0.0),
@@ -601,7 +601,7 @@ pub fn boulder() -> Vec<Obj> {
         (0.3, 0.1),
         0.0,
     );
-    _stone(
+    stone(
         "boulder_side",
         0.21,
         (0.3, 0.17, 0.0),
@@ -615,7 +615,7 @@ pub fn boulder() -> Vec<Obj> {
         (0.3, 0.1),
         0.0,
     );
-    _stone(
+    stone(
         "boulder_small",
         0.13,
         (0.26, -0.27, 0.0),
@@ -629,8 +629,8 @@ pub fn boulder() -> Vec<Obj> {
         (0.3, 0.1),
         0.0,
     );
-    let moss = _on_top(&[(-0.14, 0.12), (0.02, 0.18), (0.32, 0.24)], 0.03);
-    let lichen = _on_top(&[(0.08, -0.08), (-0.28, -0.1), (0.26, -0.27)], 0.012);
+    let moss = on_top(&[(-0.14, 0.12), (0.02, 0.18), (0.32, 0.24)], 0.03);
+    let lichen = on_top(&[(0.08, -0.08), (-0.28, -0.1), (0.26, -0.27)], 0.012);
     for (i, &at) in moss.iter().enumerate() {
         boulder!(
             format!("moss{i}"),

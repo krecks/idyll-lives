@@ -19,10 +19,10 @@ use artkit::{
 pub fn lavender() -> Vec<Obj> {
     // spikes all `bloom`: the colour part
     let p = palette(&[
-        ("leaf", "#748C70"),
-        ("leaf_light", "#82987C"),
-        ("stem", "#7E947A"),
-        ("stalk", "#7E947A"),
+        ("leaf", "#52763F"),
+        ("leaf_light", "#6D8F52"),
+        ("stem", "#6B8B55"),
+        ("stalk", "#6B8B55"),
         ("bloom", "#7E64B8"),
     ]);
     let mut rng = Random::new(75);
@@ -38,14 +38,14 @@ pub fn lavender() -> Vec<Obj> {
     );
     let mut r2 = Random::new(175);
     // narrow leaves standing out of it
-    for i in 0..22 {
+    for i in 0..30 {
         let a = i as f64 * 137.5 + r2.uniform(-10.0, 10.0);
         let rr = r2.uniform(0.07, 0.2);
         let base = V3::from(polar(rr, a, 0.04 + (0.24 - rr) * 0.5));
         let (yaw, tilt, length) = (
             a + r2.uniform(-25.0, 25.0),
-            r2.uniform(35.0, 70.0),
-            r2.uniform(0.08, 0.13),
+            r2.uniform(15.0, 50.0),
+            r2.uniform(0.11, 0.18),
         );
         if is_low() {
             continue;
@@ -78,7 +78,7 @@ pub fn lavender() -> Vec<Obj> {
             );
             let base = v3(x * 0.5, y * 0.5, 0.16);
             // (English lavender in flower stands 0.3-0.6 m)
-            let length = rng.uniform(0.4, 0.56) * 0.5;
+            let length = rng.uniform(0.5, 0.74) * 0.5;
             let tip = base + d * length;
             let along = d.to_track_quat_zy().to_matrix().to_4x4();
             if is_low() {
@@ -107,12 +107,12 @@ pub fn lavender() -> Vec<Obj> {
             );
             let spike = florets!(
                 format!("{pre}spike{i}"),
-                0.017,
+                0.021,
                 (0, 0, 0),
                 bloom,
                 bumps = 2.2,
                 amount = 0.3,
-                flat = 4.2,
+                flat = 3.8,
                 segments = 5,
                 rings = 6,
                 seed = i as f64 * 0.9
