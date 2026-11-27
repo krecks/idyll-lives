@@ -4,6 +4,11 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 
 ## Unreleased
 
+- **Walk mode:** walk as the selected resident in first person: W/S walk, A/D turn, Q/E step aside, drag to look. F uses the thing in front of you, or on a person opens the socials and a typed "Talk…" chat the LLM answers. The resident's own free will waits while you walk.
+- **Faster big towns:** a walk by road now goes round a lit junction's middle instead of searching the town tile by tile (it did so for 91 % of a city's walks to work). The slowest hour of a city day runs at about 2,100–2,500 ticks a second instead of 1,570–1,835, and the slowest steps are about half as long. Choosing an outing times the taxi's way in once.
+- **Traffic flows round taxis and junctions:** a work taxi waiting for its riders parks in its house's taxi bay beside the road, so the cars behind go by. Walkers on a 6 m lane keep clear of cars pulled over, cross in front of a car standing in a queue, and cross a country road's arm at a lit junction out past its stop line. Two cars turning round at once back up clear of each other. The generated island towns no longer lock up.
+- **Jobs start across the morning:** 70 careers start a quarter or half an hour either side of their old hour, so the morning traffic comes in a wave, not all at 9:00.
+- **Audit fixes:** furniture dropped on load gives its value back; the sounds' filters, beds and tones and the art build's checks fixed; the test saves are named for their towns.
 - **Lighter drawing in a big town:** the main thread's work per frame is about a third less by day (Medium, WebGPU, a 355-household town: 5.1 → 3.4 ms over the home, 7.6 → 5.9 ms over the whole town at 400 m). What changed:
   - **Residents:**
     - Held things are drawn once per holder, not once per resident in town.
