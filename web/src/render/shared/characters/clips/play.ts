@@ -105,11 +105,12 @@ function pitPose(f: PitFit): (p: number) => PoseSpec {
 type TentFit = Fit & { crawl: number; floor?: number };
 export const PLAY_TENT: Size<TentFit>[] = sizes('tentPlay', [0.63], (s) => ({ s, to: 0.66, crawl: 0.64 }));
 /**
- * The playhouse (`model.playhouse`, 2 × 2): its front 0.85 m from the middle with a doorway 0.66 m wide and 1.05 m
- * high in it, its floor 0.06 m up (`floor`, climbed onto crawling in over the sill). Knelt down as far out of the
- * door as at the tent's, crawled in to its middle.
+ * The playhouse (`model.playhouse`, 2 × 2): its front 0.70 m from the middle with a doorway 0.66 m wide and 1.05 m
+ * high in it, its floor 0.06 m up (`floor`, climbed onto crawling in over the sill), its back wall's inside 0.64 m
+ * behind the middle. Knelt down as far out of the door as at the tent's, crawled in to its middle (3 cm short of it:
+ * a crawl of 0.94 m drags a child's kneeling feet along the floor at a standing ankle's height, as `check:clips` sees it).
  */
-export const HOUSE_PLAY: Size<TentFit>[] = sizes('housePlay', [0.63], (s) => ({ s, to: 1.11, crawl: 1.09, floor: 0.06 }));
+export const HOUSE_PLAY: Size<TentFit>[] = sizes('housePlay', [0.63], (s) => ({ s, to: 0.96, crawl: 0.93, floor: 0.06 }));
 const TENT_S = 24;
 /** The tent's crawl: this far (m) in this long (s), in four steps; a longer one as long for its length, in as many more. */
 const TENT_CRAWL = { m: 0.64, s: 3, steps: 4 };

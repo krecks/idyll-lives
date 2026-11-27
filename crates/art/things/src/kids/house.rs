@@ -1,13 +1,14 @@
-//! The playhouse: a board hut with its doorway, a window, corner posts and its roof.
+//! The playhouse: a board hut with its doorway, a window in its side, corner posts and its roof.
 
 use super::M;
+use artkit::parts::join_all;
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, settle};
 
 pub fn playhouse() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    let (w, d, h) = (1.80, 1.70, 1.50);
+    let (w, d, h) = (1.16, 1.40, 1.40);
     let mid = 0.06 + h / 2.0;
     fbox!(
         f,
@@ -67,13 +68,14 @@ pub fn playhouse() -> Vec<Obj> {
         M.ph_board,
         bevel = 0.006
     );
+    // the window in the left side, seen from the front right (the front either side of the doorway is too narrow for one)
     fbox!(
         f,
         "window",
-        0.34,
-        0.30,
         0.020,
-        (door / 2.0 + side / 2.0, 1.10, d / 2.0 - 0.005),
+        0.30,
+        0.34,
+        (-(w / 2.0 - 0.005), 1.05, 0),
         M.ph_glass,
         bevel = 0.004
     );
@@ -112,6 +114,7 @@ pub fn playhouse() -> Vec<Obj> {
         M.ph_roof,
         bevel = 0.008
     );
+    join_all("playhouse");
     settle!();
     meshes()
 }

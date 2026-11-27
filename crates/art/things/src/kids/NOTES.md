@@ -134,6 +134,8 @@ The beds' duvets are rumpled by the form as the bedroom's are (2.5 cm folds 24 c
 ## The playhouse (2026-11-27)
 
 `playhouse` is a board hut: a floor, three walls, a front of two panels with a doorway between them under its
-header, corner posts, a window and a roof slab with its ridge. Four finishes (boards, roof, trim, glass) map to
-1 draw call. It is 1.96 × 1.70 × 1.84 m, inside its 2 × 2 footprint, and has no clip: the `play` use is the
-sandbox's, which needs no door.
+header, corner posts, a window in its left side and a roof slab with its ridge, joined into one part. Four finishes
+(boards, roof, trim, glass) map to 1 draw call. It is 1.32 × 1.60 × 1.54 m (2026-11-27: 1.96 × 1.70 × 1.84 m before,
+past a real Wendy house's 1.10–1.35 × 1.10–1.65 m in `cargo review sizes`), inside its 2 × 2 footprint, and has no
+clip. Its doorway is 0.66 m wide and 1.05 m clear over its 0.06 m floor, its front 0.70 m from the middle: the
+resident's `housePlay` clip (clips/play.ts `HOUSE_PLAY`) crawls a child in through it, fitted to those numbers.
