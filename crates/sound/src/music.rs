@@ -641,11 +641,17 @@ fn play(piece: &Score, rate: f64, only: Option<Voice>) -> Stereo {
         mix_in(&mut bus.left, start, sound, l);
         mix_in(&mut bus.right, start, sound, rr);
     }
+    // The notes are all played: let them go before the body's filters are made.
+    drop(made);
     // The strings' body (a small guitar's air and its top), run round the loop.
     for c in 0..2 {
-        let x = strings.ch(c).clone();
-        let air = node_filter(&x, rate, Filter::Bandpass, 105.0, 2.5, true);
-        let top = node_filter(&x, rate, Filter::Bandpass, 210.0, 3.0, true);
+        let x = if c == 0 {
+            &strings.left
+        } else {
+            &strings.right
+        };
+        let air = node_filter(x, rate, Filter::Bandpass, 105.0, 2.5, true);
+        let top = node_filter(x, rate, Filter::Bandpass, 210.0, 3.0, true);
         let out = rest.ch(c);
         for i in 0..n {
             out[i] =
