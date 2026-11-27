@@ -1028,10 +1028,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // follows, on its roads and its lots' pads too.)
     this.characters.setGround((x, z) => this.lot.landscape?.heightAt(x, z) ?? 0);
     // (The cars, the parked rides and the traffic lights only on a land the town follows: elsewhere at 0, as ever.)
-    const builtGround = (x: number, z: number) => this.lot.landscape?.surface?.at(x, z) ?? 0;
-    this.cars.setGround(builtGround);
-    this.parkedRides.setGround(builtGround);
-    this.signals.setGround(builtGround);
+    this.cars.setGround(this.builtGround);
+    this.parkedRides.setGround(this.builtGround);
+    this.signals.setGround(this.builtGround);
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.lotRoot.addChild(this.storeyLayer);
@@ -1388,6 +1387,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /** The menus' camera's view offset in game space (`viewShift`), worked out in place. */
   private readonly townShift: [number, number, number] = [0, 0, 0];
+
+  /** The game's built surface at a point (`BuiltSurface.at`), 0 off a land the town follows: what the cars, the parked rides and the traffic lights stand on. */
+  private readonly builtGround = (x: number, z: number): number => this.lot.landscape?.surface?.at(x, z) ?? 0;
 
   /** The menus' land's height at a point (0 before it has one): for the camera's planes (`applyTownCamera`). */
   private readonly townHeight = (x: number, z: number): number => this.lot.landscapeOf('town')?.heightAt(x, z) ?? 0;
@@ -3828,7 +3830,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /**
    * The game's land shaped (a stroke done, undone or redone): the street stands on the landscape's surface (one surface
    * for the land and what stands on it) and plans again the chunks whose roads or lots moved; the viewed lot follows its
-   * pad (the datum); the still casters' shadows
+   * pad (the datum); the traffic lights, the cars and the parked rides stand on it again; the still casters' shadows
    * are taken again.
    */
   private landUnderTown(scape: Landscape): void {
@@ -3836,6 +3838,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.sunShadows.moved();
     if (!surface || !this.builtWorld) return;
     if (this.street.landMoved(surface)) this.streamStreet();
+    // (Those that look the ground up only when placed: the traffic lights' poles, the cars standing, the parked rides.)
+    this.signals.setGround(this.builtGround);
+    this.cars.setGround(this.builtGround);
+    this.parkedRides.setGround(this.builtGround);
     const view = this.view;
     const at = view ? this.builtWorld.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     if (at < 0) return;

@@ -2,7 +2,7 @@
 // that casts into it moved, `SunShadows.reaches`): a car that moves, comes or goes draws it again when it casts
 // into it where it is now or where it was the frame before. At the fastest speed a car goes tens of metres a
 // frame: one driving off from in the map to out of it left its shadow behind on the ground (Canalside, game
-// speed 5). A car driving looks the ground up under its axles once a frame (its body and its contact shadow), and under each wheel. On the
+// speed 5). A car driving looks the ground up under its axles once a frame (its body and its contact shadow), and under each wheel; a car parked stands on the ground again as soon as the land brush moves it. On the
 // engine's null device: no GPU.
 import { afterAll, describe, expect, mock, test } from 'bun:test';
 import * as pc from '../src/render/pc/engine';
@@ -114,5 +114,30 @@ describe('the cars on the ground', () => {
     const ys = [0, 1, 2, 3].map((w) => m[w * 16 + 13] - r);
     const front = [0, 1, 2, 3].map((w) => wheelAt(CARS[0], w).front);
     for (let w = 0; w < 4; w++) expect(ys[w] - LIFT).toBeCloseTo((11 + (front[w] ? half : -half)) * 0.1, 4);
+  });
+
+  test('a car parked stands on the ground again as soon as the land moves under it (the land brush), its wheels and body', () => {
+    const { app, root } = scene();
+    const cars = new Cars(app, root, false);
+    cars.build({ cars: [{ plot: 0, x: 10, z: 10, yaw: 0, body: 0, paint: 0 }] } as unknown as WorldStructure);
+    cars.setGround(() => 1);
+    let curr = new Float32Array(layout.capacity);
+    for (let i = 0; i < 3; i++) {
+      const prev = curr;
+      curr = new Float32Array(layout.capacity);
+      curr[layout.header.speed] = 1;
+      curr[LAYOUT.header.carCount] = 1;
+      const o = carRowAt(layout, 0);
+      [curr[o + F.shown], curr[o + F.x], curr[o + F.z], curr[o + F.yaw]] = [1, 10, 10, 0];
+      cars.update({ prev, curr, alpha: 1, steps: 1, layout, now: i * 17 });
+    }
+    const c = cars as unknown as { wheels: { matrices(): Float32Array }; parked: Map<string, { draw: { matrices(): Float32Array } }> };
+    const heights = () => ({ wheel: c.wheels.matrices()[13] - CARS[0].wheelR - LIFT, body: [...c.parked.values()].flatMap((p) => [...p.draw.matrices()].filter((_, k) => k % 16 === 13)) });
+    expect(heights().wheel).toBeCloseTo(1, 4);
+    expect(heights().body).toEqual([1]);
+    // The land raised by 2 m under it: there before the next snapshot.
+    cars.setGround(() => 3);
+    expect(heights().wheel).toBeCloseTo(3, 4);
+    expect(heights().body).toEqual([3]);
   });
 });

@@ -179,6 +179,16 @@ export class Cars extends Vehicles {
     this.around = true;
   }
 
+  /** As `Vehicles.setGround`; the cars standing, parked ones too, put on it again (the land brush moved it under them). */
+  override setGround(ground: ((x: number, z: number) => number) | null): void {
+    super.setGround(ground);
+    // (A car standing keeps its `Stand` until an update moves the stamp on.)
+    this.stamp++;
+    for (const p of this.parked.values()) p.dirty = true;
+    this.around = true;
+    this.restateAll();
+  }
+
   /** Each car where the snapshot has it (between the last two), its doors, wheels and tilt, and how it's drawn. */
   update(frame: FrameState): void {
     const { curr, layout } = frame;
