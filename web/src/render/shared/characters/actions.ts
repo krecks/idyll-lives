@@ -351,8 +351,6 @@ export const CROUCH_ONLY: readonly string[] = ['crouch'];
  * through its front.
  */
 export const NEAR_DESKS = new Set(['gloomy.journalDesk', 'neat.organizerDesk', 'romantic.letterBureau', 'hotHeaded.grudgeJournal']);
-/** Ovens under a hob, near the floor: baking (`bake`) bends down to them. */
-export const LOW_OVENS = new Set(['stoveElectric', 'stoveGas', 'rangeCooker', 'chefStove', 'kind.neighbourlyOven']);
 /** Down to a dishwasher's rack and up again, a thing put in or taken out each time (`wash`, `clean`). */
 const DISHWASHER_RACK = ['pickUp', 'interact', 'pickUp', 'idle'];
 /** Dishwashers: loaded and emptied bent down to the lower rack their open door slides out, not at the worktop. */
@@ -813,12 +811,34 @@ export const ACTIONS: Record<string, ActionAnim> = {
   mix: { stand: ['stir', 'interact', 'stir'], hands: HANDS.grip, prop: PROPS.whisk },
   // A dish put in the oven or the microwave, then watched, bending to look in now and then: down to
   // a cooker's oven, at chest height to an oven tower's, a pizza oven's mouth or a microwave.
-  bake: { stand: (def) => (LOW_OVENS.has(def) ? ['pickUp', 'idle', 'foldArms', 'idle'] : ['interact', 'idle', 'foldArms', 'idle']), hands: HANDS.relaxed },
+  bake: { stand: ['interact', 'idle', 'foldArms', 'idle'], hands: HANDS.relaxed },
   // Bought from a vendor at a cart, a stall or a counter, and served from behind it (`clips/serve.ts`, sim-core
   // `staff.rs`): once each, then standing by.
   buy: { stand: ['buy', 'idle'], hands: HANDS.hold },
   sell: { stand: ['sell', 'idle'], hands: HANDS.hold },
 };
+/**
+ * Manners (content `how`, by action tag: `"how": {"bake": "low"}`): how a thing is used, laid over the tag's own
+ * `ACTIONS` entry (`actionOf`). A new thing picks a manner; only a new manner needs code. (Fitted clips, the body
+ * touching the thing, stay by the object: `STEP_IN`, `RIDES`.)
+ */
+export const MANNERS: Record<string, ActionAnim> = {
+  // Bent down to an oven under the hob (`bake`).
+  low: { stand: ['pickUp', 'idle', 'foldArms', 'idle'] },
+};
+/** `actionOf`'s mannered entries, by tag and manner, made once. */
+const MANNERED = new Map<string, Map<string, ActionAnim>>();
+/** The animation for action `tag` done in manner `how` (the object's content `how[tag]`; none, or one unknown: the tag's own). */
+export function actionOf(tag: string, how: string | undefined): ActionAnim | undefined {
+  const act = ACTIONS[tag];
+  const manner = how ? MANNERS[how] : undefined;
+  if (!act || !manner) return act;
+  let of = MANNERED.get(tag);
+  if (!of) MANNERED.set(tag, (of = new Map()));
+  let m = of.get(how!);
+  if (!m) of.set(how!, (m = { ...act, ...manner }));
+  return m;
+}
 /**
  * The prop drawn on a station's top while a Sim works there (by action tag; held.py models). Nothing for a bake: the
  * dish is in the oven. Stirred in the stew pot they then carry away (`item.mealPot`), not a frying pan.

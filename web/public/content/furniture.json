@@ -353,6 +353,7 @@
     },
     {
       "id": "stoveElectric",
+      "how": { "bake": "low" },
       "name": "Electric cooker",
       "model": "model.stoveElectric",
       "stations": [
@@ -427,6 +428,7 @@
     },
     {
       "id": "stoveGas",
+      "how": { "bake": "low" },
       "name": "Gas range",
       "model": "model.stoveGas",
       "stations": [

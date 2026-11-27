@@ -1,4 +1,5 @@
-// What every content object plays for every action tag (`render/shared/characters/actions.ts` `ACTIONS`): the
+// What every content object plays for every action tag (`render/shared/characters/actions.ts` `ACTIONS`, in the
+// manner of its content `how`, `actionOf`): the
 // standing clips, the seated clip and upper layer, the hands and the prop in hand, for a child, a teen and a
 // grown-up (1.12, 1.47, 1.77 m). Each tag's row for no object, then the objects (base, catalogs and packs) whose
 // rows differ from it. A change meant to change how residents use things: `bun test --update-snapshots`.
@@ -9,7 +10,7 @@ usePublicFetch();
 
 describe('action clips', async () => {
   const content = await loadContent();
-  const { ACTIONS, PROPS } = await import('../src/render/shared/characters/actions');
+  const { ACTIONS, MANNERS, PROPS, actionOf } = await import('../src/render/shared/characters/actions');
   const propName = new Map<unknown, string>(Object.entries(PROPS).map(([name, p]) => [p, name]));
   const BANDS = [
     ['child', 1.12],
@@ -18,7 +19,7 @@ describe('action clips', async () => {
   ] as const;
 
   const row = (tag: string, def: string, height: number): string => {
-    const a = ACTIONS[tag];
+    const a = actionOf(tag, content.object(def)?.how?.[tag])!;
     const stand = typeof a.stand === 'function' ? a.stand(def, height) : a.stand;
     const sit = typeof a.sit === 'function' ? a.sit(def) : a.sit;
     const upper = typeof a.upper === 'function' ? a.upper(def) : a.upper;
@@ -43,5 +44,10 @@ describe('action clips', async () => {
       }
     }
     expect(lines.join('\n')).toMatchSnapshot();
+  });
+
+  test("every object's `how` is a manner for an action tag", () => {
+    const wrong = content.objectList.flatMap((d) => Object.entries(d.how ?? {}).filter(([tag, how]) => !ACTIONS[tag] || !MANNERS[how]).map(([tag, how]) => `${d.id}: ${tag} ${how}`));
+    expect(wrong).toEqual([]);
   });
 });

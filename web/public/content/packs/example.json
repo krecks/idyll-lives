@@ -46,6 +46,7 @@
     },
     {
       "id": "chefStove",
+      "how": { "bake": "low" },
       "name": "Chef's stove",
       "model": "model.chefStove",
       "stations": ["stove", "oven"],

@@ -233,6 +233,8 @@ export interface SeatFit {
 }
 export interface PlacedObject {
   def: string;
+  /** How its uses are done, by action tag (content `how`: `actionOf`). */
+  how?: Readonly<Record<string, string>>;
   /** Facing (0..3, as the simulation's `rot`). */
   rot: number;
   /** Its turn (rad): `rot`'s quarter turns and a freely turned thing's own (`turn`), as it's drawn. */

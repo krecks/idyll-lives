@@ -79,6 +79,7 @@
   "objects": [
     {
       "id": "kind.neighbourlyOven",
+      "how": { "bake": "low" },
       "name": "Neighbourly baking counter",
       "model": "model.kind.neighbourlyOven",
       "stations": [

@@ -560,6 +560,7 @@
     },
     {
       "id": "rangeCooker",
+      "how": { "bake": "low" },
       "name": "Range cooker",
       "model": "model.rangeCooker",
       "footprint": [
