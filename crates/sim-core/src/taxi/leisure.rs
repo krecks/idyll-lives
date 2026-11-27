@@ -32,14 +32,14 @@ pub(crate) fn leisure_eta(
         sim,
         from,
         (None, door),
-        &mut [None, None],
+        &mut crate::travel::FromHere::default(),
     )
 }
 
-/// `leisure_eta`, with where the trips from `from` get on the roads on foot and by car (`on`,
-/// by `Mode`: `Travel::entry`, found as first asked for) kept by the caller for the next from
-/// there (a choice of what to do times the way to every place: `world::pick_autonomous`), and
-/// the door's (`Travel::door_entry`) as noted for its plot, if given.
+/// `leisure_eta`, with what the trips from `from` have in common (`here`: where they get on the
+/// roads, the taxi's way in, the ways just timed) kept by the caller for the next from there (a
+/// choice of what to do times the way to every place: `world::pick_autonomous`), and the door's
+/// (`Travel::door_entry`) as noted for its plot, if given.
 pub(crate) fn leisure_eta_via(
     travel: &crate::travel::Travel,
     exits: &[[f32; 2]],
@@ -47,51 +47,45 @@ pub(crate) fn leisure_eta_via(
     sim: &crate::world::Sim,
     from: [f32; 2],
     (plot, door): (Option<u32>, [f32; 2]),
-    on: &mut [Option<Option<crate::travel::RoadPoint>>; 2],
+    here: &mut crate::travel::FromHere,
 ) -> Option<f32> {
     use crate::travel::Mode;
     if exits.is_empty() || crate::travel::dist(from, door) <= content.autonomy.reach {
         return None;
     }
-    let mut on_at = |mode: Mode| *on[mode as usize].get_or_insert_with(|| travel.entry(from, mode));
+    let walk = sim.walk_per_minute(content);
+    let on_foot = here.eta(travel, from, (plot, door), Mode::Foot, walk);
+    // (Its way in, from the way out nearest them: the same for every place.)
+    let come = match here.come {
+        Some(come) => come,
+        None => {
+            let exit = exits.iter().copied().min_by(|a, b| {
+                crate::travel::dist(*a, from).total_cmp(&crate::travel::dist(*b, from))
+            })?;
+            let on = here.on(travel, from, Mode::Car);
+            let come = travel.eta_via(
+                exit,
+                from,
+                Mode::Car,
+                walk,
+                || travel.entry(exit, Mode::Car),
+                || on,
+            );
+            *here.come.insert(come)
+        }
+    };
+    let ride = here.eta(travel, from, (plot, door), Mode::Car, walk);
     let off_at = |mode: Mode| match plot {
         Some(plot) => travel.door_entry(plot, door, mode),
         None => travel.entry(door, mode),
     };
-    let walk = sim.walk_per_minute(content);
-    let on_foot = travel.eta_via(
-        from,
-        door,
-        Mode::Foot,
-        walk,
-        || on_at(Mode::Foot),
-        || off_at(Mode::Foot),
-    );
-    let exit = exits
-        .iter()
-        .copied()
-        .min_by(|a, b| crate::travel::dist(*a, from).total_cmp(&crate::travel::dist(*b, from)))?;
-    let come = travel.eta_via(
-        exit,
-        from,
-        Mode::Car,
-        walk,
-        || travel.entry(exit, Mode::Car),
-        || on_at(Mode::Car),
-    );
-    let ride = travel.eta_via(
-        from,
-        door,
-        Mode::Car,
-        walk,
-        || on_at(Mode::Car),
-        || off_at(Mode::Car),
-    );
     // (`kerb_walks`, by those entries.)
     let to_road = |p: [f32; 2], entry: Option<crate::travel::RoadPoint>| {
         entry.map_or(0.0, |r| crate::travel::dist(p, travel.graph.point(r)))
     };
-    let kerbs = (to_road(from, on_at(Mode::Car)) + to_road(door, off_at(Mode::Car))) * KERB_WINDING
+    let kerbs = (to_road(from, here.on(travel, from, Mode::Car))
+        + to_road(door, off_at(Mode::Car)))
+        * KERB_WINDING
         / walk.max(0.1)
         + LEISURE_KERBS;
     let by_taxi = ride * crate::travel::DRIVE_MINUTES + kerbs;

@@ -9,16 +9,18 @@ use super::*;
 #[derive(Debug, Clone, Default)]
 pub(super) struct Kerbs {
     /// What they were found for (`kerb_stamp`): the driveways and the network.
-    stamp: u64,
+    pub(super) stamp: u64,
     /// `drive_mouths` for it.
     mouths: Vec<(u32, f32)>,
     /// By plot: its door (`Plot::arrival_point`, bits) and its stand, once found.
     plots: Vec<Option<([u32; 2], Option<Kerb>)>>,
+    /// Where a taxi parks beside the road (`taxi_bays`).
+    pub(super) bays: Vec<[f32; 3]>,
 }
 
 /// What every house's stand (`stop_for`) depends on but its own door: the driveways, the
 /// network and the public parking (a hash; 0 never: none found yet).
-fn kerb_stamp(w: &World) -> u64 {
+pub(super) fn kerb_stamp(w: &World) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     let g = &w.travel.graph;
@@ -47,10 +49,12 @@ fn kerb_stamp(w: &World) -> u64 {
 pub(super) fn warm_kerbs(w: &mut World) {
     let stamp = kerb_stamp(w);
     if w.taxis.kerbs.stamp != stamp {
+        let bays = find_bays(w);
         w.taxis.kerbs = Kerbs {
             stamp,
             mouths: drive_mouths(w),
             plots: Vec::new(),
+            bays,
         };
     }
     for h in 0..w.households.len() {

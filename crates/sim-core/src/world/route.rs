@@ -292,6 +292,13 @@ pub(crate) fn road_route(
             continue;
         }
         if !nav.line_walkable_with(from, p, grounds) {
+            // (A point nobody may stand on, a lit junction's middle, `Travel::junction_tiles`:
+            // round it to the next. Routed to, it failed the whole way by road, and the walk was
+            // searched for tile by tile across town instead, 16,000 tiles a walk out of town.)
+            let (x, z) = tile(p);
+            if !nav.tile_free(x, z) {
+                continue;
+            }
             let around = route(nav, reach, from, tile(from), tile(p), p, grounds)?;
             waypoints.extend(around);
         } else {

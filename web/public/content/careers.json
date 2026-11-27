@@ -53,6 +53,7 @@
         {
           "id": "journalism.photo",
           "label": "Photojournalism",
+          "shift": { "start": 9.25, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "perception": 1, "creativity": 0.6, "endurance": 0.3 },
           "payFactor": 0.82,
           "car": { "A": "hatchback", "E": "estate" },
@@ -61,6 +62,7 @@
         {
           "id": "journalism.digital",
           "label": "Digital Media",
+          "shift": { "start": 8.75, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "technology": 1, "writing": 0.7, "business": 0.3 },
           "payFactor": 1.23,
           "titles": ["Social Media Intern", "Content Assistant", "Web Producer", "Digital Reporter", "Audience Editor", "Data Journalist", "Head of Digital", "Digital Managing Editor", "Chief Digital Officer", "Media Startup Founder"]
@@ -88,6 +90,7 @@
         {
           "id": "detective.forensics",
           "label": "Forensics",
+          "shift": { "start": 7.25, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "perception": 0.8 },
           "payFactor": 0.93,
           "titles": ["Lab Assistant", "Evidence Technician", "Crime Scene Technician", "Forensic Analyst", "Crime Scene Investigator", "Forensic Scientist", "Lead Forensic Examiner", "Crime Lab Supervisor", "Forensic Services Director", "Chief Forensic Scientist"]
@@ -103,6 +106,7 @@
         {
           "id": "detective.cybercrime",
           "label": "Cybercrime",
+          "shift": { "start": 6.75, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "technology": 1, "intelligence": 0.7, "perception": 0.4 },
           "payFactor": 1.41,
           "titles": ["Digital Evidence Clerk", "Cybercrime Trainee", "Digital Forensics Technician", "Cybercrime Investigator", "Online Fraud Specialist", "Digital Forensics Examiner", "Cyber Task Force Lead", "Cybercrime Unit Commander", "Head of National Cyber Unit", "Cybercrime Bureau Director"]
@@ -129,6 +133,7 @@
         {
           "id": "firefighter.paramedic",
           "label": "Paramedic",
+          "shift": { "start": 8.25, "hours": 12, "days": [0, 2, 4, 6] },
           "skills": { "dexterity": 1, "intelligence": 0.6, "endurance": 0.4 },
           "payFactor": 0.88,
           "car": { "A": "hatchback", "E": "estate" },
@@ -137,6 +142,7 @@
         {
           "id": "firefighter.rescue",
           "label": "Search & Rescue",
+          "shift": { "start": 7.75, "hours": 12, "days": [0, 2, 4, 6] },
           "skills": { "endurance": 1, "strength": 0.7, "perception": 0.4 },
           "payFactor": 0.98,
           "titles": ["Rescue Volunteer", "Rescue Trainee", "Rescue Technician", "Rope Rescue Specialist", "Swiftwater Rescuer", "Urban Search & Rescue Specialist", "Rescue Team Leader", "Rescue Squad Captain", "Regional Rescue Coordinator", "National Rescue Commander"]
@@ -146,7 +152,7 @@
           "label": "Fire Investigation",
           "skills": { "perception": 1, "intelligence": 0.7 },
           "payFactor": 1.17,
-          "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 9.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "titles": ["Fire Safety Clerk", "Trainee Fire Inspector", "Fire Inspector", "Fire Investigator", "Arson Investigator", "Senior Arson Investigator", "Lead Fire Investigator", "Deputy Fire Marshal", "Fire Marshal", "State Fire Marshal"]
         }
       ]
@@ -179,6 +185,7 @@
         {
           "id": "influencer.beauty",
           "label": "Beauty & Fashion Content",
+          "shift": { "start": 11.25, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
           "skills": { "creativity": 1, "charisma": 0.7 },
           "payFactor": 1.0,
           "titles": ["Makeup Enthusiast", "Beauty Blogger", "Tutorial Creator", "Beauty Vlogger", "Sponsored Creator", "Trendsetter", "Beauty Guru", "Brand Collaborator", "Cosmetics Line Founder", "Beauty Icon"]
@@ -186,6 +193,7 @@
         {
           "id": "influencer.podcast",
           "label": "Podcasting",
+          "shift": { "start": 10.75, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
           "skills": { "writing": 1, "charisma": 0.7, "technology": 0.3 },
           "payFactor": 1.0,
           "titles": ["Podcast Assistant", "Audio Editor", "Indie Podcaster", "Podcast Co-Host", "Podcast Host", "Interview Host", "Network Podcaster", "Chart-Topping Host", "Podcast Network Founder", "Podcasting Legend"]
@@ -205,6 +213,7 @@
         {
           "id": "it.software",
           "label": "Software Development",
+          "shift": { "start": 8.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "technology": 1, "intelligence": 0.7, "creativity": 0.3 },
           "payFactor": 1.18,
           "titles": ["Coding Intern", "Junior Developer", "Software Developer", "Software Engineer", "Senior Software Engineer", "Staff Engineer", "Principal Engineer", "Engineering Manager", "VP of Engineering", "Chief Technology Officer"]
@@ -220,6 +229,7 @@
         {
           "id": "it.security",
           "label": "Cybersecurity",
+          "shift": { "start": 9.25, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "technology": 1, "perception": 0.7, "intelligence": 0.4 },
           "payFactor": 1.13,
           "titles": ["Security Intern", "SOC Analyst", "Security Analyst", "Penetration Tester", "Security Engineer", "Threat Hunter", "Red Team Lead", "Security Manager", "Director of Security", "Chief Information Security Officer"]
@@ -227,6 +237,7 @@
         {
           "id": "it.data",
           "label": "Data & AI",
+          "shift": { "start": 8.75, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "technology": 0.8 },
           "payFactor": 1.07,
           "titles": ["Data Intern", "Data Analyst", "Business Intelligence Analyst", "Data Scientist", "Machine Learning Engineer", "Senior Data Scientist", "AI Research Lead", "Head of Data Science", "VP of Artificial Intelligence", "Chief AI Officer"]
@@ -246,6 +257,7 @@
         {
           "id": "tv.acting",
           "label": "Acting",
+          "shift": { "start": 10.25, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "charisma": 1, "creativity": 0.6, "endurance": 0.3 },
           "payFactor": 0.9,
           "titles": ["Extra", "Stand-In", "Bit Part Actor", "Supporting Actor", "Character Actor", "Series Regular", "Leading Actor", "Box Office Draw", "Award-Winning Actor", "Hollywood Legend"]
@@ -253,6 +265,7 @@
         {
           "id": "tv.directing",
           "label": "Directing",
+          "shift": { "start": 9.75, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "creativity": 1, "business": 0.6, "charisma": 0.4 },
           "payFactor": 1.3,
           "titles": ["Production Runner", "Script Supervisor", "Second Assistant Director", "First Assistant Director", "Short Film Director", "TV Episode Director", "Feature Film Director", "Showrunner", "Acclaimed Auteur", "Oscar-Winning Director"]
@@ -260,6 +273,7 @@
         {
           "id": "tv.camera",
           "label": "Camera & Production",
+          "shift": { "start": 10.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "dexterity": 1, "technology": 0.6, "perception": 0.4 },
           "payFactor": 1.05,
           "car": { "A": "hatchback", "D": "estate", "H": "suv" },
@@ -295,6 +309,7 @@
         {
           "id": "mechanics.engineering",
           "label": "Mechanical Engineering",
+          "shift": { "start": 7.75, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "handiness": 0.6, "technology": 0.4 },
           "payFactor": 1.0,
           "car": { "A": "hatchback", "E": "saloon", "H": "suv" },
@@ -303,6 +318,7 @@
         {
           "id": "mechanics.electronics",
           "label": "Electronics",
+          "shift": { "start": 7.25, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "technology": 1, "handiness": 0.7, "dexterity": 0.3 },
           "payFactor": 1.16,
           "titles": ["Electronics Apprentice", "Assembly Technician", "Repair Technician", "Electronics Technician", "Circuit Designer", "Embedded Systems Engineer", "Hardware Lead", "Electronics Lab Manager", "Head of Hardware", "Chief Hardware Architect"]
@@ -310,6 +326,7 @@
         {
           "id": "mechanics.aerospace",
           "label": "Aerospace",
+          "shift": { "start": 8, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "technology": 0.7, "dexterity": 0.3 },
           "payFactor": 1.21,
           "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
@@ -339,12 +356,13 @@
           "label": "Investment Banking",
           "skills": { "business": 1, "intelligence": 0.7, "endurance": 0.3 },
           "payFactor": 1.18,
-          "shift": { "start": 8, "hours": 11, "days": [0, 1, 2, 3, 4, 5] },
+          "shift": { "start": 8.5, "hours": 11, "days": [0, 1, 2, 3, 4, 5] },
           "titles": ["Summer Analyst", "Investment Analyst", "Investment Associate", "Vice President", "Senior Vice President", "Executive Director", "Managing Director", "Head of Mergers & Acquisitions", "Global Head of Investment Banking", "Investment Bank CEO"]
         },
         {
           "id": "finance.accounting",
           "label": "Accounting & Audit",
+          "shift": { "start": 8.75, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "business": 0.6, "perception": 0.3 },
           "payFactor": 0.94,
           "titles": ["Bookkeeping Clerk", "Accounts Assistant", "Staff Accountant", "Certified Accountant", "Senior Auditor", "Audit Manager", "Financial Controller", "Audit Partner", "Finance Director", "Chief Financial Officer"]
@@ -354,7 +372,7 @@
           "label": "Trading & Markets",
           "skills": { "perception": 1, "business": 0.7, "intelligence": 0.3 },
           "payFactor": 1.04,
-          "shift": { "start": 7, "hours": 10, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 7.5, "hours": 10, "days": [0, 1, 2, 3, 4] },
           "titles": ["Trading Desk Assistant", "Trade Support Analyst", "Junior Trader", "Equity Trader", "Derivatives Trader", "Portfolio Manager", "Head Trader", "Hedge Fund Partner", "Chief Investment Officer", "Hedge Fund Founder"]
         }
       ]
@@ -372,6 +390,7 @@
         {
           "id": "medicine.general",
           "label": "General Practice",
+          "shift": { "start": 6.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "charisma": 0.6 },
           "payFactor": 1.12,
           "titles": ["Medical Student", "Foundation Doctor", "Resident Physician", "General Practitioner", "Family Physician", "Senior Physician", "Attending Physician", "Head of Department", "Chief Medical Officer", "Chief Physician"]
@@ -397,7 +416,7 @@
           "label": "Psychology & Therapy",
           "skills": { "perception": 1, "intelligence": 0.6, "charisma": 0.4 },
           "payFactor": 0.54,
-          "shift": { "start": 10, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 9.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "car": { "A": "hatchback", "E": "estate", "H": "saloon" },
           "titles": ["Research Assistant", "Psychology Graduate", "Assistant Psychologist", "Counselor", "Licensed Therapist", "Clinical Psychologist", "Consultant Psychologist", "Head of Psychology", "Director of Mental Health Services", "Eminent Psychologist"]
         }
@@ -425,7 +444,7 @@
           "label": "Pastry & Baking",
           "skills": { "cooking": 1, "creativity": 0.6, "dexterity": 0.4 },
           "payFactor": 0.78,
-          "shift": { "start": 5, "hours": 8, "days": [1, 2, 3, 4, 5] },
+          "shift": { "start": 5.25, "hours": 8, "days": [1, 2, 3, 4, 5] },
           "titles": ["Bakery Assistant", "Apprentice Baker", "Baker", "Pastry Cook", "Cake Decorator", "Pastry Chef", "Head Pastry Chef", "Executive Pastry Chef", "Patisserie Owner", "Master Patissier"]
         },
         {
@@ -433,7 +452,7 @@
           "label": "Food Writing",
           "skills": { "writing": 1, "cooking": 0.6, "perception": 0.3 },
           "payFactor": 1.37,
-          "shift": { "start": 11, "hours": 6, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 11.5, "hours": 6, "days": [0, 1, 2, 3, 4] },
           "titles": ["Recipe Tester", "Food Blog Writer", "Restaurant Reviewer", "Cookbook Contributor", "Food Columnist", "Restaurant Critic", "Cookbook Author", "Food Magazine Editor", "Culinary Television Judge", "Legendary Food Critic"]
         },
         {
@@ -466,6 +485,7 @@
         {
           "id": "arts.graphic",
           "label": "Graphic Design",
+          "shift": { "start": 10.25, "hours": 7, "days": [0, 1, 2, 3, 4] },
           "skills": { "creativity": 1, "technology": 0.6, "business": 0.3 },
           "payFactor": 1.2,
           "titles": ["Design Intern", "Production Artist", "Graphic Designer", "Visual Designer", "Brand Designer", "Senior Designer", "Art Director", "Creative Director", "Executive Creative Director", "Chief Creative Officer"]
@@ -473,6 +493,7 @@
         {
           "id": "arts.sculpture",
           "label": "Sculpture & Crafts",
+          "shift": { "start": 9.75, "hours": 7, "days": [0, 1, 2, 3, 4] },
           "skills": { "handiness": 1, "creativity": 0.7, "strength": 0.3 },
           "payFactor": 0.9,
           "car": { "A": "estate", "F": "van" },
@@ -481,6 +502,7 @@
         {
           "id": "arts.photography",
           "label": "Photography",
+          "shift": { "start": 10.5, "hours": 7, "days": [0, 1, 2, 3, 4] },
           "skills": { "perception": 1, "creativity": 0.7, "technology": 0.3 },
           "payFactor": 0.85,
           "titles": ["Photo Assistant", "Event Photographer", "Portrait Photographer", "Wedding Photographer", "Commercial Photographer", "Fashion Photographer", "Exhibiting Photographer", "Studio Owner", "Magazine Photo Director", "Iconic Photographer"]
@@ -516,6 +538,7 @@
         {
           "id": "music.composition",
           "label": "Composition & Songwriting",
+          "shift": { "start": 14.25, "hours": 6, "days": [1, 2, 3, 4, 5] },
           "skills": { "creativity": 1, "writing": 0.7, "technology": 0.3 },
           "payFactor": 0.85,
           "titles": ["Jingle Writer", "Lyricist", "Staff Songwriter", "Game Music Composer", "TV Score Composer", "Hit Songwriter", "Film Score Composer", "Composer-in-Residence", "Award-Winning Composer", "Legendary Composer"]
@@ -543,6 +566,7 @@
         {
           "id": "education.primary",
           "label": "Primary Teaching",
+          "shift": { "start": 7.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "charisma": 1, "endurance": 0.6, "creativity": 0.3 },
           "payFactor": 0.93,
           "titles": ["Classroom Volunteer", "Teaching Assistant", "Student Teacher", "Primary Teacher", "Year Group Lead", "Special Needs Coordinator", "Deputy Head Teacher", "Head Teacher", "School District Superintendent", "Education Commissioner"]
@@ -559,13 +583,14 @@
           "label": "University & Academia",
           "skills": { "writing": 1, "intelligence": 0.8 },
           "payFactor": 1.12,
-          "shift": { "start": 10, "hours": 7, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 9.5, "hours": 7, "days": [0, 1, 2, 3, 4] },
           "car": { "A": "hatchback", "E": "estate", "H": "saloon" },
           "titles": ["Graduate Teaching Assistant", "Doctoral Researcher", "Postdoctoral Fellow", "Lecturer", "Senior Lecturer", "Associate Professor", "Professor", "Department Chair", "Dean of Faculty", "University Chancellor"]
         },
         {
           "id": "education.vocational",
           "label": "Vocational Instruction",
+          "shift": { "start": 8.25, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "handiness": 1, "charisma": 0.6, "endurance": 0.3 },
           "payFactor": 0.93,
           "titles": ["Workshop Helper", "Trainee Instructor", "Skills Instructor", "Vocational Teacher", "Apprenticeship Assessor", "Senior Instructor", "Training Program Lead", "Head of Vocational Studies", "Technical College Principal", "National Skills Director"]
@@ -585,6 +610,7 @@
         {
           "id": "science.biology",
           "label": "Biology & Genetics",
+          "shift": { "start": 9.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "perception": 0.6 },
           "payFactor": 1.02,
           "titles": ["Lab Intern", "Lab Technician", "Research Assistant", "Biologist", "Geneticist", "Senior Research Scientist", "Principal Investigator", "Lab Director", "Research Institute Director", "Nobel Laureate"]
@@ -592,6 +618,7 @@
         {
           "id": "science.chemistry",
           "label": "Chemistry",
+          "shift": { "start": 8.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "dexterity": 0.6, "perception": 0.3 },
           "payFactor": 0.93,
           "titles": ["Lab Glassware Assistant", "Lab Analyst", "Analytical Chemist", "Research Chemist", "Synthetic Chemist", "Senior Chemist", "Lead Formulation Scientist", "R&D Manager", "Director of Chemical Research", "Chief Science Officer"]
@@ -608,7 +635,7 @@
           "label": "Field Research",
           "skills": { "endurance": 1, "perception": 0.7, "intelligence": 0.4 },
           "payFactor": 0.78,
-          "shift": { "start": 6, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
+          "shift": { "start": 6.25, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
           "car": { "A": "estate", "E": "offRoader" },
           "titles": ["Field Volunteer", "Field Assistant", "Field Technician", "Field Researcher", "Expedition Scientist", "Senior Field Scientist", "Expedition Leader", "Research Station Chief", "Director of Field Research", "Legendary Explorer"]
         }
@@ -627,6 +654,7 @@
         {
           "id": "law.corporate",
           "label": "Corporate Law",
+          "shift": { "start": 9.25, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "business": 1, "writing": 0.6, "intelligence": 0.4 },
           "payFactor": 1.01,
           "titles": ["Legal Intern", "Paralegal", "Trainee Lawyer", "Associate Attorney", "Senior Associate", "Of Counsel", "Partner", "Equity Partner", "Managing Partner", "Name Partner"]
@@ -634,6 +662,7 @@
         {
           "id": "law.criminal",
           "label": "Criminal Defense",
+          "shift": { "start": 8.75, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "charisma": 1, "intelligence": 0.6, "perception": 0.4 },
           "payFactor": 1.01,
           "titles": ["Court Clerk", "Legal Aid Assistant", "Public Defender", "Defense Attorney", "Trial Lawyer", "Lead Trial Counsel", "Criminal Law Partner", "Celebrity Defense Attorney", "Head of the Criminal Bar", "Legendary Trial Lawyer"]
@@ -641,6 +670,7 @@
         {
           "id": "law.judiciary",
           "label": "Prosecution & Judiciary",
+          "shift": { "start": 9.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "intelligence": 1, "perception": 0.6, "writing": 0.3 },
           "payFactor": 0.96,
           "titles": ["Court Intern", "Legal Researcher", "Assistant Prosecutor", "Prosecutor", "Senior Prosecutor", "District Attorney", "Magistrate", "Judge", "Appeals Court Judge", "Supreme Court Justice"]
@@ -648,6 +678,7 @@
         {
           "id": "law.contracts",
           "label": "Contracts & Intellectual Property",
+          "shift": { "start": 8.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "writing": 1, "intelligence": 0.6, "business": 0.3 },
           "payFactor": 1.01,
           "titles": ["Legal Secretary", "Contracts Assistant", "Contracts Paralegal", "Contracts Lawyer", "Intellectual Property Attorney", "Patent Attorney", "IP Practice Lead", "Head of Legal", "General Counsel", "Chief Legal Officer"]
@@ -682,6 +713,7 @@
         {
           "id": "retail.merchandising",
           "label": "Visual Merchandising",
+          "shift": { "start": 10.25, "hours": 8, "days": [1, 2, 3, 4, 5] },
           "skills": { "creativity": 1, "perception": 0.5, "handiness": 0.3 },
           "payFactor": 0.85,
           "titles": ["Display Assistant", "Merchandising Associate", "Window Dresser", "Visual Merchandiser", "Store Display Designer", "Visual Merchandising Lead", "Visual Merchandising Manager", "Head of Store Design", "Brand Experience Director", "Global Visual Director"]
@@ -691,7 +723,7 @@
           "label": "Warehouse & Logistics",
           "skills": { "strength": 1, "endurance": 0.7 },
           "payFactor": 0.8,
-          "shift": { "start": 6, "hours": 8, "days": [0, 1, 2, 3, 4, 5] },
+          "shift": { "start": 5.75, "hours": 8, "days": [0, 1, 2, 3, 4, 5] },
           "car": { "A": "van", "H": "suv" },
           "titles": ["Warehouse Picker", "Order Packer", "Forklift Operator", "Inventory Controller", "Warehouse Team Leader", "Shift Manager", "Warehouse Manager", "Distribution Center Manager", "Head of Logistics", "Supply Chain Director"]
         }
@@ -710,6 +742,7 @@
         {
           "id": "trades.carpentry",
           "label": "Carpentry",
+          "shift": { "start": 7.25, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "handiness": 1, "strength": 0.6, "dexterity": 0.3 },
           "payFactor": 0.92,
           "titles": ["Carpentry Helper", "Carpentry Apprentice", "Joiner", "Carpenter", "Finish Carpenter", "Master Carpenter", "Carpentry Foreman", "Site Supervisor", "Construction Manager", "Master Builder"]
@@ -717,6 +750,7 @@
         {
           "id": "trades.electrical",
           "label": "Electrical Work",
+          "shift": { "start": 6.75, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "handiness": 1, "intelligence": 0.5, "dexterity": 0.3 },
           "payFactor": 0.97,
           "titles": ["Electrician's Helper", "Apprentice Electrician", "Wiring Installer", "Journeyman Electrician", "Licensed Electrician", "Master Electrician", "Electrical Foreman", "Electrical Contractor", "Electrical Project Director", "Electrical Contracting Magnate"]
@@ -724,6 +758,7 @@
         {
           "id": "trades.construction",
           "label": "Heavy Construction",
+          "shift": { "start": 7.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "strength": 1, "endurance": 0.7, "handiness": 0.3 },
           "payFactor": 0.74,
           "titles": ["Site Laborer", "Hod Carrier", "Bricklayer", "Concrete Finisher", "Crane Operator", "Heavy Equipment Operator", "Site Foreman", "Site Manager", "Construction Director", "Construction Magnate"]
@@ -733,7 +768,7 @@
           "label": "Architecture",
           "skills": { "creativity": 1, "intelligence": 0.6, "technology": 0.3 },
           "payFactor": 1.38,
-          "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 9.25, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
           "titles": ["Architecture Intern", "CAD Drafter", "Architectural Assistant", "Project Architect", "Licensed Architect", "Senior Architect", "Lead Architect", "Associate Principal", "Principal Architect", "Starchitect"]
         }
@@ -752,6 +787,7 @@
         {
           "id": "sports.athlete",
           "label": "Professional Athlete",
+          "shift": { "start": 7.75, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
           "skills": { "endurance": 1, "strength": 0.7, "dexterity": 0.3 },
           "payFactor": 1.03,
           "titles": ["Youth Prospect", "Amateur Athlete", "Reserve Player", "Rookie Pro", "Starting Player", "Team Regular", "Team Captain", "All-Star Athlete", "Olympic Champion", "Sports Legend"]
@@ -759,6 +795,7 @@
         {
           "id": "sports.coaching",
           "label": "Coaching",
+          "shift": { "start": 8.5, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
           "skills": { "charisma": 1, "perception": 0.6, "endurance": 0.3 },
           "payFactor": 0.76,
           "titles": ["Volunteer Coach", "Youth Coach", "Assistant Coach", "Position Coach", "Academy Head Coach", "Head Coach", "Technical Director", "National Team Coach", "Sports Director", "Hall of Fame Coach"]
@@ -768,7 +805,7 @@
           "label": "Personal Training",
           "skills": { "strength": 1, "charisma": 0.6 },
           "payFactor": 0.76,
-          "shift": { "start": 6, "hours": 8, "days": [0, 1, 2, 3, 4, 5] },
+          "shift": { "start": 6.5, "hours": 8, "days": [0, 1, 2, 3, 4, 5] },
           "titles": ["Gym Receptionist", "Gym Floor Assistant", "Fitness Instructor", "Personal Trainer", "Strength Coach", "Master Trainer", "Gym Manager", "Celebrity Trainer", "Fitness Brand Founder", "Fitness Empire Mogul"]
         },
         {
@@ -776,7 +813,7 @@
           "label": "Sports Medicine & Physio",
           "skills": { "dexterity": 1, "intelligence": 0.6, "strength": 0.3 },
           "payFactor": 1.44,
-          "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 8.75, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "car": { "A": "hatchback", "F": "estate" },
           "titles": ["Sports Massage Trainee", "Massage Therapist", "Athletic Trainer", "Physiotherapist", "Sports Physiotherapist", "Rehabilitation Specialist", "Head Physio", "Club Medical Director", "Head of Sports Medicine", "Olympic Team Physiotherapist"]
         }
@@ -795,6 +832,7 @@
         {
           "id": "military.army",
           "label": "Army",
+          "shift": { "start": 5.5, "hours": 10, "days": [0, 1, 2, 3, 4] },
           "skills": { "strength": 1, "endurance": 0.8 },
           "payFactor": 1.0,
           "titles": ["Recruit", "Private", "Corporal", "Sergeant", "Staff Sergeant", "Lieutenant", "Captain", "Major", "Colonel", "General"]
@@ -809,6 +847,7 @@
         {
           "id": "military.airForce",
           "label": "Air Force",
+          "shift": { "start": 6.25, "hours": 10, "days": [0, 1, 2, 3, 4] },
           "skills": { "dexterity": 1, "perception": 0.7, "intelligence": 0.3 },
           "payFactor": 1.0,
           "titles": ["Aircraftman", "Flight Cadet", "Pilot Officer", "Flying Officer", "Flight Lieutenant", "Squadron Leader", "Wing Commander", "Group Captain", "Air Commodore", "Air Chief Marshal"]
@@ -818,7 +857,7 @@
           "label": "Military Intelligence",
           "skills": { "intelligence": 1, "perception": 0.7, "technology": 0.3 },
           "payFactor": 1.0,
-          "shift": { "start": 8, "hours": 9, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 7.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
           "titles": ["Intelligence Recruit", "Signals Operator", "Intelligence Analyst", "Cryptanalyst", "Field Intelligence Officer", "Counterintelligence Officer", "Intelligence Section Chief", "Head of Station", "Director of Military Intelligence", "Spymaster"]
         }
@@ -837,6 +876,7 @@
         {
           "id": "politics.elected",
           "label": "Elected Office",
+          "shift": { "start": 9.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "charisma": 1, "business": 0.6, "writing": 0.3 },
           "payFactor": 0.89,
           "titles": ["Campaign Volunteer", "Canvasser", "Campaign Aide", "City Councillor", "Mayor", "State Representative", "Senator", "Governor", "Vice President", "President"]
@@ -844,6 +884,7 @@
         {
           "id": "politics.civilService",
           "label": "Civil Service",
+          "shift": { "start": 8.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "writing": 1, "intelligence": 0.6, "business": 0.3 },
           "payFactor": 0.84,
           "titles": ["Administrative Clerk", "Policy Assistant", "Policy Officer", "Policy Analyst", "Senior Policy Advisor", "Head of Unit", "Deputy Director", "Director-General", "Permanent Secretary", "Cabinet Secretary"]
@@ -858,6 +899,7 @@
         {
           "id": "politics.campaign",
           "label": "Campaign Strategy",
+          "shift": { "start": 9.25, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "skills": { "business": 1, "perception": 0.6, "charisma": 0.3 },
           "payFactor": 1.14,
           "car": { "A": "hatchback", "F": "saloon" },
@@ -878,6 +920,7 @@
         {
           "id": "transport.pilot",
           "label": "Airline Pilot",
+          "shift": { "start": 5.75, "hours": 9, "days": [0, 1, 2, 3, 4, 5] },
           "skills": { "dexterity": 1, "perception": 0.7, "technology": 0.3 },
           "payFactor": 1.71,
           "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
@@ -886,6 +929,7 @@
         {
           "id": "transport.cabinCrew",
           "label": "Cabin Crew",
+          "shift": { "start": 6.5, "hours": 9, "days": [0, 1, 2, 3, 4, 5] },
           "skills": { "charisma": 1, "endurance": 0.5 },
           "payFactor": 0.54,
           "titles": ["Cabin Crew Trainee", "Flight Attendant", "Senior Flight Attendant", "Lead Flight Attendant", "Purser", "Chief Purser", "Cabin Crew Instructor", "Cabin Service Manager", "Head of Cabin Crew", "Director of In-Flight Services"]
@@ -895,7 +939,7 @@
           "label": "Driving & Haulage",
           "skills": { "endurance": 1, "perception": 0.6 },
           "payFactor": 0.54,
-          "shift": { "start": 5, "hours": 10, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 4.75, "hours": 10, "days": [0, 1, 2, 3, 4] },
           "car": { "A": "van" },
           "titles": ["Delivery Rider", "Courier", "Van Driver", "Taxi Driver", "Truck Driver", "Long-Haul Trucker", "Fleet Supervisor", "Transport Manager", "Logistics Director", "Trucking Company Owner"]
         },
@@ -904,7 +948,7 @@
           "label": "Air Traffic Control",
           "skills": { "perception": 1, "intelligence": 0.6, "endurance": 0.3 },
           "payFactor": 1.21,
-          "shift": { "start": 7, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 6.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "titles": ["Control Tower Assistant", "Flight Data Assistant", "Air Traffic Control Trainee", "Tower Controller", "Approach Controller", "Radar Controller", "Senior Controller", "Watch Supervisor", "Air Traffic Manager", "National Air Traffic Director"]
         }
       ]
@@ -922,6 +966,7 @@
         {
           "id": "nature.farming",
           "label": "Farming",
+          "shift": { "start": 5.5, "hours": 9, "days": [0, 1, 2, 3, 4, 5] },
           "skills": { "strength": 1, "gardening": 0.5, "endurance": 0.4 },
           "payFactor": 0.62,
           "titles": ["Farmhand", "Harvest Worker", "Tractor Driver", "Herd Manager", "Farm Supervisor", "Farm Manager", "Farm Owner", "Estate Owner", "Agribusiness Director", "Agricultural Tycoon"]
@@ -949,7 +994,7 @@
           "label": "Veterinary Care",
           "skills": { "dexterity": 1, "intelligence": 0.7 },
           "payFactor": 1.6,
-          "shift": { "start": 8, "hours": 9, "days": [0, 1, 2, 3, 4] },
+          "shift": { "start": 8.25, "hours": 9, "days": [0, 1, 2, 3, 4] },
           "car": { "A": "estate", "F": "suv" },
           "titles": ["Kennel Assistant", "Animal Care Assistant", "Veterinary Nurse", "Veterinary Technician", "Veterinary Intern", "Veterinarian", "Veterinary Surgeon", "Practice Owner", "Zoo Chief Veterinarian", "Head of Veterinary Medicine"]
         }
@@ -977,13 +1022,14 @@
           "label": "Tour Guiding",
           "skills": { "charisma": 1, "endurance": 0.5, "perception": 0.3 },
           "payFactor": 0.78,
-          "shift": { "start": 9, "hours": 8, "days": [3, 4, 5, 6] },
+          "shift": { "start": 8.75, "hours": 8, "days": [3, 4, 5, 6] },
           "car": { "A": "hatchback", "E": "van" },
           "titles": ["Tour Assistant", "Walking Tour Guide", "Museum Guide", "Licensed Tour Guide", "Multilingual Guide", "Expedition Guide", "Tour Leader", "Tour Operations Manager", "Tour Company Director", "Travel Company Founder"]
         },
         {
           "id": "hospitality.events",
           "label": "Event Planning",
+          "shift": { "start": 12.25, "hours": 8, "days": [2, 3, 4, 5, 6] },
           "skills": { "creativity": 1, "business": 0.6, "charisma": 0.3 },
           "payFactor": 1.17,
           "car": { "A": "hatchback", "E": "estate" },
@@ -994,7 +1040,7 @@
           "label": "Cruise Ship Crew",
           "skills": { "endurance": 1, "charisma": 0.6, "handiness": 0.3 },
           "payFactor": 0.73,
-          "shift": { "start": 8, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
+          "shift": { "start": 7.75, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
           "titles": ["Deckhand", "Cabin Steward", "Activities Host", "Shore Excursion Guide", "Guest Services Officer", "Entertainment Manager", "Assistant Cruise Director", "Cruise Director", "Fleet Hotel Director", "Cruise Line Executive"]
         }
       ]
@@ -1012,6 +1058,7 @@
         {
           "id": "fashion.design",
           "label": "Fashion Design",
+          "shift": { "start": 9.75, "hours": 8, "days": [1, 2, 3, 4, 5] },
           "skills": { "creativity": 1, "dexterity": 0.6, "business": 0.3 },
           "payFactor": 1.3,
           "titles": ["Sewing Room Assistant", "Pattern Cutter", "Assistant Designer", "Fashion Designer", "Collection Designer", "Head Designer", "Design Director", "Creative Director", "Fashion House Founder", "Fashion Icon"]
@@ -1019,6 +1066,7 @@
         {
           "id": "fashion.modeling",
           "label": "Modeling",
+          "shift": { "start": 10.5, "hours": 8, "days": [1, 2, 3, 4, 5] },
           "skills": { "charisma": 1, "endurance": 0.5, "creativity": 0.3 },
           "payFactor": 0.83,
           "titles": ["Model Hopeful", "Catalogue Model", "Commercial Model", "Runway Model", "Editorial Model", "Campaign Model", "Cover Model", "Face of the Brand", "Supermodel", "Fashion Legend"]
@@ -1026,6 +1074,7 @@
         {
           "id": "fashion.hairMakeup",
           "label": "Hair & Makeup",
+          "shift": { "start": 9.5, "hours": 8, "days": [1, 2, 3, 4, 5] },
           "skills": { "dexterity": 1, "creativity": 0.7, "charisma": 0.3 },
           "payFactor": 0.62,
           "titles": ["Salon Assistant", "Shampoo Technician", "Trainee Stylist", "Hair Stylist", "Color Specialist", "Session Stylist", "Salon Manager", "Backstage Key Artist", "Celebrity Stylist", "Beauty Empire Founder"]
@@ -1052,6 +1101,7 @@
         {
           "id": "business.marketing",
           "label": "Marketing",
+          "shift": { "start": 9.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "creativity": 1, "business": 0.6, "writing": 0.3 },
           "payFactor": 0.77,
           "titles": ["Marketing Intern", "Marketing Assistant", "Marketing Coordinator", "Marketing Specialist", "Brand Manager", "Senior Brand Manager", "Marketing Manager", "Head of Marketing", "VP of Marketing", "Chief Marketing Officer"]
@@ -1059,6 +1109,7 @@
         {
           "id": "business.management",
           "label": "Management & Strategy",
+          "shift": { "start": 8.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
           "skills": { "business": 1, "intelligence": 0.6, "charisma": 0.4 },
           "payFactor": 0.98,
           "titles": ["Office Intern", "Management Trainee", "Business Analyst", "Project Manager", "Strategy Consultant", "Operations Manager", "General Manager", "Vice President", "Chief Operating Officer", "Chief Executive Officer"]
@@ -1068,7 +1119,7 @@
           "label": "Entrepreneurship",
           "skills": { "business": 1, "charisma": 0.6, "creativity": 0.3 },
           "payFactor": 1.53,
-          "shift": { "start": 8, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
+          "shift": { "start": 8.5, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
           "car": { "A": "hatchback", "E": "suv", "H": "executive" },
           "titles": ["Side Hustler", "Market Stall Trader", "Small Business Owner", "Startup Founder", "Funded Founder", "Scale-Up CEO", "Serial Entrepreneur", "Unicorn Founder", "Venture Capitalist", "Business Tycoon"]
         },

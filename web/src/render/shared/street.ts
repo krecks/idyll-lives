@@ -634,6 +634,8 @@ function mergeSilhouettes(into: SilhouettePlan, s: SilhouettePlan, dy = 0): void
 
 /** How far either side of a traffic light's pole along the kerb nothing else stands (m: `WorldStructure.lightPoles`). */
 export const POLE_CLEAR = 1.5;
+/** How far past either end of a taxi bay along the kerb nothing stands (m: `WorldStructure.taxiBays`, where a work taxi parks up on the pavement). */
+export const BAY_CLEAR = 0.5;
 
 /** A part of `TownStreet.layoutKey`, strung once per object. */
 const keys = new WeakMap<object, string>();
@@ -762,6 +764,8 @@ export class TownStreet {
    * town as it's laid out, whatever is streamed in or in view, so none comes or goes as the camera moves.
    */
   private ranks = new Map<string, [number, number]>();
+  /** The taxi bays (`WorldStructure.taxiBays`) by the road side they're on (`road:side`), for the list they were found from. */
+  private bays: { of: WorldStructure['taxiBays']; by: Map<string, [number, number, number][]> } | null = null;
   readonly footprints = new Map<string, [number, number]>();
   readonly standIns = new Map<string, StandIn>();
 
@@ -866,10 +870,27 @@ export class TownStreet {
   /** What the street before handed on (`inherit`): its street's own, and how many road sides' kerbs (for the perf log and the tests). */
   readonly handedOn = { statics: false, kerbs: 0 };
 
+  /** The taxi bays on road `r`'s side `side` (grouped once: a town has one by nearly every house). */
+  private baysOn(r: number, side: 1 | -1): [number, number, number][] {
+    const of = this.world.taxiBays;
+    if (!this.bays || this.bays.of !== of) {
+      const by = new Map<string, [number, number, number][]>();
+      for (const b of of ?? []) {
+        const near = this.index.nearest(b[0], b[1], 8);
+        if (!near) continue;
+        const key = `${near.road}:${near.side}`;
+        if (!by.has(key)) by.set(key, []);
+        by.get(key)!.push(b);
+      }
+      this.bays = { of, by };
+    }
+    return this.bays.by.get(`${r}:${side}`) ?? [];
+  }
+
   /** What every kerb and the street's own are planned from beyond their own row: the roads, their junctions, the lights' poles, the lanes cars pull over on, the world's size and whether it has cars. */
   private kerbsKeyOf(): string {
     const w = this.world;
-    return (this.kerbsKey ??= hashString(JSON.stringify([this.walkStops.roads, this.ways, this.junctions, w.lightPoles ?? null, w.pullOverStreets ?? null, !!w.cars, this.W, this.D, !!this.options.ground, this.options.has(PROP.fountain)])).toString(36));
+    return (this.kerbsKey ??= hashString(JSON.stringify([this.walkStops.roads, this.ways, this.junctions, w.lightPoles ?? null, w.taxiBays ?? null, w.pullOverStreets ?? null, !!w.cars, this.W, this.D, !!this.options.ground, this.options.has(PROP.fountain)])).toString(36));
   }
 
   /** What the street's own is planned from (`staticParts`): what the kerbs are, and the heights it stands at (`levelsKey`). */
@@ -988,6 +1009,10 @@ export class TownStreet {
       const at = kerb.along(x, z);
       if (blocked(at - POLE_CLEAR, at + POLE_CLEAR)) return null;
     }
+    for (const [x, z, half] of this.baysOn(r, side)) {
+      const at = kerb.along(x, z);
+      if (blocked(at - half - BAY_CLEAR, at + half + BAY_CLEAR)) return null;
+    }
     const [cx, cz] = kerb.at(cs, -RANK_BACK);
     const shelter = { x: cx - 1.6, z: cz - 1.6, w: 3.2, d: 3.2 };
     if (this.index.onRoad(cx, cz, 1, r) || !this.free(shelter, 0.2, NO_FOCUS)) return null;
@@ -1017,6 +1042,7 @@ export class TownStreet {
       mode === 'town' ? (world.cars ? keyOf(world.cars, () => JSON.stringify(world.cars)) : '-') : !!world.cars,
       world.pullOverStreets ? keyOf(world.pullOverStreets, () => JSON.stringify(world.pullOverStreets)) : '-',
       world.lightPoles ? keyOf(world.lightPoles, () => JSON.stringify(world.lightPoles)) : '-',
+      world.taxiBays ? keyOf(world.taxiBays, () => JSON.stringify(world.taxiBays)) : '-',
       world.junctions ? keyOf(world.junctions, () => JSON.stringify(world.junctions)) : '-',
       keyOf(world.plots, () => JSON.stringify(world.plots.map((p) => [p.id, p.x, p.z, p.w, p.d, p.public, p.entry]))),
     ].join('|');
@@ -1706,6 +1732,11 @@ export class TownStreet {
       if (near?.road !== r || near.side !== side) continue;
       const s = kerb.along(x, z);
       mouths.push([s - POLE_CLEAR, s + POLE_CLEAR]);
+    }
+    // The taxi bays on this side (sim-core `taxi::taxi_bays`): a work taxi parks up on the pavement there.
+    for (const [x, z, half] of this.baysOn(r, side)) {
+      const s = kerb.along(x, z);
+      mouths.push([s - half - BAY_CLEAR, s + half + BAY_CLEAR]);
     }
     const clear = (s: number, m: number) => s > 1 && s < kerb.length - 1 && kerb.open(s) && !mouths.some(([a, b]) => s > a - m && s < b + m);
     const used: number[] = [];

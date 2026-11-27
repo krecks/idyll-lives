@@ -1718,13 +1718,15 @@ fn a_side_roads_crosswalk_is_walked_on_the_main_roads_green_and_cars_turning_in_
 }
 
 #[test]
-fn someone_on_foot_crossing_a_country_roads_arm_at_a_lit_t_is_not_held_for_the_walk() {
-    use sim_core::snapshot::{self, LIGHT_BASE, LIGHT_STRIDE, light};
+fn someone_on_foot_crossing_a_country_roads_arm_at_a_lit_t_crosses_out_past_the_stop_line() {
     // A big world's street along x (z = 200), its ways out east and west, and a country road
     // meeting it from the north at (200, 200): a lit T. The street's arms have crosswalks, the
     // country road's none (no sidewalks to cross between, as the renderer draws it: no zebra, no
-    // pedestrians' head). Someone crossing the country road just by the junction crosses as they
-    // would anywhere else, not held for a walk phase, which nobody asks for.
+    // pedestrians' head). Someone crossing the country road just by the junction keeps off its
+    // carriageway from the box out to `KEEP_OFF_OPEN` past its stop line, where the cars wait for
+    // the lights: they cross out past them, or at the street's crosswalks. (Crossing anywhere
+    // past the box, they crossed in among the cars queued there and waited for them for hours,
+    // Skerry Island.)
     let road = |a: [f32; 2], b: [f32; 2], kind: &str, ends: &str| {
         format!(
             r#"{{"points":[{}],"width":7,"kind":"{kind}","ends":{ends},"area":0}}"#,
@@ -1785,28 +1787,28 @@ fn someone_on_foot_crossing_a_country_roads_arm_at_a_lit_t_is_not_held_for_the_w
     assert!(!sig.crossing(from) && !sig.crossing([sig.at[0], z]) && !sig.crossing(to));
     w.sims[0].pos = from;
     walk_to(&mut w, 0, to);
-    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let keep = country.stop + sim_core::traffic::KEEP_OFF_OPEN;
     let start = w.tick;
     let mut across = None;
-    while w.tick < start + common::secs(60.0) {
+    while w.tick < start + common::secs(120.0) {
         w.tick_once();
-        snapshot::write(&w, &mut buf);
-        for k in 0..sig.arms.len() {
-            assert_ne!(
-                buf[LIGHT_BASE + k * LIGHT_STRIDE + light::STATE],
-                light::WALK,
-                "a walk phase nobody waits for"
-            );
-        }
         let p = w.sims[0].pos;
+        // (How far out along the country road's arm, and how far from its middle.)
+        let d = [p[0] - sig.at[0], p[1] - sig.at[1]];
+        let along = d[0] * country.way[0] + d[1] * country.way[1];
+        let off = (d[0] * country.way[1] - d[1] * country.way[0]).abs();
+        assert!(
+            !(off < country.kerb - 0.3 && along > country.walk_from && along < keep - 0.5),
+            "on the country road's carriageway {along:.1} m out, inside {keep:.1} m"
+        );
         if (p[0] - to[0]).hypot(p[1] - to[1]) < 0.3 {
             across = Some(w.tick - start);
             break;
         }
     }
-    // (8.4 m at a walk: some 6 s, not the cars' turn, amber and all red first.)
+    // (Out past the stop line and back, or round by the crosswalks: a minute or so.)
     let across = across.expect("never across");
-    assert!(across < common::secs(9.0), "across after {across} ticks");
+    assert!(across < common::secs(90.0), "across after {across} ticks");
 }
 
 /// A big world's street along z (x = 200, a dead end south at z = 100, the way out north), a
