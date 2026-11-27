@@ -1,4 +1,4 @@
-//! The things played once: a fridge door, a pedal bin, the vending machines, a phone box, the microwave's ping, toast popping up, coffee poured.
+//! The things played once: a fridge door, a chest freezer's lid, a pedal bin, the vending machines, a phone box, the microwave's ping, a doorbell, toast popping up, coffee poured.
 
 use super::*;
 
@@ -47,6 +47,58 @@ pub(super) fn fridge_door(rate: f64) -> Stereo {
         let hz = 2000.0 + 600.0 * r.next();
         glass(&mut out, at, 0.12, 0.15, hz);
     }
+    done_once(
+        rate,
+        vec![out.into()],
+        0.0,
+        0.8,
+        &[3.1, 5.3, 7.1, 9.7],
+        0.2,
+        0.0,
+        0.0,
+    )
+}
+
+/// A chest freezer opened and shut: the handle, the lid's long seal peeling off its rim with a soft suck,
+/// the lid swung up on its springs, frozen bags crinkling as something's taken, then the lid let down: its
+/// air pushed out and the heavy, padded close onto the seal (no bottles to rattle).
+pub(super) fn lid_thud(rate: f64) -> Stereo {
+    let mut r = Rng::new(67.0);
+    let mut out = once(rate, 2.8);
+    strike(
+        &mut out,
+        0.02,
+        0.12,
+        0.0,
+        &[[1400.0, 0.006, 1.0]],
+        burst(2200.0, 1.0, 0.002, 0.6),
+    );
+    // The seal peeling from one end of the lid to the other.
+    rustle(&mut out, &mut r, 0.07, 0.18, 0.35, -0.1, 520.0, 1.2);
+    strike(
+        &mut out,
+        0.12,
+        0.45,
+        0.0,
+        &[[80.0, 0.03, 0.8]],
+        burst(320.0, 0.8, 0.025, 1.0),
+    );
+    swish(&mut out, &mut r, 0.2, 0.4, 0.18, 380.0);
+    for at in [0.75, 0.95, 1.2] {
+        let at = at + 0.05 * r.next();
+        rustle(&mut out, &mut r, at, 0.12, 0.08, 0.1, 3200.0, 0.8);
+    }
+    swish(&mut out, &mut r, 1.5, 0.35, 0.3, 300.0);
+    strike(
+        &mut out,
+        1.82,
+        1.0,
+        0.0,
+        &[[55.0, 0.09, 1.0], [118.0, 0.045, 0.5], [260.0, 0.02, 0.2]],
+        burst(240.0, 0.7, 0.025, 1.3),
+    );
+    // The air puffed out past the seal as it squashes.
+    rustle(&mut out, &mut r, 1.83, 0.12, 0.12, 0.0, 900.0, 0.7);
     done_once(
         rate,
         vec![out.into()],
@@ -488,6 +540,45 @@ pub(super) fn ping(rate: f64) -> Stereo {
         &[[420.0, 0.04, 1.0]],
         burst(600.0, 4.0, 0.08, 0.4),
     );
+    done_once(
+        rate,
+        vec![out.into()],
+        0.0,
+        0.75,
+        &[3.1, 5.3, 7.1, 9.7],
+        0.15,
+        0.0,
+        0.0,
+    )
+}
+
+/// A doorbell's two-tone chime: the button pressed throws the plunger against the higher bar (ding, E5),
+/// let go its spring throws it back against the lower (dong, C5, a major third down), each bar ringing on
+/// with a free bar's overtones (2.76 and 5.40 times up) over the plunger's tap in its housing.
+pub(super) fn doorbell(rate: f64) -> Stereo {
+    let mut out = once(rate, 3.2);
+    for (at, hz, pan) in [(0.02, 659.3, -0.1), (0.62, 523.3, 0.1)] {
+        strike(
+            &mut out,
+            at,
+            0.7,
+            pan,
+            &[
+                [hz, 0.9, 1.0],
+                [hz * 2.756, 0.3, 0.3],
+                [hz * 5.404, 0.12, 0.12],
+            ],
+            burst(1800.0, 0.8, 0.003, 0.5),
+        );
+        strike(
+            &mut out,
+            at - 0.004,
+            0.15,
+            0.0,
+            &[[240.0, 0.02, 1.0]],
+            burst(900.0, 0.8, 0.004, 0.8),
+        );
+    }
     done_once(
         rate,
         vec![out.into()],

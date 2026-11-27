@@ -19,10 +19,10 @@
  *   `runs.sound`: the washer loaded, nobody at it), while their lot is looked at, some only while a use
  *   under them sounds (`ambientWhile`: a cooker hood over a hob in use);
  * - sounds as something happens: a fridge door as its use starts (a `sound` played once), a toilet's
- *   flush or a kettle switching off as its use ends (content `endSound`), a visitor's knock at the front door; and what no use says
+ *   flush or a kettle switching off as its use ends (content `endSound`), a visitor's knock at the front door (a doorbell's own `sounds.knock` rings instead); and what no use says
  *   (`events.ts` has the rules): a door or a gate opening and falling shut as a resident goes through
  *   (`Renderer.doorSounds`, a few at a time, none from far out, at a fast speed or on a storey not shown), curtains
- *   drawn or opened on the lot in view (`curtains`, the nearest two a change), the morning's post dropping into a letterbox (its `open` going true),
+ *   drawn or opened on the lot in view (`curtains`, the nearest two a change; by the object's `sounds.shut`: blinds' slats, an awning silent), the morning's post dropping into a letterbox (its `open` going true),
  *   a car's door shut and a parked car setting off (`outside.ts`);
  * - the footsteps of the residents in view (`footsteps.ts`).
  *
@@ -96,11 +96,10 @@ const SILENT = 'none';
  * snapshot's (-1: none).
  */
 export function soundOf(content: Content, tag: string, def: number, interaction: number, recipe = 0, plate = ''): SoundKind | undefined {
+  const own = ownSound(content, tag, def, interaction, recipe);
+  if (own !== undefined) return soundKind(own);
   const object = def >= 0 ? content.objectList[def] : undefined;
   const use = interaction >= 0 ? object?.interactions[interaction] : undefined;
-  const step = recipe > 0 ? content.recipes[recipe - 1]?.steps.find((s) => s.anim === tag && s.sound !== undefined) : undefined;
-  const own = (use?.recipe ? undefined : useSounds(use, tag).sound) ?? step?.sound ?? object?.sounds?.[tag];
-  if (own !== undefined) return soundKind(own);
   if (tag === 'wash') {
     // Clearing away after a meal washes up at the sink without an interaction of its own; at a
     // dishwasher (no washing interaction) it's loaded without a sound.
@@ -113,10 +112,33 @@ export function soundOf(content: Content, tag: string, def: number, interaction:
   return ACTION_SOUNDS[tag];
 }
 
+/** The content's own sound key for an action (`soundOf`'s first choices, `none` included), if it names one. */
+function ownSound(content: Content, tag: string, def: number, interaction: number, recipe = 0): string | undefined {
+  const object = def >= 0 ? content.objectList[def] : undefined;
+  const use = interaction >= 0 ? object?.interactions[interaction] : undefined;
+  const step = recipe > 0 ? content.recipes[recipe - 1]?.steps.find((s) => s.anim === tag && s.sound !== undefined) : undefined;
+  return (use?.recipe ? undefined : useSounds(use, tag).sound) ?? step?.sound ?? object?.sounds?.[tag];
+}
+
+/** A knock at the door (the visitor's, `knock`, played again while they wait) unless the content names a sound of its own for it: a doorbell rings. */
+export function knocks(content: Content, tag: string, def: number, interaction: number): boolean {
+  return tag === 'knock' && ownSound(content, tag, def, interaction) === undefined;
+}
+
+/** What curtains drawn or opened sound like (the object's `sounds.shut`, else `curtain`: blinds' slats; `none`, an awning, is silent). */
+export function shutSoundOf(content: Content, def: number): OnceKind | undefined {
+  return onceKind((def >= 0 ? content.objectList[def]?.sounds?.shut : undefined) ?? 'curtain');
+}
+
 /** The sound played once as the use ends, done as animation `tag` (content `endSound`: a toilet's flush; a self-serve's own: `useSounds`), if any. */
 export function endSoundOf(content: Content, tag: string, def: number, interaction: number): OnceKind | undefined {
   const key = def >= 0 && interaction >= 0 ? useSounds(content.objectList[def]?.interactions?.[interaction], tag).endSound : undefined;
-  return key === undefined ? undefined : isOnce(key) ? key : unknownSound(key);
+  return key === undefined ? undefined : onceKind(key);
+}
+
+/** A content sound key played once (`none`: silence); unknown keys are silent (and said once). */
+function onceKind(key: string): OnceKind | undefined {
+  return key === SILENT ? undefined : isOnce(key) ? key : unknownSound(key);
 }
 
 /** A content sound key as a world sound (`none`: silence); unknown keys are silent (and said once). */
@@ -426,7 +448,7 @@ export class WorldSound {
       }
       if (!tag || !drawn) continue;
       const pan = this.panAt();
-      if (tag === 'knock') {
+      if (knocks(this.content, tag, def, interaction)) {
         seen.add(id);
         const next = this.knocking.get(id) ?? 0;
         const knock = !quiet && !paused && now >= next ? mono(ac, 'knock') : null;
@@ -539,28 +561,29 @@ export class WorldSound {
     if (!happened.length) return;
     const width = window.innerWidth || 1;
     const height = window.innerHeight || 1;
-    const near: { kind: Happened['kind']; x: number; row: number; pan: number; off: number }[] = [];
+    const near: { kind: Happened['kind']; sound: OnceKind; x: number; row: number; pan: number; off: number }[] = [];
     for (const h of happened) {
       const tiles = this.tilesOf.get(h.id);
-      if (!tiles) continue;
+      const sound = h.kind === 'curtain' ? shutSoundOf(this.content, this.defOf.get(h.id) ?? -1) : h.kind;
+      if (!tiles || !sound) continue;
       const x = tiles.x + tiles.w / 2;
       const row = tiles.z + tiles.d / 2;
       if (h.kind === 'curtain' && !this.inView(x, row)) continue;
       const pan = this.inPicture(x, row, 1.6);
       if (pan === null) continue;
-      near.push({ kind: h.kind, x, row, pan, off: Math.hypot(this.screen.x / width - 0.5, this.screen.y / height - 0.5) });
+      near.push({ kind: h.kind, sound, x, row, pan, off: Math.hypot(this.screen.x / width - 0.5, this.screen.y / height - 0.5) });
     }
     near.sort((a, b) => a.off - b.off);
     let curtains = 0;
     let post = 0;
     for (const n of near) {
       if (n.kind === 'curtain' ? curtains >= EVENTS.curtain.most : post >= 1) continue;
-      const made = this.made.sound(n.kind, ac.sampleRate);
+      const made = this.made.sound(n.sound, ac.sampleRate);
       if (!made) continue;
       if (n.kind === 'curtain') curtains++;
       else post++;
-      playOnce(ac, around, made, ONCE_LEVEL[n.kind], placeAt(n.pan, n.x, n.row));
-      heard(n.kind);
+      playOnce(ac, around, made, ONCE_LEVEL[n.sound], placeAt(n.pan, n.x, n.row));
+      heard(n.sound);
     }
   }
 
