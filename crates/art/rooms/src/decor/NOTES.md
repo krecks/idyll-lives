@@ -197,11 +197,20 @@ their 7 cm depth. The camera's bracket puts its body 0.35 m out from the wall, u
   read as two boxes, not as an alarm; the blinking light says alarm. The description is now "A keypad by the door:
   the little light blinks all night."
 
-The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains). One part can't turn each slat about its
-own length, and a part a slat would cost a draw call each (9 in all), so the clip swaps two parts: the open slats
-(`slats`) thin to nothing front to back, while the shut ones (`vanes`: the same eight slats turned 70° and 9.5 cm
-wide, so each overlaps the next), flat inside the head rail at rest, grow down out of it over them. It reads as the
-slats tilting shut as they come down. 3 draw calls: the rails and cords, and the two moving parts.
+The blinds shut at night (`close`, 1.2 s, `motions.night` as the curtains): sixteen 50 mm slats 45 mm apart tilt
+about their own lengths from flat to 80°, where each overlaps the next by 4 mm and they make one even surface. A
+part a slat would be 17 draw calls; instead they move as one (looked at again 2026-11-27: the clip swapped two parts,
+the open slats thinning away while tilted ones grew down out of the head rail, which looked doubled mid-clip and
+sawtoothed shut). A node's turn after its stretch along its own axes can be any linear map, and the shear that tilts
+every slat about its own middle is one: turned to 45° + θ/2 and stretched √(1 + sin θ) along its depth and
+√(1 − sin θ) along its height, a part built turned back 45° tilts each slat by θ, the slats' middles staying where
+they are (their edges stay upright, so a slat at θ is 6·cos θ mm thick: unseen). The top slat (`slats`) carries that
+turn and stretch, keyed a frame at a time; the fifteen below (`slats_below`) ride on it (`motion::attach`), their
+mesh unturned and their node turned back 45°: the gate measures a part by its mesh's box, and the column built turned
+measured 0.73 m deep. 2 draw calls, where it was 3 (the rails and cords; the slats, one moving part with all below
+it, as the renderer and the gate both count it); 432 triangles as before. Not seen in the game yet: its moving parts
+are instanced, and PlayCanvas's instanced normal matrix is the plain matrix, not its inverse transpose, so in the
+game the slats keep their open faces' light as they tilt (the shape is right; the previews light them as they face).
 
 `shutters` is the other window covering: two louvred panels, each a frame of two stiles and two rails round a core
 with six louvres tilted 20°, the same both sides (all centred on the hinge line, 3.5 cm off the wall's face), so

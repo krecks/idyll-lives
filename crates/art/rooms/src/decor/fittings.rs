@@ -2,16 +2,19 @@
 
 use super::common::{M, WALL};
 use artkit::kit;
-use artkit::math::{Axis, P3};
-use artkit::motion::{Ease, FLAT, Path, flat, keys};
+use artkit::math::{Axis, P3, radians, sin, sqrt};
+use artkit::motion::{Ease, Path, attach, keys};
 use artkit::parts::{hinged, join, join_all, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsphere, grow, settle, squash, swing};
+use artkit::{fbox, fcyl, fsphere, settle, swing};
 
 // --- D4: the venetian blinds: a head rail on the wall, slats, a bottom rail and their cords -------------
-// At night (`close`) the slats shut: one part can't turn each slat about its own length, so the open slats thin to
-// nothing front to back while the shut ones, tilted and overlapping, come down out of the head rail over them.
+// At night (`close`) the slats tilt shut, each about its own length, though all sixteen move as one.
+// A node's turn after its stretch along its own axes can be any linear map, so the part's mesh is built turned back
+// 45° and its node turns to 45° + θ/2 while it stretches √(1 + sin θ) along its depth and √(1 − sin θ) along its
+// height: together a shear taking each slat's width to the tilt θ about its own middle, the slats' middles staying
+// where they are (their edges stay upright, so a slat is 6·cos θ mm thick at θ; nothing a player can see).
 pub fn blinds() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let z = WALL + 0.035;
@@ -49,41 +52,50 @@ pub fn blinds() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some(P3::ZERO));
-    let open = new_parts(|| {
-        for i in 0..8 {
-            fbox!(
-                f,
-                format!("slat{i}"),
-                0.86,
-                0.008,
-                0.055,
-                (0, 1.870 - 0.085 * i as f64, z),
-                M.blind_slat
-            );
+    // 50 mm slats 45 mm apart: shut at 80° each overlaps the next by 4 mm
+    let (top, step) = (1.866, 0.045);
+    let pivot = f.at(0, top, z);
+    let slat = |i: usize| {
+        fbox!(
+            f,
+            format!("slat{i}"),
+            0.86,
+            0.006,
+            0.050,
+            (0, top - step * i as f64, z),
+            M.blind_slat
+        )
+    };
+    // the top slat carries the turn and stretch; the other fifteen ride on it, unturned in their own node turned
+    // back 45° (the gate measures a part by its mesh's box: built turned, the column of slats would measure 0.73 m deep)
+    let first = new_parts(|| {
+        slat(0);
+    });
+    let first = turn(hinged(join(&first, "slats", None), pivot), -45.0, Axis::X);
+    first.set_rotation((45, 0, 0));
+    let below = new_parts(|| {
+        for i in 1..16 {
+            slat(i);
         }
     });
-    let open = hinged(join(&open, "slats", None), f.at(0, 1.870, z));
-    // shut: each slat turned 70° about its length, wide enough to overlap the next
-    let shut = new_parts(|| {
-        for i in 0..8 {
-            fbox!(
-                f,
-                format!("vane{i}"),
-                0.86,
-                0.004,
-                0.095,
-                (0, 1.870 - 0.085 * i as f64, z),
-                M.blind_slat,
-                rot = (70, 0, 0)
-            );
-        }
-    });
-    // (from inside the head rail, where it hides flat at rest)
-    let shut = hinged(join(&shut, "vanes", None), f.at(0, 1.925, z));
+    let below = hinged(join(&below, "slats_below", None), pivot);
     settle!();
-    flat(shut, Axis::Z);
-    squash!(open, "close", (1, FLAT, 1), seconds = 1.2);
-    grow!(shut, "close", seconds = 1.2, axis = Axis::Z);
+    attach(below, first);
+    // a key a frame (the file samples every frame anyway), eased in and out as `swing` is
+    let (shut, frames) = (radians(80.0), 36);
+    let mut turned = Vec::new();
+    let mut deep = Vec::new();
+    let mut high = Vec::new();
+    for k in 0..=frames {
+        let (t, u) = (k as f64 / 30.0, k as f64 / frames as f64);
+        let th = shut * u * u * (3.0 - 2.0 * u);
+        turned.push((t, radians(45.0) + th / 2.0, Ease::Linear));
+        deep.push((t, sqrt(1.0 + sin(th)), Ease::Linear));
+        high.push((t, sqrt(1.0 - sin(th)), Ease::Linear));
+    }
+    keys(first, "close", Path::Rotation, 0, &turned);
+    keys(first, "close", Path::Scale, 1, &deep);
+    keys(first, "close", Path::Scale, 2, &high);
     meshes()
 }
 
