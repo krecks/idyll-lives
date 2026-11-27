@@ -752,7 +752,7 @@ export class Mirrors {
 
   /**
    * Whether this frame can find anything to draw again: a reflection is due, and it was marked to
-   * draw again, or the camera moved since it was drawn, or a resident in its view did.
+   * draw again, or the camera moved since it was drawn, or a resident in its view (as it is now) did.
    */
   private due(now: number, viewProj: Float32Array, residents: MirrorResidents | null): boolean {
     let held = false;
@@ -761,9 +761,13 @@ export class Mirrors {
       if (!r) continue;
       held = true;
       if (now < r.due - EARLY) continue;
+      const shown = r.next?.slot === i;
+      // Who its view shows, again while anyone moves (`pick` finds it only in a frame that draws): else one walking
+      // into a view nobody was in would stay out of it.
+      if (shown && residents?.posed) this.seesResidents(r, residents);
       // Marked to draw again counts only while a glass still shows it: one no glass was given
       // isn't drawn, so its mark would otherwise hold every frame to a full pick until let go.
-      if ((r.dirty && r.next?.slot === i) || this.seenMoving(r, viewProj, residents)) return true;
+      if ((r.dirty && shown) || this.seenMoving(r, viewProj, residents)) return true;
     }
     // No reflection held (none made yet, or all let go): the glasses have to be picked again.
     return !held;
