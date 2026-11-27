@@ -23,6 +23,8 @@ const FRONT_R: f64 = 0.39;
 const FRONT_W: f64 = 0.26;
 const FRONT_X: f64 = 0.5;
 const FRONT_Z: f64 = 1.3;
+const EXHAUST_X: f64 = 0.24; // the exhaust stack and its muffler, on the right of the hood; the pre-cleaner mirrors it
+const ENGINE_Z: f64 = 1.22; // the exhaust and pre-cleaner, along the hood
 
 /// A tyre with a yellow rim and dark hub, its axle along x, on the ground at (x, z); `lugs` chevron tread lugs, each
 /// a bar slanting from a shoulder in to the middle, the sides taking turns.
@@ -151,7 +153,7 @@ fn wheel(name: &str, x: f64, z: f64, r: f64, w: f64, lugs: usize, segments: usiz
     }
 }
 
-/// The hood: a rounded box, lofted, its nose rounding in to the grille.
+/// The hood: a rounded box, lofted, its nose rounding in to the grille; then the grille.
 fn hood(detail: bool) {
     let n = if detail { 20 } else { 10 };
     let mut secs = Vec::new();
@@ -169,10 +171,11 @@ fn hood(detail: bool) {
         );
     }
     eased(loft!("hood", &secs, material = M.tractor, angle = 50));
+    fbox!(F, "grille", 0.6, 0.38, 0.04, (0, 0.95, 1.61), M.iron);
 }
 
-/// The tractor (`detail`), or its far version.
-pub fn tractor_detail(detail: bool) -> Vec<Obj> {
+/// Both sides: the rear and front wheels, the fender over each rear wheel, and the step.
+fn wheels_and_fenders(detail: bool) {
     let green = M.tractor;
     for s in [-1, 1] {
         let sf = s as f64;
@@ -236,7 +239,11 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
             bevel_segments = 1
         );
     }
-    // chassis, axles, transmission housing under the cab, platform
+}
+
+/// The chassis, axles, the transmission housing under the cab and the platform.
+fn chassis() {
+    let green = M.tractor;
     fbox!(
         F,
         "chassis",
@@ -269,10 +276,11 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         bevel_segments = 3
     );
     fbox!(F, "platform", 1.0, 0.05, 0.55, (0, 1.12, -0.35), M.iron);
-    // the hood, its grille and lamps
-    hood(detail);
-    fbox!(F, "grille", 0.6, 0.38, 0.04, (0, 0.95, 1.61), M.iron);
-    // the canopy on its two bent frames, the seat
+}
+
+/// The canopy on its two bent frames, and the seat back.
+fn canopy_frame(detail: bool) {
+    let green = M.tractor;
     for sx in [-1, 1] {
         let x = sx as f64 * 0.6;
         kit_tube!(
@@ -304,21 +312,26 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         M.seat,
         bevel = if detail { 0.03 } else { 0.0 }
     );
-    if !detail {
-        // from afar: the lamps, exhaust and canopy, the front weights one block (as far out as they are, so it
-        // stands where the tractor does); no grille bars, vents or levers
-        cylinder!(
-            "exhaust",
-            0.045,
-            0.75,
-            at = F.at(0.24, 1.55, 1.22),
-            material = M.iron,
-            verts = 6
-        );
-        fbox!(F, "canopy", 1.32, 0.08, 1.38, (0, 2.42, -0.52), green);
-        fbox!(F, "weights", 0.64, 0.22, 0.13, (0, 0.6, 1.69), M.iron);
-        return settle(&[join_all("tractor_far")]);
-    }
+}
+
+/// From afar: the exhaust, the canopy and the front weights as single blocks.
+fn far_top() {
+    let green = M.tractor;
+    cylinder!(
+        "exhaust",
+        0.045,
+        0.75,
+        at = F.at(EXHAUST_X, 1.55, ENGINE_Z),
+        material = M.iron,
+        verts = 6
+    );
+    fbox!(F, "canopy", 1.32, 0.08, 1.38, (0, 2.42, -0.52), green);
+    fbox!(F, "weights", 0.64, 0.22, 0.13, (0, 0.6, 1.69), M.iron);
+}
+
+/// The canopy, rounded, and the grille's frame with its slots.
+fn detail_canopy_grille() {
+    let green = M.tractor;
     soft!(
         F,
         "canopy",
@@ -350,6 +363,11 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         bevel = 0.004,
         bevel_segments = 1
     );
+}
+
+/// Both sides: the lamp with its bezel, and the hood's vents.
+fn lamps_and_vents() {
+    let green = M.tractor;
     for s in [-1, 1] {
         let sf = s as f64;
         cylinder!(
@@ -383,7 +401,10 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
             );
         }
     }
-    // a fuel cap on the hood, and the front weights: five suitcase weights on their bracket, each with its handle
+}
+
+/// A fuel cap on the hood, and the front weights: five suitcase weights on their bracket, each with its handle.
+fn front_weights() {
     fcyl!(
         F,
         "fuel_cap",
@@ -433,12 +454,15 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
             verts = 4
         );
     }
-    // the exhaust stack with its muffler and rain flap, and the air pre-cleaner
+}
+
+/// The exhaust stack with its muffler and rain flap, and the air pre-cleaner.
+fn exhaust_and_cleaner() {
     cylinder!(
         "exhaust",
         0.045,
         0.75,
-        at = F.at(0.24, 1.55, 1.22),
+        at = F.at(EXHAUST_X, 1.55, ENGINE_Z),
         material = M.iron,
         verts = 10
     );
@@ -446,7 +470,7 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         "muffler",
         0.065,
         0.3,
-        at = F.at(0.24, 1.45, 1.22),
+        at = F.at(EXHAUST_X, 1.45, ENGINE_Z),
         material = M.iron,
         verts = 10
     );
@@ -461,7 +485,7 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         "precleaner",
         0.055,
         0.3,
-        at = F.at(-0.24, 1.33, 1.22),
+        at = F.at(-EXHAUST_X, 1.33, ENGINE_Z),
         material = M.iron,
         verts = 10
     );
@@ -469,13 +493,17 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         "precleaner_bowl",
         0.075,
         0.08,
-        at = F.at(-0.24, 1.5, 1.22),
+        at = F.at(-EXHAUST_X, 1.5, ENGINE_Z),
         material = M.lamp,
         verts = 12,
         bevel = 0.004,
         bevel_segments = 1
     );
-    // the dashboard with its gauges, the steering wheel on three spokes, the seat
+}
+
+/// The dashboard with its gauges, the steering wheel on three spokes, the seat.
+fn cab_controls() {
+    let green = M.tractor;
     fbox!(
         F,
         "dash",
@@ -577,7 +605,10 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         round_segments = 1,
         flat = 2
     );
-    // tail lamps on the rear frame, the drawbar and the three-point hitch with its top link, and the PTO stub
+}
+
+/// Tail lamps on the rear frame, the drawbar and the three-point hitch with its top link, and the PTO stub.
+fn rear_hitch() {
     for s in [-1, 1] {
         fbox!(
             F,
@@ -628,6 +659,24 @@ pub fn tractor_detail(detail: bool) -> Vec<Obj> {
         material = M.iron,
         verts = 8
     );
+}
+
+/// The tractor (`detail`), or its far version.
+pub fn tractor_detail(detail: bool) -> Vec<Obj> {
+    wheels_and_fenders(detail);
+    chassis();
+    hood(detail);
+    canopy_frame(detail);
+    if !detail {
+        far_top();
+        return settle(&[join_all("tractor_far")]);
+    }
+    detail_canopy_grille();
+    lamps_and_vents();
+    front_weights();
+    exhaust_and_cleaner();
+    cab_controls();
+    rear_hitch();
     settle(&[join_all("tractor")])
 }
 
