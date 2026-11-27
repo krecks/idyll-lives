@@ -1,11 +1,14 @@
 //! The home gym: the treadmill (`model.treadmill`), the weight bench (`model.weightBench`), the exercise bike
-//! (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`); and wellness at
+//! (`model.exerciseBike`), the yoga mat (`model.yogaMat`), the dumbbell rack (`model.dumbbells`) and the rowing machine
+//! (`model.rowingMachine`); and wellness at
 //! home: the massage table (`model.massageTable`), the meditation cushion (`model.meditationCushion`) and the sauna
 //! cabin for three (`model.sauna`). Notes: NOTES.md.
 //!
 //! Each is built where the game places it (`F`, game axes). The treadmill's belt slats run back under the runner
 //! while it is used (`belt_run`, a loop: one slat on, home unseen under the hood and the rear cap). The bike's
-//! cranks and pedals turn while it is cycled (`pedals_turn`, a loop). The yoga mat lies rolled up and unrolls flat
+//! cranks and pedals turn while it is cycled (`pedals_turn`, a loop). The rowing machine's seat slides and its handle
+//! is pulled out on its cable and let back while it is rowed (`stroke`, a loop; the rider moves with the seat, its
+//! clip's first part, `ride`). The yoga mat lies rolled up and unrolls flat
 //! for yoga (`unroll`), rolling up again at the end. The lift draws the weight in the hands (content `held`), so
 //! the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them. The sauna's glass door
 //! (`door_open`) lets the bathers in, shuts behind them and opens to let them out. The three wellness models have
@@ -100,13 +103,15 @@ pub fn family() -> Family {
                 .motions(json!({"uses": {"sauna": {"clip": "door_open", "hold": 1.5, "out": 1.5}}}))
                 .palette(sauna::palette())
                 .paint(&[("body", "Wood"), ("trim", "Trim")]),
-            Model::new("rowingMachine", row::rowing_machine, (0.56, 0.542, 1.70))
+            Model::new("rowingMachine", row::rowing_machine, (0.56, 0.522, 1.70))
                 .key("model.rowingMachine")
+                .motions(json!({"loops": {"row": "stroke"}, "ride": "stroke"}))
                 .paint(&[("body", "Frame"), ("pads", "Seat"), ("steel", "Rail")]),
         ],
         "The home gym and wellness at home (crates/art/things/src/fitness, built by cargo art). Listed in the base \
          manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish \
-         group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; \
+         group. The treadmill runs its belt (`belt_run`), the bike turns its pedals (`pedals_turn`) and the rowing machine strokes \
+         (`stroke`) while used; \
          the yoga mat unrolls (`unroll`) for yoga; the sauna's glass door opens (`door_open`) to let the bathers in \
          and out.",
     )

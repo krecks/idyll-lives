@@ -1,5 +1,5 @@
 {
-  "$comment": "The home gym and wellness at home (crates/art/things/src/fitness, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; the yoga mat unrolls (`unroll`) for yoga; the sauna's glass door opens (`door_open`) to let the bathers in and out.",
+  "$comment": "The home gym and wellness at home (crates/art/things/src/fitness, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The treadmill runs its belt (`belt_run`), the bike turns its pedals (`pedals_turn`) and the rowing machine strokes (`stroke`) while used; the yoga mat unrolls (`unroll`) for yoga; the sauna's glass door opens (`door_open`) to let the bathers in and out.",
   "version": 1,
   "entries": {
     "model.treadmill": {
@@ -341,6 +341,12 @@
         "steel": {
           "finish": "material.finish.metal"
         }
+      },
+      "motions": {
+        "loops": {
+          "row": "stroke"
+        },
+        "ride": "stroke"
       },
       "paint": [
         {

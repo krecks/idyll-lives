@@ -169,8 +169,10 @@ French-door fridge's fourth draw call is a moving part each (a glass door and a 
 `liner` for the inside, so each is 4 draw calls. Both are shells rather than solid boxes: the walls, the floor and a
 liner block inside, so that an opened lid or door shows an interior instead of a blank face. The chest freezer is a
 low box whose lid is hinged along its back edge and lifted with `swing` about the model's X axis, 85° up and no
-further (a lid that leans back past vertical would stand in the wall); its footprint is 2 × 1 (it is wider than it
+further (a lid that leans back past vertical would stand in the wall); the hinge line and its two chrome knuckles are
+1 cm in from the lid's back at its mid-thickness, so the lifted lid's back reaches no more than a centimetre past the
+wall's face (the gate's `opened`; with the knuckles on the lid's top it reached 3.5 cm into the wall); its footprint is 2 × 1 (it is wider than it
 is deep). The upright one is a tall cabinet whose door is hinged on its left and swung 100° about Z, with three
-baskets on the liner behind it. Each declares one motion in `mod.rs` — `lid_open` and `door_open` — played by the
-`frozenTreat` interaction; the resident's own animation is still the shared `fetch`, so no new clip is added to
-`base.json`.
+baskets on the liner behind it. Each declares one motion in `mod.rs` — `lid_open` (1.2 s) and `door_open` (1.2 s,
+`BackOut`) — keyed to the `fetch` animation (`frozenTreat` and any other fetch from it) and held open 3.5 s, as the
+fridges' are; the resident's own animation is the shared `fetch`, so no new clip is added to `base.json`.

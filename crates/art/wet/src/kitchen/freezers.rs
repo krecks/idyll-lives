@@ -88,20 +88,21 @@ pub fn chest_freezer() -> Vec<Obj> {
             M.chrome,
             bevel = 0.010
         );
+        // the hinges' knuckles, round the hinge line 1 cm in from the lid's back: it stays off the wall as it lifts
         for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
             fbox!(
                 f,
                 format!("hinge{i}"),
                 0.08,
                 0.030,
-                0.040,
-                (sx * 0.60, 0.875, z - 0.410),
+                0.030,
+                (sx * 0.60, 0.845, z - 0.41),
                 M.chrome,
                 bevel = 0.008
             );
         }
     });
-    let lid = hinged(join(&parts, "lid", None), f.at(0, 0.845, z - 0.42));
+    let lid = hinged(join(&parts, "lid", None), f.at(0, 0.845, z - 0.41));
     settle_all();
     swing!(lid, "lid_open", -85, axis = Axis::X, seconds = 1.2);
     Vec::new()

@@ -11,7 +11,8 @@
 //!   - the hanging plant sways when watered (`sway`);
 //!   - the fireplace's flames grow on the logs while a resident warms up (`flames`);
 //!   - the curtains are drawn closed (`close`, `motions.night`: held while the game has them drawn, sim-core
-//!     `curtains.rs`), on cloth tabs over the rail.
+//!     `curtains.rs`), on cloth tabs over the rail; the blinds' slats shut and the shutters swing closed the same
+//!     way (`close`).
 
 use artkit::family::{Family, Model, motions};
 use artkit::json::Json;
@@ -38,6 +39,11 @@ fn clock() -> Json {
 // the wall, by design (`cargo check-glb`'s `footprint`):
 const CURTAINS_ACCEPT: &str = "the rail runs past the window, its opening plus a gathered panel each side, so the open \
                                curtains stack on the wall beside the glass (decor.md, M-decor-02)";
+
+// Folded back by day, the shutters lie flat on the wall either side of the window, 0.39 m past their footprint each
+// side, as an open curtain's panels stack beside the glass (`cargo check-glb`'s `footprint`):
+const SHUTTERS_ACCEPT: &str = "folded back by day, the two panels lie flat on the wall either side of the window, past \
+                               the footprint, and swing shut over it at night";
 
 /// The family.
 pub fn family() -> Family {
@@ -177,6 +183,7 @@ pub fn family() -> Family {
                 .key("model.blinds")
                 .centre(0.0, -0.3975)
                 .on_wall()
+                .motions(night())
                 .paint(&[("blind_slat", "Slats"), ("blind_rail", "Head rail")]),
             Model::new("coatHooks", fittings::coat_hooks, (0.90, 0.14, 0.12))
                 .key("model.coatHooks")
@@ -193,11 +200,13 @@ pub fn family() -> Family {
                 .centre(0.0, -0.3995)
                 .on_wall()
                 .paint(&[("gadget_white", "Case"), ("gadget_dark", "Keypad")]),
-            Model::new("shutters", fittings::shutters, (0.89, 0.765, 0.058))
+            Model::new("shutters", fittings::shutters, (1.765, 0.765, 0.050))
                 .key("model.shutters")
                 .centre(0.0, -0.391)
                 .on_wall()
-                .paint(&[("blind_rail", "Panels"), ("hook_board", "Frame")]),
+                .motions(night())
+                .paint(&[("blind_rail", "Panels"), ("hook_board", "Frame")])
+                .accept("footprint", SHUTTERS_ACCEPT),
             Model::new("hallStand", fittings::hall_stand, (0.90, 1.80, 0.35))
                 .key("model.hallStand")
                 .centre(0.0, -0.255)
@@ -216,6 +225,6 @@ pub fn family() -> Family {
         "The decor (crates/art/rooms/src/decor, built by cargo art): wall art and clocks, ornaments, curtains and \
              rugs. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one \
              draw call per finish group. The clocks' hands tell the game's time (`clock`); the hanging plant sways when \
-             watered, the fire burns while a resident warms up by it, and the curtains are drawn at night.",
+             watered, the fire burns while a resident warms up by it, and the curtains, blinds and shutters close at night.",
     )
 }

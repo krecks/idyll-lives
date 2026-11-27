@@ -6061,6 +6061,10 @@
       "category": "decor",
       "group": "ornaments",
       "decor": 0.4,
+      "seat": {
+        "height": 0.47,
+        "forward": -0.27
+      },
       "description": "A mirror, a rail of hooks and a bench with a shoe shelf: the last thing you touch on the way out.",
       "interactions": []
     }

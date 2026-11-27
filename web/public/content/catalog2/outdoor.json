@@ -968,8 +968,50 @@
       "group": "decor",
       "outdoors": true,
       "decor": 0.6,
-      "description": "A white timber gazebo with a pitched roof: a shady place to sit out of the sun.",
-      "interactions": []
+      "slots": 3,
+      "approach": "door",
+      "seat": {
+        "height": 0.45,
+        "forward": 0
+      },
+      "places": [
+        {
+          "at": [
+            -0.75,
+            -1.1
+          ]
+        },
+        {
+          "at": [
+            0,
+            -1.1
+          ]
+        },
+        {
+          "at": [
+            0.75,
+            -1.1
+          ]
+        }
+      ],
+      "description": "A timber gazebo under a stepped roof, with a bench along the back: a shady place to sit out of the sun.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit in the gazebo",
+          "anim": "sit",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
     },
     {
       "id": "pergola",

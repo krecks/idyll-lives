@@ -1,58 +1,88 @@
 //! D4: wall fittings — the venetian blinds, the coat hooks, and the door's gadgets: the bell, the alarm keypad and the camera.
 
 use super::common::{M, WALL};
+use artkit::math::{Axis, P3};
+use artkit::motion::{FLAT, flat};
+use artkit::parts::{hinged, join, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsphere, settle};
+use artkit::{fbox, fsphere, grow, settle, squash, swing};
 
 // --- D4: the venetian blinds: a head rail on the wall, slats, a bottom rail and their cords -------------
+// At night (`close`) the slats shut: one part can't turn each slat about its own length, so the open slats thin to
+// nothing front to back while the shut ones, tilted and overlapping, come down out of the head rail over them.
 pub fn blinds() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let z = WALL + 0.035;
-    fbox!(
-        f,
-        "head",
-        0.90,
-        0.055,
-        0.070,
-        (0, 1.925, z),
-        M.blind_rail,
-        bevel = 0.006
-    );
-    for i in 0..8 {
-        let y = 1.870 - 0.085 * i as f64;
+    let still = new_parts(|| {
         fbox!(
             f,
-            format!("slat{i}"),
-            0.86,
-            0.008,
+            "head",
+            0.90,
             0.055,
-            (0, y, z),
-            M.blind_slat
+            0.070,
+            (0, 1.925, z),
+            M.blind_rail,
+            bevel = 0.006
         );
-    }
-    fbox!(
-        f,
-        "bottom",
-        0.90,
-        0.028,
-        0.060,
-        (0, 1.160, z),
-        M.blind_rail,
-        bevel = 0.004
-    );
-    for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
         fbox!(
             f,
-            format!("cord{i}"),
-            0.006,
-            0.700,
-            0.004,
-            (sx * 0.28, 1.530, z + 0.030),
-            M.blind_rail
+            "bottom",
+            0.90,
+            0.028,
+            0.060,
+            (0, 1.160, z),
+            M.blind_rail,
+            bevel = 0.004
         );
-    }
+        for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+            fbox!(
+                f,
+                format!("cord{i}"),
+                0.006,
+                0.700,
+                0.004,
+                (sx * 0.28, 1.530, z + 0.030),
+                M.blind_rail
+            );
+        }
+    });
+    join(&still, "body", Some(P3::ZERO));
+    let open = new_parts(|| {
+        for i in 0..8 {
+            fbox!(
+                f,
+                format!("slat{i}"),
+                0.86,
+                0.008,
+                0.055,
+                (0, 1.870 - 0.085 * i as f64, z),
+                M.blind_slat
+            );
+        }
+    });
+    let open = hinged(join(&open, "slats", None), f.at(0, 1.870, z));
+    // shut: each slat turned 70° about its length, wide enough to overlap the next
+    let shut = new_parts(|| {
+        for i in 0..8 {
+            fbox!(
+                f,
+                format!("vane{i}"),
+                0.86,
+                0.004,
+                0.095,
+                (0, 1.870 - 0.085 * i as f64, z),
+                M.blind_slat,
+                rot = (70, 0, 0)
+            );
+        }
+    });
+    // (from inside the head rail, where it hides flat at rest)
+    let shut = hinged(join(&shut, "vanes", None), f.at(0, 1.925, z));
     settle!();
+    flat(shut, Axis::Z);
+    squash!(open, "close", (1, FLAT, 1), seconds = 1.2);
+    grow!(shut, "close", seconds = 1.2, axis = Axis::Z);
     meshes()
 }
 
@@ -223,83 +253,94 @@ pub fn cctv_camera() -> Vec<Obj> {
     meshes()
 }
 
-// --- D4: the shutters: two louvred panels, one either side of the window ---------------------------------
+// --- D4: the shutters: two louvred panels, folded back flat on the wall either side of the window by day ------
+// and swung shut over it at night (`close`), each on its hinge at the window's edge. A panel is the same both sides
+// (frame, core and louvres centred on its hinge line), so folded back it shows its louvres too.
 pub fn shutters() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
-    let z = WALL + 0.025;
+    // the hinge line's depth: the frame's back 1 cm off the wall's face
+    let z = WALL + 0.035;
+    let knuckles = new_parts(|| {
+        for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
+            for k in 0..2 {
+                fbox!(
+                    f,
+                    format!("knuckle{i}{k}"),
+                    0.016,
+                    0.08,
+                    0.016,
+                    (sx * 0.445, 1.24 + 0.42 * k as f64, z),
+                    M.gadget_chrome,
+                    bevel = 0.003
+                );
+            }
+        }
+    });
+    join(&knuckles, "body", Some(P3::ZERO));
+    let mut panels = Vec::new();
     for (i, sx) in [-1.0f64, 1.0].into_iter().enumerate() {
         let x = sx * 0.225;
-        fbox!(
-            f,
-            format!("panel{i}"),
-            0.44,
-            0.76,
-            0.030,
-            (x, 1.45, z),
-            M.blind_rail,
-            bevel = 0.008
-        );
-        // the stiles and rails of its frame, proud of the panel
-        fbox!(
-            f,
-            format!("stile{i}a"),
-            0.035,
-            0.76,
-            0.020,
-            (x - 0.20, 1.45, z + 0.024),
-            M.hook_board,
-            bevel = 0.004
-        );
-        fbox!(
-            f,
-            format!("stile{i}b"),
-            0.035,
-            0.76,
-            0.020,
-            (x + 0.20, 1.45, z + 0.024),
-            M.hook_board,
-            bevel = 0.004
-        );
-        for (k, y) in [1.085, 1.815].into_iter().enumerate() {
+        let parts = new_parts(|| {
             fbox!(
                 f,
-                format!("rail{i}{k}"),
-                0.44,
-                0.035,
-                0.020,
-                (x, y, z + 0.024),
-                M.hook_board,
-                bevel = 0.004
-            );
-        }
-        for k in 0..6 {
-            let y = 1.16 + 0.098 * k as f64;
-            fbox!(
-                f,
-                format!("louvre{i}{k}"),
-                0.36,
-                0.030,
-                0.045,
-                (x, y, z + 0.020),
+                format!("core{i}"),
+                0.37,
+                0.69,
+                0.012,
+                (x, 1.45, z),
                 M.blind_rail,
-                bevel = 0.004
+                bevel = 0
             );
-        }
-        for k in 0..2 {
-            let y = 1.24 + 0.42 * k as f64;
-            fbox!(
-                f,
-                format!("hinge{i}{k}"),
-                0.08,
-                0.030,
-                0.016,
-                (sx * 0.40, y, z + 0.026),
-                M.gadget_chrome,
-                bevel = 0.003
-            );
-        }
+            // the stiles and rails of its frame, proud of the louvres
+            for (k, dx) in [-0.20, 0.20].into_iter().enumerate() {
+                fbox!(
+                    f,
+                    format!("stile{i}{k}"),
+                    0.035,
+                    0.76,
+                    0.050,
+                    (x + dx, 1.45, z),
+                    M.hook_board,
+                    bevel = 0.004
+                );
+            }
+            for (k, y) in [1.085, 1.815].into_iter().enumerate() {
+                fbox!(
+                    f,
+                    format!("rail{i}{k}"),
+                    0.365,
+                    0.035,
+                    0.050,
+                    (x, y, z),
+                    M.hook_board,
+                    bevel = 0.004
+                );
+            }
+            for k in 0..6 {
+                fbox!(
+                    f,
+                    format!("louvre{i}{k}"),
+                    0.365,
+                    0.030,
+                    0.042,
+                    (x, 1.16 + 0.098 * k as f64, z),
+                    M.blind_rail,
+                    bevel = 0.004,
+                    rot = (20, 0, 0)
+                );
+            }
+        });
+        // hinged at the window's edge and folded back flat on the wall beside it, at rest
+        let panel = hinged(
+            join(&parts, &format!("shutter{i}"), None),
+            f.at(sx * 0.445, 1.45, z),
+        );
+        panels.push((turn(panel, 180.0, Axis::Z), sx));
     }
     settle!();
+    for (panel, sx) in panels {
+        swing!(panel, "close", 180.0 * sx, seconds = 1.2);
+    }
     meshes()
 }
 
