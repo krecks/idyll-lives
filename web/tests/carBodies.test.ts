@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { CARS, carDoor, DOORS, FAMILY_CARS, paintCar } from '../src/render/shared/cars';
+import { CARS, carDoor, DOORS, FAMILY_CARS, inCar, paintCar } from '../src/render/shared/cars';
 import { Geo } from '../src/render/shared/geometry';
 import { Painter } from '../src/render/shared/street';
 
@@ -81,5 +81,25 @@ describe('the cars’ bodies', () => {
         expect(door.sill).toBeLessThan(body.cabin[4]);
       }
     }
+  });
+});
+
+describe('in a car', () => {
+  test('a point is in a car where its box seen from above holds it, however the car is turned (the quick miss never says no to one in it)', () => {
+    let rand = 7;
+    const next = () => ((rand = (rand * 16807) % 2147483647) / 2147483647) * 2 - 1;
+    let ins = 0;
+    for (const body of CARS) {
+      for (let k = 0; k < 4000; k++) {
+        const pose = { x: 30 * next(), z: 30 * next(), yaw: Math.PI * next() };
+        // Round its corners, mostly: just in and just out.
+        const [x, z] = [pose.x + next() * (body.len / 2 + 0.3), pose.z + next() * (body.len / 2 + 0.3)];
+        const [dx, dz, s, c] = [x - pose.x, z - pose.z, Math.sin(pose.yaw), Math.cos(pose.yaw)];
+        const inBox = Math.abs(dx * s + dz * c) < body.len / 2 && Math.abs(dx * c - dz * s) < body.wid / 2;
+        expect(inCar(body, pose, x, z)).toBe(inBox);
+        if (inBox) ins++;
+      }
+    }
+    expect(ins).toBeGreaterThan(1000);
   });
 });
