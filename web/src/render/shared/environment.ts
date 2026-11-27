@@ -95,6 +95,18 @@ export function lightingAt<L extends Lighting>(minuteOfDay: number, look: Look, 
   return out;
 }
 
+/** The least turn of the light (0.25°, as its cosine) that a lighting step draws its shadows again for (`sunTurned`). */
+const SUN_TURN_COS = Math.cos((0.25 * Math.PI) / 180);
+
+/**
+ * Whether the light's way `to` has turned far enough from `was` (both unit; `was` unset, NaN: it has) for a lighting
+ * step to turn the sun: every turn draws the whole sun map again, and the sun crawls 0.07° (low) to 0.11° (at noon) a
+ * half-minute step, so only every third or fourth step turns it (a shadow's tip held back by at most 0.25°).
+ */
+export function sunTurned(to: XYZ, was: XYZ): boolean {
+  return !(to.x * was.x + to.y * was.y + to.z * was.z >= SUN_TURN_COS);
+}
+
 /** A lighting to write into, its colours and vectors made by `color` and `vector` (plain objects by default). */
 export function createLighting<C extends RGB = RGB, V extends XYZ = XYZ>(
   color: () => C = () => ({ r: 0, g: 0, b: 0 }) as C,

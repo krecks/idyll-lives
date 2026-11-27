@@ -92,7 +92,7 @@ import { cutInView } from '../shared/landVeil';
 import { DOOR_SWING, doorLead, goingThrough, MOVER } from '../shared/doors';
 import { smooth } from '../../game/noise';
 import { withoutCloudShadows } from './cloudShadows';
-import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
+import { createLighting, lightingAt, sunTurned, type Lighting, type RGB } from '../shared/environment';
 import { playbackRate } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { isPaths, pathLayers, pavedRects } from '../shared/paving';
@@ -3052,7 +3052,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const step = fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
     const due = this.lastLightMinute < 0 || frame.now - this.lastLightAt >= LIGHT_MIN_MS;
     if (due && Math.abs(minute - this.lastLightMinute) >= step) {
-      this.applyLighting(minute);
+      // (A step of the clock: the sun turned only once it has moved enough, `sunTurned`; lit afresh, at once.)
+      this.applyLighting(minute, this.lastLightMinute >= 0);
       this.lastLightMinute = minute;
       this.lastLightAt = frame.now;
     }
@@ -3387,9 +3388,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * The time of day (`shared/environment.ts`): the sun, the sky's fill, the environment's light,
-   * the fog and the clear colour, in PlayCanvas's units (`lightUnits.ts`). No allocations.
+   * the fog and the clear colour, in PlayCanvas's units (`lightUnits.ts`). `step`: a step of the clock's, whose sun
+   * turns only once it has moved far enough (`sunTurned`); otherwise (a new hour, a load, the bench's) exactly. No
+   * allocations.
    */
-  private applyLighting(minute: number): void {
+  private applyLighting(minute: number, step = false): void {
     this.counts.lightingUpdates++;
     this.pictureChanged(); // (the sky, its light and the lamps', not all of which a held frame sees.)
     const l = lightingAt(minute, LOOK, this.lighting);
@@ -3402,9 +3405,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // A directional light shines along its entity's -y: turned from straight down to the sun's way (game space to PlayCanvas).
     const to = toEngine(l.sunDirection.x, l.sunDirection.y, l.sunDirection.z, this.vTmp).normalize();
     // Only a sun that turned draws its map again: a step that only changes the light's colour (every step of the
-    // night, whose moon stands still) leaves the shadows as they are; the held reflections take the new light either way.
+    // night, whose moon stands still, and most of the day's: `sunTurned`) leaves the shadows as they are; the held
+    // reflections take the new light either way.
     this.mirrors.changed();
-    if (!to.equals(this.sunWay)) {
+    if (step ? sunTurned(to, this.sunWay) : !to.equals(this.sunWay)) {
       this.sunWay.copy(to);
       const axis = this.vTmp2.cross(DOWN, to);
       const sin = axis.length();
