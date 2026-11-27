@@ -89,6 +89,8 @@ export class Signals {
   private crosswalks: Uint8Array | null = null;
   /** Whether the poles changed where they cast into the sun's map (the map is to be drawn again). */
   moved = false;
+  /** Each head's matrix (16 floats a row) as the poles' draws were last written: a lamp changing writes the glows from them, not looking the ground up again. */
+  private heads = new Float32Array(0);
   /** Scratch: a matrix, a turn, each draw's count as it's written. */
   private readonly m = new Float32Array(16);
   private readonly q: Quat = [0, 0, 0, 1];
@@ -134,6 +136,8 @@ export class Signals {
   /** The ground the poles stand on (game space, m: `BuiltSurface.at` on a land the town follows), or 0 everywhere (null). */
   setGround(ground: ((x: number, z: number) => number) | null): void {
     this.ground = ground;
+    // (The poles stand on it: written again, `heads` with them.)
+    this.reframed = true;
     this.due = true;
   }
   private ground: ((x: number, z: number) => number) | null = null;
@@ -233,8 +237,10 @@ export class Signals {
     // (Which heads are drawn and how changed: the poles' draws and shadows with them.)
     const moved = placed || this.reframed;
     this.reframed = false;
-    const { rows, m, q, lit } = this;
+    const { rows, q, lit } = this;
     const far = d.farBody.length > 0;
+    if (moved && this.heads.length < rows.count * 16) this.heads = new Float32Array(rows.count * 16);
+    const heads = this.heads;
     if (moved) {
       for (const draw of d.body) draw.setCount(rows.count);
       for (const draw of d.farBody) draw.setCount(rows.count);
@@ -259,24 +265,26 @@ export class Signals {
       if (this.chunks && !this.chunks.has(chunkAt(x, z))) continue;
       const dist = looked ? Math.hypot(x - this.eyeX, z - this.eyeZ) : 0;
       if (dist > FAR) continue;
-      compose(1, 1, 1, quatYawPitchRoll(rows.yaw[k], 0, 0, q), x, this.ground ? this.ground(x, z) : 0, z, m);
+      // (Where it stands only when the poles are written: a lamp changing has it from then.)
+      const at = k * 16;
+      if (moved) heads.set(compose(1, 1, 1, quatYawPitchRoll(rows.yaw[k], 0, 0, q), x, this.ground ? this.ground(x, z) : 0, z, this.m), at);
       if (far && dist > FAR_MODELS) {
-        if (moved) for (const draw of d.farBody) draw.setMatrix(away, m);
+        if (moved) for (const draw of d.farBody) draw.setMatrix(away, heads, at);
         away++;
       } else {
-        if (moved) for (const draw of d.body) draw.setMatrix(near, m);
+        if (moved) for (const draw of d.body) draw.setMatrix(near, heads, at);
         // (A pedestrians' head only where there's a crosswalk to cross.)
         if (ped && (!this.crosswalks || this.crosswalks[rows.row[k]] === 1)) {
-          if (moved) ped.housing.setMatrix(peds, m);
+          if (moved) ped.housing.setMatrix(peds, heads, at);
           peds++;
-          if (rows.walk[k]) ped.walk?.setMatrix(walking++, m);
-          else ped.dontWalk?.setMatrix(waiting++, m);
+          if (rows.walk[k]) ped.walk?.setMatrix(walking++, heads, at);
+          else ped.dontWalk?.setMatrix(waiting++, heads, at);
         }
         near++;
       }
       const lamp = rows.lamp[k];
       const glow = d.glows[lamp];
-      if (glow) glow.setMatrix(lit[lamp]++, m);
+      if (glow) glow.setMatrix(lit[lamp]++, heads, at);
     }
     // (Only the lamps changed: the poles stand as they stood.)
     if (moved) {
