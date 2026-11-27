@@ -162,4 +162,30 @@ describe("a land drawn from a height field: a stamp's tiles", async () => {
     // (The edge's land carries 60 m past it: tile 1 (-132..-4) and tile 2 (-4..124).)
     expect(changed(edge, drawn(tiles))).toEqual([4 * count + 1, 4 * count + 2]);
   });
+
+  test('a road taken on draws all the pads again, for its later blocks too; a stroke only those round it', async () => {
+    const { scape } = shaped();
+    const inner = scape as unknown as { builtMoved: boolean; surface: unknown; sheetAsNeeded(): void; padsChanged(): Set<number> | null; padDraws(...a: unknown[]): unknown; redrawBuilt(box: unknown): void };
+    // (No town on the fixture's land: only the pads' choice is looked at, the pads none; nor the sea's sheet, its material.)
+    inner.sheetAsNeeded = () => {};
+    const dirties: (Set<number> | null)[] = [];
+    inner.padsChanged = () => new Set();
+    inner.padDraws = (...a: unknown[]) => (dirties.push(a[3] as Set<number> | null), { slabs: [], edges: [], made: [], gone: [] });
+    const redraw = inner.redrawBuilt.bind(scape);
+    inner.redrawBuilt = (box) => {
+      inner.surface = {};
+      redraw(box);
+      inner.surface = null;
+    };
+    // (`takeRoads`: the surface solved whole, its blocks drawn one by one, the first drawing the pads.)
+    inner.builtMoved = true;
+    await scape.landDone({ i0: 10, j0: 10, i1: 20, j1: 20 }, undefined, true);
+    await scape.landDone({ i0: 150, j0: 150, i1: 160, j1: 160 }, undefined, true);
+    expect(dirties).toEqual([null]);
+    // A stroke: the tiles round it only.
+    inner.builtMoved = true;
+    await scape.landDone({ i0: 90, j0: 90, i1: 91, j1: 91 });
+    expect(dirties.length).toBe(2);
+    expect(dirties[1]!.size).toBeGreaterThan(0);
+  });
 });

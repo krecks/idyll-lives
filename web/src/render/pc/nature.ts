@@ -776,12 +776,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.redrawTile(t, positions, colors);
     }
     this.sheetAsNeeded();
-    // (Roads or lots the land moved: the pads and the country roads drawn again on them.)
+    // (Roads or lots the land moved: the pads and the country roads drawn again on them; all the pads on a surface
+    // `takeRoads` solved again, whose blocks come one by one and only the first draws them.)
     if (this.builtMoved) {
       this.builtMoved = false;
       await pace?.();
       if (!this.host) return null;
-      perfTime('land: pads and roads', () => this.redrawBuilt(box));
+      perfTime('land: pads and roads', () => this.redrawBuilt(solved ? null : box));
     }
     const grass = this.grass?.grassField;
     if (grass) {
@@ -811,12 +812,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /**
    * The pads and the country roads drawn again on the surface as it is now (the land moved them: `landDone`): the pads
    * in the ground tiles over `box` (m: where the ground was shaded again, so the slabs take its colours) and those
-   * round a pad that moved (`padsChanged`), the rest kept; the roads whole (one draw of them all).
+   * round a pad that moved (`padsChanged`), the rest kept (null: all of them); the roads whole (one draw of them all).
    */
-  private redrawBuilt(box: [number, number, number, number]): void {
+  private redrawBuilt(box: [number, number, number, number] | null): void {
     if (!this.host || !this.surface) return;
     const { app, parent } = this.host;
-    const dirty = this.padsChanged(null);
+    const dirty = box && this.padsChanged(null);
     if (dirty) for (const k of this.tilesIn(box)) dirty.add(k);
     const pads = this.padDraws(app, parent, this.grounds, dirty);
     const old = [...pads.gone, ...this.roadDraws];
