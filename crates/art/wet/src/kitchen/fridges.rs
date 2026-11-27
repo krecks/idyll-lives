@@ -4,7 +4,7 @@
 use super::M;
 use super::common::{apple, carton, gasket, jar, kick};
 use super::fridge::{bottle, door_bin};
-use artkit::forms::{circle, rounded_rect};
+use artkit::forms::rounded_rect;
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
@@ -12,8 +12,7 @@ use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, soft, swing};
 
 /// A small under-counter fridge: a white cabinet on a vented plinth, one door over its whole front (its seal,
-/// two bins and their bottles inside), an ice box with a flap at the top, a shelf and a crisper below, and a
-/// chopping board, a jar and an apple on top.
+/// two bins and their bottles inside), an ice box with a flap at the top, a shelf and a crisper below; the top bare.
 pub fn fridge_mini() -> Vec<Obj> {
     let fm = GameFrame::new(0.0);
     let still = new_parts(|| {
@@ -182,36 +181,6 @@ pub fn fridge_mini() -> Vec<Obj> {
         {
             apple(&fm, &format!("apple{i}"), x, 0.404, z, 0.034, None);
         }
-        // a chopping board (a hanging hole at one end), a jar and an apple on top
-        let hang: Vec<(f64, f64)> = circle(0.012, 8)
-            .iter()
-            .map(|&(u, v)| (u + 0.2, v))
-            .collect();
-        fextrude!(
-            fm,
-            "board",
-            &rounded_rect(0.50, 0.40, 0.03, 3),
-            0.02,
-            (0, 0.88, -0.02),
-            M.board,
-            plane = Facing::Top,
-            holes = [hang],
-            bevel = 0.004,
-            bevel_segments = 1
-        );
-        jar(
-            &fm,
-            "jar",
-            -0.14,
-            0.89,
-            -0.04,
-            0.05,
-            0.07, // a short jar: the fridge's 0.87 with what is on it stays a mini fridge's height
-            M.porcelain,
-            M.trim,
-            12,
-        );
-        apple(&fm, "apple_top", 0.12, 0.89, 0.0, 0.034, None);
     });
     join(&still, "body", Some((0, 0, 0).into()));
     // the door over the whole front, hinged on its left edge: its seal, a liner and two bins with bottles and a can

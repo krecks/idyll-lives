@@ -35,26 +35,23 @@ fn rect_ring(f: &GameFrame, x0: f64, x1: f64, z0: f64, z1: f64, y: f64) -> Vec<P
 pub fn range_hood() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let still = new_parts(|| {
-        // a two-piece chimney, the upper one a little narrower, a seam between
-        fbox!(
-            f,
+        // one flue tapering from the canopy's neck to a narrower top, its corners rounded, its back on the wall
+        let ring = |w: f64, d: f64, y: f64, back: f64| -> Vec<P3> {
+            rounded_rect(w, d, 0.03, 2)
+                .into_iter()
+                .map(|(u, v)| f.at(u, y, back + d / 2.0 + v))
+                .collect()
+        };
+        loft!(
             "flue",
-            0.3,
-            0.29,
-            0.3,
-            (0, 1.815, -0.28),
-            M.steel,
-            bevel = 0.006
-        );
-        fbox!(
-            f,
-            "flue_upper",
-            0.29,
-            0.29,
-            0.29,
-            (0, 2.105, -0.285),
-            M.steel,
-            bevel = 0.006
+            &[
+                ring(0.31, 0.305, 1.67, -0.43),
+                ring(0.27, 0.27, 1.96, -0.43),
+                ring(0.23, 0.23, 2.235, -0.43), // its top edge eased
+                ring(0.206, 0.206, 2.25, -0.418)
+            ],
+            material = M.steel,
+            angle = 20
         );
         // the canopy: an upright band, then sloping up to the chimney, its back on the wall
         fbox!(

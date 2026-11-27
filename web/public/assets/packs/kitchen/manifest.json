@@ -267,9 +267,6 @@
         "liner": {
           "finish": "material.finish.matte"
         },
-        "porcelain": {
-          "finish": "material.finish.gloss"
-        },
         "produce": {
           "finish": "material.finish.satin"
         },
