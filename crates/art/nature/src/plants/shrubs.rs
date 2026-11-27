@@ -202,7 +202,11 @@ pub fn boxwood() -> Vec<Obj> {
             let ring = (1.0 - t * t).sqrt();
             let a = i as f64 * 2.4 + rng.uniform(-0.2, 0.2);
             let r = rng.uniform(0.07, 0.09);
-            let (x, y, z) = (0.31 * ring * cos(a), 0.31 * ring * sin(a), 0.32 + 0.31 * t - r * 0.8);
+            let (x, y, z) = (
+                0.31 * ring * cos(a),
+                0.31 * ring * sin(a),
+                0.32 + 0.31 * t - r * 0.8,
+            );
             lump!(
                 format!("clump{i}"),
                 r,

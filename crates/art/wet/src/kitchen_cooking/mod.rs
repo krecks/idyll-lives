@@ -49,7 +49,7 @@ palette! { M:
 
 const SECONDS: f64 = 1.4; // a door drops, a drawer slides or a knob turns in this long
 // catalog2's 0.79-deep counter numbers drawn 0.66 deep against the wall: the counters'
-use crate::kitchen_counters::COUNTER66;
+use crate::common::COUNTER66;
 const HOLD: f64 = 3.0; // seconds a door stays open once a use starts
 
 /// The microwave's plate turns once its door has shut (`door_open` opens in 1.0 s and plays back from its hold,

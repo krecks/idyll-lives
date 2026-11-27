@@ -75,3 +75,54 @@ fn centres_are_every_family_s_models_and_no_others() {
     );
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// Every group's crate folder under crates/art (`crates/art/<group>/src/<family>/`).
+const GROUPS: [&str; 6] = ["nature", "wet", "rooms", "packs", "outside", "things"];
+
+/// A family is a unit with its own notes, and imports only artkit and its group's `src/common.rs`: never another
+/// family of its group (`crate::<family>`, also `$crate::<family>` in a macro of another's).
+#[test]
+fn every_family_has_notes_and_imports_no_other_family() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut faults = Vec::new();
+    for group in GROUPS {
+        if !root.join(group).join("NOTES.md").is_file() {
+            faults.push(format!("{group}: no NOTES.md"));
+        }
+        let src = root.join(group).join("src");
+        let mut families: Vec<String> = std::fs::read_dir(&src)
+            .unwrap_or_else(|e| panic!("{}: {e}", src.display()))
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        families.sort();
+        for family in &families {
+            if !src.join(family).join("NOTES.md").is_file() {
+                faults.push(format!("{group}/{family}: no NOTES.md"));
+            }
+            let mut files = vec![src.join(family)];
+            while let Some(path) = files.pop() {
+                if path.is_dir() {
+                    files.extend(std::fs::read_dir(&path).unwrap().map(|e| e.unwrap().path()));
+                } else if path.extension().is_some_and(|x| x == "rs") {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    for other in families.iter().filter(|o| *o != family) {
+                        let needle = format!("crate::{other}");
+                        let imported = text.match_indices(&needle).any(|(i, _)| {
+                            !text[i + needle.len()..]
+                                .starts_with(|c: char| c.is_alphanumeric() || c == '_')
+                        });
+                        if imported {
+                            faults.push(format!(
+                                "{}: imports the family {other}",
+                                path.strip_prefix(root).unwrap().display()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(faults.is_empty(), "{}", faults.join("\n"));
+}

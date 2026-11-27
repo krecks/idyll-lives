@@ -172,7 +172,16 @@ pub fn stile() -> Vec<Obj> {
     for (side, s) in [("front", 1.0), ("back", -1.0)] {
         // the tread, its two legs under the outer corners
         let zc = s * (0.225 + 0.11);
-        fbox!(F, format!("{side}Tread"), 0.50, 0.05, 0.22, (0.0, 0.25, zc), M.oak, bevel = 0.008);
+        fbox!(
+            F,
+            format!("{side}Tread"),
+            0.50,
+            0.05,
+            0.22,
+            (0.0, 0.25, zc),
+            M.oak,
+            bevel = 0.008
+        );
         for (i, x) in [-0.22, 0.22].iter().enumerate() {
             fbox!(
                 F,
@@ -187,7 +196,16 @@ pub fn stile() -> Vec<Obj> {
         }
     }
     for (i, x) in [-0.40, 0.40].iter().enumerate() {
-        fbox!(F, format!("post{i}"), 0.10, 0.96, 0.10, (*x, 0.48, 0.0), M.oak, bevel = 0.01);
+        fbox!(
+            F,
+            format!("post{i}"),
+            0.10,
+            0.96,
+            0.10,
+            (*x, 0.48, 0.0),
+            M.oak,
+            bevel = 0.01
+        );
     }
     settle(&[join_all("stile")])
 }

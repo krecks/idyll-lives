@@ -9,9 +9,11 @@ use artkit::mesh::Mesh;
 use artkit::noise::noise;
 use artkit::palette;
 use artkit::parts::{join, own};
-use artkit::place::{Coord, Facing, GameFrame, Spot};
+use artkit::place::{Coord, Facing, Spot};
 use artkit::scene::{Obj, meshes};
 use artkit::{cylinder, extrude, fcyl, fextrude, fsweep, loft, revolve, ring, settle};
+
+pub use crate::common::{F, bent, rod};
 
 palette! { M:
     iron = ("#2A2C30", metal),           // cast and wrought iron frames
@@ -97,23 +99,9 @@ palette! { M:
     awning_stripe2 = ("#B8623F", satin),
 }
 
-pub const F: GameFrame = GameFrame::new(0.0);
-
 /// A game position or direction as a Blender vector.
 pub fn v(p: impl Spot) -> V3 {
     V3::from(p.through(&F))
-}
-
-/// A round bar from game point `a` to `b`.
-pub fn rod(name: &str, a: impl Spot, b: impl Spot, r: f64, material: Mat, verts: usize) -> Obj {
-    artkit::rod!(
-        name,
-        a.through(&F),
-        b.through(&F),
-        r,
-        material = material,
-        verts = verts
-    )
 }
 
 /// Joins the model (but what it carries); `centred`: moves it onto its Model's `centre` (its back onto the wall face), else
@@ -152,30 +140,6 @@ pub fn jitter(obj: Obj, amount: f64, size: f64, seed: f64, up: f64) -> Obj {
         }
     });
     obj
-}
-
-/// One length of round bar or tube through game points, its corners bent round about `bend` (no overshoot).
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn bent(
-    name: &str,
-    pts: &[(f64, f64, f64)],
-    r: f64,
-    material: Mat,
-    bend: f64,
-    verts: usize,
-    steps: usize,
-    scale: f64,
-) -> Obj {
-    kit::tube!(
-        F,
-        name,
-        &kit::fillet!(pts, bend, steps),
-        r,
-        material,
-        verts = verts,
-        round = 1,
-        scale = scale
-    )
 }
 
 /// A flat or square bar (`w` across the path's normal, `h` the other way, corners rounded `r`) through game points,

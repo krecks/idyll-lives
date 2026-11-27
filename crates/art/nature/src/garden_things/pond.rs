@@ -1,7 +1,7 @@
 //! The garden pond (2x2): a stone-edged pool with lilies and reeds, ripples, and a koi that comes up.
 
 use super::common::{F, M, own};
-use crate::ground::common::mesh;
+use crate::common::mesh;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr;
 use artkit::materials::Mat;

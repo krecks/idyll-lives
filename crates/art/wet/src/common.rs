@@ -174,3 +174,7 @@ pub fn stream<X: Coord, Z: Coord>(
     obj.edit(|o| o.scale.z = 0.001);
     obj
 }
+
+// catalog2's 0.79-deep counter numbers (worktop -0.48..0.31, carcass -0.46..0.24) as drawn: 0.66 deep, the
+// worktop -0.43..0.23 and the carcass -0.41..0.19 (the old `COUNTER66`; GameFrame `depths`)
+pub const COUNTER66: [(f64, f64); 4] = [(-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23)];

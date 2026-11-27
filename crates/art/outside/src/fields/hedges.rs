@@ -3,8 +3,8 @@
 use artkit::botany::{hedge_top, palette};
 use artkit::materials::Palette;
 use artkit::parts::{join_all, settle};
-use artkit::scene::Obj;
 use artkit::rand::Random;
+use artkit::scene::Obj;
 use artkit::{florets, hedge_block, perches, twig};
 
 /// The hedgerow's colours: the plants' botany palette (its finishes too: one draw on `foliage`, as the street
@@ -34,7 +34,11 @@ pub fn hedgerow() -> Vec<Obj> {
         let top = 1.25 + rng.uniform(0.0, 0.1);
         twig!(
             format!("shoot{i}"),
-            &[(x, y, 0.8), (x + lx * 0.5, y + ly * 0.5, 1.15), (x + lx, y + ly, top)],
+            &[
+                (x, y, 0.8),
+                (x + lx * 0.5, y + ly * 0.5, 1.15),
+                (x + lx, y + ly, top)
+            ],
             0.014,
             0.006,
             p.get("twig"),

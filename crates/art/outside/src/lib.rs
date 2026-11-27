@@ -3,6 +3,8 @@
 
 use artkit::family::Family;
 
+mod common;
+
 pub mod civic;
 pub mod civic_works;
 pub mod farm;

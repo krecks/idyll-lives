@@ -1,7 +1,7 @@
 //! What the play and yard things are built from: the palette, the frame, and the shapes more than one of them
 //! makes (ground, clumps, pots, slabs from outlines).
 
-pub use crate::outdoor::common::{F, bent, rod};
+pub use crate::common::{F, bent, rod};
 use artkit::far::low;
 use artkit::materials::Mat;
 use artkit::math::V3;

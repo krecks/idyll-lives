@@ -1,6 +1,7 @@
 //! The late-night microwave cart (1x1): a rolling cart, a microwave on top, frozen dinners below.
 
-use super::common::{_box, _can, _wrapper, M, POP, cut_pocket};
+use super::common::{_can, _wrapper, M, POP, cut_pocket};
+use crate::common::_box;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{P3, PI, cos, sin};

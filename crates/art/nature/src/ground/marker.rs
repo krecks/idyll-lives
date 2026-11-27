@@ -1,7 +1,7 @@
 //! The selection marker: the sparkle star over the selected resident.
 
 use super::M;
-use super::common::mesh;
+use crate::common::mesh;
 use artkit::edit::{NgonMethod, QuadMethod, triangulate};
 use artkit::math::{PI, TAU, V3, cos, pow, sin, sqrt, v3};
 use artkit::normals::custom_from_verts;

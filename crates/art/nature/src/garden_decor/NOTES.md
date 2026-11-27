@@ -45,7 +45,7 @@ the wheelbarrow come down by half while showing more.
 (2026-10-22, headless, WebGPU and WebGL2): the gallery and the fountain's `flow` on the clips bench, no errors.
 
 Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). The boulders'
-cuts are the ground's (`ground::rock::cut`, on artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`): a
+cuts are the ground's (`common::cut` (the nature group's), on artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`): a
 stone's fractures are cut where it was made, at the origin.
 
 ## The gate's edges and texels (2026-11-25)

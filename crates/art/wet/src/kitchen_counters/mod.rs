@@ -77,9 +77,7 @@ const HOLD: f64 = 1.5; // seconds it stays open once a use starts
 pub const DOOR_SECONDS: f64 = 1.6; // a cupboard door swings in this long
 const DOOR_HOLD: f64 = 2.5; // seconds a pantry's doors stay open once a use starts
 pub const WALL_DOOR_SECONDS: f64 = 0.8; // a wall cabinet's door swings open in this long, while clean things are put away
-// catalog2's 0.79-deep counter numbers (worktop -0.48..0.31, carcass -0.46..0.24) as drawn: 0.66 deep, the
-// worktop -0.43..0.23 and the carcass -0.41..0.19 (the old `COUNTER66`; GameFrame `depths`)
-pub const COUNTER66: [(f64, f64); 4] = [(-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23)];
+use crate::common::COUNTER66;
 
 /// Sorting the recycling lifts the three lids one after another.
 fn sort_recycling() -> Json {
