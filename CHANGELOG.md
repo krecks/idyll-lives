@@ -16,7 +16,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
     - The menus' town fades its contact shading out as the game's town view does.
   - **Shadows and mirrors:**
     - The sun turns, and its shadow map is drawn again, only once it has moved a quarter of a degree.
-    - High's mirrors draw again only when something in them changed.
+    - High's mirrors draw again only when something in them changed, and a mirror small on screen at most 12 times a second (the camera moving round a room with a mirror in view: 60 → 8 reflections a second, 120 → 14 extra draws a frame).
   - **Traffic:**
     - A swinging gate uploads its own leaf, not every gate in town.
     - A traffic light's lamp changing doesn't look the ground up again.
