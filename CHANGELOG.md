@@ -2,7 +2,7 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
-## Unreleased
+## 0.9.0 — 2026-11-27
 
 - **Walk mode:** walk as the selected resident in first person: W/S walk, A/D turn, Q/E step aside, drag to look. F uses the thing in front of you, or on a person opens the socials and a typed "Talk…" chat the LLM answers. The resident's own free will waits while you walk.
 - **Faster big towns:** a walk by road now goes round a lit junction's middle instead of searching the town tile by tile (it did so for 91 % of a city's walks to work). The slowest hour of a city day runs at about 2,100–2,500 ticks a second instead of 1,570–1,835, and the slowest steps are about half as long. Choosing an outing times the taxi's way in once.
