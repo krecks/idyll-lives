@@ -3059,7 +3059,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // resident's pose does: held to the preset's `shadowRate`.)
       urgent ||= leaf.front;
     }
-    // (Doors and gates cast only the sun's shadow.)
+    // (Doors and gates cast only the sun's shadow. Any that swung shows in the mirrors' held reflections, whether it casts or not.)
+    if (swung) this.mirrors.changed();
     if (moved) this.sunShadows.moved(urgent, false);
     else if (swung) this.pictureChanged();
   }
@@ -3102,7 +3103,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.settleTarget(this.frameDt / 1000);
     this.keepCameraClear();
     if (this.lot.update(frame)) {
-      this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
+      this.mirrors.changed(); // (the objects' clips, the screens, the fires' flicker; things moving, in the held reflections.)
       this.pictureChanged();
     }
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)

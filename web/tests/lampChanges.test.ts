@@ -55,17 +55,33 @@ describe("the lamps' changes", () => {
     // glows use.
     const draw = { destroyed: false, enabled: false, setAll() {}, update() {} };
     const fire = { draw, colors: new Float32Array(4), rooms: [0], lamps: [-1], ids: [5], screen: false, glass: false, base: new Float32Array(1) };
-    const lot = { glows: [fire], motion: { burning: () => true } } as never;
-    const contents = LotContents.prototype as unknown as { applyGlow(light: never): boolean; animateFires(frame: { now: number }): void };
-    const l = lamps({ windows: false }, { applyGlow: (light) => contents.applyGlow.call(lot, light) });
+    const lot = { glows: [fire], motion: { burning: () => true }, flickerTime: 0 };
+    const contents = LotContents.prototype as unknown as { applyGlow(light: never): boolean; animateFires(): boolean };
+    const l = lamps({ windows: false }, { applyGlow: (light) => contents.applyGlow.call(lot as never, light) });
     expect(draw.enabled).toBe(true);
     let told = 0;
     l.onChanged = () => told++;
     const dark = new Set([7]);
     for (let i = 0; i < 10; i++) {
-      contents.animateFires.call(lot, { now: i * 16 });
+      lot.flickerTime = i * 16;
+      contents.animateFires.call(lot as never);
       l.frame(1 / 60, dark, new Set(), 0, 0);
     }
     expect(told).toBe(0);
+  });
+
+  test("a fire's flicker is told while the game runs (the mirrors show it), and stands still while it's paused", () => {
+    const draw = { destroyed: false, enabled: true, setAll() {}, update() {} };
+    const fire = { draw, colors: new Float32Array(4), rooms: [0], lamps: [-1], ids: [5], screen: false, glass: false, base: new Float32Array([1]) };
+    const lot = Object.setPrototypeOf(
+      { glows: [fire], motion: { burning: () => true, update: () => ({ moved: false }) }, camera: { getPosition: () => ({ x: 0, y: 0, z: 0 }) }, eye: {}, screenOn: new Set(), flickerTime: 0, flickerAt: 0 },
+      LotContents.prototype,
+    ) as { update(frame: unknown): boolean };
+    const frame = (now: number, speed: number) => ({ now, curr: [speed], layout: { header: { speed: 0 }, actions: [] } });
+    lot.update(frame(0, 1));
+    expect(lot.update(frame(16, 1))).toBe(true);
+    // Paused: the flicker holds, and nothing is told (a paused frame stays held).
+    lot.update(frame(32, 0));
+    expect(lot.update(frame(48, 0))).toBe(false);
   });
 });

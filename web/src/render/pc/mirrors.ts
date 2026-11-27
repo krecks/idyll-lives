@@ -31,11 +31,12 @@
  * A reflection is drawn on demand and held in between ("held": its camera is off and its target keeps
  * the last picture): again when the camera moves, the mirror moves (a cabinet's door), a resident in its
  * view moves, or the renderer says something else changed (`changed`: the sun, the lamps, things placed
- * or moving), with a `rate` (Low and Medium) at most that many times a second, without one (High) in the
- * frame it changed. A held reflection is looked up through the camera it was drawn for, so it stays on
- * the glass while the camera moves on (only its parallax lags, until the next draw). The picking that
- * places the glasses and ranks them runs only on the frames that may draw one. What moves only for the
- * eye (the plants' sway, the water's flow) stands still in a held reflection until the next draw.
+ * or moving, a door swinging, a fan turning, a fire's or a screen's flicker), with a `rate` (Low and
+ * Medium) at most that many times a second, without one (High) in the frame it changed. A held
+ * reflection is looked up through the camera it was drawn for, so it stays on the glass while the camera
+ * moves on (only its parallax lags, until the next draw). The picking that places the glasses and ranks
+ * them runs only on the frames that may draw one. What moves only for the eye (the plants' sway, the
+ * water's flow) stands still in a held reflection until the next draw.
  *
  * Mirrors follow their object's instance matrix each frame, so things popping in, hidden storeys,
  * things on walls cut away and objects being moved need nothing extra. A reflection's target (and
