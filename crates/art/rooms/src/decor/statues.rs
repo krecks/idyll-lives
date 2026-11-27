@@ -6,7 +6,7 @@ use artkit::json::float_repr;
 use artkit::math::{P3, TAU, cos, sin};
 use artkit::parts::{join_all, new_parts, settle_all};
 use artkit::scene::Obj;
-use artkit::{boulder, cone, cube, extrude, jitter, loft, revolve, ring, sphere, sweep};
+use artkit::{boulder, cone, extrude, jitter, loft, revolve, ring, sphere, sweep};
 
 /// A marble bust on a stone pedestal: a turned socle, a chest cut off at the shoulders, a neck, a head lofted from
 /// chin to crown with a nose, eyelids, lips, a chin and ears, under a cap of curly hair.
