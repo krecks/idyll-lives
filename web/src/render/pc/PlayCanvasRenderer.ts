@@ -3242,8 +3242,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * rooms and beyond the view too, and what is hidden now (`drawHidden`); buy mode's red copy
    * (`drawRedCopies`); the sun's map drawn; every reflection drawn with everything in it
    * (`Mirrors.warm`: their targets and turned faces); the picture chain as the game has it (the
-   * multisampled scene, the image processing, Low's FXAA). The frame goes to the canvas, behind the
-   * veil; the sun's map, the reflections and the town's held frame are drawn again after.
+   * multisampled scene, the image processing, Low's FXAA), the passes it leaves out for now too
+   * (`PostProcessing.warm`). The frame goes to the canvas, behind the veil; the sun's map, the
+   * reflections and the town's held frame are drawn again after.
    *
    * WebGPU makes its pipelines in the frame that first needs them (PlayCanvas has no asynchronous way
    * there); WebGL2 could skip draws whose shaders still compile (`asyncCompile`, the previews' choice),
@@ -3263,7 +3264,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (And a lamp's shadow map, where lamps cast: its shadow pass's shaders, `lampShadows.ts`.)
     this.lampWarm = true;
     const lamps = this.lamps.warm(this.orbit.target.x, -this.orbit.target.z);
+    // (And the picture chain's passes left out for now: the bloom's by day, `post.ts` `idlePasses`.)
+    const post = this.post?.warm();
     return () => {
+      post?.();
       lamps();
       this.lampWarm = false;
       mirrors();
