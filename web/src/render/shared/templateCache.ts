@@ -23,7 +23,7 @@ export interface CachedTemplate {
 }
 
 /** How an engine's templates go (`TemplateCache`). */
-export interface TemplateHooks<T> {
+interface TemplateHooks<T> {
   /** Tells the scene's or app's listeners of the file at `url` again (`retellModelFileArrived`). */
   retell(url: string): void;
   /** Whether the scene or app has gone. */

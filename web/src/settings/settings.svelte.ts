@@ -146,7 +146,7 @@ interface OldGraphics {
  * old quality preset, or the parts as the old Low set them), anything else Medium (High and the old
  * defaults too: Medium is everyone's default now).
  */
-export function migrateGraphics(old: OldGraphics): GraphicsPreset {
+function migrateGraphics(old: OldGraphics): GraphicsPreset {
   if (old.quality === 'low') return 'low';
   const low = old.resolutionScale === 0.75 && old.shadowDetail === 1024 && old.antiAliasing === false && old.allLamps === false && old.mirrors === false && !old.ambientOcclusion;
   return low ? 'low' : 'medium';

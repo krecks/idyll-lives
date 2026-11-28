@@ -104,7 +104,7 @@ export const MOUNTAINS: Partial<LandscapeParams> = { hills: 12, rise: 24, rim: 4
  * each cell's middle, 0 on the water; here a valley along z = SIDE / 2 whose sides climb from 0 at 70 m off its
  * floor to `top` m at the world's edge (60 to 150 m), the valley's low-z side `low` as high (the generator's 0.45).
  */
-export function valleyRelief(top: number, low = 0.45, side = SIDE, water: WorldZone[] = townZones().filter((z) => z.kind === 'water')): NonNullable<WorldMeta['relief']> {
+function valleyRelief(top: number, low = 0.45, side = SIDE, water: WorldZone[] = townZones().filter((z) => z.kind === 'water')): NonNullable<WorldMeta['relief']> {
   const cell = 16;
   const cols = Math.ceil(side / cell);
   const rows = cols;

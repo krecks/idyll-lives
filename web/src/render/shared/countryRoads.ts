@@ -21,8 +21,8 @@ import { MOTORWAY } from './motorway';
 import { mulberry32 } from '../../game/noise';
 
 /** Road widths (m): as wide as the town's streets where they leave it, narrower out in the country. */
-export const TOWN_WIDTH = 6;
-export const COUNTRY_WIDTH = 5;
+const TOWN_WIDTH = 6;
+const COUNTRY_WIDTH = 5;
 /** Metres between the points of a road. */
 export const STEP = 4;
 /** Straight out of town for this many points before it starts to wind. */
@@ -41,7 +41,7 @@ export const LIFT = 0.06;
 /** How far the ground is graded to the road on either side, past its edge (m). */
 export const ROAD_VERGE = 7;
 
-export interface Rect {
+interface Rect {
   x: number;
   z: number;
   w: number;

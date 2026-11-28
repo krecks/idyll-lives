@@ -14,7 +14,7 @@
 import { layoutTags, type Box as TagBox, type TagSpot } from '../game/tagLayout';
 
 /** The ground in view (m): the viewBox. */
-export interface MapView {
+interface MapView {
   x: number;
   z: number;
   w: number;
@@ -22,7 +22,7 @@ export interface MapView {
 }
 
 /** A box on screen (px), as `getBoundingClientRect` gives it. */
-export interface Box {
+interface Box {
   left: number;
   top: number;
   width: number;
@@ -86,7 +86,7 @@ export interface MapLabel<K> {
 }
 
 /** Where a name goes, in the SVG's coordinates (m: x, and y as `mapY` has it): its baseline's middle, and its second line's. */
-export interface PlacedLabel {
+interface PlacedLabel {
   x: number;
   y: number;
   subY: number;

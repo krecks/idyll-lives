@@ -56,7 +56,7 @@ import { frameNow } from '../shared/frameClock';
 export type { MirrorInstance } from './lotContents';
 
 /** How the mirrors reflect (a preset's `mirrors`, `mirrorScale`, `mirrorRate`; `msaaSamples`). */
-export interface MirrorQuality {
+interface MirrorQuality {
   /** How many mirrors reflect at once (0: none). */
   count: number;
   /** Resolution of a reflection, as a share of the screen's along each side. */
@@ -68,7 +68,7 @@ export interface MirrorQuality {
 }
 
 /** Residents as the characters last posed them (`characters.ts`): head tops (x, y, z per row, game space), which are drawn, whether any moved this frame. */
-export interface MirrorResidents {
+interface MirrorResidents {
   readonly heads: Float32Array;
   readonly visible: Uint8Array;
   readonly posed: boolean;

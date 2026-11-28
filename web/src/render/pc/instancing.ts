@@ -39,7 +39,7 @@ export const INSTANCE_COLOR: InstanceStream = { semantic: INSTANCE_COLOR_SEMANTI
 /** The matrix's columns' vertex attributes (PlayCanvas's `instance_line1..4`). */
 const MATRIX_SEMANTICS = [pc.SEMANTIC_ATTR11, pc.SEMANTIC_ATTR12, pc.SEMANTIC_ATTR14, pc.SEMANTIC_ATTR15];
 
-export interface InstancesOptions {
+interface InstancesOptions {
   name?: string;
   /** Streams beside the matrix (`INSTANCE_COLOR`, ...). */
   streams?: readonly InstanceStream[];
@@ -124,7 +124,6 @@ export class Instances {
     let draws = drawsOf.get(mesh);
     if (!draws) drawsOf.set(mesh, (draws = new Set()));
     draws.add(this);
-    byEntity.set(this.entity, this);
     if (options.castKeyed) keyedDraws.set(this.meshInstance, this);
     // The mesh is its owner's (a template's, a cache's): a draw holds it, never destroys it (a mesh
     // instance destroyed lets go of its mesh, and destroys it once nothing else holds it).
@@ -294,7 +293,6 @@ export class Instances {
   destroy(): void {
     if (!this.buffer) return;
     drawsOf.get(this.mesh)?.delete(this);
-    byEntity.delete(this.entity);
     keyedDraws.delete(this.meshInstance);
     this.entity.destroy();
     this.mesh.decRefCount();
@@ -303,15 +301,3 @@ export class Instances {
   }
 }
 
-/** Each draw by its entity (`destroyDraw`). */
-const byEntity = new WeakMap<pc.Entity, Instances>();
-
-/**
- * Takes down a draw by its entity: an instanced one (`Instances.destroy`: its buffer goes, the mesh
- * stays its owner's), or any other entity (its own meshes go with it).
- */
-export function destroyDraw(entity: pc.Entity): void {
-  const draw = byEntity.get(entity);
-  if (draw) draw.destroy();
-  else entity.destroy();
-}

@@ -43,7 +43,7 @@ export interface StudioScene {
   destroy(): void;
 }
 
-export interface StudioOptions {
+interface StudioOptions {
   /** `webgl` forces WebGL2 (the game's renderer setting, or `?renderer=webgl`). */
   backend: 'auto' | 'webgl';
   /** A multisampled canvas (the colour studio's stage; pictures multisample their own target). */

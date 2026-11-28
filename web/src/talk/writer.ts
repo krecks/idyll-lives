@@ -26,7 +26,7 @@ export const LINE_STOPS = ['"', '“', '”'];
 const LENGTHS = [0.2, 0.25, 0.25, 0.15, 0.15];
 
 /** How many sentences a line is asked for, by its seed (1–5). */
-export function lineSentences(seed: number): number {
+function lineSentences(seed: number): number {
   let u = hashUnit(seed, 13);
   for (const [i, share] of LENGTHS.entries()) {
     if (u < share) return i + 1;
@@ -41,7 +41,7 @@ const EXAMPLES = 2;
 const MAX_LOG = 30;
 
 /** With `?debug`: what was asked and written, newest last (`window.__voices.writer.log`). */
-export interface WriterLog {
+interface WriterLog {
   key: string;
   prompt: string;
   raw: string | null;

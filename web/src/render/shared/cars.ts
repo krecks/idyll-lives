@@ -884,16 +884,6 @@ export interface DriveEnd {
   street: number;
 }
 
-/** The inner end of the driveway `drive` on `plot`, by the street the plot faces (one of its z edges lies on a street's edge); null when it faces none. */
-export function driveEnd(plot: Rect, drive: Rect, streets: readonly Rect[]): DriveEnd | null {
-  for (const st of streets) {
-    if (st.w < st.d || plot.x + plot.w <= st.x || plot.x >= st.x + st.w) continue;
-    if (Math.abs(plot.z + plot.d - st.z) < 0.05) return { x: drive.x + drive.w / 2, z: drive.z, front: 1, street: st.z + st.d / 2 };
-    if (Math.abs(plot.z - (st.z + st.d)) < 0.05) return { x: drive.x + drive.w / 2, z: drive.z + drive.d, front: -1, street: st.z + st.d / 2 };
-  }
-  return null;
-}
-
 /** Where a house's car parks: its middle, which way it faces (0: towards +z), the middle of the street its driveway leads to, its body and paint (indices into `CARS`, `CAR_PAINT`) and size. */
 export interface ParkedCar {
   x: number;
@@ -907,7 +897,7 @@ export interface ParkedCar {
 }
 
 /**
- * The car of the house on `plot`, on its driveway (at its inner end `spot`, `driveEnd`: beside
+ * The car of the house on `plot`, on its driveway (at its inner end `spot`: beside
  * the house, not in the front yard Sims cross), facing the house or the street; null when the
  * house has none (about one in five). From the plot's place, so the town, the menus and the game
  * agree: one of the family cars (`FAMILY_CARS`), which the sim changes for the one its household's

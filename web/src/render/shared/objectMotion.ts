@@ -40,7 +40,7 @@ import { objectCentre, type ObjectPlacement } from '../../core/protocol';
 import type { ObjectClipInfo } from '../types';
 
 /** A model's moving parts as the motion needs them: by mesh of the template, the part it belongs to (-1 the still body), and the clips. */
-export interface MotionParts {
+interface MotionParts {
   parts: number[];
   clips: Map<string, ModelClip>;
 }
@@ -119,7 +119,7 @@ export function restPoses(parts: number): Float32Array {
 }
 
 /** The identity matrix into `out` at `offset`. */
-export function identityAt(out: Float32Array, offset: number): void {
+function identityAt(out: Float32Array, offset: number): void {
   out.fill(0, offset, offset + 16);
   for (let i = 0; i < 4; i++) out[offset + i * 5] = 1;
 }

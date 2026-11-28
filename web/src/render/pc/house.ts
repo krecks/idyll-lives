@@ -43,7 +43,7 @@ export interface HouseBuild extends Omit<HousePlan, 'parts' | 'doors'> {
   doors: HouseDoor[];
 }
 
-export interface SilhouetteBuild extends Omit<SilhouettePlan, 'parts'> {
+interface SilhouetteBuild extends Omit<SilhouettePlan, 'parts'> {
   meshes: HouseMesh[];
 }
 

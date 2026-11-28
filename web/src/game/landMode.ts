@@ -58,7 +58,7 @@ export function wetChanged(land: Land, patch: LandPatch): boolean {
 }
 
 /** Whether a river's way (`Land.flow`) is laid anywhere in the patch's rectangle, before it or now. */
-export function flowTouched(land: Land, patch: LandPatch): boolean {
+function flowTouched(land: Land, patch: LandPatch): boolean {
   if (!patch.flow || !land.flow) return false;
   if (patch.flow.some((v) => v !== 0)) return true;
   const { rect } = patch;

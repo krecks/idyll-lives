@@ -444,7 +444,7 @@ export interface Way {
 }
 
 /** A way found over the grid: its cells, which of the ways it was asked from it leaves by, the heading it ends on, and whether it was steered (else found by A*). */
-export interface Route {
+interface Route {
   cells: number[];
   from: number;
   h?: number;
@@ -452,7 +452,7 @@ export interface Route {
 }
 
 /** A stretch of a country road's course: its ends, its cells, and whether it is the course's first or last (`shared`). */
-export interface Piece {
+interface Piece {
   a: Way;
   cells: number[];
   b: Way | null;
@@ -461,10 +461,10 @@ export interface Piece {
 }
 
 /** What a cell the route might end on costs to end there (-1: it may not), heading `h`, more loosely if `loose`. */
-export type Goal = (i: number, h?: number, loose?: boolean) => number;
+type Goal = (i: number, h?: number, loose?: boolean) => number;
 
 /** What a cell costs a country road: where it may go (Infinity: not), and where it may go when that finds no way. */
-export type Costs = readonly [(i: number) => number, (i: number) => number];
+type Costs = readonly [(i: number) => number, (i: number) => number];
 
 /** The country road on from a port (`CountryRouter.onward`), as it would be laid: its road whole, the port it ends at (if one), how bad it is, its course, its far end (null: out of the world over edge `side`); and the way it leaves by. */
 export interface Onward {

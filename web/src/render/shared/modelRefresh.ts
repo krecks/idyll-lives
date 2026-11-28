@@ -10,8 +10,8 @@
  */
 
 /** The wait (ms) after the last file came, and the longest from the first. */
-export const FILES_SETTLE_MS = 1500;
-export const FILES_WAIT_MS = 5000;
+const FILES_SETTLE_MS = 1500;
+const FILES_WAIT_MS = 5000;
 
 export class ModelRefresh {
   private readonly arrived = new Set<string>();

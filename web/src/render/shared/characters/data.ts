@@ -111,7 +111,7 @@ export interface BodyData {
 }
 
 /** A life stage's shape of a base body: per part position deltas and normals, and its skeleton. */
-export interface StageJson {
+interface StageJson {
   mesh: string;
   height: number;
   restT: number[];
@@ -252,7 +252,7 @@ interface RigJson {
 }
 
 /** A mesh part in a binary (byte offsets). */
-export interface PartJson {
+interface PartJson {
   vertices: number;
   indices: number;
   positions: number;

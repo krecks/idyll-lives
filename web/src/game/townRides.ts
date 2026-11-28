@@ -56,7 +56,7 @@ export function ridesFor(content: Content, household: HouseholdDraft, car: boole
 }
 
 /** What `placeRides` keeps clear and goes by, in plot coordinates. */
-export interface RideLot {
+interface RideLot {
   width: number;
   depth: number;
   walls: readonly Wall[];

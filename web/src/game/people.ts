@@ -203,7 +203,7 @@ const RICH_FOR = 4;
  * A home a household may live in: a house's lot, or a flat of a flats building or over a place (`flat`: its index
  * in the building's flats). Its slot (where it is, its area), its bedrooms and its price.
  */
-export interface Home {
+interface Home {
   slot: PlotSlot;
   flat?: number;
   bedrooms: number;
@@ -321,7 +321,7 @@ export function offered(town: NeighbourhoodDraft, streams: PeopleStreams, most =
  * at most in full (`FILL_CAP` by default; a smaller tier stops at its own limit when that is fewer);
  * and family names none of their households takes (the player's).
  */
-export interface FillOptions {
+interface FillOptions {
   tier?: FillTier;
   cap?: number;
   avoid?: readonly string[];
@@ -534,7 +534,7 @@ export function neighbourBonds(
  * households, who have climbed higher and put more by. Every roll comes from `rand`. Null if none
  * turns up.
  */
-export function householdFor(
+function householdFor(
   content: Content,
   assets: AssetRegistry,
   bedrooms: number,

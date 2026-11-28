@@ -13,7 +13,7 @@ import type { NeighbourhoodDraft, Templates } from '../game/town';
 import { homesForSale, type HomeOffer, type HomeRef } from '../ui/homes';
 
 /** Where the household moves in: the first house for sale, one in the main town, or a flat. */
-export type SceneHome = 'first' | 'town' | 'flat';
+type SceneHome = 'first' | 'town' | 'flat';
 
 /** `make` with `Math.random` drawn from `seed` while it runs (as it is, with no seed). */
 function seeded<T>(seed: number | null, make: () => T): T {

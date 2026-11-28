@@ -43,14 +43,14 @@ import { addLot, fillStreet, removeLotsEdit, renumber, withLotPlace, withPlaceNa
 export type BuildMode = 'homes' | 'buildings' | 'both';
 
 /** A build-up asked for: the road, what goes along it, and the seed its homes and buildings are drawn from. */
-export interface BuildUpOp {
+interface BuildUpOp {
   road: number;
   mode: BuildMode;
   seed: number;
 }
 
 /** A civic place put down by hand: which (an index into `CIVIC`), along which road, how far along it (m) and on which side, and the seed its look and name are drawn from. */
-export interface CivicOp {
+interface CivicOp {
   civic: number;
   road: number;
   s: number;

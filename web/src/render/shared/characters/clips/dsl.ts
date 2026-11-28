@@ -18,7 +18,6 @@
  */
 
 import type { CharacterSet, Clip } from '../data';
-import { clamp } from '../../../../game/noise';
 
 export type Rot = readonly [x: number, y: number, z: number];
 export type Vec = readonly [x: number, y: number, z: number];
@@ -27,13 +26,13 @@ const SIDED = ['clavicle', 'upperarm', 'lowerarm', 'hand', 'thumb_01', 'thumb_02
 type Sided = (typeof SIDED)[number];
 export type BoneKey = 'pelvis' | 'spine_01' | 'spine_02' | 'spine_03' | 'neck_01' | 'Head' | Sided | `${Sided}_l` | `${Sided}_r`;
 export type PoseSpec = { [K in BoneKey]?: Rot } & { move?: Vec };
-export type PoseFn = (phase: number) => PoseSpec;
+type PoseFn = (phase: number) => PoseSpec;
 export type Ease = 'linear' | 'smooth' | 'in' | 'out' | ((t: number) => number);
-/** A key: phase (0..1), the pose (or a function making it at bake time, for `legIK`), the easing into it. */
+/** A key: phase (0..1), the pose (or a function making it at bake time, for IK helpers), the easing into it. */
 export type Key = readonly [t: number, pose: PoseSpec | (() => PoseSpec), ease?: Ease];
-export type Mask = 'upper' | 'legs' | 'hands';
+type Mask = 'upper' | 'legs' | 'hands';
 
-export interface ClipOptions {
+interface ClipOptions {
   seconds: number;
   loop: boolean;
   /** Locomotion: ground speed of the planted foot (m/s, reference skeleton). */
@@ -210,7 +209,7 @@ export interface Reference {
  */
 export const WRITTEN = { pelvis: 0.947, torso: 0.4772, eyes: 0.1035 } as const;
 
-/** Rest joints of the reference skeleton while baking (for `legIK`). */
+/** Rest joints of the reference skeleton while baking (for IK helpers such as clips/ik.ts). */
 let ref: Reference | null = null;
 
 /**
@@ -222,7 +221,7 @@ let ref: Reference | null = null;
 export type ReachReport = (clip: string, limb: string, reach: number, fold: number) => void;
 let report: ReachReport | null = null;
 let baking = '';
-/** An IK solve's reach (clips/ik.ts `twoBone`, `legIK`): `want` m to the target, on bones `l1` and `l2` long. */
+/** An IK solve's reach (clips/ik.ts `twoBone`): `want` m to the target, on bones `l1` and `l2` long. */
 export function reached(limb: string, want: number, l1: number, l2: number): void {
   report?.(baking, limb, want / (l1 + l2), Math.abs(l1 - l2) / (l1 + l2));
 }
@@ -232,42 +231,6 @@ export function reference(): Reference {
   if (!ref) throw new Error('reference: only while baking clips');
   return ref;
 }
-
-/**
- * Thigh, calf and foot rotations that put the ankle of leg `side` at its rest position + `ankle`
- * (m, reference skeleton) while the pelvis is moved by `move`, the knee bending forward and the
- * sole staying level. Two-bone analytic IK on the reference leg lengths (from rig.json); usable
- * only while clips bake (inside `cycle` functions and key functions).
- */
-export function legIK(side: 'l' | 'r', ankle: Vec, move: Vec = [0, 0, 0]): PoseSpec {
-  if (!ref) throw new Error('legIK: only while baking clips');
-  const hip = ref.joint(`thigh_${side}`);
-  const foot = ref.joint(`foot_${side}`);
-  const dx = foot[0] + ankle[0] - (hip[0] + move[0]);
-  const dy = foot[1] + ankle[1] - (hip[1] + move[1]);
-  const dz = foot[2] + ankle[2] - (hip[2] + move[2]);
-  const { thigh: L1, shin: L2 } = ref;
-  reached(`leg_${side}`, Math.hypot(dx, dy, dz), L1, L2);
-  const D = Math.min(Math.hypot(dx, dy, dz), (L1 + L2) * 0.9995);
-  const knee = Math.PI - Math.acos(clamp((L1 * L1 + L2 * L2 - D * D) / (2 * L1 * L2), -1, 1));
-  const lift = Math.acos(clamp((L1 * L1 + D * D - L2 * L2) / (2 * L1 * D), -1, 1));
-  const pitch = Math.atan2(dz, -dy);
-  const roll = Math.asin(clamp(dx / Math.max(D, 1e-6), -1, 1));
-  // Pitches (forward of straight down) of the thigh and shin: at rest, and wanted. A rotation of
-  // -a about x pitches a bone forward by a.
-  const k = ref.joint(`calf_${side}`);
-  const rest1 = Math.atan2(k[2] - hip[2], hip[1] - k[1]);
-  const rest2 = Math.atan2(foot[2] - k[2], k[1] - foot[1]);
-  const thigh = -(pitch + lift - rest1);
-  const calf = rest2 - thigh - (pitch + lift - knee);
-  const deg = 180 / Math.PI;
-  return {
-    [`thigh_${side}`]: [thigh * deg, 0, roll * deg],
-    [`calf_${side}`]: [calf * deg, 0, 0],
-    [`foot_${side}`]: [-(thigh + calf) * deg, 0, -roll * deg],
-  } as PoseSpec;
-}
-
 
 // --- baking -----------------------------------------------------------------------------------
 

@@ -97,12 +97,12 @@ export type LineEvent =
   | { kind: 'thought'; thought: string; subject: string };
 
 /** Fills `{key}` placeholders. */
-export function fillIn(template: string, values: Record<string, string>): string {
+function fillIn(template: string, values: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (all, key: string) => values[key] ?? all);
 }
 
 /** Who is speaking, in words (the start of the last message: `lead`). */
-export function personaText(text: TalkText, p: Persona): string {
+function personaText(text: TalkText, p: Persona): string {
   const me = p.first;
   const parts = [fillIn(text.intro, { me, person: p.person })];
   if (p.job) parts.push(fillIn(text.job, { me, subject: p.job }));
@@ -112,7 +112,7 @@ export function personaText(text: TalkText, p: Persona): string {
 }
 
 /** The event in words, about `me`. */
-export function eventText(text: TalkText, me: string, e: LineEvent): string | null {
+function eventText(text: TalkText, me: string, e: LineEvent): string | null {
   switch (e.kind) {
     case 'social': {
       const s = text.social[e.social];
@@ -137,7 +137,7 @@ export function eventText(text: TalkText, me: string, e: LineEvent): string | nu
 }
 
 /** `sentences`: how many the line should have (1–5; none: as the model likes). */
-export function situationMessage(text: TalkText, me: string, s: Situation, event: string, examples: readonly string[], to?: string, sentences?: number): string {
+function situationMessage(text: TalkText, me: string, s: Situation, event: string, examples: readonly string[], to?: string, sentences?: number): string {
   const w = text.situation;
   const lines = [`${fillIn(w.when, { subject: s.when })}, ${s.place}.`];
   if (s.weather) lines.push(fillIn(w.weather, { me, subject: s.weather }));

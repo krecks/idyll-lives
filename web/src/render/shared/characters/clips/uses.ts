@@ -395,7 +395,7 @@ function showerAt(p: number, turn: number, twist: number): PoseSpec {
  */
 const GUITAR_BODY: Vec = [0.08, -0.03, 0.17];
 const GUITAR_NECK: Vec = [-0.844, 0.5, 0.195];
-export const GUITAR_REACH = { long: 0.55, short: 0.27 };
+const GUITAR_REACH = { long: 0.55, short: 0.27 };
 /** A short one (a ukulele) is held this much higher, up at the chest (characters.ts `GUITAR.upShort`). */
 const GUITAR_UP_SHORT = 0.12;
 

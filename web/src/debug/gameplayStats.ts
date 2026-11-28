@@ -18,7 +18,7 @@ export const GAMEPLAY_STATS = DEBUG_HOOKS && params.has('gpustats');
  * What `window.__gameStats()` answers: the renderer's stats, the GPU passes it timed, and the
  * simulation's WASM memory (the sim worker reports its own; the main thread can't read it).
  */
-export type GameplayStats = RenderStats & {
+type GameplayStats = RenderStats & {
   gpuPasses: { name: string; ms: number; frames: number }[];
   /** The sim worker's WASM linear memory, bytes; null until its first 1 Hz report. */
   simMemoryBytes: number | null;

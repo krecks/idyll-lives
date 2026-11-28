@@ -143,7 +143,7 @@ function luminance(c: readonly number[]): number {
 }
 
 /** Eye colours for looks without one (older saves): the creator's `palette.eyes`, mostly brown. */
-export const EYE_COLOURS = ['#4A2E1B', '#6B4226', '#6B4226', '#8A6237', '#5F7A3E', '#4E7BA6', '#7C8A96'];
+const EYE_COLOURS = ['#4A2E1B', '#6B4226', '#6B4226', '#8A6237', '#5F7A3E', '#4E7BA6', '#7C8A96'];
 
 /** Share of each (linear) swatch channel real skin reflects (light swatches; see `skinColour`). */
 const SKIN_REFLECT = [0.68, 0.6, 0.56];

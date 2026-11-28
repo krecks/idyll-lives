@@ -8,7 +8,7 @@
 import * as pc from './engine';
 
 /** The forward renderer's directional shadow renderer (`Renderer._shadowRendererDirectional`). */
-export interface DirectionalShadows {
+interface DirectionalShadows {
   cull(light: object, comp: object, camera: pc.Camera, casters?: object, mask?: number): void;
   getLightRenderPass(light: object, camera: pc.Camera): object | null;
 }
@@ -20,7 +20,7 @@ export function directionalShadows(app: pc.AppBase): DirectionalShadows | undefi
 }
 
 /** The forward renderer's shadow renderer for spot and point lights (`Renderer._shadowRendererLocal`). */
-export interface LocalShadows {
+interface LocalShadows {
   cull(light: pc.Light, comp: object, casters?: pc.MeshInstance[] | null): void;
 }
 
@@ -31,7 +31,7 @@ export function localShadows(app: pc.AppBase): LocalShadows | undefined {
 }
 
 /** A shader the device made, as far as `shadersCompiling` and `pcmaterials` read it. */
-export interface CompiledShader extends pc.Shader {
+interface CompiledShader extends pc.Shader {
   ready: boolean;
   failed: boolean;
   impl: { isLinked(device: pc.GraphicsDevice): boolean };
@@ -58,7 +58,7 @@ interface AdapterInfo {
  * The context's driver names, whichever its backend has: WebGL2's `unmasked*` on the device itself,
  * WebGPU's adapter in `gpuAdapter` (so never both — the callers read what they find).
  */
-export interface DriverInfo {
+interface DriverInfo {
   unmaskedRenderer?: string;
   unmaskedVendor?: string;
   gpuAdapter?: { info?: AdapterInfo };
@@ -72,7 +72,7 @@ export function deviceDriverInfo(device: pc.GraphicsDevice): DriverInfo {
 }
 
 /** PlayCanvas 2.23's WebGPU render pipeline cache (`WebgpuRenderPipeline`): `get` makes a miss with `create`. */
-export interface RenderPipelineCache {
+interface RenderPipelineCache {
   create(...args: unknown[]): unknown;
   cache: Map<number, { pipeline: unknown }[]>;
 }

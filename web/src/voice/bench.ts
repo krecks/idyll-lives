@@ -21,7 +21,7 @@ import type { LineTiming } from './supertonic';
 import type { VoiceParams } from './voices';
 
 /** Lines like residents' (one to five sentences), each in a voice of its own. */
-export const BENCH_LINES: { name: string; text: string; voice: VoiceParams }[] = [
+const BENCH_LINES: { name: string; text: string; voice: VoiceParams }[] = [
   { name: 'arlo-short', text: 'Hello there!', voice: { style: 'M1', pitch: 1, depth: 1, speed: 1 } },
   { name: 'ada-hungry', text: "I'm so hungry, I could eat a whole pizza by myself.", voice: { style: 'F1', pitch: 1, depth: 1, speed: 1 } },
   { name: 'child-garden', text: 'What a lovely garden. I should water the roses before it gets dark.', voice: { style: 'F1', pitch: 1.3, depth: 1.08, speed: 1.04 } },
@@ -32,7 +32,7 @@ export const BENCH_LINES: { name: string; text: string; voice: VoiceParams }[] =
   { name: 'ezra-tired', text: "I'm exhausted. Bed sounds wonderful right now.", voice: { style: 'M5', pitch: 1, depth: 1, speed: 0.9 } },
 ];
 
-export interface LineSample {
+interface LineSample {
   name: string;
   /** Seconds of speech made. */
   seconds: number;
@@ -47,7 +47,7 @@ export interface LineSample {
   samples: string;
 }
 
-export interface VoiceReport {
+interface VoiceReport {
   device: VoiceDevice;
   adapter: Record<string, string>;
   isolated: boolean;
@@ -70,7 +70,7 @@ export interface VoiceReport {
   perSecond: LineTiming;
 }
 
-export interface VoiceBenchOptions {
+interface VoiceBenchOptions {
   device?: VoiceDevice;
   /** Runs per line (default 3). */
   runs?: number;

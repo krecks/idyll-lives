@@ -425,9 +425,24 @@ pub fn nightstand_round() -> Vec<Obj> {
         let arc: Vec<(f64, f64)> = (0..=8)
             .map(|i| 55.0 + 70.0 * f64::from(i) / 8.0)
             .map(|a| (0.2605 * cosd(a), z + 0.2605 * sind(a)))
-            .chain((0..=8).rev().map(|i| 55.0 + 70.0 * f64::from(i) / 8.0).map(|a| (0.2565 * cosd(a), z + 0.2565 * sind(a))))
+            .chain(
+                (0..=8)
+                    .rev()
+                    .map(|i| 55.0 + 70.0 * f64::from(i) / 8.0)
+                    .map(|a| (0.2565 * cosd(a), z + 0.2565 * sind(a))),
+            )
             .collect();
-        fextrude!(F, "drawer", &arc, 0.1, (0, 0.42, 0), M.clay, plane = Facing::Top, bevel = 0.003, bevel_segments = 1);
+        fextrude!(
+            F,
+            "drawer",
+            &arc,
+            0.1,
+            (0, 0.42, 0),
+            M.clay,
+            plane = Facing::Top,
+            bevel = 0.003,
+            bevel_segments = 1
+        );
         kit::knob!(F, "knob", 0, 0.42, z + 0.255, 0.0125, M.brass); // (2.5 cm: the drum stays a nightstand's depth)
         revolve!(
             "top",

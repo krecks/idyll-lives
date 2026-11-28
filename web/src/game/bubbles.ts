@@ -208,7 +208,7 @@ export class BubbleLayer {
 }
 
 /** The icon of a room thought's subject (sim-core `rooms::room_subject`: kind × 8 + factor). */
-export function roomIcon(content: Content, subject: number): string {
+function roomIcon(content: Content, subject: number): string {
   const kind = Math.floor(subject / 8);
   if (kind === 0) return 'icon.category.garden';
   return content.roomKinds[kind - 1]?.icon || 'icon.ui.room';

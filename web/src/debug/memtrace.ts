@@ -25,7 +25,7 @@ interface Site {
   largest: number;
 }
 
-export interface MemtraceSite extends Site {
+interface MemtraceSite extends Site {
   stack: string;
 }
 

@@ -24,7 +24,7 @@ import { ITEM_STAND_IN } from '../shared/modelEntry';
 import { sphereData } from '../shared/modelParts';
 
 /** Where items show: the storey in view, the storey of a lot row and how high each stands. */
-export interface ItemView {
+interface ItemView {
   storey: number;
   /** The storey a lot row is on (-1: the basement). */
   storeyOf(z: number): number;
@@ -38,7 +38,7 @@ export interface ItemView {
 }
 
 /** A drawn item's pick box (metres; ground rows). */
-export interface PlacedItem {
+interface PlacedItem {
   id: number;
   minX: number;
   minZ: number;

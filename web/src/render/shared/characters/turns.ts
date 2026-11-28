@@ -12,7 +12,7 @@ import type { CharacterSet, Clip } from './data';
 import { type SimRig, wrapAngle } from './rig';
 
 /** Turns smaller than this (rad) pivot on the planted feet; from this on they step round. */
-export const TURN_MIN = (35 * Math.PI) / 180;
+const TURN_MIN = (35 * Math.PI) / 180;
 /** The crossfade into a turn and out of it (s). */
 export const TURN_FADE = 0.2;
 

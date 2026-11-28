@@ -72,7 +72,7 @@ type Rand = () => number;
 export type LotChoice = { kind: 'house'; size: Exclude<LotSize, 'farm' | 'terrace'>; garden?: GardenSize } | { kind: 'farm' } | { kind: 'flats' } | { kind: 'park' | 'shop' | 'outdoor'; template: string } | { kind: 'place'; what: PlaceWhat; area: number };
 
 /** Where a lot would go (`canPlace`): its rectangle on the town and the way it faces; a building of flats', what it is (`FlatsTemplate.description`). */
-export interface LotFit extends Rect {
+interface LotFit extends Rect {
   facing: Facing;
   about?: string;
 }
@@ -213,7 +213,7 @@ function areaAt(draft: NeighbourhoodDraft, road: number, [x, z]: Pt): number {
   return best;
 }
 
-/** The middle of area `a`'s box (`macro.ts` `areaCentre`), else of the world. */
+/** The middle of area `a`'s box, else of the world. */
 function middleOf(draft: NeighbourhoodDraft, a: number): Pt {
   const area = draft.open?.areas[a];
   return area ? [area.x + area.w / 2, area.z + area.d / 2] : [draft.width / 2, draft.depth / 2];

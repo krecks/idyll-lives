@@ -19,7 +19,7 @@ export type RoofKind = (typeof ROOFS)[number];
 /** A storey (m), as the contract has it. */
 export const STOREY = 3;
 /** A pitched roof's pitch (as the game's houses: 34°), a mansard's rise at most (m), a flat roof's parapet (m). */
-export const PITCH = Math.tan((34 * Math.PI) / 180);
+const PITCH = Math.tan((34 * Math.PI) / 180);
 const MANSARD_RISE = 3.2;
 export const PARAPET = 0.7;
 /** How far walls go under the lowest corner's ground (m): no gap under a building on a slope. */

@@ -7,7 +7,7 @@
  * Plain TypeScript without runtime imports (the Node check runs it by stripping the types).
  */
 
-export interface CleanOptions {
+interface CleanOptions {
   /** The speaker's first name (lines may start with it as a label). */
   me: string;
   /** Other names that may appear (who they talk to): "Tom smiles…" is narration. */
@@ -21,7 +21,7 @@ export interface CleanOptions {
 }
 
 /** Sentences a line keeps at most. */
-export const MAX_SENTENCES = 5;
+const MAX_SENTENCES = 5;
 
 /** Characters a line may keep: Latin letters (with accents), digits, spaces and plain punctuation. */
 const ALLOWED = /[^A-Za-zÀ-ÖØ-öø-ÿ0-9 .,!?'’\-—…:;]/g;

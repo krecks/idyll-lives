@@ -12,7 +12,7 @@ import { add, ccw, fillPoly, r2, rectFrom, rectPoly, tilesOf } from './footprint
 const HIGH_STREET = 180;
 const BAND = 32;
 /** The bands a centre's outline is tried at, widest first (`outline`): a narrower one where the wider crosses itself, or isn't the densest. */
-export const BANDS = [BAND, 24, 18, 12];
+const BANDS = [BAND, 24, 18, 12];
 /** What a city's avenue counts against being its high street (m, as nearer the middle): its through road, the shops on a street off it. */
 const AVENUE_HIGH_STREET = 400;
 /** A centre's side narrowed to its kerb (`narrowCentre`): the road's half-width and its pavement, about (m). */
@@ -43,7 +43,7 @@ export interface Centre {
 
 
 /** Whether a polyline crosses itself (two segments not next to each other meeting). */
-export function selfCrossing(poly: readonly Pt[]): boolean {
+function selfCrossing(poly: readonly Pt[]): boolean {
   const n = poly.length;
   const cross = (o: Pt, a: Pt, b: Pt) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   for (let i = 0; i < n; i++) {
@@ -149,7 +149,7 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
  * (`centreDensity` over `taken`, `polys`), the widest outline that is; else the one that comes nearest. Its square
  * stays inside it (`outline` goes round it).
  */
-export function narrowCentre(roads: readonly RoadPlan[], c: Centre, W: number, D: number, taken: Uint8Array, box: Rect, polys: readonly (readonly Pt[])[]): void {
+function narrowCentre(roads: readonly RoadPlan[], c: Centre, W: number, D: number, taken: Uint8Array, box: Rect, polys: readonly (readonly Pt[])[]): void {
   const ratio = densityRatio(W, D, taken, box, polys);
   let best = { poly: c.poly, r: ratio(c.poly), width: 2 * c.band };
   if (best.r >= DENSEST) return;
@@ -221,7 +221,7 @@ export function densestCentre(c: Centre, roads: readonly RoadPlan[], W: number, 
 }
 
 /** A centre's outline `band` m either side of its high street (`right` m on its right, if given), out round its square: counter-clockwise seen from above. */
-export function outline(roads: readonly RoadPlan[], c: Centre, band: number, right = band): Pt[] {
+function outline(roads: readonly RoadPlan[], c: Centre, band: number, right = band): Pt[] {
   const pts = roads[c.road].points;
   const ls = lengths(pts);
   const { s0, s1, at } = c;

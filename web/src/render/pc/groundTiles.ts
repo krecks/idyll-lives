@@ -74,7 +74,7 @@ const MAP = {
 } as const;
 
 /** What the farmland's map asks of the land: a big world's farmland, its box and how to paint it (`LandscapeLayout.farmland`). */
-export interface TownGroundLand {
+interface TownGroundLand {
   /** `key`: which of its fields are farmed and where its edges cut them, as a hash (the map is made again only when it changes). */
   farmland(): { box: [number, number, number, number]; key: string; paint(g: FieldCanvas): void } | null;
 }
@@ -99,7 +99,7 @@ function groundVersion(world: WorldStructure): number {
 const groundVersions = new WeakMap<object, { plots: WorldStructure['plots']; parking: WorldStructure['parking']; carParks: WorldStructure['carParks']; version: number }>();
 
 /** What `paintPaving` draws with: a 2D canvas's context (or a stand-in that records what is drawn, in the tests). */
-export type PavingCanvas = Pick<OffscreenCanvasRenderingContext2D, 'fillStyle' | 'strokeStyle' | 'lineWidth' | 'lineCap' | 'fillRect' | 'beginPath' | 'moveTo' | 'lineTo' | 'closePath' | 'rect' | 'fill' | 'stroke'>;
+type PavingCanvas = Pick<OffscreenCanvasRenderingContext2D, 'fillStyle' | 'strokeStyle' | 'lineWidth' | 'lineCap' | 'fillRect' | 'beginPath' | 'moveTo' | 'lineTo' | 'closePath' | 'rect' | 'fill' | 'stroke'>;
 
 /**
  * The town's paving into the map (`g`, in town metres over a `W` × `D` ground): the tiles it lays whole

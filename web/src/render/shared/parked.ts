@@ -31,7 +31,7 @@ export function placements<P extends { id: number; x: number; z: number; home: b
 }
 
 /** What a draw keyed by its copies answers (`Instances.castKey`: `castKeyOf` of its copies, kept while they are). */
-export interface CastKeyed {
+interface CastKeyed {
   castKey(reaches: (x: number, z: number) => boolean, ground: number): number;
 }
 

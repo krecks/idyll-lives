@@ -33,7 +33,7 @@ export function viewShift(alpha: number, beta: number, ox: number, oy: number, o
 }
 
 /** The camera the overview drives: any with these fields. */
-export interface OverviewCameraTarget {
+interface OverviewCameraTarget {
   alpha: number;
   beta: number;
   radius: number;
@@ -45,7 +45,7 @@ export interface OverviewCameraTarget {
 }
 
 /** How tall the town stands (m), framed with it. */
-export const OVERVIEW_TOWN_HEIGHT = 7;
+const OVERVIEW_TOWN_HEIGHT = 7;
 
 /** How near (radians, and parts of the radius) a settled camera comes to its goal before it's put there. */
 const SNAP = 1e-4;
@@ -85,7 +85,7 @@ const PAN_REACH = 1500;
  */
 export const LAND_TALL = 0.4;
 /** Or this share of the picture's height the land has at the shot's own tilt, if that is less (`reachTilt`). */
-export const LAND_KEEP = 0.8;
+const LAND_KEEP = 0.8;
 /**
  * The land's sides the eye stands past are seen over the landscape's ring (`overRing`) at this many points each, its
  * ground read this many times along the way to each, from where the way comes into the landscape to the land's edge.
@@ -107,7 +107,7 @@ function enter(e: number, d: number, a: number, b: number): number {
 }
 
 /** A rectangle of the world (m) the camera's target is kept over. */
-export interface OverviewBounds {
+interface OverviewBounds {
   x0: number;
   z0: number;
   x1: number;

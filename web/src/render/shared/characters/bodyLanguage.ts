@@ -15,7 +15,7 @@ import type { Additive } from './pose';
 import { addRotation } from './pose';
 
 /** How a resident holds themselves (degrees; 0 is the clips' own bearing). */
-export interface Bearing {
+interface Bearing {
   /** The back bent forward (+) or held up straight (-), spread over the spine. */
   stoop: number;
   /** The head bowed (+) or raised (-). */
@@ -40,7 +40,7 @@ export const BEARING_FLOATS = KEYS.length + 3;
  * the elbows bent; tense and uncomfortable draw the shoulders up and hold the arms in; embarrassed hunches, the head
  * down.
  */
-export const BEARINGS: Record<string, Partial<Bearing>> = {
+const BEARINGS: Record<string, Partial<Bearing>> = {
   sad: { stoop: 8, head: 12, shoulders: 7, arms: 3, swing: -0.55 },
   tired: { stoop: 9, head: 9, shoulders: 6, swing: -0.45 },
   bored: { stoop: 5, head: 5, shoulders: 3, swing: -0.25 },
@@ -62,7 +62,7 @@ export const BEARINGS: Record<string, Partial<Bearing>> = {
 };
 
 /** What the body is free to change this frame (0..1 each): the back and shoulders, the arms, the head. */
-export interface Freedom {
+interface Freedom {
   posture: number;
   arms: number;
   head: number;

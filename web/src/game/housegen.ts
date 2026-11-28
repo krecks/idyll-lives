@@ -681,7 +681,7 @@ type Cut = HouseTemplate & { cut?: { x: number; width: number; depth: number } }
  * the front door (where `driveway` in `town.ts` puts it); a house in a row (`row`), `ROW_GAP`
  * beside it on its +x side only. `x`: where the lot starts.
  */
-export function fitLot(spec: GardenSpec, rng: () => number, house: Rect, doorX: number, row = false): { x: number; width: number; depth: number } {
+function fitLot(spec: GardenSpec, rng: () => number, house: Rect, doorX: number, row = false): { x: number; width: number; depth: number } {
   if (row) {
     // (In a row: the house's wall on the lot's edge on one side, `ROW_GAP` on the other.)
     const share = spec.back[0] + rng() * (spec.back[1] - spec.back[0]);

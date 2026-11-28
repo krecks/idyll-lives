@@ -9,7 +9,7 @@
  * Why time stands still: the game is still loading (until `reveal`), a menu or window is open
  * (`setMenuPause`), or the player is in Build or Create.
  */
-export type SpeedHold = 'loading' | 'menu' | 'build';
+type SpeedHold = 'loading' | 'menu' | 'build';
 
 /**
  * Super speed (sim-core `clock::SUPER_SPEED`): as fast as the machine goes, up to 30×, and up to 60× while

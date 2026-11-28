@@ -72,7 +72,7 @@ fn gameAcesFitted(color: vec3f) -> vec3f {
  * `gameExposure`, `gameContrast`, `gameVignette1`/`2` (the original's `vignetteSettings1`/`2`) and
  * `gameCurveNeutral`/`Positive`/`Negative` (`vCameraColorCurve*`).
  */
-export const IMAGE_PROCESSING: Record<Language, string> = {
+const IMAGE_PROCESSING: Record<Language, string> = {
   glsl: `
 uniform float gameExposure;
 uniform float gameContrast;
@@ -155,7 +155,7 @@ fn gameSrgbDecode(c: vec3f) -> vec3f {
 `,
 };
 
-export interface ComposeOptions {
+interface ComposeOptions {
   /** The image processing (off: the diag views and `?diag=linear`, which show the colour itself). */
   imageProcessing: boolean;
   /** The night grade at the end (off where the FXAA pass has it, and with `?diag=nonight`). */

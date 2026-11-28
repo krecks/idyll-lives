@@ -150,7 +150,7 @@ export interface Templates {
 }
 
 /** Town sizes of drafts from older code (worlds have a place and options now). */
-export type OldTownSize = 'small' | 'medium' | 'large';
+type OldTownSize = 'small' | 'medium' | 'large';
 
 export interface PlotSlot {
   index: number;
@@ -252,7 +252,7 @@ export interface NeighbourhoodDraft {
 }
 
 /** What kind of world a town is in, one line about it, and how its land looks. */
-export interface WorldInfo {
+interface WorldInfo {
   /** Its place (`world.ts` `WorldKind`); a classic world's kind, or an older draft's (`LEGACY_KINDS`). */
   kind: string;
   /** How big the world is (always `big`; missing in drafts from older code). */
@@ -375,7 +375,7 @@ export function primeHouses(houses: readonly [string, HouseTemplate | undefined]
 }
 
 /** Width and depth of a lot of this size. */
-export function lotDims(t: Templates, size: LotSize | undefined): { width: number; depth: number } {
+function lotDims(t: Templates, size: LotSize | undefined): { width: number; depth: number } {
   return t.lotSizes?.[size ?? 'medium'] ?? t.plot;
 }
 
@@ -464,7 +464,7 @@ export function onLot(t: Templates, h: HouseTemplate, s: Pick<PlotSlot, 'lot' | 
 }
 
 /** A public place moved onto plot `s`'s lot like a house layout (`onLot`): centred across it, front kept at the street, its storey above with it. */
-export function placeOnLot(t: Templates, p: PublicTemplate, s: Pick<PlotSlot, 'lot' | 'w' | 'd'>): PublicTemplate {
+function placeOnLot(t: Templates, p: PublicTemplate, s: Pick<PlotSlot, 'lot' | 'w' | 'd'>): PublicTemplate {
   const dx = Math.floor((slotDims(t, s).width - (p.lot ?? t.plot).width) / 2);
   if (dx === 0) return p;
   const door = (d: Door): Door => ({ ...d, x: d.x + dx });
@@ -621,7 +621,7 @@ export interface Frontage {
 }
 
 /** Which way a lot on the side of a road that `n` points to faces (towards the road). */
-export function facingFrom([nx, nz]: Pt): Facing {
+function facingFrom([nx, nz]: Pt): Facing {
   return Math.abs(nz) >= Math.abs(nx) ? (nz > 0 ? 0 : 2) : nx > 0 ? 1 : 3;
 }
 
@@ -1061,7 +1061,7 @@ const BARN = { w: 8, d: 7 };
 /** Driveways are paths wider than this (garden paths are 1 m); see `driveway`. */
 export const DRIVEWAY_MIN_WIDTH = 1.8;
 /** How far a driveway goes on across the verge to its road at most (m; a garden path's goes 12). */
-export const DRIVE_REACH = 30;
+const DRIVE_REACH = 30;
 
 /** How far a garden path goes on across the verge to its road at most (m): a lot set back from a bend still gets to it. */
 const PATH_REACH = 24;
@@ -1074,7 +1074,7 @@ const DRIVEWAY_PAST_FRONT = 5.4;
  * beside the house, on the side with more room (away from the front door when even), clear
  * of garden objects. Null when neither side has room.
  */
-export function driveway(h: HouseTemplate, pw: number, pd: number, footprint: (def: string) => [number, number]): Rect | null {
+function driveway(h: HouseTemplate, pw: number, pd: number, footprint: (def: string) => [number, number]): Rect | null {
   return driveways(h, pw, pd, footprint)[0] ?? null;
 }
 
@@ -1082,7 +1082,7 @@ export function driveway(h: HouseTemplate, pw: number, pd: number, footprint: (d
  * The driveways a house layout has room for (`driveway`), the one it takes first: one on each
  * side with room, clear of garden objects and of `keep` (a farm's fields and farmyard).
  */
-export function driveways(h: HouseTemplate, pw: number, pd: number, footprint: (def: string) => [number, number], keep: readonly Rect[] = []): Rect[] {
+function driveways(h: HouseTemplate, pw: number, pd: number, footprint: (def: string) => [number, number], keep: readonly Rect[] = []): Rect[] {
   const xs = h.walls.flatMap(([x0, , x1]) => [x0, x1]);
   const zs = h.walls.flatMap(([, z0, , z1]) => [z0, z1]);
   const [hx0, hx1, hz0] = [Math.min(...xs), Math.max(...xs), Math.min(...zs)];
@@ -1114,7 +1114,7 @@ export function vacantSlots(town: NeighbourhoodDraft): PlotSlot[] {
 }
 
 /** Town geometry in world tiles: what `assembleTown` writes and the menu preview draws. */
-export interface TownLayout {
+interface TownLayout {
   walls: Wall[];
   doors: Door[];
   windows: Door[];
@@ -1535,7 +1535,7 @@ function porchedFront(walls: readonly Wall[], front: Door): boolean {
  * outer row's sides, sim-core `Porch::post_tiles`), where it has one (`frontPorch`): nobody walks
  * through them, so the bikes by the house keep round them (`placeRides`).
  */
-export function frontPorchPosts(walls: readonly Wall[], front: Door | undefined): [number, number][] {
+function frontPorchPosts(walls: readonly Wall[], front: Door | undefined): [number, number][] {
   if (!front || !porchedFront(walls, front)) return [];
   return [
     [front.x - 1, front.z - 2],
@@ -1548,7 +1548,7 @@ export function frontPorchPosts(walls: readonly Wall[], front: Door | undefined)
  * (content `crown`, `crownClear`; the game refuses to plant one there too): the town's ground-storey
  * walls (`walls`, town rows; those below `depth` are upper storeys and the basement).
  */
-export function dropCrowdedTrees(content: Content, walls: readonly (readonly [number, number, number, number])[], objects: Placement[], depth: number): void {
+function dropCrowdedTrees(content: Content, walls: readonly (readonly [number, number, number, number])[], objects: Placement[], depth: number): void {
   const crowned = objects.some((o) => (content.object(o.def)?.crown ?? 0) > 0);
   if (!crowned) return;
   const edges = new Map([...unitEdges(walls.filter(([, z0, , z1]) => Math.max(z0, z1) <= depth))].map((e) => [e, 'wall']));
@@ -1840,7 +1840,7 @@ export function assembleTown(
  * Further from square it comes alongside the road rather than onto it, and its car has no way
  * to turn out onto it.
  */
-export const DRIVE_SQUARE = 0.55;
+const DRIVE_SQUARE = 0.55;
 
 /**
  * Whether a house on lot `u` at `at` (on `roads`) has a driveway whose line meets a road squarely
@@ -1864,7 +1864,7 @@ export function drivesOut(roads: readonly RoadPlan[], t: Templates, u: Unplaced,
 }
 
 /** Where a driveway meets its road (`driveMeets`). */
-export interface DriveMeet {
+interface DriveMeet {
   road: number;
   /** How far along the road (m), where the driveway's line gets nearest its middle. */
   s: number;
@@ -1879,7 +1879,7 @@ export interface DriveMeet {
  * it squarely there, as the simulation measures it (the way the road's segment runs there:
  * sim-core `Bay::new`). Null: none.
  */
-export function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt, reach: number): DriveMeet | null {
+function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, street: Pt, way: Pt, reach: number): DriveMeet | null {
   const at = (k: number): Pt => [street[0] + way[0] * k, street[1] + way[1] * k];
   const widest = Math.max(0, ...list.map((r) => r.width));
   for (let k = 0.5; k <= reach; k += 0.5) {
@@ -1905,7 +1905,7 @@ export function driveMeets(list: readonly RoadPlan[], roads: ReturnType<typeof r
 }
 
 /** The way a polyline's segment at arc length `s` runs (a unit direction; as sim-core `Road::tangent`). */
-export function segmentWay(pts: readonly Pt[], s: number): Pt {
+function segmentWay(pts: readonly Pt[], s: number): Pt {
   const ls = lengths(pts);
   let i = 1;
   while (i < pts.length - 1 && ls[i] <= s) i++;

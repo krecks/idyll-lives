@@ -205,7 +205,7 @@ export interface BlockView {
   done: number;
 }
 
-export type GoalKind = 'hasJob' | 'jobLevel' | 'promoted' | 'skill' | 'friends' | 'partner' | 'funds' | 'own';
+type GoalKind = 'hasJob' | 'jobLevel' | 'promoted' | 'skill' | 'friends' | 'partner' | 'funds' | 'own';
 
 /** What a goal still takes: a skill level a career goal needs (reached ones drop off), the
  * performance bar (of 100), or the money for something they want. */
@@ -235,7 +235,7 @@ export interface GoalView {
 }
 
 /** Something a resident asks to buy, waiting for a yes or no. */
-export interface PurchaseView {
+interface PurchaseView {
   object: string;
   price: number;
   /** Times they were told no for it before (from the second no on, they're cross). */
@@ -292,7 +292,7 @@ export interface WallEdge {
  * Diagonal wall directions across tile (x, z): `dp` ("/") from (x, z) to (x + 1, z + 1),
  * `dn` ("\") from (x, z + 1) to (x + 1, z).
  */
-export type DiagonalAxis = 'dp' | 'dn';
+type DiagonalAxis = 'dp' | 'dn';
 
 /** A wall edge (or a diagonal across a tile) to set: a plain wall, a door or window in a wall, or nothing (`open`). */
 export interface EdgeEdit {
@@ -473,7 +473,7 @@ export interface RoadPlan {
   island?: 'fountain';
   /** What kind of way it is (default `street`). */
   kind?: RoadKind;
-  /** The area (`OpenWorldTownFields.areas` index) it belongs to; absent for ways between areas. */
+  /** The area (`WorldMeta.areas` index) it belongs to; absent for ways between areas. */
   area?: number;
   /** A bridge or a causeway: the arc lengths (m) along it where its deck over the water begins and ends. */
   bridge?: [number, number];
@@ -545,20 +545,6 @@ export interface WorldZone {
   /** What the land is (an orchard: fruit trees in rows beside a farmstead). */
   kind: 'woods' | 'meadow' | 'water' | 'hill' | 'fields' | 'orchard';
   poly: [number, number][];
-}
-
-/** The town file's open-world fields (all optional; absent: today's behaviour). */
-export interface OpenWorldTownFields {
-  size?: WorldSize;
-  /** The roads for the sim (the same objects as `meta.roads`). */
-  roads?: RoadPlan[];
-  areas?: TownArea[];
-  exits?: TownExit[];
-  terrain?: { water?: Rle; blocked?: Rle };
-  /** Public parking: marked bays, each where a car parked in it stands (the simulation parks at exactly this pose). */
-  parking?: ParkingBay[];
-  /** The car parks the bays are grouped into (`ParkingBay.park`). */
-  carParks?: CarPark[];
 }
 
 export interface WorldMeta {
@@ -690,7 +676,7 @@ export interface LotLook {
 }
 
 /**
- * A marked parking bay (`OpenWorldTownFields.parking`, `WorldStructure.parking`): its middle (m),
+ * A marked parking bay (`WorldStructure.parking`): its middle (m),
  * the way a car parked in it faces (rad, as the simulation's yaw: nose in, away from the road), its
  * area (`TownArea` index) and its car park (`carParks` index; absent: a bay on its own by the verge).
  */
@@ -1001,7 +987,7 @@ export interface JunctionInfo {
  * (`traffic::CROSSWALK` = 3 m on), and the stop line at `stop` (`traffic::STOP_GAP` = 0.5 m past
  * it): cars on red stop with their noses there, and at a zebra for those on foot on it.
  */
-export interface JunctionArmInfo {
+interface JunctionArmInfo {
   /** The arm's road (`meta.roads` index). */
   road: number;
   /** The way out along the arm from the middle (a unit vector: x, z). */
@@ -1076,7 +1062,7 @@ export interface PorchPieceInfo {
 }
 
 /** A household's car (`WorldStructure.cars`): where it parks (its middle, which way it faces: 0 towards +z) and its look (`shared/cars.ts`: its size is its body's). */
-export interface CarInfo {
+interface CarInfo {
   plot: number;
   x: number;
   z: number;
@@ -1088,12 +1074,12 @@ export interface CarInfo {
 }
 
 /** One of the town's servers (`WorldStructure.staff`). */
-export interface StaffInfo {
+interface StaffInfo {
   seed: number;
   posts: number[];
 }
 
-export interface ActionView {
+interface ActionView {
   label: string;
   /** The object it's done at (its stable id). */
   object: number | null;
@@ -1166,7 +1152,7 @@ export interface SimView {
 }
 
 /** A resident's phone (`phone.rs`). */
-export interface PhoneView {
+interface PhoneView {
   /** Why they can't use it now ("Too young for a phone", "At work"), or null. */
   off: string | null;
   /** Everyone they've met who has a phone too. */
@@ -1174,7 +1160,7 @@ export interface PhoneView {
 }
 
 /** Someone in a resident's phone. */
-export interface ContactView {
+interface ContactView {
   id: number;
   /** What keeps them from the phone ("Asleep", "At work", "Busy"...), or null when free. */
   status: string | null;

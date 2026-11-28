@@ -23,7 +23,7 @@ export interface ChatFormat {
   bos: string;
 }
 
-export interface ChatPrompt {
+interface ChatPrompt {
   /** The text in parts, the model's state kept after each but the last (empty parts left out). */
   parts: string[];
 }

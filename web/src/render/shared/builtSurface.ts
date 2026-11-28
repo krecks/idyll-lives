@@ -111,7 +111,7 @@ const DECK_DRY = 4;
 const DECK_APRON = 2;
 
 /** A road's height is solved every this far along it (m). */
-export const PROFILE_STEP = 2;
+const PROFILE_STEP = 2;
 /** The land along a road is averaged over this far either way (m) for its first height. */
 const PROFILE_REACH = 12;
 /** How many times the roads are smoothed, clamped, joined and lifted over their water. */
@@ -135,7 +135,7 @@ const BEND = 0.02;
 const MOVED = 0.001;
 
 /** A lot as the surface takes it: its rectangle, and where its way in meets its road (null: off any road). */
-export interface SurfacePlot {
+interface SurfacePlot {
   x: number;
   z: number;
   w: number;
@@ -146,7 +146,7 @@ export interface SurfacePlot {
 }
 
 /** Whether (x, z) is on `p`'s pad: in its box. */
-export function onPad(p: SurfacePlot, x: number, z: number): boolean {
+function onPad(p: SurfacePlot, x: number, z: number): boolean {
   return x >= p.x && x <= p.x + p.w && z >= p.z && z <= p.z + p.d;
 }
 
@@ -203,7 +203,7 @@ interface Node {
 }
 
 /** A junction as solved: where it is, its height, and its roads with how far along each it is held there (arc lengths). */
-export interface SurfaceJunction {
+interface SurfaceJunction {
   x: number;
   z: number;
   y: number;
@@ -211,7 +211,7 @@ export interface SurfaceJunction {
 }
 
 /** A road passing over another on a deck (`RoadPlan.crosses`): where, along each, and their heights there (`BuiltSurface.overpasses`). */
-export interface SurfaceCrossing {
+interface SurfaceCrossing {
   /** The road on the deck, and how far along it (m) it crosses. */
   over: number;
   s: number;
@@ -1844,7 +1844,7 @@ function frontOf(p: { x: number; z: number; w: number; d: number }, onRoad: (x: 
 }
 
 /** How steeply a world's land may rise from what is built (`LandscapeParams.slope`): the surface's `bank`. */
-export function bankOf(world: SurfaceWorld): number {
+function bankOf(world: SurfaceWorld): number {
   return world.meta?.world?.landscape?.slope ?? DEFAULT_BANK;
 }
 
@@ -1860,7 +1860,7 @@ export function builtSurfaceOf(world: SurfaceWorld, land: Land): BuiltSurface {
 }
 
 /** A road's profile as `profileOf` gives it: per sample, how far along (m), where, its height and its cut or fill. */
-export interface RoadProfile {
+interface RoadProfile {
   s: number[];
   x: number[];
   z: number[];

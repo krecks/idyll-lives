@@ -38,7 +38,7 @@ import { codeFor, float as f, registerShaderFeature, type Language, type ShaderF
  * its crests (`foamShade`). `sunGlint`, the share of the sun's highlight the water keeps, and `sunMost` the most of
  * it (linear).
  */
-export const WATER = tuned('water', {
+const WATER = tuned('water', {
   still: 5.3,
   stillSmall: 2.1,
   drift: [0.05, 0.022],
@@ -159,6 +159,6 @@ function code(lang: Language): ShaderFeature['glsl'] {
 }
 
 /** After the town's ground (237); its `combine` before the soft look's (300), which combines the light. */
-export const WATER_SHADER: ShaderFeature = { name: 'water', priority: 238, glsl: code('glsl'), wgsl: code('wgsl') };
+const WATER_SHADER: ShaderFeature = { name: 'water', priority: 238, glsl: code('glsl'), wgsl: code('wgsl') };
 
 registerShaderFeature(WATER_SHADER);

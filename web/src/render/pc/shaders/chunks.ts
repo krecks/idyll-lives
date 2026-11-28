@@ -85,7 +85,7 @@ export function codeFor(lang: Language) {
   };
 }
 
-export interface FeatureCode {
+interface FeatureCode {
   vsDecl?: string;
   vsLocal?: string;
   vsNormal?: { when: string; code: string };
@@ -186,7 +186,7 @@ const WRAPS = {
 } as const;
 
 /** The anchors the overrides and patches rely on (also listed in `tools/render/chunks.json`). */
-export const ANCHORS = {
+const ANCHORS = {
   glsl: {
     transformCoreVS: 'vec3 getLocalPosition(vec3 vertexPosition) {',
     normalVS: 'return normalize(dNormalMatrix * localNormal);',

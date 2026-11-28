@@ -55,7 +55,7 @@ export interface Lane {
 }
 
 /** A road's lines across (m from its middle, + as `Lane.off`): its lanes, the dashed lines between lanes going the same way, its solid edge lines. */
-export interface LaneLayout {
+interface LaneLayout {
   lanes: Lane[];
   dividers: number[];
   edges: number[];

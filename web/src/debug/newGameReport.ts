@@ -31,7 +31,7 @@ export interface NewGameState {
 }
 
 /** What a report gives back: the step New game opens at (later steps open at the streets, made again from their keys), and `app`'s fields. */
-export interface RestoredNewGame extends Omit<NewGameState, 'screen'> {
+interface RestoredNewGame extends Omit<NewGameState, 'screen'> {
   step: 'land' | 'streets';
 }
 
@@ -132,7 +132,7 @@ function unpackLayout(packed: PackedLayout): Layout {
 // --- The graph's packing -------------------------------------------------------------------------
 
 /** A packed graph: its root, and the blocks (height fields, typed arrays) it refers to by index. */
-export interface Packed {
+interface Packed {
   root: unknown;
   blobs: unknown[];
 }

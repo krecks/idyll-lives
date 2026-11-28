@@ -9,7 +9,7 @@ import type { GameShot } from '../types';
 import { angleDelta, ease } from './angles';
 
 /** The camera the rig drives: an orbit pose (any camera with these fields). */
-export interface RigCamera {
+interface RigCamera {
   alpha: number;
   beta: number;
   radius: number;

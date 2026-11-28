@@ -49,7 +49,7 @@ import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 import { frameNow } from '../shared/frameClock';
 import { LAMP_GLASS } from './lightUnits';
 
-export interface StreetOptions {
+interface StreetOptions {
   /** Layer ids of everything this street draws (default: the world layer). */
   layers?: number[];
   /** Neighbours' windows glow only while someone is up in there (`setUp`; the game's street, not the menus' town). */
@@ -100,7 +100,7 @@ interface Cell {
 }
 
 /** A placed thing in the game: what the birds find in the street (`PlantPlacement` in the landscape). */
-export interface StreetPlant {
+interface StreetPlant {
   key: string;
   x: number;
   y: number;

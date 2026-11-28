@@ -37,7 +37,7 @@ import { services } from '../ui/services';
 import { loadState } from './report';
 
 /** Longest wait for a game loaded to come up (loading, shaders), and for what it streams in to come and be built. */
-export const START_LIMIT_MS = 120_000;
+const START_LIMIT_MS = 120_000;
 export const SETTLE_LIMIT_MS = 60_000;
 /** Where every bench camera starts from: the game's own opening angle. */
 export const START_ALPHA = -Math.PI * 0.62;

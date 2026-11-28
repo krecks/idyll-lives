@@ -29,7 +29,7 @@
 import * as pc from './engine';
 
 /** A pass's GPU time, averaged over the frames it was drawn in (ms). */
-export interface PassTime {
+interface PassTime {
   name: string;
   ms: number;
   frames: number;

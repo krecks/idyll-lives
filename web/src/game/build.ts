@@ -75,7 +75,7 @@ import * as pmath from './pmath';
 export const PROPOSAL_SEED = 0;
 
 /** A lot goes where this share of the cells under it at least are painted its use (and none a green, but a green's). */
-export const SHARE = 0.6;
+const SHARE = 0.6;
 /**
  * The share of what is under a lot that may be public land but a civic place's (the civic places go down first, on what
  * they find), or land painted shops and work but a shop's or a workplace's (a lot that takes a few metres of it takes a

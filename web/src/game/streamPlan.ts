@@ -14,7 +14,7 @@ import type { WorldStructure } from '../core/protocol';
 import { BIRD_MODELS } from '../render/shared/birds';
 import * as pmath from './pmath';
 
-export interface Rect {
+interface Rect {
   x: number;
   z: number;
   w: number;

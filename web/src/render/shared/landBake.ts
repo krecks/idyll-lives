@@ -9,7 +9,7 @@
 import { blankLand, COVER, COVER_CELL, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
 
 /** What `bakeLand` reads of the landscape (`LandscapeLayout`): the land's height, the water's edge and the zones' cover. */
-export interface BakeSource {
+interface BakeSource {
   ground(x: number, z: number): number;
   waterEdge(x: number, z: number): number;
   /** What covers the ground at (x, z) (`COVER`). */
@@ -227,7 +227,7 @@ const FLOOR_OVER = 0.6;
 /** A sea river's banks rise this much a metre from its water up to the floor. */
 const BANK_GRADE = 0.12;
 /** The valley's sides rise at most this much a metre across (tan: 26.6° at the edge) easing to this (12.4°) by `VALLEY_OUT` m out. */
-export const VALLEY_STEEP = 0.5;
+const VALLEY_STEEP = 0.5;
 const VALLEY_GENTLE = 0.22;
 const VALLEY_OUT = 260;
 
@@ -341,7 +341,7 @@ export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: num
 }
 
 /** A rim of land along the edge between it and the sea is this many samples wide at most (`seaRims`). */
-export const RIM_SAMPLES = 2;
+const RIM_SAMPLES = 2;
 /** Where the sea behind a rim turns away from the edge (`seaRims`): no sea `RIM_TURN` samples in within `RIM_ON` samples on (at about 20° or more). */
 const RIM_TURN = 4;
 const RIM_ON = 8;
@@ -444,7 +444,7 @@ export interface WaterGrid {
 
 /** `roundedWater`'s cells (m), and how many either way each of its three box blurs takes in. */
 export const ROUND_CELL = 4;
-export const ROUND_CELLS = 8;
+const ROUND_CELLS = 8;
 /** How far (m) a change in the water reaches in `roundedWater`'s grid, each way. */
 export const ROUND_REACH = 3 * ROUND_CELLS * ROUND_CELL;
 

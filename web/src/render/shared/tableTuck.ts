@@ -33,7 +33,7 @@ export interface DrawnGeometry {
 }
 
 /** An object as drawn: where its middle is (its instance's place, game space), and its meshes (its moving parts' too). */
-export interface DrawnObject {
+interface DrawnObject {
   x: number;
   z: number;
   geometry(): DrawnGeometry[];

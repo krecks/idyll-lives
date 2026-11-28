@@ -56,7 +56,7 @@ import { removalRefused, removeLots, renumber, withLotPlace } from './lots';
 import * as pmath from '../pmath';
 
 /** Where a village is placed (its box's middle, m), whether its shape is turned across, and the seed its streets, lots and names are drawn from. */
-export interface VillageAt {
+interface VillageAt {
   x: number;
   z: number;
   swap: boolean;
@@ -64,10 +64,10 @@ export interface VillageAt {
 }
 
 /** A village's box on the town (m), where it would go. */
-export type VillageBox = Rect;
+type VillageBox = Rect;
 
 /** What removing a village takes: how many of its own roads and of the country roads that led to it, the lots (indices in the draft it is asked of), how many parking bays; or why it may not go. */
-export type VillageGoes = { roads: number; others: number; lots: number[]; parking: number } | { refused: string };
+type VillageGoes = { roads: number; others: number; lots: number[]; parking: number } | { refused: string };
 
 // ---- the generator's measures ------------------------------------------------------------------
 

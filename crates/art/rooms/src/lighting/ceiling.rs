@@ -311,15 +311,11 @@ pub fn chandelier() -> Vec<Obj> {
         ring_at("ring_low", 0.435, (0, 2.05, 0), 0.013, M.brass, 36, 4);
         for a in [0, 60, 120, 180, 240, 300] {
             let (c, s) = (cosd(a as f64), sind(a as f64));
-            let pts: Vec<(f64, f64, f64)> = [
-                (0.02, 2.32),
-                (0.16, 2.30),
-                (0.3, 2.2),
-                (0.435, 2.055),
-            ]
-            .iter()
-            .map(|&(r, y)| (r * c, y, r * s))
-            .collect();
+            let pts: Vec<(f64, f64, f64)> =
+                [(0.02, 2.32), (0.16, 2.30), (0.3, 2.2), (0.435, 2.055)]
+                    .iter()
+                    .map(|&(r, y)| (r * c, y, r * s))
+                    .collect();
             kit::tube!(
                 F,
                 format!("arm{a}"),

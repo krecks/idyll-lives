@@ -127,7 +127,7 @@ class Movement {
   }
 }
 
-export interface OrbitLimits {
+interface OrbitLimits {
   radius: readonly [number, number];
   beta: readonly [number, number];
 }

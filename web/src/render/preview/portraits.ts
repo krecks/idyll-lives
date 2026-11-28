@@ -25,7 +25,7 @@ import type { SimLook } from '../types';
 import { Studio } from './studio';
 
 /** Portrait size in pixels (displayed at up to ~64 CSS px, so 2-3x for sharp HiDPI avatars). */
-export const PORTRAIT_PX = 160;
+const PORTRAIT_PX = 160;
 /** Sims a batch stands in a row: about as many faces as step 2's list shows at once, so they come together. */
 const BATCH = 32;
 const PER_FRAME = 8;
@@ -54,7 +54,7 @@ const REF_TOP = 1.78;
 const PORTRAIT_FACE = { smile: 0.6, wide: 0.3, lidL: 0.35, browUp: 0.15 };
 
 /** `now`: on screen (drawn first, in the order asked); `idle`: drawn ahead of time, or out of view. */
-export type PortraitPriority = 'now' | 'idle';
+type PortraitPriority = 'now' | 'idle';
 
 interface Job {
   key: string;

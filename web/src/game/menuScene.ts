@@ -23,7 +23,7 @@ import { sameContent } from '../core/sameContent';
 import * as pmath from './pmath';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
-export const MENU_MINUTE = 18 * 60 + 20;
+const MENU_MINUTE = 18 * 60 + 20;
 /** Late afternoon while building the household: warm but brighter (sim faces, town detail). */
 const CREATE_MINUTE = 17 * 60 + 30;
 /** The overview while choosing: clear afternoon light, houses read best from above. */
@@ -37,7 +37,7 @@ export interface Frame {
   bottom: number;
 }
 
-export type Shot =
+type Shot =
   /** Main menu: a slow, low orbit, the town to the right of the menu panel. */
   | { kind: 'menu' }
   /** Behind character creation: closer, slower. */

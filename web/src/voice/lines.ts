@@ -38,7 +38,7 @@ export interface Line {
 }
 
 /** What a resident is using, by content id. */
-export interface Use {
+interface Use {
   object?: string;
   interaction?: string;
 }

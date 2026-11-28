@@ -62,7 +62,7 @@ import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
 export { decorPlants, natureDecor, type PlantPlacement } from '../shared/nature';
 
 /** What the landscape draws: entities under the world root, switched off until their owner shows them. */
-export interface NatureResult {
+interface NatureResult {
   draws: pc.Entity[];
   /**
    * Draws that should cast shadows: the woods near the town, whole in the game too (its shadow map
@@ -2017,7 +2017,7 @@ function windCode(lang: 'glsl' | 'wgsl'): ShaderFeature['glsl'] {
 }
 
 /** The plants' wind and tint (see `windCode`), at its place among the shader features (`chunks.ts`: lower runs first). */
-export const NATURE_WIND: ShaderFeature = { name: 'natureWind', priority: 230, glsl: windCode('glsl'), wgsl: windCode('wgsl') };
+const NATURE_WIND: ShaderFeature = { name: 'natureWind', priority: 230, glsl: windCode('glsl'), wgsl: windCode('wgsl') };
 
 // (Before any device's chunks are built: they're built with every feature registered, once per device.)
 registerShaderFeature(NATURE_WIND);

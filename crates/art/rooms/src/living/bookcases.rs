@@ -194,7 +194,15 @@ pub fn bookcase_corner() -> Vec<Obj> {
     // a slim post up the curve's middle ties the shelves into one rounded end
     for deg in [30.0, 60.0] {
         let (px, pz) = ((r - 0.012) * cosd(deg), (r - 0.012) * sind(deg));
-        fcyl!(F, "end_post", 0.02, 1.83, (x1 + px, 0.95, WALL + pz), M.shelf_white, verts = 10);
+        fcyl!(
+            F,
+            "end_post",
+            0.02,
+            1.83,
+            (x1 + px, 0.95, WALL + pz),
+            M.shelf_white,
+            verts = 10
+        );
     }
     fbox!(
         F,

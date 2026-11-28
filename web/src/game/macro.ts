@@ -116,7 +116,7 @@ export interface OpenWorldDraft {
  * the calm reach by the site), a lake, an island's coast, ponds. A town laid on a land whose water
  * is as planned uses these, so its bridges and causeways are as a generated world's.
  */
-export interface LandPlan {
+interface LandPlan {
   v: 1;
   kind: WorldKind;
   seed: number;
@@ -138,7 +138,7 @@ export interface LandPlan {
  * and `waterKept` when the land's water is as its plan has it (the town then uses the plan's river
  * for its bridges, and may go on either bank).
  */
-export interface LayOptions {
+interface LayOptions {
   townSeed?: number;
   site?: Pt;
   waterKept?: boolean;
@@ -2075,7 +2075,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
 // ---- the generator's pieces a village placed by hand reuses -----------------------------------
 
 /** A world being laid out: its size, its roads and its areas so far (`putArea` adds to both). */
-export interface Laying {
+interface Laying {
   W: number;
   D: number;
   roads: RoadPlan[];
@@ -2089,7 +2089,7 @@ export interface Laying {
  * `PORT_IN` m inside the world's edge and kept as one of its ways on (`ports`). Its roads are added
  * to `laying.roads` and it to `laying.plans` (its index is the number of areas before it).
  */
-export function putArea(laying: Laying, areaName: string, laid: readonly RoadPlan[], local: Box, x: number, z: number, swap: boolean, size: SizeSpec, greens: Pt[][], centre: Pt): AreaPlan {
+function putArea(laying: Laying, areaName: string, laid: readonly RoadPlan[], local: Box, x: number, z: number, swap: boolean, size: SizeSpec, greens: Pt[][], centre: Pt): AreaPlan {
   const { W, D, roads, plans } = laying;
   const onto = ([px, pz]: Pt): Pt => (swap ? [x + pz, z + px] : [x + px, z + pz]);
   const index = plans.length;
@@ -2128,7 +2128,7 @@ export function putArea(laying: Laying, areaName: string, laid: readonly RoadPla
 }
 
 /** A hamlet laid out in its own box (`hamletOf`): its name, its roads, its layout (its greens and middle), its size (the lots it wants). */
-export interface Hamlet {
+interface Hamlet {
   name: string;
   laid: RoadPlan[];
   layout: RoadLayout;
@@ -2164,7 +2164,7 @@ export function putHamlet(laying: Laying, h: Hamlet, x: number, z: number, swap:
  * on a land whose water was changed (`region`: `landPieces.ts`), the bridges' and causeways' ends
  * (`crossings`), and how far the generator has given up on a flat site (`relax`).
  */
-export interface HamletSite {
+interface HamletSite {
   water: WorldSpec['water'];
   boxes: readonly Rect[];
   region?: { holds: (r: Rect, by: number) => boolean } | null;
@@ -2230,7 +2230,7 @@ export function hamletLots(content: Content, t: Templates, spec: WorldSpec, plan
  * `lotAt` lays a lot but not snug (it has no driveway whose end must meet the road): the middle of its
  * front within `PLACE_REACH` m of its road's edge, the land a metre round it taken. Its slot, or null.
  */
-export function putPlace(lots: LotPlacer, t: Templates, roads: readonly RoadPlan[], u: Unplaced, frontage: readonly Frontage[]): PlotSlot | null {
+function putPlace(lots: LotPlacer, t: Templates, roads: readonly RoadPlan[], u: Unplaced, frontage: readonly Frontage[]): PlotSlot | null {
   const { width, depth } = slotDims(t, u);
   for (const f of frontage) {
     const road = roads[f.road];
@@ -2255,7 +2255,7 @@ export function putPlace(lots: LotPlacer, t: Templates, roads: readonly RoadPlan
  * (`paraded`). Those not put down yet, to go one by one: the civic places first, then a restaurant, the
  * shops and cafés, the offices, the workshops.
  */
-export function namedLots(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], a: number, size: TownSize, main: boolean, near: readonly Frontage[], street: readonly Frontage[], rand: Rand): Unplaced[] {
+function namedLots(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], a: number, size: TownSize, main: boolean, near: readonly Frontage[], street: readonly Frontage[], rand: Rand): Unplaced[] {
   const civic = CIVIC.flatMap((c) => (civicTooBig(c, main ? size : 'hamlet') ? [] : [{ ...placeUnit(t, c, size, rand), area: a }])).filter((u) => !putPlace(lots, t, roads, u, near));
   // (A main town's on its compact layouts: its high street built up shoulder to shoulder.)
   const of = (k: ZoneKind) => Array.from({ length: between(rand, main ? ZONE[k].lots[size] : ZONE[k].around) }, (): Unplaced => ({ ...placeUnit(t, k, size, rand, main), area: a }));
@@ -2268,7 +2268,7 @@ export function namedLots(t: Templates, lots: LotPlacer, roads: readonly RoadPla
  * in parades of two to four along `street` (`LotPlacer.placeRow`: nearest its start first), each as long
  * as `rand` draws else shorter, down to a pair. Those left (the first a parade found no room for on).
  */
-export function paraded(lots: LotPlacer, units: readonly Unplaced[], street: readonly Frontage[], a: number, rand: Rand): Unplaced[] {
+function paraded(lots: LotPlacer, units: readonly Unplaced[], street: readonly Frontage[], a: number, rand: Rand): Unplaced[] {
   const left = units.slice();
   while (left.length >= 2 && street.length) {
     let row: PlotSlot[] = [];
@@ -2284,7 +2284,7 @@ export function paraded(lots: LotPlacer, units: readonly Unplaced[], street: rea
  * country, a farm in an area), along its road within about `FARM_SHOP_REACH` m of its middle, called after
  * the farm (`Meadow Farm Shop`), drawn from `rand`. One with no room by its farm is listed in `lots.dropped`.
  */
-export function farmShops(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], sizeOf: (area: number) => TownSize, rand: Rand): void {
+function farmShops(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], sizeOf: (area: number) => TownSize, rand: Rand): void {
   for (const s of lots.slots.filter((q) => q.lot === 'farm')) {
     const f = lots.placed.get(s);
     if (!f) continue;
@@ -2302,7 +2302,7 @@ export function farmShops(t: Templates, lots: LotPlacer, roads: readonly RoadPla
  * among `roads`, of a place of the main town's size `main`, else of its area's, `areaSize`), drawn from
  * `rand`. Its place is called the same (`dense.ts` `townPlaces`).
  */
-export function nameLots(content: Content, slots: readonly PlotSlot[], plans: readonly AreaPlan[], roads: readonly RoadPlan[], main: TownSize, rand: Rand): void {
+function nameLots(content: Content, slots: readonly PlotSlot[], plans: readonly AreaPlan[], roads: readonly RoadPlan[], main: TownSize, rand: Rand): void {
   const taken = new Set(slots.flatMap((s) => (s.dress ? [] : [s.name])));
   const lastNames = content.names.last.length ? content.names.last : ['Smith'];
   for (const s of slots) {
@@ -2966,7 +2966,7 @@ function heightsOf(land: Cells, built: readonly Rect[], roads: readonly RoadPlan
  * tried shorter, down to a pair. Their houses are drawn from `rand` (the world's own draws are left as
  * they were). The rows placed.
  */
-export function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (readonly Frontage[])[], spec: Pick<WorldSpec, 'terraces' | 'rows'>, rand: Rand): PlotSlot[][] {
+function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (readonly Frontage[])[], spec: Pick<WorldSpec, 'terraces' | 'rows'>, rand: Rand): PlotSlot[][] {
   const out: PlotSlot[][] = [];
   let left = between(rand, spec.terraces);
   // (Its houses of a few designs, as a terrace built at once is; each design generated once.)
@@ -3001,7 +3001,7 @@ const straight = (pts: readonly Pt[], s: number, ls: readonly number[]) => strai
  * and yard) every `every` m of road (150 to 200 in the classic worlds), each clear of the areas,
  * the water and steep land, and of the area it is nearest. The farmsteads placed.
  */
-export function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly AreaPlan[], roads: readonly RoadPlan[], land: Cells, every: [number, number], rand: Rand, steepest = STEEP): PlotSlot[] {
+function alongCountryRoads(content: Content, t: Templates, lots: LotPlacer, plans: readonly AreaPlan[], roads: readonly RoadPlan[], land: Cells, every: [number, number], rand: Rand, steepest = STEEP): PlotSlot[] {
   const country = roads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
   const byRoad = new Map<number, Frontage[]>();
   const lens = new Map(country.map((r) => [r, lengths(roads[r].points)]));
@@ -3094,7 +3094,7 @@ export function alongCountryRoads(content: Content, t: Templates, lots: LotPlace
  * takes, no further than `reach` from the area's box. Its rectangle and which way it faces
  * (towards the area: its trail comes from there).
  */
-export function siteFor(place: PublicTemplate, plan: AreaPlan, land: Cells, ground: Ground, water: Uint8Array, t: Templates, rand: Rand, W: number, D: number, reach = Infinity): { x: number; z: number; facing: Facing; w: number; d: number } | null {
+function siteFor(place: PublicTemplate, plan: AreaPlan, land: Cells, ground: Ground, water: Uint8Array, t: Templates, rand: Rand, W: number, D: number, reach = Infinity): { x: number; z: number; facing: Facing; w: number; d: number } | null {
   const frame = place.lot ?? t.plot;
   let best: { at: { x: number; z: number; facing: Facing; w: number; d: number }; score: number } | null = null;
   const wetAt = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && water[Math.floor(z) * W + Math.floor(x)] === 1;
@@ -3191,9 +3191,4 @@ export function trailTo(slot: PlotSlot, plan: AreaPlan, roads: readonly RoadPlan
   const smooth = curve(simplify(raw, 0.9));
   const points = clear(smooth) ? smooth : evenly(raw, 1);
   return { points: points.map(([x, z]): Pt => [round2(x), round2(z)]), width: TRAIL_WIDTH, ends: ['join', 'dead'], kind: 'trail' };
-}
-
-/** The middles of a big world's areas, and a centroid helper for the menus. */
-export function areaCentre(a: TownArea): Pt {
-  return centroid([[a.x, a.z], [a.x + a.w, a.z + a.d]]);
 }

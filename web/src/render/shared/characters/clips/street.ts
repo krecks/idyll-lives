@@ -29,7 +29,7 @@ export const REF_HEIGHT = 1.77;
  * grown-up's share (a child of 1.12 m has the legs of a grown-up's 1.01 m), a teen's and a grown-up's the same; in
  * between from 1.25 m to 1.4 m.
  */
-export function legShare(height: number): number {
+function legShare(height: number): number {
   return 0.9 + 0.1 * Math.min(1, Math.max(0, (height - 1.25) / 0.15));
 }
 /**

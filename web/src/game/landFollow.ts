@@ -93,7 +93,7 @@ export interface Slopes {
  * cut into the land or stands over it too far (`cut`), or its edge stands too tall over the land
  * (`edge`) or the pad (`edgePad`) beside it; `by` how much (rise per m, or m) and the limit `most`.
  */
-export interface Over {
+interface Over {
   what: 'climb' | 'cut' | 'edge' | 'edgePad';
   by: number;
   most: number;
@@ -104,7 +104,7 @@ export interface Over {
  * roads break them; and for those over the limits themselves (not only within `margin` of them), how
  * (`over`: the first limit each breaks, keyed as `pads` and `roads` are).
  */
-export interface LandMeasure {
+interface LandMeasure {
   slopes: Slopes;
   problems: string[];
   pads: Set<number>;
@@ -341,7 +341,7 @@ export function settleLand<W extends FollowWorld>(
 // ---- step 2's settle ---------------------------------------------------------------------------
 
 /** What `settleEdit` gives: see there. */
-export interface EditSettled<W> {
+interface EditSettled<W> {
   draft: NeighbourhoodDraft;
   world: W;
   /**
@@ -733,7 +733,7 @@ function oneNetwork(roads: readonly RoadPlan[], without: ReadonlySet<number>): b
 }
 
 /** The roads, lots and the land round them graded into `land` (its heights changed in place; water left as it is): the surface it was graded to. */
-export function gradeLand(land: Land, world: SurfaceWorld): BuiltSurface {
+function gradeLand(land: Land, world: SurfaceWorld): BuiltSurface {
   const surface = builtSurfaceOf(world, land);
   land.h.set(surface.graded());
   return surface;
@@ -940,7 +940,7 @@ export function smoothHeights(land: Land): Float32Array {
  * caller has them already. The areas' planes used, in their order (a plane per area that has built
  * ground in its box).
  */
-export function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = [], given: { kept?: readonly GentlePlane[]; dist?: Float32Array; smooth?: Float32Array } = {}): GentlePlane[] {
+function gentleUnder(land: Land, world: FollowWorld, areaOf: readonly number[] = [], given: { kept?: readonly GentlePlane[]; dist?: Float32Array; smooth?: Float32Array } = {}): GentlePlane[] {
   const { cols, rows } = land;
   const look = { ...DEFAULT_LANDSCAPE, ...(world.meta?.world as { landscape?: Partial<typeof DEFAULT_LANDSCAPE> } | undefined)?.landscape };
   const dist = given.dist ?? new Protection(cols, rows, builtOf(world)).dist;

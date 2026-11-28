@@ -24,7 +24,7 @@
 import * as pc from './engine';
 import type { PostAttachment, PostProcessing } from './post';
 
-export interface ThumbnailHost {
+interface ThumbnailHost {
   /** A frame drawn soon, even behind a full-screen menu. */
   wantFrame(): void;
   /** The sun's map drawn again in the next frame. */

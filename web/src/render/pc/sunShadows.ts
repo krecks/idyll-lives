@@ -136,7 +136,7 @@ function stillPasses(app: pc.AppBase): void {
   };
 }
 
-export interface Square {
+interface Square {
   /** The middle (PlayCanvas space) and the half side (m). */
   centre: pc.Vec3;
   radius: number;
@@ -252,7 +252,7 @@ function patch(app: pc.AppBase): void {
 }
 
 /** Anchors of the edge patch in `lightFunctionShadowPS` (also in `tools/render/chunks.json`). */
-export const SHADOW_EDGE_ANCHORS = {
+const SHADOW_EDGE_ANCHORS = {
   glsl: {
     coord: 'vec3 shadowCoord = getShadowSampleCoord{i}(shadowMatrix, light{i}_shadowParams, vPositionW, vec3(0.0), lightDirW, dLightDirNormW, dVertexNormalW);',
     reads: ['getShadowPCF1x1', 'getShadowPCF3x3', 'getShadowPCF5x5'].map((f) => `return ${f}(SHADOWMAP_PASS(light{i}_shadowMap), shadowCoord, light{i}_shadowParams);`),
@@ -319,7 +319,7 @@ function patchShadowEdge(device: pc.GraphicsDevice): void {
   }
 }
 
-export interface SunShadowOptions {
+interface SunShadowOptions {
   /** Texels a side (`QualitySettings.shadowMapSize`). */
   size: number;
   /** Pose-driven redraws a second at most (`QualitySettings.shadowRate`; 0: every change). */

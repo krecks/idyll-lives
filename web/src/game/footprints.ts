@@ -1,16 +1,13 @@
 /**
  * Footprints on the town's ground: polygons in town metres (x, z), counter-clockwise seen from above
  * (+y up, x right: z runs down the screen, so the signed area x·z' − x'·z is negative), the tiles
- * they cover, whether they overlap, and whether one faces the road nearest it. Shared by the
+ * they cover and whether they overlap. Shared by the
  * generator's passes (the centre, the dense pass, the parking) and the checks of a laid town.
  */
 
-import { centroid, dist, inside, lengths, pointAt, type RoadIndex, type Pt, type RoadPlan } from './roads';
+import { dist, inside, type Pt } from './roads';
 import type { Rect } from './town';
 import * as pmath from './pmath';
-
-/** A building's side runs within this (radians) of the way the road nearest it runs, or square to it. */
-export const FACING = (15 * Math.PI) / 180;
 
 /** `a` moved `k` times `b` along. */
 export const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
@@ -105,43 +102,6 @@ export function tilesOf(poly: readonly Pt[], grow: number, fn: (x: number, z: nu
   }
   return false;
 }
-
-/**
- * Whether a footprint faces the road nearest its middle (not a trail): one of its sides runs
- * within `FACING` of the road's way there, or square to it (`FACING` from that too). tools/worlds/sample.ts asks the same.
- */
-export function facesRoad(poly: readonly Pt[], roads: readonly RoadPlan[], index: RoadIndex, slack = 0): boolean {
-  const c = centroid(poly);
-  const near = [...index.around(c[0], c[1], 90)].filter(([r]) => roads[r].kind !== 'trail');
-  if (!near.length) return false;
-  const least = Math.min(...near.map(([, hit]) => hit.dist));
-  // (`slack`: every road about as near, as well: the roads rounded in the file may have another nearest.)
-  const lens = (lengthsOf.get(roads) ?? lengthsOf.set(roads, roads.map((r) => lengths(r.points))).get(roads))!;
-  /** Whether a side runs along road `r` at `s` (the way it runs over 4 m there: one segment's way at a bend's corner may be off it). */
-  const along = (r: number, s: number) => {
-    const L = lens[r][lens[r].length - 1];
-    const [a, b] = [pointAt(roads[r].points, Math.max(0, s - 2), lens[r]).p, pointAt(roads[r].points, Math.min(L, s + 2), lens[r]).p];
-    const l = dist(a, b) || 1;
-    const t: Pt = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
-    return poly.some((p, k) => {
-      const q = poly[(k + 1) % poly.length];
-      const e = pmath.hypot(q[0] - p[0], q[1] - p[1]) || 1;
-      const cos = Math.abs(((q[0] - p[0]) * t[0] + (q[1] - p[1]) * t[1]) / e);
-      return cos >= pmath.cos(FACING) || cos <= pmath.sin(FACING);
-    });
-  };
-  return near
-    .filter(([, hit]) => hit.dist <= least + slack)
-    .every(([r, hit]) => {
-      if (!along(r, hit.s)) return false;
-      // (Inside a bend, as near to the road at more than one place along it: along it at each.)
-      if (!slack) return true;
-      const pts = roads[r].points;
-      return pts.every((p, i) => dist(p, c) > least + slack || along(r, lens[r][i]));
-    });
-}
-/** Each set of roads' arc lengths (`facesRoad`). */
-const lengthsOf = new WeakMap<readonly RoadPlan[], number[][]>();
 
 /** Calls `fn` with the index of every tile (of `W` × `D`) whose middle is inside `poly`. */
 export function fillPoly(poly: readonly Pt[], W: number, D: number, fn: (i: number) => void): void {

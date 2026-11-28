@@ -192,7 +192,7 @@ const rounded = (pts: readonly Pt[]): Pt[] => pts.map(([x, z]): Pt => [round2(x)
  * ends it). Its deck along the bridge from `pa` (arc lengths), if worked out (`withBridge` finds it
  * on the water else, as the generator does). The chord (`chordOf`) is the stretch of the line itself.
  */
-export interface BridgeFit {
+interface BridgeFit {
   a: number;
   b: number;
   pa: Pt;
@@ -273,7 +273,7 @@ function groundAt(land: Land, x: number, z: number): number {
  * ground (a bank's top, a footpath along it), where it would lie on the land. `short`: per end,
  * whether it would have reached on past that (the straight is too short for it).
  */
-export function grownDeck(points: readonly Pt[], deck: readonly [number, number], land: Land, most: number, ls = lengths(points)): { deck: [number, number]; short: [boolean, boolean] } {
+function grownDeck(points: readonly Pt[], deck: readonly [number, number], land: Land, most: number, ls = lengths(points)): { deck: [number, number]; short: [boolean, boolean] } {
   const L = ls[ls.length - 1];
   const at = (s: number) => {
     const { p } = pointAt(points, s, ls);
@@ -331,7 +331,7 @@ export function grownDeck(points: readonly Pt[], deck: readonly [number, number]
 }
 
 /** What `crossWater` lays a bridge with: the water (the walkers' mask: 1 m tiles, `W` × `D`), the roads and lots a bridge keeps off, the land (its dips: `grownDeck`), and the longest deck (m). */
-export interface WaterWay {
+interface WaterWay {
   wet: Uint8Array;
   W: number;
   D: number;
@@ -431,7 +431,7 @@ const GROW_ROUNDS = 4;
 const near = (p: Pt, q: Pt) => pmath.hypot(p[0] - q[0], p[1] - q[1]) < 0.05;
 
 /** What `crossWater` lays: the fit chosen, and the road it makes (see `piecesOf`). */
-export interface Crossed {
+interface Crossed {
   fit: BridgeFit;
   before: Pt[] | null;
   bridge: Pt[];

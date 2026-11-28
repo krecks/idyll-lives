@@ -20,8 +20,8 @@ import { bridgeSpans, inside } from './roads';
 import * as pmath from './pmath';
 
 /** Strokes kept to undo, and the most their old values may hold (bytes). */
-export const UNDO_STROKES = 32;
-export const UNDO_BYTES = 16 * 1024 * 1024;
+const UNDO_STROKES = 32;
+const UNDO_BYTES = 16 * 1024 * 1024;
 
 /**
  * What shaping the land costs (content `build.land`): `earth` and `mountain` a cubic metre moved
@@ -41,10 +41,10 @@ export interface LandPrices {
 
 /** The flat ground round what is built before the brushes may change the land at all (m: the renderer's `APRON`), and over how far they come in fully. */
 export const APRON = 6;
-export const APRON_FADE = 8;
+const APRON_FADE = 8;
 /** Water keeps this far off a lot (m), and this much more than half its width off a road. */
-export const LOT_SHORE = 3;
-export const ROAD_SHORE = 2;
+const LOT_SHORE = 3;
+const ROAD_SHORE = 2;
 /** What counts as built round a road: half its width and this verge (m), as the renderer's distance-from-built grid has it. */
 const ROAD_VERGE = 2;
 
@@ -241,7 +241,7 @@ function mergeZones(base: readonly WorldZone[], derived: readonly WorldZone[], w
 // ---- The editor ------------------------------------------------------------------------------
 
 /** What `LandEditor` needs to know of its world beyond the land. */
-export interface LandEditorOptions {
+interface LandEditorOptions {
   /** Whether a sample may be under water (every sample if not given). */
   wettable?: Wettable;
   /** The world's size (m; the land's own if not given) and roads (their bridge decks stay dry). */

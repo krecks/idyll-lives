@@ -12,16 +12,16 @@ export interface Stereo {
 
 /** The water's loops (`crates/sound/src/water.rs`); the flush is played once. */
 export const WATER = ['shower', 'tap', 'washUp', 'bathFill', 'bathSoak', 'washer', 'dryer', 'dishwasher', 'crockery', 'fountain', 'flush'] as const;
-export type WaterKind = (typeof WATER)[number];
+type WaterKind = (typeof WATER)[number];
 export const ONCE = ['flush'] as const satisfies readonly WaterKind[];
 
 /** The things' sounds (`things.rs`); those played once as something happens. */
-export const THINGS = ['treadmill', 'bike', 'rower', 'tools', 'bikeTools', 'pool', 'foosball', 'pingPong', 'darts', 'arcade', 'sewing', 'potteryWheel', 'bubbling', 'espresso', 'blender', 'mixer', 'microwave', 'toaster', 'ovenFan', 'hood', 'fire', 'basketball', 'singing', 'cello', 'punchBag', 'smash', 'fridgeDoor', 'lidThud', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'doorbell', 'toastPop', 'pour'] as const;
-export type ThingKind = (typeof THINGS)[number];
+const THINGS = ['treadmill', 'bike', 'rower', 'tools', 'bikeTools', 'pool', 'foosball', 'pingPong', 'darts', 'arcade', 'sewing', 'potteryWheel', 'bubbling', 'espresso', 'blender', 'mixer', 'microwave', 'toaster', 'ovenFan', 'hood', 'fire', 'basketball', 'singing', 'cello', 'punchBag', 'smash', 'fridgeDoor', 'lidThud', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'doorbell', 'toastPop', 'pour'] as const;
+type ThingKind = (typeof THINGS)[number];
 export const ONCE_THINGS = ['fridgeDoor', 'lidThud', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'doorbell', 'toastPop', 'pour'] as const satisfies readonly ThingKind[];
 
 /** The things' sounds at home and in the garden (`things/home.rs`); the one played once. */
-export const HOME_THINGS = ['vacuum', 'iron', 'sweep', 'mop', 'mower', 'hose', 'wateringCan', 'shears', 'kettle', 'typing', 'saunaStove', 'fireplaceElectric', 'cutlery', 'kettleOff'] as const;
+const HOME_THINGS = ['vacuum', 'iron', 'sweep', 'mop', 'mower', 'hose', 'wateringCan', 'shears', 'kettle', 'typing', 'saunaStove', 'fireplaceElectric', 'cutlery', 'kettleOff'] as const;
 export const ONCE_HOME = ['kettleOff'] as const satisfies readonly (typeof HOME_THINGS)[number][];
 
 /** The sounds of things happening (`things/events.rs`), all played once. */
@@ -34,7 +34,7 @@ export type MadeKind = (typeof MADE)[number];
 
 /** The outdoors' loops (`outdoors.rs`): one channel for what has a place (a car), two for what is all round. */
 export const OUTDOORS = ['carEngine', 'carTyres', 'town', 'leaves'] as const;
-export type OutdoorKind = (typeof OUTDOORS)[number];
+type OutdoorKind = (typeof OUTDOORS)[number];
 
 /** The pieces of music the game plays (`music.rs`). */
 export const MUSIC = ['musicFolk', 'musicDance', 'musicSlow'] as const;

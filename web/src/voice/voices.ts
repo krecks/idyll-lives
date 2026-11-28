@@ -19,7 +19,7 @@
  * Names are what the creator shows (ours; the model only numbers them); `sex` picks who a voice
  * fits. Saves store the name.
  */
-export interface Preset {
+interface Preset {
   name: string;
   sex: 'female' | 'male';
   /** The model's voice style. */

@@ -72,20 +72,6 @@ fn with_suffix(path: &Path, suffix: &str) -> std::path::PathBuf {
     path.with_file_name(name)
 }
 
-/// The whole file at `url`, with no hash to check it against (a CDN's, pinned by version).
-pub fn download_unhashed(agent: &ureq::Agent, url: &str) -> Result<Vec<u8>, String> {
-    let mut resp = agent
-        .get(url)
-        .header("User-Agent", UA)
-        .call()
-        .map_err(|e| format!("{url}: {e}"))?;
-    resp.body_mut()
-        .with_config()
-        .limit(u64::MAX)
-        .read_to_vec()
-        .map_err(|e| format!("{url}: {e}"))
-}
-
 /// The whole file at `url`, checked against its SHA-256.
 pub fn download(agent: &ureq::Agent, url: &str, expected: &str) -> Result<Vec<u8>, String> {
     let mut resp = agent

@@ -107,7 +107,7 @@ const BIN = ['#3C6B3A', '#55595E', '#2E5C8A'];
 
 /** Model keys of the thin-instanced foliage (the street and trees packs). */
 export const FOLIAGE = { bush: 'model.bush', flowers: 'model.street.flowers', hedge: 'model.hedge' } as const;
-export type FoliageKind = keyof typeof FOLIAGE;
+type FoliageKind = keyof typeof FOLIAGE;
 /** Props drawn from manifest models (the street and town packs); a missing one is left out. */
 const PROP = {
   bench: 'model.street.bench',
@@ -377,7 +377,7 @@ export function blob(g: Geo, x: number, z: number, rx: number, rz: number, yaw: 
  * A plot as its dressing is laid out: in the town's coordinates, or turned a quarter (`turned`;
  * see `localRect`) so that its street runs along x either way.
  */
-export interface PlotLayout {
+interface PlotLayout {
   /** The plot (its rectangle as laid out). */
   plot: PlotInfo;
   /** The plot in the town's own coordinates. */
@@ -414,7 +414,7 @@ function poseHash(o: ObjectPlacement): number {
 }
 
 /** What `planStreet` needs to know of the game: its models, and its public places' things. */
-export interface StreetSource {
+interface StreetSource {
   /** Whether the manifests have model `key` (a missing one is left out). */
   has(key: string): boolean;
   /** Model `key`'s manifest entry. */
@@ -545,7 +545,7 @@ interface PlotOut {
  * How a lot with a look (`WorldMeta.lotLooks`: a named place's, a flats building's) looks from outside, its place's
  * hours (its windows lit while it is open), and whether a place has flats over it (`WorldStructure.flats` of its lot).
  */
-export interface LotDress {
+interface LotDress {
   look: LotLook;
   hours?: TownPlace['hours'];
   flats?: true;
@@ -2801,7 +2801,7 @@ export async function planStreet(planner: HousePlanner, world: WorldStructure, v
 }
 
 /** Chunk plans as one street plan (the batches' order: the foliage first, then the rest as they come). */
-export function mergePlans(chunks: readonly ChunkPlan[], street: TownStreet): StreetPlan {
+function mergePlans(chunks: readonly ChunkPlan[], street: TownStreet): StreetPlan {
   const silhouettes: SilhouettePlan = { parts: [], homes: [], lamps: [] };
   const [walk, props, glow, pools, shadows] = [new Geo(), new Geo(), new Geo(), new Geo(), new Geo()];
   const batches = new Map<string, Inst[]>((Object.keys(FOLIAGE) as FoliageKind[]).map((k) => [FOLIAGE[k], []]));
@@ -2921,7 +2921,7 @@ function garage(L: PlotLayout, blocked: Rect[]): SilhouetteSpec['garage'] {
 }
 
 /** The outward normal (x, z) of a garage's door facing `rot` (as a thing's: 0 towards +z, 1 +x, 2 -z, 3 -x). */
-export function garageDoor(rot: number): [number, number] {
+function garageDoor(rot: number): [number, number] {
   return ([[0, 1], [1, 0], [0, -1], [-1, 0]] as [number, number][])[((rot % 4) + 4) % 4];
 }
 

@@ -29,15 +29,15 @@ import { turner, type Door, type Placement, type PlannedRoom, type PlotSlot, typ
 type Rand = () => number;
 
 /** A thing a flat keeps though it stands outside it (`unit`: the flat's index in `FlatsTemplate.units`): its letterbox by the street door. */
-export type KeptPlacement = Placement & { unit?: number };
+type KeptPlacement = Placement & { unit?: number };
 
 /** One storey of a building's own (its stair hall's floor): walls, doors, windows, things and rooms as planned. */
-export interface StoreyShell extends FloorPlan {
+interface StoreyShell extends FloorPlan {
   objects: KeptPlacement[];
 }
 
 /** A flat's layout in its building (plot coordinates on the ground's rows): its front door first. */
-export interface FlatLayout extends FloorPlan {
+interface FlatLayout extends FloorPlan {
   class: string;
   description: string;
 }
@@ -47,7 +47,7 @@ export interface FlatLayout extends FloorPlan {
  * `inside` the middle of the tile behind it (where one who lives there is at home), its bedrooms
  * and its layout, furnished for who lives there.
  */
-export interface FlatUnit {
+interface FlatUnit {
   storey: number;
   rect: Rect;
   door: [number, number];
@@ -99,7 +99,7 @@ export interface PlaceFloors {
 }
 
 /** A flats building as a slot takes it: its template (`flats:<seed>:<storeys>:<wide>[:p]`), its name (the template's), its lot's size and its look. */
-export type FlatsSlot = Pick<PlotSlot, 'template' | 'name' | 'w' | 'd' | 'dress'>;
+type FlatsSlot = Pick<PlotSlot, 'template' | 'name' | 'w' | 'd' | 'dress'>;
 
 /** Time spent generating buildings of flats and floors above places (ms), and how many. */
 export const flatsStats = { ms: 0, made: 0 };

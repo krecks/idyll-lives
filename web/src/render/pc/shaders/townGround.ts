@@ -56,6 +56,6 @@ function code(lang: Language): ShaderFeature['glsl'] {
 }
 
 /** After the grass's ground (235) and the town's buildings (236). */
-export const TOWN_GROUND: ShaderFeature = { name: 'townGround', priority: 237, glsl: code('glsl'), wgsl: code('wgsl') };
+const TOWN_GROUND: ShaderFeature = { name: 'townGround', priority: 237, glsl: code('glsl'), wgsl: code('wgsl') };
 
 registerShaderFeature(TOWN_GROUND);

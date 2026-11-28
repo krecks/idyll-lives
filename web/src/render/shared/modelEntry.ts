@@ -170,7 +170,7 @@ export interface UseClip {
  * in twelve hours and the `minute` one in an hour, and the game holds each where the game's time
  * has it. `at`: the time the hands show at rest, in minutes past twelve (default 0: twelve o'clock).
  */
-export interface ClockClips {
+interface ClockClips {
   hour?: string;
   minute?: string;
   at?: number;

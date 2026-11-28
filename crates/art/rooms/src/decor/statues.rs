@@ -100,7 +100,14 @@ pub fn bust_marble() -> Vec<Obj> {
         ]
         .iter()
         .map(|&(z, rx, ry, cy)| {
-            ring!(rx * 1.12, ry * 1.04, z = y + hz(z), verts = 24, square = 2.2, at = (0.0, cy))
+            ring!(
+                rx * 1.12,
+                ry * 1.04,
+                z = y + hz(z),
+                verts = 24,
+                square = 2.2,
+                at = (0.0, cy)
+            )
         })
         .collect();
         loft!("head", &head, material = M.marble);

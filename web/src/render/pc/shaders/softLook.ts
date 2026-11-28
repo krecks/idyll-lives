@@ -36,7 +36,7 @@ const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152,
  * `surfaceAlbedo = base * (1 - F0) * (1 - metallic)`), which PlayCanvas doesn't take off. The soft
  * look and the diag view see the base colour so: that, plus the metal's own colour.
  */
-export const DIELECTRIC = '0.96';
+const DIELECTRIC = '0.96';
 
 /** `base`: the colour the soft look ramps and the diag view shows (metals in their own colour). */
 export const BASE = {

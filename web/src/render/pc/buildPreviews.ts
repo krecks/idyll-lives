@@ -69,7 +69,7 @@ const GROUND_UVS = [0, 1, 1, 1, 0, 0, 1, 0];
 const GROUND_INDICES = [3, 1, 0, 2, 3, 0];
 
 /** What the previews need of the renderer (as of the call). */
-export interface BuildPreviewHost {
+interface BuildPreviewHost {
   readonly content: Content;
   /** The world last asked for (the walls, openings and fences a preview goes into). */
   world(): WorldStructure | null;

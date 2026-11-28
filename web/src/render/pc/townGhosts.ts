@@ -71,7 +71,7 @@ export type Drape = (x: number, z: number) => number;
  * The surface of the town's road along a ghost's line, if the town has that road (`shared/roads.ts` `roadHeightsOf`):
  * its height `s` m along it. A road's ghost lies on it where it is higher than the ground (on a deck); else on the ground.
  */
-export type RoadHeights = (points: readonly (readonly [number, number])[]) => ((s: number) => number) | null;
+type RoadHeights = (points: readonly (readonly [number, number])[]) => ((s: number) => number) | null;
 
 /** A polyline cut into pieces no longer than `step` (m); `closed`: back to its first point. */
 function resample(points: readonly (readonly [number, number])[], step: number, closed = false): [number, number][] {

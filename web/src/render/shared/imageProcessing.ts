@@ -53,7 +53,7 @@ export const NEUTRAL_CURVES: Readonly<ColorCurveSettings> = {
 };
 
 /** The curves' three uniforms (`vCameraColorCurveNeutral`, `...Positive`, `...Negative`), RGBA each. */
-export interface CurveUniforms {
+interface CurveUniforms {
   neutral: Float32Array;
   positive: Float32Array;
   negative: Float32Array;

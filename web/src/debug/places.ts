@@ -14,7 +14,7 @@ import type { GameControls } from '../ui/services';
 import { DEBUG_HOOKS } from './hooks';
 
 /** A place as `__places()` gives it. */
-export interface PlaceSeen {
+interface PlaceSeen {
   name: string;
   kind: TownPlace['kind'];
   plot: number;

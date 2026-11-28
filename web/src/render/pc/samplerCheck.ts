@@ -12,7 +12,7 @@
 
 import * as pc from './engine';
 
-export interface SamplerCount {
+interface SamplerCount {
   /** Its samplers (the active ones; a failed program's read in its fragment shader). */
   count: number;
   samplers: string[];

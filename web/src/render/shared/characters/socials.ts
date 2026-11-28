@@ -26,7 +26,7 @@ export const Anim = {
  * went badly (a joke nobody laughs at, a flirt turned down). A `good` laugh is shared: the teller
  * laughs along between their turns.
  */
-export interface Gesture {
+interface Gesture {
   speak?: string;
   answer?: string;
   listen?: string;
@@ -35,7 +35,7 @@ export interface Gesture {
   flop?: string;
 }
 /** Per animation code, for socials without their own (`GESTURES`; packs'). */
-export const ANIM_GESTURES: Record<number, Gesture> = {
+const ANIM_GESTURES: Record<number, Gesture> = {
   [Anim.Laugh]: { good: 'laugh', bad: 'foldArms', flop: 'shrug' },
   [Anim.Flirt]: { speak: 'flirt', bad: 'foldArms', flop: 'rebuffed' },
   [Anim.Argue]: { speak: 'argue', answer: 'argue', listen: 'no' },
@@ -55,7 +55,7 @@ export const GESTURES: Record<string, Gesture> = {
   apologize: { speak: 'apologize', bad: 'foldArms', flop: 'rebuffed' },
 };
 /** A social's gestures (`GESTURES`) over its animation code's (`ANIM_GESTURES`), per code then social id, merged once. */
-export const MERGED_GESTURES = new Map<number, Map<string, Gesture>>();
+const MERGED_GESTURES = new Map<number, Map<string, Gesture>>();
 export function gesturesOf(anim: number, social: string): Gesture {
   let bySocial = MERGED_GESTURES.get(anim);
   if (!bySocial) MERGED_GESTURES.set(anim, (bySocial = new Map()));

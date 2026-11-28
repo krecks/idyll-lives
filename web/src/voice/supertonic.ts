@@ -16,7 +16,7 @@
 
 import type { VoiceParams } from './voices';
 
-export interface OrtTensor {
+interface OrtTensor {
   readonly data: unknown;
   readonly dims: readonly number[];
   /** Where the data is (ONNX Runtime Web): `'cpu'` or `'gpu-buffer'`. */
@@ -27,7 +27,7 @@ export interface OrtTensor {
   dispose?(): void;
 }
 /** The pieces of ONNX Runtime used here (the worker's `onnxruntime-web/webgpu`, or Node's `onnxruntime-web`). */
-export interface Ort {
+interface Ort {
   Tensor: new (type: 'int64' | 'float32', data: BigInt64Array | Float32Array, dims: readonly number[]) => OrtTensor;
 }
 export interface Session {
@@ -41,7 +41,7 @@ interface Line {
   visemes(): Float32Array;
   free(): void;
 }
-export interface Phonemizer {
+interface Phonemizer {
   line(text: string, pitch: number, depth: number): Line;
 }
 
@@ -56,7 +56,7 @@ export interface StyleFile {
   style_dp: { dims: number[]; data: unknown[] };
 }
 /** A voice style, flat. */
-export interface Style {
+interface Style {
   ttl: { data: Float32Array; dims: readonly number[] };
   dp: { data: Float32Array; dims: readonly number[] };
 }
@@ -84,7 +84,7 @@ export const STYLE_IDS = ['F1', 'F2', 'F3', 'F4', 'F5', 'M1', 'M2', 'M3', 'M4', 
  * Denoising passes per line: 6 is within a hair of the reference's 8 (spectral correlation
  * 0.97+), a quarter faster; 4 is about twice as fast but rougher.
  */
-export const STEPS = 6;
+const STEPS = 6;
 /** The reference's speaking rate; a voice's `speed` is a factor on it. */
 const BASE_SPEED = 1.05;
 
@@ -99,7 +99,7 @@ export function parseStyle(file: StyleFile): Style {
  * quotes and stray symbols made plain, spaces before punctuation dropped, a full stop at the end
  * if there's none, and the language tags around it.
  */
-export function prepareText(text: string): string {
+function prepareText(text: string): string {
   let t = text.normalize('NFKD');
   t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F1E6}-\u{1F1FF}]+/gu, '');
   t = t.replace(/[–‑—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’´`]/g, "'").replace(/[_[\]|/#→←]/g, ' ');

@@ -161,7 +161,7 @@ interface Cupboard {
   to: (s: number) => number;
 }
 const WALL_PULL = { y: 1.56, z: -0.04 };
-export const CUPBOARDS: Record<string, Cupboard> = {
+const CUPBOARDS: Record<string, Cupboard> = {
   // Over a 0.6 m deep worktop (its front about 0.17 m out): the toes up to it.
   putAway: {
     doors: [

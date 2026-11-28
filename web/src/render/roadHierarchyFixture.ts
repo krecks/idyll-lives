@@ -43,8 +43,6 @@ export const OFF_RAMP = 3;
 export const ON_RAMP = 4;
 export const AVENUE = 5;
 export const CROSS_WEST = 6;
-export const CROSS_EAST = 7;
-export const LOOP_LINK = 8;
 /** The one-way loop's four sides: west (cars go south), south (east), east (north) and north (west, its points running east). */
 export const LOOP = [9, 10, 11, 12] as const;
 

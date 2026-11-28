@@ -56,7 +56,7 @@ import { hash, lerp, mulberry32, smoothstep } from '../../game/noise';
 import { WALL_HEIGHT } from './walls';
 import { frameRandom } from './frameClock';
 
-export type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
+type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
 
 /** The model's nodes, in the order of the parts drawn. */
 export const BIRD_PARTS = ['body', 'head', 'tail', 'wing.L', 'wing.R'] as const;

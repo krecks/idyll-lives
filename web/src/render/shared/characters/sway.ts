@@ -20,7 +20,7 @@
  */
 
 /** A point's spring. */
-export interface SwaySpring {
+interface SwaySpring {
   /** Its own swing, per second. */
   readonly hz: number;
   /** Its damping, of critical (under 1: it swings past and back). */

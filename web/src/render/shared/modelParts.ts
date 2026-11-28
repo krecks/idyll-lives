@@ -431,7 +431,7 @@ export function icoSphereData(radius: number, subdivisions: number): VData {
  * Box with rounded edges and corners (radius `r`), centred on the origin. Each face is a grid
  * whose outer rows are bent around the edge, so normals are smooth across the bevel.
  */
-export function roundedBoxData(sx: number, sy: number, sz: number, r: number): VData {
+function roundedBoxData(sx: number, sy: number, sz: number, r: number): VData {
   const half = [sx / 2, sy / 2, sz / 2];
   const radius = Math.max(0, Math.min(r, ...half.map((h) => h * 0.98)));
   const steps = radius > 0 ? 3 : 0;
@@ -499,7 +499,7 @@ export function roundedBoxData(sx: number, sy: number, sz: number, r: number): V
 }
 
 /** Surface of revolution from a profile (see `ExtraShapes.profile`), centred on the origin. */
-export function latheData(profile: [number, number][], segments: number): VData {
+function latheData(profile: [number, number][], segments: number): VData {
   // Per profile point: one vertex ring (smooth) or two (hard edge), each with its 2D normal.
   const rings: { r: number; y: number; nr: number; ny: number }[][] = [];
   const segNormal = (a: [number, number], b: [number, number]): [number, number] => {
@@ -557,7 +557,7 @@ export function latheData(profile: [number, number][], segments: number): VData 
 }
 
 /** Lumpy sphere (foliage clumps, rocks): an icosphere displaced by smooth 3D noise. */
-export function blobData(sx: number, sy: number, sz: number, amount: number, subdivisions: number, seed: number): VData {
+function blobData(sx: number, sy: number, sz: number, amount: number, subdivisions: number, seed: number): VData {
   const data = icoSphereData(0.5, subdivisions);
   // (32-bit positions, as an updatable mesh has: the blob was built as one up to 0.3.2.)
   const pos = (data.positions = Float32Array.from(data.positions));
@@ -623,7 +623,7 @@ function hasUVs(data: VData, count: number): boolean {
 }
 
 /** World-aligned planar UVs (metres) by dominant normal axis, so textures keep their scale. */
-export function boxProjectUVs(data: VData): void {
+function boxProjectUVs(data: VData): void {
   const pos = data.positions;
   const nor = data.normals;
   if (!nor) return;

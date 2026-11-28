@@ -14,7 +14,7 @@
 import { untrack } from 'svelte';
 import { idleMoment } from '../render/shared/idle';
 
-export type InferenceDevice = 'gpu' | 'cpu';
+type InferenceDevice = 'gpu' | 'cpu';
 
 /** A hold the game forgot to let go of ends by itself after this long (a session that failed to start). */
 const HOLD_MAX_MS = 120_000;

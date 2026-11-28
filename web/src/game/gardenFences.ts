@@ -53,7 +53,7 @@ export interface FencePlot {
   fenced: boolean;
 }
 
-export interface FenceInput {
+interface FenceInput {
   plots: FencePlot[];
   /** Farm fields (town tiles; `TownLayout.fields`). */
   fields: Rect[];
@@ -75,7 +75,7 @@ const BESIDE_DRIVE = 1.5;
 const DOOR_ROOM = 1;
 
 /** The fence styles the town uses (content `fenceStyles` ids). */
-export const TOWN_FENCE = { picket: 'picket', hedge: 'hedge', rail: 'rails' } as const;
+const TOWN_FENCE = { picket: 'picket', hedge: 'hedge', rail: 'rails' } as const;
 
 /** As `shared/street.ts` lays a plot out: turned a quarter when its street runs along z. */
 const localRect = (turned: boolean, r: Rect): Rect => (turned ? { x: r.z, z: -(r.x + r.w), w: r.d, d: r.w } : r);

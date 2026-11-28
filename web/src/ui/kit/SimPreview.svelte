@@ -14,15 +14,13 @@
    *
    * `gender` defaults to the one the look was created for (drafts from `randomSim`).
    * `id` is the Sim's id in a running game (older saves derive clothes from it).
-   * `animate` is accepted for compatibility and ignored.
    */
-  // eslint-disable-next-line svelte/no-unused-props -- `animate` is kept for compatibility
   let {
     appearance,
     gender,
     id,
     size = 46,
-  }: { appearance: Appearance; gender?: string; id?: number; size?: number; animate?: boolean } = $props();
+  }: { appearance: Appearance; gender?: string; id?: number; size?: number } = $props();
 
   let url = $state<string | null>(null);
   let box: HTMLSpanElement;

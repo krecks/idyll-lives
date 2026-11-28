@@ -30,10 +30,10 @@ import * as pmath from './pmath';
 type Rand = () => number;
 
 /** Where a lot stands, which sets its kinds, gaps and the corner it keeps: a main town's centre, the rest of a main town, a hamlet. */
-export type Zone = 'centre' | 'town' | 'hamlet';
+type Zone = 'centre' | 'town' | 'hamlet';
 
 /** What a pass over a town being generated is made from. */
-export interface DenseInput {
+interface DenseInput {
   content: Content;
   t: Templates;
   roads: readonly RoadPlan[];
@@ -53,7 +53,7 @@ export interface DenseInput {
  * are measured by, the content its places come from, and the ground its lots go down on (`ground`: one shared with lots
  * being laid beside it, Build's; else the draft's own, `edit/ground.ts` `townGround`).
  */
-export interface DenseDraft {
+interface DenseDraft {
   draft: NeighbourhoodDraft;
   t: Templates;
   content: Content;
@@ -65,7 +65,7 @@ export interface DenseDraft {
  * the row's middle is and on which side, how far back from the road its back is, its zone, and the
  * kinds the row was limited to (if it was).
  */
-export interface Row {
+interface Row {
   slots: number[];
   r: number;
   s: number;
@@ -80,7 +80,7 @@ export interface Row {
  * (`kinds`: any of its zone's if not given; `kindsAt`: those the land a metre along and 6 m back from the
  * sidewalk asks for, none there if null, in place of `kinds`, with no gaps but where it asks for none).
  */
-export interface RowLimits {
+interface RowLimits {
   from?: number;
   to?: number;
   kinds?: readonly BuildingUse[];
@@ -494,7 +494,7 @@ export function terraceUnits(t: Templates, n: number, area: number, rand: Rand):
  * hundred lays none out; `houseFor` would put a fixed layout, too wide for the lot, in its place).
  * Null: none in 40 draws.
  */
-export function rowHouse(t: Templates, rand: Rand): ReturnType<typeof houseFor> | null {
+function rowHouse(t: Templates, rand: Rand): ReturnType<typeof houseFor> | null {
   for (let k = 0; k < 40; k++) {
     const h = houseFor(t, 'terrace', 'snug', rand);
     if (h.template.startsWith('gen:')) return h;

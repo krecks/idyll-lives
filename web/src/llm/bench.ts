@@ -29,7 +29,7 @@ import type { GenParams, GenResult } from './generate';
 import { MODEL } from './models';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
 
-export interface PerfSample {
+interface PerfSample {
   name: string;
   promptTokens: number;
   cachedTokens: number;
@@ -46,7 +46,7 @@ export interface PerfSample {
   perToken: GenResult['steps'];
 }
 
-export interface PerfReport {
+interface PerfReport {
   adapter: Record<string, string>;
   isolated: boolean;
   cores: number;
@@ -66,7 +66,7 @@ export interface PerfReport {
   sampled: PerfSample[];
 }
 
-export interface PerfOptions {
+interface PerfOptions {
   /** Tokens a decode run may write (default 96). */
   decodeTokens?: number;
   /** Decode runs (default 3). */
