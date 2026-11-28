@@ -1600,6 +1600,39 @@ fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
     );
 }
 
+/// A taxi whose room runs out: pulled over for another car (no further than `PULL_MOST`), it's
+/// back in its lane at once, as any car; parked beside the road in its bay (`park_shift`), it
+/// eases back in a `PULL_RATE` a tick.
+#[test]
+fn only_a_taxi_parked_in_its_bay_eases_back_in() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    let mut legs = Legs::default();
+    for k in 0..=20 {
+        legs.push_lane([10.0 + 2.0 * k as f32, 9.5], 5.0, 0.0, Some(LANE));
+    }
+    let route = legs.timed(true, true);
+    let t = route.points[10].2;
+    let (p, yaw, _) = route.at(t);
+    let car = &mut w.cars[0];
+    car.taxi = true;
+    car.state = CarState::Leaving;
+    car.route = Some((false, route));
+    car.progress = t;
+    car.shown = Some((p, yaw, true, 0));
+    for (from, to) in [
+        (PULL_MOST, 0.0),
+        (park_shift(car.wid), park_shift(car.wid) - PULL_RATE),
+    ] {
+        w.cars[0].shift = from;
+        pull_over(&mut w, 0, &[], false, None);
+        assert!(
+            (w.cars[0].shift - to).abs() < 1e-5,
+            "from {from:.3} m over: {:.3}, not {to:.3}",
+            w.cars[0].shift
+        );
+    }
+}
+
 /// A road of `kind` through `pts` (a point every metre), `oneway` (`OneWay`).
 fn road_raw(
     pts: &[[f32; 2]],

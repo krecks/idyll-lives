@@ -52,6 +52,24 @@ fn a_kept_stand_is_for_the_driveways_as_they_are() {
     assert_eq!((warm.road, warm.s), (fresh.road, fresh.s));
 }
 
+/// A house nobody lives in has its taxi bay by its door: the door moved (the roads and driveways
+/// as they were), its bay moves with it (`warm_kerbs` once looked again only at households').
+#[test]
+fn an_empty_houses_bay_moves_with_its_door() {
+    let mut w = street();
+    // H1 empty, no driveway: its stand is by its door.
+    w.households[1].plot = None;
+    w.drives.retain(|d| d.plot != 1);
+    warm_kerbs(&mut w);
+    // (Within a stand's reach of x: H0's bay is 48 m and more from both doors.)
+    let near = |w: &World, x: f32| w.taxis.kerbs.bays.iter().any(|b| (b[0] - x).abs() < 30.0);
+    assert!(near(&w, 148.5), "a bay by H1's door");
+    w.plots[1].entry = Some([40.5, 17.5]);
+    warm_kerbs(&mut w);
+    assert!(near(&w, 40.5), "a bay by its new door");
+    assert!(!near(&w, 148.5), "none left by the old");
+}
+
 /// No more than `LEISURE_FLEET` taxis go out on visits and outings at once, there and back
 /// counted alike; the work taxi's runs don't count.
 #[test]
