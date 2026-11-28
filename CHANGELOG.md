@@ -5,6 +5,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 ## Unreleased
 
 - **Taxi bays:** an empty house's taxi bay moves with its door, so the kerbside furniture keeps clear of the right spot. Editing a road or a driveway while paused no longer slows every update after it. A taxi pulled over for another car goes back into its lane as other cars do; only one parked in its bay eases out.
+- **More new worlds generate cleanly:** a motorway's junction is laid where a road from the town can climb to it, and never over a road that climbs a steep hill just past it; a slip road meets its motorway without a step; a street left ending in the air by a country road given up to the slopes is cut back to its last junction; a river's extra bridge always joins the roads; a city's centre is found when its one-way streets leave the high street short, a winding main street is still chosen as the high street over a short lane, and a town's square no longer counts against its centre being the most built up; every village gets a parking bay; a motorway's bridge off an island reaches the world's edge.
 
 ## 0.9.0 — 2026-11-27
 
