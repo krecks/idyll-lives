@@ -4,9 +4,9 @@
 rustflags = ["-C", "target-feature=+simd128"]
 
 # The repo's tools (crates/tools), run from the repo root. Their Python and JavaScript predecessors
-# are gone. decoders and licenses are unoptimised: a release build would only cost minutes of compiling.
-# The rest build in the `tools` profile (Cargo.toml: release without fat LTO), as their tests do; the
-# fetch, release-version and wasm-opt tools repack or quantise assets that Pages runs beside the others.
+# are gone. decoders is unoptimised: it only waits on the network. The rest build in the `tools`
+# profile (Cargo.toml: release without fat LTO), as their tests do, so the production build and Pages
+# compile ll-tools once for all of them (the fetches repack and quantise, licenses runs after wasm-opt).
 [alias]
 art = "run -q -p ll-art --profile tools --bin art --"
 assets = "run -q -p ll-tools --profile tools --bin assets --"
@@ -21,7 +21,7 @@ decoders = "run -q -p ll-tools --bin decoders --"
 envconv = "run -q -p ll-tools --profile tools --bin envconv --"
 fetch-llm = "run -q -p ll-tools --profile tools --bin fetch-llm --"
 fetch-voice = "run -q -p ll-tools --profile tools --bin fetch-voice --"
-licenses = "run -q -p ll-tools --bin licenses --"
+licenses = "run -q -p ll-tools --profile tools --bin licenses --"
 pins = "run -q -p ll-tools --profile tools --bin pins --"
 release-version = "run -q -p ll-tools --profile tools --bin release-version --"
 wasm-opt = "run -q -p ll-tools --profile tools --bin wasm-opt --"

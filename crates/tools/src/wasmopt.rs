@@ -8,9 +8,11 @@
 //!   with simd128 from .cargo/config.toml), so nothing depends on that section surviving.
 //! - Never `-tnh` / `-iit` (traps-never-happen, ignore-implicit-traps): with `panic = "abort"`
 //!   every Rust panic is a trap, and those flags let the optimiser assume it can't happen.
-//! - About 48 s for the simulation on an M3 (binaryen.js is slow), so results are kept in
-//!   `web/.assets/wasm-opt/{release,names}/` by the input's SHA-256 and a rebuild of the same wasm
-//!   is instant.
+//! - binaryen.js is one thread: about 5 min for the simulation on an idle M3 (13 on a busy one).
+//!   Outside CI a native `wasm-opt` on PATH (`brew install binaryen`) is used instead, threaded and
+//!   far quicker; CI keeps the pinned binaryen.js, so the shipped bytes don't depend on the machine.
+//!   Results are kept in `web/.assets/wasm-opt/{release,names}/` by the input's SHA-256 and the
+//!   optimiser's version, and a rebuild of the same wasm is instant.
 //!
 //! The `--names` variant runs the same optimisations but leaves the names in, so its function
 //! numbers match the shipped wasm and a stack from the site can be read with it.
@@ -81,7 +83,11 @@ pub struct Optimized {
 /// are removed.
 pub fn optimize(path: &Path, names: bool) -> Result<Optimized, String> {
     let binaryen = binaryen()?;
-    let version = binaryen_version(&binaryen)?;
+    let native = std::env::var_os("CI").is_none().then(native).flatten();
+    let version = match &native {
+        Some((_, v)) => v.clone(),
+        None => binaryen_version(&binaryen)?,
+    };
     let flags = flags(names);
     let name = strip_hash(path);
     let dir = web()
@@ -115,7 +121,16 @@ pub fn optimize(path: &Path, names: bool) -> Result<Optimized, String> {
             }
         }
         let tmp = with_suffix(&cached, ".part");
-        run_wasm_opt(&binaryen.join("bin").join("wasm-opt"), &flags, path, &tmp)?;
+        match native {
+            Some((bin, _)) => run_wasm_opt(&bin, &[None], &flags, path, &tmp)?,
+            None => run_wasm_opt(
+                &binaryen.join("bin").join("wasm-opt"),
+                &[Some("node"), Some("bun"), None],
+                &flags,
+                path,
+                &tmp,
+            )?,
+        }
         std::fs::rename(&tmp, &cached).map_err(|e| format!("{}: {e}", cached.display()))?;
     }
     let part = with_suffix(path, ".part");
@@ -131,12 +146,31 @@ pub fn optimize(path: &Path, names: bool) -> Result<Optimized, String> {
     })
 }
 
-/// binaryen's `bin/wasm-opt` is a Node script: run it as one, or as the shell would (its shebang),
-/// or with bun if Node isn't installed. Only a runner that can't be started is passed over: wasm-opt
-/// failing is an error at once.
-fn run_wasm_opt(script: &Path, flags: &[String], input: &Path, out: &Path) -> Result<(), String> {
+/// A native `wasm-opt` on PATH and its version line (`wasm-opt version 123 (…)`), the cache key's.
+/// PATH's `node_modules` folders are passed over: under `bun run` they come first, and their
+/// `wasm-opt` is binaryen.js's script.
+fn native() -> Option<(PathBuf, String)> {
+    let bin = std::env::split_paths(&std::env::var_os("PATH")?)
+        .filter(|dir| !dir.components().any(|c| c.as_os_str() == "node_modules"))
+        .map(|dir| dir.join("wasm-opt"))
+        .find(|p| p.is_file())?;
+    let out = Command::new(&bin).arg("--version").output().ok()?;
+    let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    out.status.success().then_some((bin, version))
+}
+
+/// Runs `script` under each runner in turn (`None`: as is). binaryen's `bin/wasm-opt` is a Node
+/// script: run as one, as the shell would (its shebang), or with bun if Node isn't installed. Only
+/// a runner that can't be started is passed over: wasm-opt failing is an error at once.
+fn run_wasm_opt(
+    script: &Path,
+    runners: &[Option<&str>],
+    flags: &[String],
+    input: &Path,
+    out: &Path,
+) -> Result<(), String> {
     let mut errors = Vec::new();
-    for runner in [Some("node"), Some("bun"), None] {
+    for &runner in runners {
         let mut cmd = match runner {
             Some(program) => {
                 let mut c = Command::new(program);

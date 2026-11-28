@@ -287,20 +287,43 @@ function runTool(args: string[]): string[] {
 /**
  * The release WebAssembly: once the build has written the simulation's, the sounds' and the voice's wasm, they
  * are optimised and stripped by binaryen's wasm-opt (`cargo wasm-opt`: -O3, no name or producers
- * sections; about a minute the first time, then cached). The dev server, and `bun run wasm` behind
+ * sections; minutes the first time with binaryen.js, started at buildStart on the packages' copies, then cached). The dev server, and `bun run wasm` behind
  * it, keep them as built.
  */
 function releaseWasm(): Plugin {
   let outDir = '';
+  let root = '';
   let log: (line: string) => void = () => {};
+  let warm: Promise<void> | null = null;
   return {
     name: 'release-wasm',
     apply: 'build',
     configResolved(config) {
+      root = config.root;
       outDir = resolve(config.root, config.build.outDir);
       log = (line) => config.logger.info(line, { timestamp: true });
     },
+    async buildStart() {
+      // The bundle's wasm is the packages' byte for byte: optimising copies of them now, while vite
+      // bundles, fills wasm-opt's cache (keyed by the bytes), and closeBundle finds it done.
+      const dir = join(root, '.assets', 'wasm-opt', 'warm');
+      await mkdir(dir, { recursive: true });
+      const copies: string[] = [];
+      for (const pkg of ['core/wasm-pkg/sim_wasm_bg.wasm', 'audio/wasm-pkg/sound_wasm_bg.wasm', 'voice/wasm-pkg/voice_wasm_bg.wasm']) {
+        const to = join(dir, basename(pkg));
+        try {
+          await cp(join(root, 'src', pkg), to);
+          copies.push(to);
+        } catch {
+          // (Not built: closeBundle optimises it, or fails, as before.)
+        }
+      }
+      if (copies.length === 0) return;
+      // (A failure here only loses the head start: closeBundle runs wasm-opt itself either way.)
+      warm = new Promise((done) => spawn('cargo', ['wasm-opt', ...copies], { stdio: 'ignore' }).on('close', () => done()).on('error', () => done()));
+    },
     async closeBundle() {
+      await warm;
       const dir = join(outDir, 'assets');
       const files = (await readdir(dir)).filter((f) => /^(sim|voice|sound)_wasm_bg-[\w-]+\.wasm$/.test(f));
       if (!files.some((f) => f.startsWith('sim_'))) throw new Error(`release-wasm: no sim_wasm_bg-*.wasm in ${dir}`);
