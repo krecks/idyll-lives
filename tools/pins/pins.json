@@ -114,9 +114,9 @@
     {
       "name": "sim-privacy",
       "file": "crates/sim-core/src/privacy.rs",
-      "sha256": "01571a9bc70cf9fcedd69d2d657ad4799065f9aaa8b1d6b7daa287005e095ee7",
-      "by": "playtest/design-proposals",
-      "reason": "PR #115, owner's OK: someone waiting outside a room kept shut gives up after 50 game minutes (WAIT_MINUTES, was 60)."
+      "sha256": "d5b7b89f36bbbca8b7ec43cf7a865845ab13c5f2183ee21b3ebdadbf9e0a7fd4",
+      "by": "fix/walk-takeover",
+      "reason": "walk mode: a resident the player walks isn't held outside a shut room (shut_ahead off while steered), and a 'Try for a baby' ordered while walking keeps its bed task (directed while steered)"
     },
     {
       "name": "living-town-lens",
