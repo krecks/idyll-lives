@@ -50,7 +50,8 @@ test('a wall across the way is found, a diagonal only when both ways round are w
 /** A walk mode over a fake bridge (one resident, id 7, at `pos`; `pos` null: away) with the keys typed at `window`. */
 function harness() {
   const g = globalThis as Record<string, unknown>;
-  g.window ??= new EventTarget();
+  // (Its own: other files leave a plain `{}` as `window`, which can't take the keys.)
+  g.window = new EventTarget();
   g.requestAnimationFrame = () => 0;
   g.cancelAnimationFrame = () => {};
   for (const n of ['HTMLInputElement', 'HTMLTextAreaElement', 'HTMLSelectElement', 'HTMLElement']) g[n] ??= class {};
