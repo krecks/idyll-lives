@@ -9,13 +9,13 @@ import { withGlows, type ModelTemplate } from '../render/pc/models';
 import type { Shown } from './clipBench';
 
 /** What a template draws: triangles, vertices and draw calls (its glows' too). */
-export interface Counts {
+interface Counts {
   triangles: number;
   vertices: number;
   draws: number;
 }
 
-export function counts(t: ModelTemplate): Counts {
+function counts(t: ModelTemplate): Counts {
   let triangles = 0;
   let vertices = 0;
   for (const { mesh } of t.meshes) {
@@ -31,7 +31,7 @@ export interface Box {
   hi: [number, number, number];
 }
 
-export function restBox(t: ModelTemplate): Box | null {
+function restBox(t: ModelTemplate): Box | null {
   if (!t.meshes.length) return null;
   const lo: [number, number, number] = [Infinity, Infinity, Infinity];
   const hi: [number, number, number] = [-Infinity, -Infinity, -Infinity];

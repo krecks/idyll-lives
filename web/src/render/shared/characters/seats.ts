@@ -133,7 +133,7 @@ export const NO_FEET_UP = new Set(['music', 'meditate', 'toilet', 'bath', 'wash'
  * seat (`BEDS` `across`), the head at one arm, under a blanket tucked in between the back and the front and ending
  * inside the arm (`tuck`, `foot`); curled up on a two-seater (`CURLED_BEDS`), at full length on a three-seater.
  */
-export const SOFA_NIGHTS = ['sofa', 'loveseat', 'sofaDesign', 'sofaThree', 'sofaThreeSeat'];
+const SOFA_NIGHTS = ['sofa', 'loveseat', 'sofaDesign', 'sofaThree', 'sofaThreeSeat'];
 /** Beds whose sleepers get a blanket (pack hammocks and nap pods don't): the beds, and the sofas slept on for the night (content `spare`), a blanket pulled over them. */
 export const BLANKET_BEDS = new Set(['bed', 'lazy.snoozecloudBed', 'bedSingle', 'bedBunk', 'bedFuton', 'bedKing', 'bedDouble', 'bedQueenUpholstered', 'bedCanopy', 'kidsBed', 'kidsBedCar', 'wallBed', 'bedDaybed', ...SOFA_NIGHTS]);
 /**
@@ -197,7 +197,7 @@ export const BENCH_HIP = 0.09;
 /** Legs out along a seat (`Characters.legsOut`): the ankles this far below the hips' joints (m, body scale 1). */
 export const LEGS_OUT_DROP = 0.04;
 /** How a held part is held (content `held.grip`; see `Characters.writeHeld`). */
-export type Grip = 'bar' | 'pair' | 'guitar' | 'pole';
+type Grip = 'bar' | 'pair' | 'guitar' | 'pole';
 /** Where the legs are in a clip (`measureLegs`; body space, scale 1; `LegSide`, characters/seatFit.ts). */
 export interface LegFit {
   l: LegSide;

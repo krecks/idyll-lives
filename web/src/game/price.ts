@@ -13,7 +13,7 @@ import { houseTemplate, slotDims, type HouseTemplate, type PlotSlot, type Templa
 import * as pmath from './pmath';
 
 /** A home's price and what it's made of ($). */
-export interface PriceParts {
+interface PriceParts {
   land: number;
   house: number;
   furniture: number;

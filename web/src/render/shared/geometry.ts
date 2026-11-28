@@ -19,9 +19,6 @@ export function encodeFinish(roughness: number, metallic: number): number {
   return metallic >= 0.5 ? 0.5 + r : r;
 }
 
-/** Custom vertex attribute: [mask A, kind, mask B, 0]; see `WallCutPlugin`. */
-export const WALL_CUT_KIND = 'wallCut';
-
 /** Cutaway behaviour of a vertex when its wall is cut: keep, clamp to stub height, hide. */
 export const Cut = { Keep: 0, Clamp: 1, Hide: 2 } as const;
 
@@ -40,7 +37,7 @@ export interface MeshData {
   indices: Uint16Array | Uint32Array;
   /** sRGB vertex colours (RGBA, 0..255 for 0..1), if asked for. */
   colors?: Uint8Array;
-  /** The cutaway attribute (`WALL_CUT_KIND`, 4 per vertex: masks 0..15, kind 0..2), if asked for. */
+  /** The cutaway attribute ([mask A, kind, mask B, 0] per vertex: masks 0..15, kind 0..2; see `WallCutPlugin`), if asked for. */
   cut?: Uint8Array;
   /** Whether a vertex colour is translucent (the mesh then blends by vertex alpha). */
   vertexAlpha: boolean;

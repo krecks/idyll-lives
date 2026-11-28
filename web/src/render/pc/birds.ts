@@ -118,7 +118,7 @@ function lookFrom(app: pc.AppBase, root: pc.Entity, entry: BirdEntry, template: 
 }
 
 /** What the birds need of the renderer (read when they're settled and each frame). */
-export interface BirdsHost {
+interface BirdsHost {
   /** The camera's position (game space). */
   eye(out: { x: number; y: number; z: number }): void;
   /** The storey in view (the garden is dug away over the basement: the birds hide). */

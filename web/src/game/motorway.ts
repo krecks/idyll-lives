@@ -44,7 +44,7 @@ const WIDTH = ROAD_KIND.motorway.width;
 /** From the middle line to a carriageway's outer edge (m). */
 const OUTER = APART / 2 + WIDTH / 2;
 /** How many courses it tries. */
-export const CANDIDATES = 24;
+const CANDIDATES = 24;
 /** The tightest it bends (m of radius), measured over `BEND_SPAN` m either way. */
 export const BEND_RADIUS = 150;
 const BEND_SPAN = 25;
@@ -55,13 +55,13 @@ export const TOWN_REACH = 220;
 /** How far from the town's box its middle line is best passing (m): clear of the lots spilling out along the roads from it, near enough for the way to its junction. */
 const REACH_AIM = 150;
 /** How far its middle line keeps off the world's edges but the two it runs between (m). */
-export const SIDE_CLEAR = 40;
+const SIDE_CLEAR = 40;
 /** Its courses along an edge of the world (`candidates`) this far in from `SIDE_CLEAR` and `TOWN_REACH` (m: room for the road under its junction to go on beyond it, `gatesOf`). */
 const EDGE_IN = 40;
 /** How far its middle line keeps off the roads laid before it (bridges, causeways: m). */
 const ROAD_CLEAR = 40;
 /** Its water: crossed this square or squarer (radians), each crossing this long at most (m), crossings at most. */
-export const WATER_ANGLE = Math.PI / 3;
+const WATER_ANGLE = Math.PI / 3;
 const WATER_MOST = 100;
 const WATER_CROSSINGS = 1;
 /** At an end, off the coast to the world's edge (an island's sea), this long at most (m). */
@@ -99,9 +99,9 @@ const GATE_SQUARE = (20 * Math.PI) / 180;
 const GATE_LOOK = 80;
 /** An overpass reaches at least this far either side of the road under it (m), and spans closer than `MERGE_SPANS` m are one. */
 const OVER_HALF = 15;
-export const MERGE_SPANS = 150;
+const MERGE_SPANS = 150;
 /** A crossing this much squarer than not (radians) at least. */
-export const CROSS_ANGLE = (45 * Math.PI) / 180;
+const CROSS_ANGLE = (45 * Math.PI) / 180;
 /**
  * A ramp: from its merge, `RAMP_ALONG` m along its carriageway from where it meets the road under it, out over
  * `RAMP_TAPER` m to `RAMP_BESIDE` m beside it (their edges touching), along beside it, then out to the road under it,
@@ -111,7 +111,7 @@ const RAMP_WIDTH = ROAD_KIND.ramp.width;
 const RAMP_ALONG = 118;
 const RAMP_TAPER = 40;
 const RAMP_BESIDE = WIDTH / 2 + RAMP_WIDTH / 2;
-export const RAMP_T = 25;
+const RAMP_T = 25;
 /** The ramp's run in to its T (m along the carriageway before it), tried in turn; and its T's distance out, tried in turn (a road under it slanting away). */
 const RAMP_INS = [38, 26, 52, 16, 70];
 const RAMP_TS = [RAMP_T, RAMP_T + 7, RAMP_T + 14];
@@ -127,7 +127,7 @@ const MOTOR = 0x6d6f746f;
 const offRect = (r: Rect, [x, z]: Pt) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 
 /** A gate the country roads cross the motorway by: where along its middle line (m), there, and the way across (a unit step of the land's cells). */
-export interface Gate {
+interface Gate {
   s: number;
   p: Pt;
   across: Pt;
@@ -155,7 +155,7 @@ export interface MotorwayRoute {
 }
 
 /** A road crossing the motorway's middle line: which, how far along it (m) and along the middle line (m), and how square (radians from along). */
-export interface Crossing {
+interface Crossing {
   road: number;
   s: number;
   m: number;
@@ -285,7 +285,7 @@ function wetRuns(pts: readonly Pt[], wet: (x: number, z: number) => boolean, ls 
 }
 
 /** What the motorway's course is tried against: the land, the areas (the main town's first), the roads laid already, the water at the metre (`wet`). */
-export interface MotorwaySite {
+interface MotorwaySite {
   land: Cells;
   /** The land's height at (x, z) as seeded (m; default its cells', between their middles). */
   height?: (x: number, z: number) => number;
@@ -769,7 +769,7 @@ export function crossings(middle: readonly Pt[], roads: readonly RoadPlan[]): Cr
 }
 
 /** The motorway as laid (`finishMotorway`): its roads (two carriageways, then its ramps), and what each road it crosses gets in its `crosses`. */
-export interface MotorwayLaid {
+interface MotorwayLaid {
   roads: RoadPlan[];
   /** Per road it passes over (by index), the carriageways it passes under (their indices once laid: `base` on) and where along that road. */
   under: Map<number, { road: number; s: number }[]>;
@@ -899,7 +899,7 @@ const grids = new WeakMap<readonly Pt[], ReturnType<typeof segmentGrid>>();
  * a ramp over the water, near another road, by another crossing or a junction on the road under it, or past the
  * world's edge.
  */
-export function halfDiamond(route: MotorwayRoute, c: Crossing, roads: readonly RoadPlan[], index: RoadIndex, found: readonly Crossing[], wet: (x: number, z: number) => boolean): { off: RoadPlan; on: RoadPlan; side: -1 | 1 } | null {
+function halfDiamond(route: MotorwayRoute, c: Crossing, roads: readonly RoadPlan[], index: RoadIndex, found: readonly Crossing[], wet: (x: number, z: number) => boolean): { off: RoadPlan; on: RoadPlan; side: -1 | 1 } | null {
   const { middle } = route;
   const { ls: lm } = chunksOf(middle);
   const L = lm[lm.length - 1];
@@ -1060,7 +1060,7 @@ export function motorwayProblems(roads: readonly RoadPlan[]): string[] {
  * `merge` end), there, and the carriageway nearest there (its index, how far its middle is and where along it, m;
  * none without a carriageway). Null: no end of it merges.
  */
-export function mergeOf(roads: readonly RoadPlan[], ramp: RoadPlan): { end: 0 | 1; at: Pt; way?: { road: number; dist: number; s: number } } | null {
+function mergeOf(roads: readonly RoadPlan[], ramp: RoadPlan): { end: 0 | 1; at: Pt; way?: { road: number; dist: number; s: number } } | null {
   const e = ramp.ends.indexOf('merge');
   if (e < 0) return null;
   const at = e === 0 ? ramp.points[0] : ramp.points[ramp.points.length - 1];

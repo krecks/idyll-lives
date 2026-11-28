@@ -10,7 +10,7 @@
 
 import * as pmath from './pmath';
 
-export interface PointerHandlers {
+interface PointerHandlers {
   click(x: number, y: number): void;
   hover(x: number, y: number): void;
   leave(): void;

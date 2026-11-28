@@ -42,7 +42,7 @@ export interface StudioDeps {
 }
 
 /** A Sim in the studio. `yaw` 0 faces the camera (+z). */
-export interface Row {
+interface Row {
   look: SimLook;
   x: number;
   z: number;

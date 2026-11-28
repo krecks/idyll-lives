@@ -2,7 +2,6 @@
 //! outline (`leafy_shrub`), a clipped block (`hedge_block`), what is spread over them, their perches, and a plant
 //! grown from random numbers fitted to its size (`fit_to`).
 
-
 use crate::botany::leaf::{Leaf, leaf};
 use crate::botany::lump::{Lump, lump};
 use crate::botany::stems::{Twig, twig};

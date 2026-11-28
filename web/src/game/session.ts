@@ -201,7 +201,7 @@ export interface GameSession {
 }
 
 /** Reports a loading step and the overall progress (0..1) while a session is prepared. */
-export type ProgressReport = (label: string, value: number) => void;
+type ProgressReport = (label: string, value: number) => void;
 
 export async function startSession(
   renderer: Renderer,

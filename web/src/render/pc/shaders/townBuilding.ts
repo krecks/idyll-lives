@@ -189,7 +189,7 @@ function code(lang: Language): ShaderFeature['glsl'] {
 }
 
 /** The town view's buildings (see the file's header), before the soft look (300) and after the grass (235). */
-export const TOWN_BUILDING: ShaderFeature = { name: 'townBuilding', priority: 236, glsl: code('glsl'), wgsl: code('wgsl') };
+const TOWN_BUILDING: ShaderFeature = { name: 'townBuilding', priority: 236, glsl: code('glsl'), wgsl: code('wgsl') };
 
 registerShaderFeature(TOWN_BUILDING);
 

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
   import type { LandTool } from '../../game/landBrush';
   import Icon from '../Icon.svelte';
   import { groupOf, hasHeight, hasStrength, HEIGHTS, LAND_GROUPS, sizeAt, sizeOf, sizeRange, POINT, sizeText, sliderAt, stepSize, toolInfo, type BrushState } from './landTools';
@@ -22,7 +21,6 @@
     onundo,
     onredo,
     onreset,
-    extra,
   }: {
     brush: BrushState;
     canUndo?: boolean;
@@ -39,8 +37,6 @@
     onundo?: () => void;
     onredo?: () => void;
     onreset: () => void;
-    /** More, after the buttons (step 1: laying the town again). */
-    extra?: Snippet;
   } = $props();
 
   const info = $derived(toolInfo(brush.tool));
@@ -187,7 +183,6 @@
         <button class="btn ghost small reset" disabled={disabled || !canReset} title="Put the land back as it was" onclick={() => (confirming = true)}>Reset the land</button>
       {/if}
     </div>
-    {@render extra?.()}
   </div>
 </div>
 

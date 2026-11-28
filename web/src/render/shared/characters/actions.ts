@@ -142,9 +142,9 @@ export interface StepIn {
   square?: boolean;
 }
 /** `StepIn.by` from a clip's sizes, each from its shortest resident up: the size's clip, or the clips `clips` plays for it. */
-export const bySize = (sizes: readonly Size[], clips: (clip: string) => readonly string[] = (clip) => [clip]): StepIn['by'] => sizes.map(({ clip, min, fit }) => [min, clips(clip), fit] as const);
+const bySize = (sizes: readonly Size[], clips: (clip: string) => readonly string[] = (clip) => [clip]): StepIn['by'] => sizes.map(({ clip, min, fit }) => [min, clips(clip), fit] as const);
 /** Eating a picked fruit (after the pick), bite by bite. */
-export const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
+const EAT_FRUIT = ['eat', 'idle', 'eat', 'idle', 'eat', 'idle'];
 export const STEP_IN: Record<string, StepIn> = {
   drinkingFountain: { by: bySize(FOUNTAIN) },
   // Onto its floor (the plinth, 12 cm), facing the phone at the back.
@@ -344,10 +344,10 @@ export const TOWEL_OUT = 0.8;
 /** Things stood on holding their grips (content `stand`): the vibration plate, its clip in a size per height (`PLATE_HOLD`). */
 export const GRIPPED: Record<string, readonly { clip: string; min: number }[]> = { 'lazy.vibePlate': PLATE_HOLD };
 /** Relaxing on foot (`ACTIONS.relax`): standing about, the arms folded now and then. */
-export const RELAX_STAND: readonly string[] = ['idle', 'foldArms'];
+const RELAX_STAND: readonly string[] = ['idle', 'foldArms'];
 /** Showering (`ACTIONS.shower`), a grown-up's and a child's. */
-export const SHOWER_ONLY: readonly string[] = ['shower'];
-export const SHOWER_SMALL: readonly string[] = ['showerChild'];
+const SHOWER_ONLY: readonly string[] = ['shower'];
+const SHOWER_SMALL: readonly string[] = ['showerChild'];
 /** A use sequence of one clip in sizes (the tallest first): the size for the user's height (m). */
 function sized(sizes: readonly { clip: string; min: number }[]): (def: string, height: number) => readonly string[] {
   const seqs = sizes.map(({ clip, min }) => [min, [clip]] as const);

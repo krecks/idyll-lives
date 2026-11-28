@@ -89,7 +89,7 @@ const LAMP_SWITCH_FADE = 0.25;
 const NIGHT_EXPOSURE = Math.max(...LOOK.keys.map((k) => k.exposure));
 
 /** The lot as the renderer has it now. */
-export interface LampView {
+interface LampView {
   /** The storey in view (-1: the basement). */
   storey(): number;
   /** The storey a lot row is on. */
@@ -103,7 +103,7 @@ export interface LampView {
 }
 
 /** What the lamps light besides the lot's surfaces. */
-export interface LampHooks {
+interface LampHooks {
   house: HouseBuilder;
   lot: LotContents;
   /** The garden's pools of lamplight again (their lamps' fades: `Lamps.lampOn`); whether one changed. */

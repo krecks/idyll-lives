@@ -4,7 +4,7 @@
  * (`sim-core/src/blueprint.rs`).
  */
 
-export interface SavedBlueprint {
+interface SavedBlueprint {
   id: string;
   name: string;
   /** When it was saved (ISO). */

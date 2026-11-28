@@ -111,7 +111,7 @@ export function householdFunds(content: Content, savings: number, price: number,
 }
 
 /** The money a household that saved `savings` has to spend once it has paid `price` for its home (the rest stays put by). */
-export function fundsAfter(content: Content, savings: number, price: number): number {
+function fundsAfter(content: Content, savings: number, price: number): number {
   const keep = content.economy.savings?.keep ?? 0;
   return content.economy.startingFunds + Math.max(0, Math.min(keep, savings - price));
 }

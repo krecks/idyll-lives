@@ -47,7 +47,7 @@ import { WALL_HALF, WALL_HEIGHT } from './walls';
 export type SurfacePattern = 'stripes' | 'whitewash';
 
 /** What a house mesh is drawn with: a surface (manifest key, vertex-coloured), a room's clear glass (0: outdoors; `GLASS_OUT`: looked out through), or the contact shadows. */
-export type HouseSurface = { kind: 'surface'; key: string; pattern?: SurfacePattern } | { kind: 'glass'; room: number } | { kind: 'contactShadow' } | { kind: 'neighbourGlass'; lit: boolean };
+type HouseSurface = { kind: 'surface'; key: string; pattern?: SurfacePattern } | { kind: 'glass'; room: number } | { kind: 'contactShadow' } | { kind: 'neighbourGlass'; lit: boolean };
 
 /**
  * One mesh of a house: its geometry and name, what it's drawn with, and how. Empty ones are
@@ -191,7 +191,7 @@ export interface HouseLooks {
 }
 
 /** A roof's shape: gable, hip or flat, and the pitch (rise per run) of pitched ones. */
-export interface RoofShape {
+interface RoofShape {
   shape: RoofStyleDef['shape'];
   pitch: number;
 }
@@ -437,7 +437,7 @@ export function placeLights(world: WorldStructure, inView: (x: number, z: number
 }
 
 /** What a lamp object gives (content `light`). */
-export interface LampLight {
+interface LampLight {
   range?: number;
   intensity?: number;
   height?: number;
@@ -580,7 +580,7 @@ export interface SilhouettePlan {
 }
 
 /** A door a porch stands over (`porchDoors`): its wall's axis, the wall's outer face, its outward normal and the door's middle along it. */
-export interface PorchDoor {
+interface PorchDoor {
   axis: 'h' | 'v';
   plane: number;
   n: V3;

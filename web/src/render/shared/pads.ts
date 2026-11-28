@@ -60,7 +60,7 @@ export function padMask(pads: readonly Pad[], w: number, d: number): Uint8Array 
 }
 
 /** The slabs and the retaining edges of one group of lots (a ground tile's). */
-export interface PadGeometry {
+interface PadGeometry {
   slabs: Geo;
   edges: Geo;
 }

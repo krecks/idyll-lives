@@ -20,7 +20,7 @@ const NO_DETAILS: Pick<SimView, 'needs' | 'mood' | 'emotion' | 'feelings' | 'act
 const NEW_SIM: SimView = { id: -1, detail: false, name: '', household: 0, traits: [], perks: [], plot: null, awayUntil: null, visiting: null, job: null, ...NO_DETAILS };
 
 /** The lists an update changed (null: unchanged). */
-export interface UiChanges {
+interface UiChanges {
   sims: SimView[] | null;
   relationships: RelationshipView[] | null;
   rooms: RoomView[] | null;

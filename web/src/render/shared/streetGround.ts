@@ -27,17 +27,17 @@ import type { ChunkPlan, GroundLayer } from './street';
 import { clipRect, COURSE, courseCells, LINE, PAVING_LOOK, terrainPieces, TILE, townPaving, type BayDraw, type PavingDraw, type Poly, type Rect, type TownPaving } from './townPaving';
 
 /** What the near paving reads (as `townPaving.ts` `PavingWorld`), and the world's size. */
-export type StreetGroundWorld = Pick<WorldStructure, 'plots' | 'meta' | 'parking' | 'carParks' | 'width' | 'depth' | 'storeyDepth'>;
+type StreetGroundWorld = Pick<WorldStructure, 'plots' | 'meta' | 'parking' | 'carParks' | 'width' | 'depth' | 'storeyDepth'>;
 
 /** The P sign's model, one by each car park (`CarPark.sign`). */
-export const PARKING_SIGN = 'model.street.parkingSign';
+const PARKING_SIGN = 'model.street.parkingSign';
 
 /**
  * How high the paving lies over the ground as the ground tiles draw it (m): under the road (`roads.ts`
  * `ROAD_Y`), which is drawn over its edge as the far map paints the roads over it; a car park's apron a
  * touch over the paving, and its bays' lines over the apron.
  */
-export const PAVING_Y = 0.006;
+const PAVING_Y = 0.006;
 const APRON_Y = 0.008;
 const LINE_Y = 0.016;
 /** The largest cell the paving is cut into (m), on a flat town. */

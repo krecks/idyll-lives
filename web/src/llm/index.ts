@@ -8,7 +8,6 @@
  *   (shared with `tools/llm/check.mjs`); `cpuGraph.ts`: its graph made runnable on the processor.
  */
 
-export type { ChatMessage } from './chat';
-export type { GenParams, GenResult } from './generate';
-export { downloadMb, MODEL, type ModelSpec } from './models';
-export { ensureLlm, generateText, llmReady, llmStats, llmStatus, unloadLlm, type LlmState, type LlmStats } from './service.svelte';
+export type { GenResult } from './generate';
+export { downloadMb, MODEL } from './models';
+export { ensureLlm, generateText, llmReady, llmStats, llmStatus, unloadLlm, type LlmStats } from './service.svelte';

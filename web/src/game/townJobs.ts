@@ -114,7 +114,7 @@ export interface Proposal {
  * index in the batch, from 0) with why, as a clause; what in it is over a slope limit (`marks`, the
  * next job's `before`); and what is wrong with it (`townCheck.ts`, `hard` blocks Next), if checked.
  */
-export interface EditedTown extends Omit<LaidTown, 'plan' | 'marks'> {
+interface EditedTown extends Omit<LaidTown, 'plan' | 'marks'> {
   step: number;
   refused: { op: number; why: string }[];
   marks: string[];

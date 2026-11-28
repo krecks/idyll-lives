@@ -50,7 +50,7 @@ const PITCH = 0.5;
 const MIN_HALF = 0.3;
 
 /** `now`: on screen (drawn first, in request order); `idle`: drawn ahead of time when nothing else waits. */
-export type Priority = 'now' | 'idle';
+type Priority = 'now' | 'idle';
 
 interface Job {
   key: string;

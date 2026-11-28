@@ -23,7 +23,7 @@ export interface Shapes {
 }
 
 /** Something placed: as the structure lists it (`ObjectPlacement`) or as a house layout does. */
-export interface Placed {
+interface Placed {
   id?: number;
   def: string;
   x: number;
@@ -74,7 +74,7 @@ export function placedSize(content: Shapes, o: Placed): [number, number] {
 }
 
 /** A placed thing's own footprint before turning (tiles across and deep). */
-export function footprintOf(content: Shapes, o: Placed): [number, number] {
+function footprintOf(content: Shapes, o: Placed): [number, number] {
   const [w, d] = placedSize(content, o);
   return o.rot % 2 === 0 ? [w, d] : [d, w];
 }
@@ -110,7 +110,7 @@ export function topOf(content: Shapes, o: Placed): Top | null {
 }
 
 /** A point in a top's own frame (x to its right, z to its front). */
-export function localOf(top: Top, x: number, z: number): [number, number] {
+function localOf(top: Top, x: number, z: number): [number, number] {
   const [dx, dz] = [x - top.cx, z - top.cz];
   return [dx * top.cos - dz * top.sin, dx * top.sin + dz * top.cos];
 }
@@ -122,7 +122,7 @@ export function covers(top: Top, x: number, z: number): boolean {
 }
 
 /** Whether a disc of `radius` at a point lies on a top, inside the margin along its edges. */
-export function holds(top: Top, x: number, z: number, radius: number): boolean {
+function holds(top: Top, x: number, z: number, radius: number): boolean {
   const [lx, lz] = localOf(top, x, z);
   const m = top.inset + radius;
   return Math.abs(lx) <= top.hw - m + SLACK && Math.abs(lz) <= top.hd - m + SLACK;
@@ -130,12 +130,12 @@ export function holds(top: Top, x: number, z: number, radius: number): boolean {
 
 
 /** Whether a placed thing stands on a top (the `surface` layer). */
-export function onTop(content: Shapes, o: Placed): boolean {
+function onTop(content: Shapes, o: Placed): boolean {
   return content.object(o.def)?.layer === 'surface';
 }
 
 /** Why a thing can't stand somewhere on a surface. */
-export type Misfit = 'noTop' | 'overEdge' | 'crowded';
+type Misfit = 'noTop' | 'overEdge' | 'crowded';
 
 /**
  * Where a thing of `radius` with its middle at `(x, z)` would stand: the top taking the whole

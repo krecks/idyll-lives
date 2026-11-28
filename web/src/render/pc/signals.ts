@@ -36,7 +36,7 @@ import type { WorldStructure } from '../../core/protocol';
 import { crosswalkRows, pedestrianHead, SIGNAL_LAMPS, SignalRows } from '../shared/signals';
 
 /** The model's key in the manifests. */
-export const SIGNAL_MODEL = 'model.trafficLight';
+const SIGNAL_MODEL = 'model.trafficLight';
 /** Heads further than this from the camera's target aren't drawn (m), as the cars (`vehicles.ts` `FAR`). */
 const FAR = 650;
 /** Heads further than this (m) draw the far version (the street's models' `FAR_MODELS`). */
@@ -47,7 +47,7 @@ const REFRAME = 4;
 const GLOW_DAY = 1.6;
 const GLOW_NIGHT = 1.1;
 
-export interface SignalOptions {
+interface SignalOptions {
   /** Whether the poles cast the sun's shadows (`QualitySettings.streetShadows`). */
   shadows: boolean;
   /** 1: the far version for every head (`QualitySettings.streetLod`, Low). */

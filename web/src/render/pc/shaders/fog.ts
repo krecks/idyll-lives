@@ -40,7 +40,7 @@ import type { Language, ShaderFeature } from './chunks';
 const float = (n: number): string => (Number.isInteger(n) ? n.toFixed(1) : String(n));
 
 /** The lines of `fogPS` replaced: the fragment's distance, and the exponential-squared factor. */
-export const FOG_ANCHORS = {
+const FOG_ANCHORS = {
   glsl: { depth: 'float depth = gl_FragCoord.z / gl_FragCoord.w;', exp2: 'fogFactor = exp(-depth * depth * fog_density * fog_density);', mix: 'return mix(fog_color * dBlendModeFogFactor, color, getFogFactor());' },
   wgsl: { depth: 'let depth = pcPosition.z / pcPosition.w;', exp2: 'return evaluateFogFactorExp2(depth, uniform.fog_density);', mix: 'return mix(uniform.fog_color * dBlendModeFogFactor, color, getFogFactor());' },
 } as const;

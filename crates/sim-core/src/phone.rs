@@ -103,18 +103,6 @@ pub struct PhoneRules {
 }
 
 impl PhoneRules {
-    pub fn none() -> Self {
-        Self {
-            from_age: 0.0,
-            anim: None,
-            seat_tags: 0,
-            seat_avoid: 0,
-            seat_range: 0.0,
-            no_answer_minutes: 3.0,
-            actions: Vec::new(),
-        }
-    }
-
     pub fn action_index(&self, id: &str) -> Option<usize> {
         self.actions.iter().position(|a| a.id == id)
     }

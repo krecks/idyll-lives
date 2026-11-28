@@ -15,10 +15,10 @@ use artkit::parts::{join_all, new_parts, settle};
 use artkit::rand::Random;
 use artkit::scene::{self, Obj};
 use artkit::{
-    _crop, _put, arc, blade, cone, cube, cut_leaf, dome, dots, florets, leaf,
-    leafy_shrub, lobed, lump, mound, normals, on_masses, outline, perch, perches, pinnate, rays,
-    ribbed, rose_head, rose_leaf, rosettes, slits, soil_top, sphere, spiral, stalk, star, stem,
-    tulip_head, twig, vessel,
+    _crop, _put, arc, blade, cone, cube, cut_leaf, dome, dots, florets, leaf, leafy_shrub, lobed,
+    lump, mound, normals, on_masses, outline, perch, perches, pinnate, rays, ribbed, rose_head,
+    rose_leaf, rosettes, slits, soil_top, sphere, spiral, stalk, star, stem, tulip_head, twig,
+    vessel,
 };
 use common::*;
 use std::cell::RefCell;

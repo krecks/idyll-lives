@@ -14,7 +14,7 @@ import { CUP_HELD, eatPose, seatedBody } from './seated';
 // --- a coin into the fountain ---------------------------------------------------------------------
 
 /** The toss: seconds, and when the coin leaves the hand (share of the clip: actions.ts shows the coin until then). */
-export const TOSS_S = 3.2;
+const TOSS_S = 3.2;
 export const TOSS_LET_GO = 0.63;
 
 /** The coin in the palm looked at, held to the chest for the wish, then the arm back and an underarm toss over the rim. */

@@ -34,7 +34,7 @@ import { FLAT_WALLS } from './flatBuild';
 
 type Point = { x: number; z: number };
 /** A wall face to paint; `half` for a half wall (the preview's height). */
-export type PaintFace = FacePaint & { half: boolean };
+type PaintFace = FacePaint & { half: boolean };
 /** A wall's look as the structure sends it (doors and windows resized: sill and top, decimetres). */
 type Look = { faces?: [number, number]; form?: number; style?: number; sill?: number; head?: number };
 

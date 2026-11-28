@@ -8,7 +8,7 @@ import * as pc from './engine';
 import { toEngine, toGame } from './space';
 import { viewShift } from '../shared/overviewCamera';
 
-export interface Lens {
+interface Lens {
   /** Vertical field of view (radians), near and far planes (m). */
   fov: number;
   near: number;

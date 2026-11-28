@@ -97,7 +97,7 @@ function townSpots(world: WorldStructure | null, home: [number, number, number] 
   return { centre, home: at };
 }
 /** The camera's pose as `?bench=`'s flags give it (`benchFlags.ts`), and as `__bench.pose` changes it. */
-export interface BenchView {
+interface BenchView {
   cam: BenchCamera;
   /** Seconds along the path (held, with `freeze` or `hold`). */
   at: number;
@@ -113,7 +113,7 @@ export interface BenchView {
  * `__bench.pose`: a whole pose, as a URL's flags would give it; what it leaves out is the flags' default (an orbit from
  * the path's start, over the home, the game's own walls), so one pose never carries over into the next.
  */
-export interface BenchPose {
+interface BenchPose {
   cam?: BenchCamera;
   at?: number;
   radius?: number | null;
@@ -127,7 +127,7 @@ export interface BenchPose {
 }
 
 /** What `__bench.counts` read over its frames: sums and per-frame means of the frame probe's counts, and the sun's map. */
-export interface BenchCounts {
+interface BenchCounts {
   frames: number;
   sum: { draws: number; shadowDraws: number; mirrorDraws: number; triangles: number; shadowTriangles: number; mirrorTriangles: number };
   mean: { draws: number; shadowDraws: number; mirrorDraws: number; triangles: number; shadowTriangles: number; mirrorTriangles: number };
@@ -532,7 +532,7 @@ interface Stats {
   max: number;
 }
 
-export interface BenchResult {
+interface BenchResult {
   ok: boolean;
   error?: string;
   version: string;
@@ -836,7 +836,7 @@ function stats(values: number[]): Stats | null {
 }
 
 /** A few lines to read (and paste). */
-export function summary(r: BenchResult): string {
+function summary(r: BenchResult): string {
   if (!r.ok) return `bench ${r.scene} failed: ${r.error}`;
   const f = r.flags;
   const render = r.render as { backend?: string; render?: { width: number; height: number }; quality?: { shadowMapSize: number; postSamples: number } };

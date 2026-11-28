@@ -164,7 +164,7 @@ function holdFile(app: pc.AppBase, url: string, file: LoadedFile, template: Mode
  * A model's moving parts: each is drawn by meshes of its own (at rest, where the file has it),
  * which an instance moves with a matrix of its own (`clipPose`, before its placement).
  */
-export interface ModelMotion {
+interface ModelMotion {
   /** Per mesh of the template: the moving part it belongs to, or -1 for the still body. */
   parts: number[];
   /** By the file's animation name. */
@@ -417,7 +417,7 @@ function uploadModel(device: pc.GraphicsDevice, data: VData, source: () => VData
 }
 
 /** A mesh's vertices as uploaded (`readMesh`): 32-bit floats throughout, as the GPU has them. */
-export interface MeshVertices extends VData {
+interface MeshVertices extends VData {
   positions: Float32Array;
   normals: Float32Array | null;
   uvs: Float32Array | null;

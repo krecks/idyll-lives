@@ -15,7 +15,7 @@ import { smooth } from '../../../../game/noise';
 const WALK_SPEED = 1.1;
 const WALK_SECONDS = 1.1;
 
-export interface Gait {
+interface Gait {
   /** Ground travelled per cycle (m); 0 runs on the spot. */
   stride: number;
   /** How far behind the hip the stance is centred (m). */
@@ -126,7 +126,7 @@ function footAt(q: number, g: Gait): FootState {
 }
 
 /** A gait pose at phase p (0 = left heel strike). */
-export function gaitPose(p: number, g: Gait): PoseSpec {
+function gaitPose(p: number, g: Gait): PoseSpec {
   const wrap = (x: number) => ((x % 1) + 1) % 1;
   const L = footAt(wrap(p), g);
   const R = footAt(wrap(p + 0.5), g);
@@ -163,7 +163,7 @@ export function gaitPose(p: number, g: Gait): PoseSpec {
 }
 
 /** Jogging on the spot: short ground contact with a flight phase, knees up, the arms bent and pumping. */
-export const JOG: Gait = {
+const JOG: Gait = {
   stride: 0,
   back: 0.0,
   duty: 0.4,

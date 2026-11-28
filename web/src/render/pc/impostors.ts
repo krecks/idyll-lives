@@ -222,7 +222,7 @@ function impostorCode(lang: Language): ShaderFeature['glsl'] {
 }
 
 /** The cards' shader (see the file's header); before the veil's sinking (`fog.ts`, 239), which then sinks the card. */
-export const IMPOSTOR_SHADER: ShaderFeature = { name: 'impostor', priority: 225, glsl: impostorCode('glsl'), wgsl: impostorCode('wgsl') };
+const IMPOSTOR_SHADER: ShaderFeature = { name: 'impostor', priority: 225, glsl: impostorCode('glsl'), wgsl: impostorCode('wgsl') };
 
 registerShaderFeature(IMPOSTOR_SHADER);
 

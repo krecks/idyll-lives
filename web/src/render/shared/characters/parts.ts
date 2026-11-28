@@ -52,7 +52,7 @@ export type Range = (typeof Range)[keyof typeof Range];
 /** The part of a hair part's wisps (`hair.long` → `hair.long.wisps`: its soft edges, drawn only close up). */
 export const wispsOf = (hair: string): string => `${hair}.wisps`;
 /** Whether a part is a hair part's wisps. */
-export const isWisps = (part: string): boolean => part.startsWith('hair.') && part.endsWith('.wisps');
+const isWisps = (part: string): boolean => part.startsWith('hair.') && part.endsWith('.wisps');
 
 /** The surface a part is drawn with (the engine's resident material, `pc/characterMaterial.ts`). */
 export type CharacterSurface = 'body' | 'cloth' | 'cut' | 'hair' | 'wisp' | 'brow' | 'lash' | 'mouth' | 'eye';
@@ -61,7 +61,7 @@ export type CharacterSurface = 'body' | 'cloth' | 'cut' | 'hair' | 'wisp' | 'bro
  * one mesh for every bottom with legs (`outfit.ts` `LEGGED`), and the long top, one mesh for every regular top
  * (`REGULAR`). They have no `lod.` copy: far off the low-detail body is painted.
  */
-export const CUT_SHELLS: ReadonlySet<string> = new Set(['bottom.trousers', 'top.long']);
+const CUT_SHELLS: ReadonlySet<string> = new Set(['bottom.trousers', 'top.long']);
 
 /** The surface part `part` is drawn with. */
 export function surfaceOf(part: string): CharacterSurface {
@@ -115,7 +115,7 @@ export const POSE_NEAR_PX = 7;
  * Small face parts are skipped on faces too small on screen to show them: the projected size (px)
  * of a 5 cm feature (a mouth, an eye with its brow) below which each isn't drawn.
  */
-export const DETAIL_PX: Record<string, number> = { teeth: 8, tongue: 8, lashes: 3, brows: 2 };
+const DETAIL_PX: Record<string, number> = { teeth: 8, tongue: 8, lashes: 3, brows: 2 };
 /**
  * The hair's wisps (same measure): not drawn below the first, and thinned out by their shader from the
  * second down to it (`pc/shaders/character.ts` `RESIDENT_WISP_OPACITY`), so they come and go without a

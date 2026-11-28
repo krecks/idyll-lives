@@ -65,7 +65,7 @@ const SKY_RADIUS = 700;
 const SKY_FAR_SHARE = 0.97;
 
 /** The lot as the renderer has it now: the storey in view, where each storey's rows are, and what's in view. */
-export interface LotView {
+interface LotView {
   /** The storey in view (-1: the basement). */
   storey(): number;
   /** The storey a lot row is on. */
@@ -79,7 +79,7 @@ export interface LotView {
 }
 
 /** What the renderer does for the lot's contents. */
-export interface LotHooks {
+interface LotHooks {
   /** Gives the frames the build runs behind a turn (the renderer's `pace`). */
   pace(): Promise<void>;
   /** The sun's shadows draw again (`urgent`: now, not at the shadow rate). */
@@ -107,7 +107,7 @@ interface NatureSet {
 }
 
 /** A placed object as drawn (picking, build mode's hand, the chairs pulled in). */
-export interface PlacedObject {
+interface PlacedObject {
   id: number;
   /** Where it stands, on the storey it's on (`y0`: that storey's floor). */
   y0: number;

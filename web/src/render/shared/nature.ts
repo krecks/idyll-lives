@@ -28,7 +28,7 @@ import { CROP_LOOK, cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
  * reach further, to a farther horizon). The valley's rim rises over `RING` either way.
  */
-export const RING = 150;
+const RING = 150;
 const WORLD_RING = 260;
 /** How far (m) `world`'s landscape reaches past its land's edge (the layout's own ring, known before one is made). */
 export function landscapeRing(world: { meta?: { world?: unknown } | null }): number {
@@ -421,7 +421,7 @@ function bareTilesOf(world: WorldStructure, mask: LawnMask, paved: Uint8Array | 
  * forage on the lawn). `any`: the tiles any of them reaches into; else only
  * those whose middle they cover.
  */
-export function unlawned(world: WorldStructure, any = true): Uint8Array {
+function unlawned(world: WorldStructure, any = true): Uint8Array {
   const w = world.width;
   const d = groundDepth(world);
   const out = world.meta?.roads ? roadTiles(world.meta.roads, w, d).slice() : new Uint8Array(w * d);

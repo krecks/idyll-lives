@@ -37,7 +37,7 @@ export interface DebugReport {
   saveMeta: Omit<SaveRecord, 'data' | 'thumbnail'>;
 }
 
-export interface DebugPayload {
+interface DebugPayload {
   report: DebugReport;
   /** The simulation's save data (null: there was no game, or it had stopped). */
   save: string | null;

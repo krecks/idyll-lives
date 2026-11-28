@@ -46,7 +46,7 @@ import { composeChunks, FXAA, PAGE_TONE_MAPPING, pageToneMapping } from './shade
 import { curveUniforms, NEUTRAL_CURVES, vignetteUniforms, type ColorCurveSettings, type VignetteSettings } from '../shared/imageProcessing';
 import { tuned } from '../tune';
 
-export interface PostOptions {
+interface PostOptions {
   /** Multisampling of the scene (1: none). */
   samples: number;
   /** FXAA after the image processing. */
@@ -94,7 +94,7 @@ const BLOOM_IDLE = 1e-6;
 const CONTACT = tuned('contact', { radius: 0.5, intensity: 1.5, power: 1, samples: 16, minAngle: 25, scale: 0.5 });
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
-export interface PostLook {
+interface PostLook {
   contrast: number;
   /** Weight 0: no vignette. */
   vignette: VignetteSettings;
@@ -203,7 +203,7 @@ export function gameLook(look: { contrast: number; vignette: number; saturation:
 }
 
 /** No contrast, vignette or curves: exposure and ACES only (the dev pages). */
-export const PLAIN_LOOK: PostLook = { contrast: 1, vignette: { weight: 0, stretch: 0, color: [0, 0, 0] }, curves: NEUTRAL_CURVES };
+const PLAIN_LOOK: PostLook = { contrast: 1, vignette: { weight: 0, stretch: 0, color: [0, 0, 0] }, curves: NEUTRAL_CURVES };
 
 const SCENE_FORMATS = [pc.PIXELFORMAT_RGBA16F, pc.PIXELFORMAT_RGBA32F];
 /** Low's: 11/11/10-bit float first (4 bytes a pixel, not 8; no alpha, which the compose doesn't read). */

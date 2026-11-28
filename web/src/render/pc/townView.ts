@@ -243,7 +243,7 @@ export class TownBuildings {
 // ---- the movers ---------------------------------------------------------------------------
 
 /** What moves, as the town view draws it. */
-export type MoverKind = 'car' | 'taxi' | 'bike' | 'person';
+type MoverKind = 'car' | 'taxi' | 'bike' | 'person';
 
 /** The movers' shapes (m, as made; scaled up with the blend: `MOVER_GROW`). */
 function moverMesh(kind: 'car' | 'bike' | 'person'): Geo {

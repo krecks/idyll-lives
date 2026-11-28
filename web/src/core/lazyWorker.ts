@@ -35,7 +35,7 @@ interface Pending<In, Out, Note> {
   reject: (err: unknown) => void;
 }
 
-export interface LazyWorkerOptions {
+interface LazyWorkerOptions {
   /** Starts the worker (`new Worker(new URL(…, import.meta.url))`, written where the bundler sees it). */
   start: () => Worker;
   /** It goes once it has had nothing to do (no ask waiting, nothing held) for this long. */

@@ -29,7 +29,7 @@ const SHORTEST = 1000 / 500;
 const LONGEST = 1000 / 20;
 
 /** Every how many refreshes to draw, for a cap (frames per second; 0: none) on a display refreshing `hz` times a second. */
-export function pacingDivisor(cap: number, hz: number): number {
+function pacingDivisor(cap: number, hz: number): number {
   if (!(cap > 0) || !(hz > 0)) return 1;
   return Math.max(1, Math.ceil(hz / (cap * ROUND_UP * TOLERANCE)));
 }
@@ -39,7 +39,7 @@ export function pacingDivisor(cap: number, hz: number): number {
  * Longer gaps are refreshes a busy frame missed, so it's the average of the gaps around the
  * shortest usual one (the 10th percentile; one-off short gaps, as after a late frame, don't count).
  */
-export function refreshInterval(sorted: Float64Array): number {
+function refreshInterval(sorted: Float64Array): number {
   const floor = sorted[Math.floor(sorted.length * 0.1)];
   let sum = 0;
   let count = 0;

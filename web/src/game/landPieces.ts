@@ -18,7 +18,7 @@ const CELL = 8;
 export type Bounds = [number, number, number, number];
 
 /** A land's pieces of dry land (8 m cells joined side to side; see `dryPieces`). */
-export interface DryPieces {
+interface DryPieces {
   /** Per 8 m cell, the piece it is on; -1 where it is water. */
   piece: Int32Array;
   /** Each piece's size (cells), by id: the ids go in the order the cells are read from the corner. */
@@ -124,7 +124,7 @@ export function dryPieces(land: Pick<Cells, 'gw' | 'gd' | 'water'>): DryPieces {
  * Where a bridge could cross the water: from bank `a` to bank `b` (each the first dry point past the
  * water, m), the way across `u` (unit, `a` to `b`: square to both banks), and how far that is (m).
  */
-export interface BridgeSite {
+interface BridgeSite {
   a: Pt;
   b: Pt;
   u: Pt;

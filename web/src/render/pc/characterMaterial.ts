@@ -43,7 +43,7 @@ registerShaderFeature(RESIDENT);
 registerShaderFeature(BLANKET);
 
 /** The vertex attributes of a resident part (one interleaved buffer; see `residentVertexFormat`). */
-export const RESIDENT_VERTEX = {
+const RESIDENT_VERTEX = {
   joints: pc.SEMANTIC_BLENDINDICES,
   weights: pc.SEMANTIC_BLENDWEIGHT,
   fields: pc.SEMANTIC_ATTR7,
@@ -76,7 +76,7 @@ const formats = new WeakMap<pc.GraphicsDevice, pc.VertexFormat>();
  * the bone indices (BLENDINDICES, 4 bytes) and weights (BLENDWEIGHT, 4 normalised bytes), then the
  * fields (ATTR7), the morph block (ATTR8) and the tone (ATTR9), 4 floats each.
  */
-export function residentVertexFormat(device: pc.GraphicsDevice): pc.VertexFormat {
+function residentVertexFormat(device: pc.GraphicsDevice): pc.VertexFormat {
   let format = formats.get(device);
   if (!format) {
     const f32 = (semantic: string, components: number) => ({ semantic, components, type: pc.TYPE_FLOAT32 });
@@ -150,7 +150,7 @@ export function createMorphTexture(device: pc.GraphicsDevice, morphs: MorphSet):
   });
 }
 
-export interface ResidentTextures {
+interface ResidentTextures {
   /** The pose texture: RGBA32F, a row per resident (`shared/characters/layout.ts`), nearest, no mipmaps (`PoseTexture`). */
   poses: pc.Texture;
   /** Bones in the set: a row's appearance texels start at `bones * 4`. */
@@ -220,7 +220,7 @@ export function setResidentTextures(app: pc.AppBase, textures: ResidentTextures)
   for (const m of r.materials.values()) bind(r, m);
 }
 
-export interface CharacterMaterialOptions {
+interface CharacterMaterialOptions {
   /** The part has face morphs (`MeshPart.morph`): they move it. */
   morph?: boolean;
   /** For the shadow-only copies (`shadowOnlyLayer`): skinned, no morphs, not one of the library's lit materials. */

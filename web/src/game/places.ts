@@ -23,7 +23,7 @@ export interface Kind {
   roofs: readonly LotLook['roof'][];
 }
 /** A kind of building: its use, how long along the road and how deep (m), its storeys and roofs. */
-export const K = (use: BuildingUse, w: [number, number], d: [number, number], storeys: [number, number], roofs: readonly LotLook['roof'][]): Kind => ({ use, w, d, storeys, roofs });
+const K = (use: BuildingUse, w: [number, number], d: [number, number], storeys: [number, number], roofs: readonly LotLook['roof'][]): Kind => ({ use, w, d, storeys, roofs });
 
 /**
  * A town's civic places, each a lot (`placeLots.ts`), a main town's laid first, nearest its square (its
@@ -119,8 +119,6 @@ export const LOT_HOURS: NonNullable<TownPlace['hours']> = { open: 7 * 60, close:
 export const LOT_WORK: Record<string, string[]> = { cafe: ['culinary', 'hospitality'], grocer: ['retail'], bakery: ['culinary', 'retail'], market: ['retail', 'nature'] };
 /** The careers working at a named place of a kind besides the civic ones. */
 export const KIND_WORK: Partial<Record<TownPlace['kind'], string[]>> = { shop: ['retail'], cafe: ['culinary', 'hospitality'], restaurant: ['culinary', 'hospitality'], office: ['business'], workshop: ['trades'], farm: ['nature'] };
-/** The kinds of named place a building may be (not a park or the outdoors). */
-export const PLACE_KINDS: readonly TownPlace['kind'][] = ['shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'workshop', 'farm'];
 
 /** Opening hours for a place of `kind` where `work`'s careers work: the kind's, widened to every shift of theirs (a career's own and its tracks'). */
 export function hoursFor(base: NonNullable<TownPlace['hours']>, work: readonly string[], categories: readonly CareerCategory[]): NonNullable<TownPlace['hours']> {
@@ -254,7 +252,7 @@ export function civicChoices(draft: NeighbourhoodDraft, area = 0): { index: numb
 }
 
 /** How big `draft`'s main town is (its place's and options' `civic`). */
-export function draftSize(draft: NeighbourhoodDraft): TownSize {
+function draftSize(draft: NeighbourhoodDraft): TownSize {
   return specOf(placeOf(draft.world?.kind ?? 'country'), draft.world?.options).civic;
 }
 

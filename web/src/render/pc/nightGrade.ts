@@ -20,7 +20,7 @@ import type { Language } from './shaders/chunks';
 export const NIGHT_TINT: readonly [number, number, number] = [0.8, 0.94, 1.45];
 
 /** Below this amount the grade is off. */
-export const NIGHT_OFF = 0.001;
+const NIGHT_OFF = 0.001;
 
 /** The grade's uniforms: `gameNightAmount` (0..1) and `gameNightTint`. */
 export const NIGHT_GRADE: Record<Language, string> = {

@@ -11,7 +11,7 @@
 import { hash } from '../../game/noise';
 
 /** The patchwork as the landscape gives it (`LandscapeParams.fields`): fields about `size` m, the rows along `angle` (radians). */
-export interface FieldGrid {
+interface FieldGrid {
   size: number;
   angle: number;
 }
@@ -42,7 +42,7 @@ const BALE_ROWS = 11;
 const BALE_STEP = 9;
 
 /** A field: its row and its place in it, where it starts along and across the rows (m, the patchwork's frame), its size, crop and rows' way. */
-export interface Field {
+interface Field {
   row: number;
   col: number;
   u0: number;
@@ -58,7 +58,7 @@ export interface Field {
  * A field boundary's stretch (the patchwork's frame, m), and whether a hedge grows along it. `contour`: a piece of the
  * farmland's own edge through a field it cuts (a hedge, a metre or two long: `cut`), not one of the patchwork's lines.
  */
-export interface FieldEdge {
+interface FieldEdge {
   a: readonly [number, number];
   b: readonly [number, number];
   hedge: boolean;
@@ -106,7 +106,7 @@ const CUT_STEP = 2;
  * crop is, the cells of its grid inside its margin from those edges (each polygon's u, v flat, all wound the same
  * way: their union is its crop), and the hedge along the farmland's edge through it, in pieces.
  */
-export interface FieldCut {
+interface FieldCut {
   crop: number[][];
   hedge: [readonly [number, number], readonly [number, number]][];
   /** Its clip as asked, hashed: the map is made again when it changes. */

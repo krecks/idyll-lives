@@ -8,7 +8,7 @@
 import type { WorldMeta } from '../core/protocol';
 
 /** Live things on the map, asked for about twice a second while it is open. */
-export interface TownMapSource {
+interface TownMapSource {
   /** Residents outdoors and in, town tiles (`mine`: the player's household). */
   dots?(): { x: number; z: number; mine: boolean }[];
   /** Where the camera is looking (town tiles). */

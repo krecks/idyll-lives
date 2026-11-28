@@ -30,7 +30,7 @@ export interface TalkSources {
   world: () => WorldStructure | null;
 }
 
-export interface Moment {
+interface Moment {
   persona: Persona;
   situation: Situation;
   event: LineEvent;

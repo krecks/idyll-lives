@@ -30,7 +30,7 @@ import { isResolution, type Resolution } from '../render/shared/resolution';
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam' | 'street' | 'town' | 'over' | 'zoom';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'nolayers', 'noflow', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'noimpostors', 'notownground', 'notownbuildings', 'wholeshadows', 'nowarm', 'nobloom'] as const;
+const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'nolayers', 'noflow', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'noimpostors', 'notownground', 'notownbuildings', 'wholeshadows', 'nowarm', 'nobloom'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {

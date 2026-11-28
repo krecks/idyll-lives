@@ -62,7 +62,7 @@ export const FACE_CHANNELS = [
   'lipFullness',
   'faceLength',
 ] as const;
-export type FaceChannel = (typeof FACE_CHANNELS)[number];
+type FaceChannel = (typeof FACE_CHANNELS)[number];
 /** The creator's sliders, grouped as it shows them: a channel, its name and what its two ends are. */
 export const FACE_GROUPS: readonly { name: string; channels: readonly { id: FaceChannel; label: string; low: string; high: string }[] }[] = [
   {
@@ -183,7 +183,7 @@ const textSeed = (text: string): number => [...text].reduce((h, c) => Math.imul(
 const FACE_SEED = 0x2f6b3a95;
 
 /** `hex` mixed `amount` of the way towards silver. */
-export function greyed(hex: string, amount: number): string {
+function greyed(hex: string, amount: number): string {
   const n = parseInt(hex.replace('#', ''), 16);
   if (!Number.isFinite(n) || amount <= 0) return hex;
   const mix = (c: number) => Math.round(c + (0xc4 - c) * Math.min(1, amount));
@@ -207,7 +207,7 @@ export interface SimDraft {
   job?: { career: string; level: number };
 }
 
-export interface Bond {
+interface Bond {
   a: string;
   b: string;
   /** Key into the content's bond presets (roommates, friends, partners, ...). */
@@ -478,7 +478,7 @@ export function randomAge(content: Content, stage?: string, rand: () => number =
 }
 
 /** How `randomHousehold` rolls a household: `older`, its first grown-up past the young-adult years (for a dear home). */
-export interface HouseholdRoll {
+interface HouseholdRoll {
   older?: boolean;
 }
 
@@ -644,7 +644,7 @@ export function lookAtStage(appearance: Appearance, stage: LifeStageDef | undefi
 }
 
 /** Whether a hair colour is silver or grey (light and without colour). */
-export function isGreyHair(hex: string): boolean {
+function isGreyHair(hex: string): boolean {
   const n = parseInt(hex.replace('#', ''), 16);
   if (!Number.isFinite(n)) return false;
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -653,7 +653,7 @@ export function isGreyHair(hex: string): boolean {
 
 /** A look with a life stage's body and head size and stoop (none: as grown). Children and teens
  * never show grey hair: a colour of their own instead, picked from their look (always the same). */
-export function lookOfStage(appearance: Appearance, stage: LifeStageDef | undefined, hairPalette: readonly string[] = []): Appearance {
+function lookOfStage(appearance: Appearance, stage: LifeStageDef | undefined, hairPalette: readonly string[] = []): Appearance {
   const young = hairPalette.filter((c) => !isGreyHair(c));
   if (stage && !(stage.adult ?? (!stage.baby && !stage.school)) && young.length && appearance.hair && isGreyHair(appearance.hairBase ?? appearance.hair)) {
     const key = `${appearance.skin}${appearance.body}${appearance.top ?? ''}`;

@@ -13,7 +13,7 @@
 import type { PorchInfo, PorchPieceInfo, PorchPieceKind } from '../core/protocol';
 
 /** Tiles across and deep a piece may be at most (sim-core `CANOPY_MOST`, `STEP_MOST`). */
-export const PIECE_MOST: Record<PorchPieceKind, readonly [number, number]> = { post: [1, 1], canopy: [3, 6], step: [4, 4] };
+const PIECE_MOST: Record<PorchPieceKind, readonly [number, number]> = { post: [1, 1], canopy: [3, 6], step: [4, 4] };
 
 /** What each piece is called (as the simulation names them). */
 export const PIECE_NAME: Record<PorchPieceKind, string> = { post: 'porch post', canopy: 'porch canopy', step: 'step platform' };

@@ -107,12 +107,12 @@ export interface VoiceDirectorStats {
 }
 
 /** Where a line's text shows while it plays (the speech bubbles). */
-export interface Subtitles {
+interface Subtitles {
   say(id: number, text: string, ms: number): void;
 }
 
 /** What the voice director needs from the game besides the snapshot. */
-export interface VoiceSources {
+interface VoiceSources {
   /** The lot in view (rooms, for where residents are). */
   world: () => WorldStructure | null;
   subtitles?: Subtitles;

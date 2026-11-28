@@ -17,9 +17,9 @@ import { hangArms, stand } from './idle';
 import { armIK, wrist, type ArmOptions } from './ik';
 
 /** Seconds of `buy` and `sell` (a served use's minutes at speed 1). */
-export const SERVE_SECONDS = 5;
+const SERVE_SECONDS = 5;
 /** Where the clips are, as shares of them: the order taken, the goods reached for, picked up, handed over, paid for. */
-export const SERVE = { ordered: 0.24, reach: 0.3, picked: 0.42, handed: 0.62, paid: 0.84 } as const;
+const SERVE = { ordered: 0.24, reach: 0.3, picked: 0.42, handed: 0.62, paid: 0.84 } as const;
 /** Who holds what changes hands, by clip and share of it (`residents.ts`): the vendor between picking it up and handing it over, the customer from then. */
 export const HANDED: Record<string, readonly [number, number]> = { sell: [SERVE.picked, SERVE.handed], buy: [SERVE.handed, 1] };
 

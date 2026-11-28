@@ -63,7 +63,7 @@ export function pathLayers<R extends Rect>(rects: readonly R[], prefix: string):
 }
 
 /** `rects`, each less what the ones before it cover: the rest of it as up to four rectangles (none: all covered). */
-export function unpaved<R extends Rect>(rects: readonly R[]): R[] {
+function unpaved<R extends Rect>(rects: readonly R[]): R[] {
   // (Each pair weighed: about 11 ms for a town's 1,500 paths, which the street, the lot's view and the town view all ask for.)
   const known = cut.get(rects) as R[] | undefined;
   if (known) return known;

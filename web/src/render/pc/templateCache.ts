@@ -10,7 +10,7 @@ import { disposeTemplate, retellModelFileArrived, type ModelMesh } from './model
 import { TemplateCache as SharedTemplateCache } from '../shared/templateCache';
 
 /** What a cache keeps: a template's meshes (and its glows'), and the files it was built without. */
-export interface CachedTemplate {
+interface CachedTemplate {
   meshes: ModelMesh[];
   glows?: { mesh: ModelMesh }[];
   failed?: string[];

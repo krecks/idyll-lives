@@ -5,9 +5,6 @@ pub fn sin(x: f64) -> f64 {
 pub fn cos(x: f64) -> f64 {
     libm::cos(x)
 }
-pub fn tan(x: f64) -> f64 {
-    libm::tan(x)
-}
 pub fn exp(x: f64) -> f64 {
     libm::exp(x)
 }
@@ -22,9 +19,6 @@ pub fn log10(x: f64) -> f64 {
 }
 pub fn tanh(x: f64) -> f64 {
     libm::tanh(x)
-}
-pub fn atan(x: f64) -> f64 {
-    libm::atan(x)
 }
 pub fn atan2(y: f64, x: f64) -> f64 {
     libm::atan2(y, x)

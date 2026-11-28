@@ -27,14 +27,14 @@ const JUMP = 10;
 const FASTEST = 30;
 
 /** `JUMP` for a frame `real` seconds long, `drive` seconds of drive time a real second (`driveScale` × playback rate). */
-export function jumpOver(real: number, drive: number): number {
+function jumpOver(real: number, drive: number): number {
   return Math.max(JUMP, FASTEST * drive * real);
 }
 /** Height of the body and wheels over the ground (as the street's `paintCar`). */
 export const LIFT = 0.015;
 
 /** Where a vehicle is drawn (`shown`: 0 out of town or not drawn at all). */
-export interface Spot {
+interface Spot {
   x: number;
   z: number;
   yaw: number;
@@ -42,7 +42,7 @@ export interface Spot {
 }
 
 /** A wheel: which side (+1: +x), where (m from the middle), and whether it steers. */
-export interface Wheel {
+interface Wheel {
   side: 1 | -1;
   x: number;
   z: number;
@@ -64,13 +64,13 @@ export interface Stand {
 export const newStand = (): Stand => ({ y: 0, pitch: 0, x: NaN, z: NaN, yaw: NaN, wheelBase: NaN, stamp: -1 });
 
 /** The wheels' turn (rad, about their axle) and the front ones' steer (rad, +: towards +x). */
-export interface Rolling {
+interface Rolling {
   spin: number;
   steer: number;
 }
 
 /** How the front wheels steer: at most (rad), and how quickly they follow the way it turns (per second). */
-export interface Steering {
+interface Steering {
   max: number;
   rate: number;
 }

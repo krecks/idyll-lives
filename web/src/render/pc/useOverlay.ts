@@ -48,7 +48,7 @@ const SCALE_MOST = (USE_CELL * EDGE_MAX) / MIN_EDGE_PX;
 export type Drape = (x: number, z: number) => number;
 
 /** A rectangle of cells: columns `i0` up to (not with) `i1`, rows `j0` up to `j1`. */
-export interface CellRect {
+interface CellRect {
   i0: number;
   j0: number;
   i1: number;
@@ -56,7 +56,7 @@ export interface CellRect {
 }
 
 /** A row's run of one use: `n` cells from column `i`, with its `code`, and whether they are hatched. */
-export interface UseRun {
+interface UseRun {
   i: number;
   n: number;
   code: number;

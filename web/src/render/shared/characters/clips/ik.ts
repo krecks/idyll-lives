@@ -6,16 +6,16 @@
  * resident's left at -x) and only while the clips bake (`reference()` in dsl.ts).
  */
 
-import { reached, reference, WRITTEN, type BoneKey, type PoseSpec, type Rot, type Vec } from './dsl';
+import { reached, reference, WRITTEN, type PoseSpec, type Rot, type Vec } from './dsl';
 import { smooth } from '../../../../game/noise';
 
 /** A 3x3 rotation, row-major. */
-export type M3 = readonly number[];
+type M3 = readonly number[];
 
 const R2D = 180 / Math.PI;
 const D2R = Math.PI / 180;
 
-export const I3: M3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+const I3: M3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
 export function mul(a: M3, b: M3): M3 {
   const o: number[] = [];
@@ -23,7 +23,7 @@ export function mul(a: M3, b: M3): M3 {
   return o;
 }
 
-export function tr(a: M3): M3 {
+function tr(a: M3): M3 {
   return [a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]];
 }
 
@@ -59,7 +59,7 @@ export function sub(a: Vec, b: Vec): Vec {
 export function addV(a: Vec, b: Vec, k = 1): Vec {
   return [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
 }
-export function dot(a: Vec, b: Vec): number {
+function dot(a: Vec, b: Vec): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 export function cross(a: Vec, b: Vec): Vec {
@@ -74,7 +74,7 @@ export function norm(a: Vec): Vec {
 }
 
 /** A pose's Euler angles for one bone (a side-less key mirrored onto the right: x, -y, -z). */
-export function anglesOf(spec: PoseSpec, bone: string): Rot {
+function anglesOf(spec: PoseSpec, bone: string): Rot {
   const own = (spec as Record<string, Rot | undefined>)[bone];
   if (own) return own;
   const m = /^(.*)_(l|r)$/.exec(bone);
@@ -203,7 +203,7 @@ export function armIK(side: 'l' | 'r', target: Vec, spec: PoseSpec, o: ArmOption
   return out;
 }
 
-export interface LegOptions {
+interface LegOptions {
   /** Where the knee points (model space direction); default forward and a touch out. */
   pole?: Vec;
   /** The foot's world rotation (DSL Euler; default level: the sole flat, toes forward). */
@@ -265,8 +265,6 @@ export function wrist(side: 'l' | 'r', flex: number, dev = 0, roll = 0): Rot {
   const h0 = norm(cross(v0, [0, 0, 1]));
   return toEuler(mul(axisAngle(v0, roll * sx), mul(axisAngle(h0, dev), axisAngle([0, 0, 1], flex * -sx))));
 }
-
-export type Bones = Partial<Record<BoneKey, Rot>>;
 
 /** A clamped smoothstep ramp from a to b. */
 export function ramp(t: number, a: number, b: number): number {

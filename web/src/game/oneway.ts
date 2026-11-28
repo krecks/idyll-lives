@@ -28,7 +28,7 @@ export function stronglyConnected(roads: readonly RoadPlan[], within = false): b
 }
 
 /** What `cutOffRoads` asks: `within`, by the roads alone (see there); `index`, the roads' own (`RoadIndex`) if made already. */
-export interface CutOffAsk {
+interface CutOffAsk {
   within?: boolean;
   index?: RoadIndex;
 }

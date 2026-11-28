@@ -61,7 +61,7 @@ interface GatePost {
 }
 
 /** The fences' geometry (plain finish, by vertex colour), their gates' leaves in it, and the hedges' instances. */
-export interface FencePlan {
+interface FencePlan {
   geo: Geo;
   gates: GateLeaf[];
   /** The hedge model's instances (`street.ts` `Inst`: x, z, length scale, height scale, yaw), one per hedge edge. */
@@ -249,7 +249,7 @@ export function wallCorners(walls: readonly { axis: 'h' | 'v'; x: number; z: num
  * edge (so stretches overlap and corners close), scaled evenly (the viewed lot plants it with its
  * garden's shrubs, the street with its own), turned either way by where it is.
  */
-export function hedgeAt(x: number, z: number, axis: 'h' | 'v'): Inst {
+function hedgeAt(x: number, z: number, axis: 'h' | 'v'): Inst {
   const s = (1 / HEDGE_LENGTH) * (1.04 + hash(x, z, 60) * 0.05);
   return [x, z, s, s, (axis === 'h' ? 0 : Math.PI / 2) + (hash(x, z, 62) < 0.5 ? 0 : Math.PI)];
 }

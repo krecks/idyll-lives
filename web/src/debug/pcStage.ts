@@ -20,7 +20,7 @@ import { SunShadows } from '../render/pc/sunShadows';
 import { AssetRegistry } from '../assets/registry';
 import { OrbitControls } from '../render/shared/orbit';
 
-export interface StageOptions {
+interface StageOptions {
   /** The sky's light, and the sun's direction (game space: the way it shines). */
   sky: number;
   sun: [number, number, number];
@@ -37,7 +37,7 @@ export interface StageOptions {
   wheelPrecision?: number;
 }
 
-export interface Stage {
+interface Stage {
   canvas: HTMLCanvasElement;
   device: pc.GraphicsDevice;
   app: pc.AppBase;

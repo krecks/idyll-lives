@@ -26,7 +26,7 @@ import { smooth } from '../../game/noise';
 /** Metres past the stream radius a chunk keeps streaming before it goes. */
 export const HYSTERESIS = 32;
 /** A lot this near the camera's target (m) can be the focus when no lot is under it. */
-export const FOCUS_REACH = 12;
+const FOCUS_REACH = 12;
 /** How long (ms) the camera stays on a lot before it becomes the focus. */
 export const SETTLE_MS = 350;
 /** The camera's target moving slower than this (m/s) has settled. */
@@ -50,7 +50,7 @@ export interface FocusPlot {
 }
 
 /** The camera as the stream sees it: its target on the ground, its distance, which way it looks (the eye's angle about the target) and its horizontal field of view. */
-export interface StreamCamera {
+interface StreamCamera {
   x: number;
   z: number;
   radius: number;
@@ -306,7 +306,7 @@ export const WARM_LOTS = 6;
 export const WARM_MIN_GAIN = 3;
 
 /** What `warmLots` reads of a world: its lots and what stands on them (rows of upper storeys below the ground's, `storeyDepth` apart). */
-export interface WarmWorld {
+interface WarmWorld {
   plots: readonly { x: number; z: number; w: number; d: number; house: unknown }[];
   storeyDepth?: number;
   depth: number;

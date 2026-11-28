@@ -33,7 +33,7 @@ const ripples = new WeakMap<pc.GraphicsDevice, pc.Texture>();
  * a finer noise of the same kind, evened out (the foam's). With mips, so far-off water reads them averaged out
  * (calm), not as noise.
  */
-export function rippleTexels(size = RIPPLE_SIZE): Uint8Array {
+function rippleTexels(size = RIPPLE_SIZE): Uint8Array {
   const rand = mulberry32(0x5eed);
   const waves = wavesOf(rand, 2, 9, 1.6);
   const fine = wavesOf(rand, 4, 12, 1);

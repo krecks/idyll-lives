@@ -12,7 +12,7 @@ import { weighted } from './housegen';
 import type { PlannedRoom } from './town';
 
 /** Covering ids (content `floorCoverings`) by weight. */
-export type FloorWeights = Record<string, number>;
+type FloorWeights = Record<string, number>;
 
 export interface FlooringSpec {
   /** By room kind (`hall`: the landing upstairs); a kind not listed keeps the automatic floor. */

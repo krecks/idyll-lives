@@ -27,21 +27,21 @@ export interface Tensor {
   getData?(): Promise<unknown>;
   dispose?(): void;
 }
-export type TensorCtor = new (type: 'int64' | 'float32' | 'float16', data: BigInt64Array | Float32Array | Uint16Array, dims: readonly number[]) => Tensor;
-export interface ValueMetadata {
+type TensorCtor = new (type: 'int64' | 'float32' | 'float16', data: BigInt64Array | Float32Array | Uint16Array, dims: readonly number[]) => Tensor;
+interface ValueMetadata {
   name: string;
   isTensor: boolean;
   type?: string;
   shape?: readonly (number | string)[];
 }
-export interface LlmSession {
+interface LlmSession {
   readonly inputNames: readonly string[];
   readonly outputNames: readonly string[];
   readonly inputMetadata: readonly ValueMetadata[];
   run(feeds: Record<string, Tensor>): Promise<Record<string, Tensor>>;
 }
 /** The pieces of `@huggingface/tokenizers` used here. */
-export interface LlmTokenizer {
+interface LlmTokenizer {
   encode(text: string, options: { add_special_tokens: boolean }): { ids: number[] };
   decode(ids: number[], options: { skip_special_tokens: boolean }): string;
 }
@@ -211,7 +211,7 @@ function plainTokens(engine: LlmEngine, vocab: number): PlainOnly {
 }
 
 /** The output that carries an input's next state (`past_key_values.2.key` → `present.2.key`, `past_conv.0` → `present_conv.0`). */
-export function presentName(past: string): string {
+function presentName(past: string): string {
   return past.replace(/^past_key_values\./, 'present.').replace(/^past_/, 'present_');
 }
 

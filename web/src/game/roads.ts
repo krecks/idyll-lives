@@ -211,7 +211,7 @@ function metres(pts: readonly Pt[]): Pt[] {
 }
 
 /** A polyline's segments (by their end's index, from 1) filed by the `SEG_CELL` m cells their bounds cover. */
-export type SegmentGrid = Map<number, number[]>;
+type SegmentGrid = Map<number, number[]>;
 export const SEG_CELL = 16;
 /** A `SegmentGrid`'s key for cell (`cx`, `cz`). */
 export const gridKey = (cx: number, cz: number) => cx * 65536 + cz;
@@ -499,7 +499,7 @@ export function evenly(pts: readonly Pt[], most: number): Pt[] {
 /** A lane left with a dead end (a court) reaches at most this far past the last road it meets (m). */
 export const COURT = 45;
 /** Roads running alongside each other keep this far apart (m, from the other's edge to the middle). */
-export const APART = 18;
+const APART = 18;
 /** Cross streets keep further from the roads they run alongside (room for a lot between, m). */
 const STREETS_APART = 30;
 /** Where a road meets another, no third comes within this of it (m). */
@@ -902,7 +902,7 @@ export function walkerBlocked(roads: readonly RoadPlan[], w: number, d: number):
 }
 
 /** How far (m) past a road nobody walks along (`walkerBlocked`) the ground is kept from those on foot: its barrier's or its kerb's. */
-export const WALK_OFF_EDGE = 1;
+const WALK_OFF_EDGE = 1;
 
 /** Grid cells (m) roads' segments are filed under, for `RoadIndex`'s questions. */
 const CELL = 8;

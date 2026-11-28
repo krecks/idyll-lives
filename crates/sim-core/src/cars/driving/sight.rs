@@ -416,7 +416,6 @@ pub(crate) fn unstick(w: &mut World) {
             continue;
         };
         w.traffic.forget(car_first(c));
-        w.traffic.unstuck += 1;
         let car = &mut w.cars[c];
         car.progress = to;
         car.shift = 0.0;

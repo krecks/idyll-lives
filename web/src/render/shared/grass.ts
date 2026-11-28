@@ -172,14 +172,14 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
 }
 
 /** A patch over a step lies off the ground by more than this (m) somewhere: no blades grow on it. */
-export const UNEVEN = 0.06;
+const UNEVEN = 0.06;
 
 /**
  * On a land the town follows (`GrassLand.padAt`), the patches (i0..i1, j0..j1, inclusive): one whose middle is on a
  * lot's pad level at the pad; one reaching over a lot's edge (its corners on another pad, or off it) marked uneven
  * where its plane lies more than `UNEVEN` off the ground at any of nine points over it (`GrassField.uneven`).
  */
-export function settlePads(field: GrassField, land: Pick<GrassLand, 'heightAt' | 'padAt'>, i0: number, j0: number, i1: number, j1: number): void {
+function settlePads(field: GrassField, land: Pick<GrassLand, 'heightAt' | 'padAt'>, i0: number, j0: number, i1: number, j1: number): void {
   const padAt = land.padAt;
   if (!padAt) return;
   const p = GRASS.patch;
@@ -289,7 +289,7 @@ function byte(v: number): number {
 }
 
 /** What `townGrass` changed: the town tiles whose mask it made again and the shade's texels (rectangles, last ones included; null: all of them). */
-export interface TownGrassChange {
+interface TownGrassChange {
   tiles: TexelRect[] | null;
   shade: TexelRect[] | null;
 }

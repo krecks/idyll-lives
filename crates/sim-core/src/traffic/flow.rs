@@ -108,9 +108,6 @@ pub struct Traffic {
     /// Ticks a car was kept from moving deeper into another by the last-resort check
     /// (`cars::guard`), since the game was loaded.
     pub guarded: u64,
-    /// Cars held up out of the picture put on along their ways (`cars::unstick`), since the game
-    /// was loaded.
-    pub unstuck: u64,
     /// Cars held up in sight turned round to go another way (`cars::unjam`), and rings of them
     /// none of which could, by why, since the game was loaded.
     pub unjams: u64,

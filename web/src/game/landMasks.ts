@@ -37,7 +37,7 @@ export function simplify(pts: readonly Pt[], tol: number): Pt[] {
 }
 
 /** A closed polygon simplified as `simplify` does a polyline: in two halves, from its first point and the point furthest from it. */
-export function simplifyRing(ring: readonly Pt[], tol: number): Pt[] {
+function simplifyRing(ring: readonly Pt[], tol: number): Pt[] {
   if (ring.length < 4) return [...ring];
   let far = 0;
   for (let i = 1; i < ring.length; i++) if (dist(ring[i], ring[0]) > dist(ring[far], ring[0])) far = i;
@@ -47,7 +47,7 @@ export function simplifyRing(ring: readonly Pt[], tol: number): Pt[] {
 }
 
 /** A closed polygon with its corners cut (Chaikin), once. */
-export function chaikin(poly: readonly Pt[]): Pt[] {
+function chaikin(poly: readonly Pt[]): Pt[] {
   const out: Pt[] = [];
   for (let i = 0; i < poly.length; i++) {
     const [a, b] = [poly[i], poly[(i + 1) % poly.length]];

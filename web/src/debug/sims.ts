@@ -9,7 +9,7 @@ import type { SnapshotLayout } from '../core/snapshot';
 
 const POSES = ['stand', 'sit', 'lie'] as const;
 
-export interface LiveSim {
+interface LiveSim {
   id: number;
   name: string;
   household: number;

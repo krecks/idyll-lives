@@ -22,7 +22,7 @@ import { tuned } from '../tune';
  * standing over a lawn read in a still picture as a dark area of the lawn, not as a cloud's shade); `speed`: the
  * drift (m/s); `at`: where the clouds are as a game opens (m, along x and z).
  */
-export const CLOUDS = tuned('clouds', {
+const CLOUDS = tuned('clouds', {
   span: 380,
   cells: 12,
   cover: [0.55, 0.68],
@@ -35,7 +35,7 @@ export const CLOUDS = tuned('clouds', {
 const SIZE = 256;
 
 /** How much of a cloud is over each texel of the map (a byte, tiling). */
-export function cloudCover(size = SIZE): Uint8Array {
+function cloudCover(size = SIZE): Uint8Array {
   const C = CLOUDS;
   const out = new Uint8Array(size * size);
   for (let j = 0; j < size; j++) {

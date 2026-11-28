@@ -19,7 +19,7 @@ import { WALL_HEIGHT } from '../shared/walls';
 import type { PickResult } from '../types';
 
 /** How picking reads the storeys (the renderer's). */
-export interface PickView {
+interface PickView {
   /** The storey in view. */
   storey(): number;
   /** The storey a lot row is on. */

@@ -25,7 +25,7 @@ import { DEFAULT_SETTINGS, settings } from '../settings/settings.svelte';
 import { EFFECTS_LEVEL } from './catalog';
 import { Space } from './space';
 
-export type Bus = 'effects' | 'voices' | 'world';
+type Bus = 'effects' | 'voices' | 'world';
 
 /** Seconds the master volume takes to fade out or back in as the window loses or gets focus. */
 const FOCUS_FADE = 0.15;
@@ -34,13 +34,13 @@ const FOCUS_FADE = 0.15;
  * heard over a tap or a television without the room going silent), and the seconds it takes to give way
  * and to come back once the last voice has ended.
  */
-export const DUCK = { level: 0.5, down: 0.08, up: 0.5 };
+const DUCK = { level: 0.5, down: 0.08, up: 0.5 };
 /**
  * The limiter over everything: what goes over `threshold` (dBFS) is held there (`ratio` to one, no knee),
  * caught within `attack` seconds and let go over `release`. The sounds are made well under it one by one
  * (`tools/audio/listen.ts`: the loudest loop peaks at -11 dBFS), so it works only when many sound at once.
  */
-export const LIMIT = { threshold: -3, ratio: 20, attack: 0.003, release: 0.25 };
+const LIMIT = { threshold: -3, ratio: 20, attack: 0.003, release: 0.25 };
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;

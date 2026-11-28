@@ -21,7 +21,7 @@ export type LoopKind = 'sizzle' | 'chop' | 'tv' | 'music' | 'drums' | MusicKind 
 /** A world sound: a loop, or one played once (as a use starts, when it's a use's sound). */
 export type SoundKind = LoopKind | OnceKind;
 
-export interface LoopDef {
+interface LoopDef {
   level: number;
   /** How far the speed (and with it the pitch) wanders either way, so a loop doesn't sound the same each time round. */
   drift?: number;
@@ -192,7 +192,7 @@ export const GUARD: Record<Group, readonly [number, number]> = {
 };
 
 /** A sound as `bun run sounds` renders it and the tests measure it. */
-export interface Listed {
+interface Listed {
   name: string;
   group: Group;
   plays: 'loop' | 'once';

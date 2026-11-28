@@ -38,7 +38,7 @@ import { pickCasters } from '../shared/lampShadows';
 import { tuned } from '../tune';
 import { frameNow } from '../shared/frameClock';
 
-export const LAMP_SHADOWS = tuned('lampShadows', {
+const LAMP_SHADOWS = tuned('lampShadows', {
   /** The cone a lamp's map covers (degrees across), and its last degrees (from the edge in) over which the shadows fade out. */
   fov: 156,
   edge: 5,
@@ -60,14 +60,14 @@ const WARM_HEIGHT = 30;
 const WARM_RANGE = 1000;
 
 /** A lamp's light as the shadows need it (`lamps.ts` `RoomLamp`). */
-export interface ShadowLamp {
+interface ShadowLamp {
   entity: pc.Entity;
   light: pc.LightComponent;
   use: RoomLight | null;
   on: number;
 }
 
-export interface LampShadowHooks {
+interface LampShadowHooks {
   /** The storey in view, and the storey and first lot row of a lot row (`LampView`). */
   storey(): number;
   storeyOf(z: number): number;

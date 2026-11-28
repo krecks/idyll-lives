@@ -21,14 +21,14 @@ export interface PerfEntry {
   detail?: string;
 }
 
-export interface LongTask {
+interface LongTask {
   start: number;
   ms: number;
   /** The span that was running (or had just ended), if one was. */
   phase: string;
 }
 
-export interface DroppedFrame {
+interface DroppedFrame {
   /** When the long frame began, ms since the page loaded. */
   at: number;
   /** Time since the previous frame, ms. */
@@ -36,7 +36,7 @@ export interface DroppedFrame {
   phase: string;
 }
 
-export interface PerfReport {
+interface PerfReport {
   entries: PerfEntry[];
   longTasks: LongTask[];
   droppedFrames: DroppedFrame[];
@@ -119,7 +119,7 @@ export function perfReport(): PerfReport {
 }
 
 /** Logs the slowest spans and hitches as a table (the `?profile` summary). */
-export function perfSummary(): void {
+function perfSummary(): void {
   const report = perfReport();
   const rows = report.slowest.map((e) => ({ step: e.name, ms: Math.round(e.ms), at: Math.round(e.start), detail: e.detail ?? '' }));
   if (rows.length) console.table(rows);

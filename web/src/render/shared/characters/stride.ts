@@ -89,7 +89,7 @@ const V = new Float32Array(3);
  * its own size, with the additive layer `add` on it if given (as `skin` applies it): the hip, the knee and the
  * ankle (m) and the thigh's rotation, into `out` (13 numbers). Rest rotations are the identity (the format's).
  */
-export function legPose(set: CharacterSet, body: BodyData, q: Float32Array, pelvis: ArrayLike<number>, add: Additive | null, side: number, out: Float32Array): void {
+function legPose(set: CharacterSet, body: BodyData, q: Float32Array, pelvis: ArrayLike<number>, add: Additive | null, side: number, out: Float32Array): void {
   const B = set.bone;
   const { restT } = body;
   const a = add?.active ? add.q : null;

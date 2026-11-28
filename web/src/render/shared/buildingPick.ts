@@ -7,7 +7,7 @@
 import { MOST_STOREYS } from './townBuildings';
 
 type V3 = { readonly x: number; readonly y: number; readonly z: number };
-export type Footprint = readonly (readonly [number, number])[];
+type Footprint = readonly (readonly [number, number])[];
 
 /** Whether (`x`, `z`) is inside `poly` (even-odd). */
 function insidePoly(poly: Footprint, x: number, z: number): boolean {

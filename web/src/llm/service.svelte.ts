@@ -16,7 +16,7 @@ import type { GenParams, GenResult } from './generate';
 import { MODEL } from './models';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
 
-export type LlmState = 'off' | 'loading' | 'ready' | 'error';
+type LlmState = 'off' | 'loading' | 'ready' | 'error';
 
 // Models players added from Hugging Face (until 2026-10-12): no longer offered.
 try {

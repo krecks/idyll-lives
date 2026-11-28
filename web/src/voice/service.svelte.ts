@@ -20,7 +20,7 @@ export interface Clip {
   visemes: VisemeTrack;
 }
 
-export interface BenchResult {
+interface BenchResult {
   /** Median generation time ÷ audio length (lower is faster; 0.25 = four times real time). */
   rtf: number;
   /** Median time to make one typical line, ms. */
@@ -34,8 +34,8 @@ export interface BenchResult {
   date: string;
 }
 
-export type BenchVerdict = 'good' | 'ok' | 'slow';
-export type ModelState = 'off' | 'loading' | 'ready' | 'error';
+type BenchVerdict = 'good' | 'ok' | 'slow';
+type ModelState = 'off' | 'loading' | 'ready' | 'error';
 
 /** How the voice worker is doing (for the debug overlay). */
 export interface VoiceThreadStats {
@@ -172,7 +172,7 @@ function onMessage(msg: FromVoiceWorker): void {
  * overrides the chosen one (Auto's fallback, or a manual choice); otherwise Auto picks the
  * graphics card when WebGPU is there and the processor when it is not.
  */
-export async function ensureVoice(device?: VoiceDevice): Promise<void> {
+async function ensureVoice(device?: VoiceDevice): Promise<void> {
   let target = device ?? chosenDevice();
   if (!target) {
     // Auto asks whether there is a graphics card. Meanwhile the voices may be switched off or

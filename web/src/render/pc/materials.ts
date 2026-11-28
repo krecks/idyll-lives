@@ -64,7 +64,7 @@ export type SurfacePattern = 'stripes' | 'whitewash';
  * The light mask of the sun (the renderer's directional light): every mesh's dynamic bit, and one
  * of its own that meshes left out of the lamps keep (`excludeFromLights`).
  */
-export const SUN_LIGHT_BIT = 8;
+const SUN_LIGHT_BIT = 8;
 export const SUN_LIGHT_MASK = pc.MASK_AFFECT_DYNAMIC | SUN_LIGHT_BIT;
 
 /**
@@ -330,7 +330,7 @@ const LIGHT_CHANGE_MIN = 0.004;
 /** The sky's hemispheric fill comes from here (game space; the direction the look was tuned with). */
 const SKY_FILL_DIRECTION = { x: 0.2, y: 1, z: -0.3 };
 
-export interface SurfaceOptions {
+interface SurfaceOptions {
   /** Multiply albedo by (sRGB) vertex / instance colours. */
   vertexColors?: boolean;
   /** Render both faces (generated lot geometry does not guarantee winding). */

@@ -239,7 +239,7 @@ function clip(poly: P2[], a: number, b: number, c: number): P2[] {
 }
 
 /** Offsets a convex counter-clockwise polygon outwards by `d` (mitred corners). */
-export function offsetConvex(poly: readonly P2[], d: number): P2[] {
+function offsetConvex(poly: readonly P2[], d: number): P2[] {
   const n = poly.length;
   const lines = poly.map((p, i) => {
     const q = poly[(i + 1) % n];

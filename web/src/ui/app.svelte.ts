@@ -21,7 +21,7 @@ import { homeKey, sameHome, type HomeRef } from './homes';
 export type Screen = 'menu' | 'land' | 'streets' | 'town' | 'household' | 'create' | 'home' | 'game';
 
 /** A step's draft and the key of what it was made from (`newGame.ts` `landKey`, `townKey`): a later step whose key no longer matches is made again. */
-export interface Keyed {
+interface Keyed {
   draft: NeighbourhoodDraft;
   key: string;
 }
@@ -60,7 +60,7 @@ export interface Layout extends Keyed {
   marks?: readonly string[];
 }
 
-export type Overlay = 'settings' | 'load' | 'credits' | null;
+type Overlay = 'settings' | 'load' | 'credits' | null;
 /** A loading step and the overall progress, 0..1. */
 export interface Progress {
   label: string;

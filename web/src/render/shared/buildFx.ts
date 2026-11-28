@@ -26,11 +26,11 @@ import type { BuildEffect } from '../types';
 /** Seconds a ring takes to spread and fade. */
 export const RING_TIME = 0.65;
 /** Rings at most (the oldest is taken again). */
-export const RING_POOL = 8;
+const RING_POOL = 8;
 /** Seconds the pop takes to settle. */
 export const POP_TIME = 0.6;
 /** Rings lie this far (m) above the floor. */
-export const RING_LIFT = 0.045;
+const RING_LIFT = 0.045;
 
 /** A ring's colour per effect (sRGB, drawn as it is: unlit). */
 export const RING_COLORS: Record<BuildEffect['kind'], string> = {
@@ -233,7 +233,7 @@ export abstract class BuildEffectsCore<T extends PopInstance> {
 }
 
 /** The pop's spring at `s` seconds. */
-export function popSpring(s: number): number {
+function popSpring(s: number): number {
   return s <= 0 ? 0 : 1 - Math.exp(-7 * s) * Math.cos(13 * s);
 }
 

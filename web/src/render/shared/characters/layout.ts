@@ -56,7 +56,7 @@ export const SHIRT = { white: 1, charcoal: 2, grey: 3, apron: 4 } as const;
 export const EXPRESSION_TEXELS = 12;
 export const MORPH_PAIRS = EXPRESSION_TEXELS * 2;
 /** The resident's own face after them (the identity channels, one pair each): written once. */
-export const IDENTITY_TEXELS = 8;
+const IDENTITY_TEXELS = 8;
 export const IDENTITY_PAIRS = IDENTITY_TEXELS * 2;
 /** Every pair texel the shader reads. */
 export const MORPH_TEXELS = EXPRESSION_TEXELS + IDENTITY_TEXELS;

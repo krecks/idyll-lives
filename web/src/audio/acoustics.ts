@@ -55,7 +55,7 @@ export function muffled(amount: number): { cutoff: number; gain: number } {
 }
 
 /** What of a world's structure says where its rooms are (`WorldStructure`). */
-export interface RoomMap {
+interface RoomMap {
   width: number;
   depth: number;
   /** The room of each tile, row by row (0: outdoors), every storey's rows included. */

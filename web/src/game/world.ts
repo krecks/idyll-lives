@@ -74,7 +74,7 @@ export interface SizeSpec {
  * (`ROAD_KIND.avenue`, 14 m), the first of its roads, laid so before the streets off it (where a crossroads' cross
  * road meets it, a crossroads with lights, not a roundabout); a shape with no through road (a clearing's ring) has none.
  */
-export type Shape = (rand: Rand, box: Box, scale?: number, avenue?: boolean) => RoadLayout;
+type Shape = (rand: Rand, box: Box, scale?: number, avenue?: boolean) => RoadLayout;
 
 /** Road `r` an avenue if `avenue` (as wide as one), else as it is. */
 const avenueIf = (r: RoadPlan, avenue = false): RoadPlan => (avenue ? { ...r, kind: 'avenue', width: ROAD_KIND.avenue.width } : r);
@@ -99,7 +99,7 @@ export interface LotMix {
 }
 
 /** A hamlet round the main town: its shapes (each hamlet one of them), its box, lots, how far its lanes reach (`SizeSpec.scale`), its streets out into its box and cross streets (`fill`, `extend`). */
-export interface HamletSpec {
+interface HamletSpec {
   shapes: Shape[];
   box: Box;
   lots: [number, number];
@@ -178,7 +178,7 @@ export interface WorldSpec extends LotMix {
 }
 
 /** A place as step 1 lists it, and the options it starts with. */
-export interface Place {
+interface Place {
   label: string;
   blurb: string;
   defaults: WorldOptions;
@@ -194,20 +194,20 @@ function tint(hex: string, rand: Rand, warm: number, light: number): string {
 }
 
 /** Grass for a world: a base palette, warmer or cooler, lighter or darker. */
-export function grass(rand: Rand, base: LandscapeParams['grass'], warm: [number, number], light: [number, number]): LandscapeParams['grass'] {
+function grass(rand: Rand, base: LandscapeParams['grass'], warm: [number, number], light: [number, number]): LandscapeParams['grass'] {
   const w = range(rand, ...warm);
   const l = range(rand, ...light);
   return base.map((g) => tint(g, rand, w, l)) as LandscapeParams['grass'];
 }
 
 /** Grass palettes: the classic valley's, the mountains', the coast's, the heath's (heather where the meadows are, bracken on the hills). */
-export const GREEN = DEFAULT_LANDSCAPE.grass;
-export const ALPINE: LandscapeParams['grass'] = ['#557F3A', '#6E9142', '#8C9A55', '#4F7238'];
-export const COAST: LandscapeParams['grass'] = ['#7AA046', '#93AD55', '#B2B46A', '#6C9142'];
-export const HEATH: LandscapeParams['grass'] = ['#76783F', '#7F9146', '#86687F', '#937046'];
+const GREEN = DEFAULT_LANDSCAPE.grass;
+const ALPINE: LandscapeParams['grass'] = ['#557F3A', '#6E9142', '#8C9A55', '#4F7238'];
+const COAST: LandscapeParams['grass'] = ['#7AA046', '#93AD55', '#B2B46A', '#6C9142'];
+const HEATH: LandscapeParams['grass'] = ['#76783F', '#7F9146', '#86687F', '#937046'];
 
 /** The classic valley, rolled a little differently for each world. */
-export const valley = (rand: Rand): LandscapeParams => ({
+const valley = (rand: Rand): LandscapeParams => ({
   ...DEFAULT_LANDSCAPE,
   hills: range(rand, 9, 18),
   rise: range(rand, 38, 52),
@@ -232,7 +232,7 @@ function toward(parent: RoadPlan, s: number, side: 1 | -1, length: number, curl:
 }
 
 /** One winding high street, a back lane looping off it and back, a short lane off the other side. */
-export function highStreet(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+function highStreet(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
   const main = avenueIf(through(rand, box, { amp: range(rand, 6, 11), bends: 2 }), avenue);
   const L = lengthOf(main);
   const s = side(rand);
@@ -243,7 +243,7 @@ export function highStreet(rand: Rand, box: Box, scale = 1, avenue = false): Roa
 }
 
 /** A through road with a crescent round a green; lanes off it joined up into a back street and to the crescent. */
-export function crescentTown(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+function crescentTown(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
   const main = avenueIf(through(rand, box, { at: 0.55, amp: range(rand, 6, 10), bends: 2 }), avenue);
   const L = lengthOf(main);
   const mid = L * range(rand, 0.42, 0.55);
@@ -274,7 +274,7 @@ export function crescentTown(rand: Rand, box: Box, scale = 1, avenue = false): R
  * lanes off each road for `connect` to join up. A city's (`avenue`): its main road an avenue straight
  * through, the cross road meeting it from either side (a crossroads with lights), no roundabout.
  */
-export function crossroads(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+function crossroads(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
   const main = avenueIf(through(rand, box, { amp: range(rand, 4, 8), bends: 2 }), avenue);
   const cross = through(rand, box, { along: 'z', amp: range(rand, 4, 8), bends: 2 });
   const at = crossing(main, cross) ?? ([box.w / 2, box.d / 2] as Pt);
@@ -314,7 +314,7 @@ export function crossroads(rand: Rand, box: Box, scale = 1, avenue = false): Roa
 const AVENUE_CUT = 2;
 
 /** A long country lane winding through the fields, a fork off it leading out of town. */
-export function countryLane(rand: Rand, box: Box, _scale = 1): RoadLayout {
+function countryLane(rand: Rand, box: Box, _scale = 1): RoadLayout {
   const main = through(rand, box, { amp: range(rand, 14, 22), bends: 3, width: 6 });
   const L = lengthOf(main);
   const fork = branch(main, L * range(rand, 0.4, 0.6), side(rand), box.d, range(rand, -0.5, 0.5), { end: 'out' });
@@ -339,7 +339,7 @@ function waterfront(rand: Rand, box: Box, at: number, amp: [number, number], ave
  * A road along the shore (homes on its landward side only), a crescent up the hill at one end of
  * the village, two lanes climbing inland for `connect` to join into an upper street.
  */
-export function shoreRoad(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+function shoreRoad(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
   const { main, water, land, centre, L } = waterfront(rand, box, 0.12, [3, 6], avenue);
   const end = rand() < 0.5 ? 0.22 : 0.78;
   const crescent = loop(main, L * end - 22 * scale, L * end + 22 * scale, land, range(rand, 30, 38) * scale);
@@ -357,7 +357,7 @@ function inland(r: RoadPlan, s: number, land: 1 | -1, depth: number): Pt {
 }
 
 /** A lane winding up the valley in tight bends, tracks off it (round to it again where the land allows). */
-export function switchback(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+function switchback(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
   const main = avenueIf(through(rand, box, { amp: range(rand, 16, 24), bends: 3, width: 6 }), avenue);
   const L = lengthOf(main);
   const tracks = [0.3, 0.6].map((at) => {
@@ -372,7 +372,7 @@ export function switchback(rand: Rand, box: Box, scale = 1, avenue = false): Roa
  * A road round the lake's end of town (homes on its landward side), a crescent off it, and lanes
  * either side of it climbing inland for `connect` to join into an upper street over the crescent.
  */
-export function lakeRoad(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+function lakeRoad(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
   const { main, water, land, centre, L } = waterfront(rand, box, 0.14, [5, 9], avenue);
   const crescent = loop(main, L * 0.5 - 24 * scale, L * 0.5 + 24 * scale, land, range(rand, 34, 42) * scale);
   const up = inland(main, L * 0.5, land, 95 * scale);
@@ -381,7 +381,7 @@ export function lakeRoad(rand: Rand, box: Box, scale = 1, avenue = false): RoadL
 }
 
 /** A lane round a clearing in the woods, a way out of it and a track into the trees. */
-export function clearing(rand: Rand, box: Box, scale = 1): RoadLayout {
+function clearing(rand: Rand, box: Box, scale = 1): RoadLayout {
   const [cx, cz] = [box.w / 2, box.d / 2];
   const round = ring(rand, cx, cz, range(rand, 30, 36) * scale, range(rand, 22, 28) * scale);
   // Out of the clearing from its southern edge (the way the menus look at it from), and a track into the trees.
@@ -890,7 +890,7 @@ const SIZES: Record<TownSize, SizeTable> = {
   city: { area: 152_000, lots: [104, 110], scale: 1.3, extend: 8, fill: 6, places: [6, 6], terraces: [125, 140], rows: [3, 6], density: 0.85 },
 };
 /** The town sizes, smallest first. */
-export const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
+const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
 /** A main town at town size has its place's lots, between these (`mainTown`). */
 const TOWN_LOTS: [number, number] = [66, 84];
 
@@ -1115,7 +1115,7 @@ const given = (options: Partial<WorldOptions>) => Object.fromEntries(Object.entr
  * chosen; else the place's own with its own town and villages, or the smallest land the town and
  * villages chosen fit on (`sizeFor`).
  */
-export function optionsFor(kind: WorldKind, options: Partial<WorldOptions> = {}): WorldOptions & { size: LandSize } {
+function optionsFor(kind: WorldKind, options: Partial<WorldOptions> = {}): WorldOptions & { size: LandSize } {
   const chosen = given(options);
   const own = defaultsOf(kind);
   const o = { ...own, ...chosen };

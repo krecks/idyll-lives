@@ -34,7 +34,7 @@ import { cleanLine } from './clean';
 import { buildMessages, type LineEvent, type Persona, type Situation, type TalkText } from './prompt';
 import { cutShort, LINE_STOPS, LINE_TOKENS, WRITE_MS } from './writer';
 
-export interface TestResult {
+interface TestResult {
   /** It loaded and ran (`error` otherwise). */
   ran: boolean;
   error?: string;
@@ -125,7 +125,7 @@ export const deviceTest = $state({
 });
 
 /** Where the result for this computer on `device` is kept: per model version, voice model, GPU and device. */
-export function reportKey(device: OrtDevice): string {
+function reportKey(device: OrtDevice): string {
   return `${MODEL.version}|${VOICE_MODEL_ID}|${deviceTest.gpu}|${device}`;
 }
 

@@ -57,7 +57,7 @@ export function aimOf(brush: Brush, x: number, z: number): [number, number] {
 }
 
 /** One stamp along a stroke: where (world m) and the seconds since the last one. */
-export interface Stamp {
+interface Stamp {
   x: number;
   z: number;
   dt: number;
@@ -87,38 +87,38 @@ export const TOOL_KIND: Record<LandTool, 'earth' | 'water' | 'cover' | 'mountain
 };
 
 /** The cover each cover tool paints. */
-export const COVER_OF: Partial<Record<LandTool, number>> = { woods: COVER.woods, meadow: COVER.meadow, fields: COVER.fields, clear: COVER.open };
+const COVER_OF: Partial<Record<LandTool, number>> = { woods: COVER.woods, meadow: COVER.meadow, fields: COVER.fields, clear: COVER.open };
 
 /** Raise and lower move the land this fast (m/s) at the brush's middle, at strength 0 and 1. */
-export const RATE: [number, number] = [0.5, 8];
+const RATE: [number, number] = [0.5, 8];
 /** A lake's level, started on dry land: the ground at the press less this (m). */
-export const LAKE_BELOW = 0.1;
+const LAKE_BELOW = 0.1;
 /** A river's level: never above the ground under it less this (m). */
-export const RIVER_BELOW = 0.4;
+const RIVER_BELOW = 0.4;
 /** A river dragged uphill keeps its level through this much of a rise (m); past it, it steps up with the land. */
-export const RIVER_CLIMB = 1;
+const RIVER_CLIMB = 1;
 /**
  * A river dragged into a ridge keeps its level through it, a gorge this deep at most (m), if the land past it falls
  * back to the water within `RIDGE_REACH` m along the drag; higher ground, or ground that goes on rising, it climbs.
  */
-export const RIVER_CUT = 6;
+const RIVER_CUT = 6;
 /** How far ahead along the drag (m) a river looks for the far side of a ridge (`RIVER_CUT`). */
-export const RIDGE_REACH = 40;
+const RIDGE_REACH = 40;
 /** A lake's or a river's bank: dry ground round its water is raised this far over its level (m), in a ring this wide (m, at least; a quarter of the radius on wide ones). */
-export const BANK = 0.25;
-export const BANK_RING = 2.5;
+const BANK = 0.25;
+const BANK_RING = 2.5;
 /** The deepest a lake or a river is dug, at strength 0 and 1 (m; the sea sheet's own bed goes no deeper than 4). */
-export const DEPTH: [number, number] = [0.5, 4];
+const DEPTH: [number, number] = [0.5, 4];
 /** `dry` fills a bed this far over its old water's level (m). */
-export const DRY_OVER = 0.05;
+const DRY_OVER = 0.05;
 /** A river's way along the drag: from the stamp this many back to the one now (a curve reads smoothly). */
-export const RIVER_WAY_STAMPS = 4;
+const RIVER_WAY_STAMPS = 4;
 
 /** A mountain's height (m) when the brush gives none. */
 export const MOUNTAIN_HEIGHT = 40;
 
 /** Why a stroke couldn't do something, for the palette's hint line. */
-export const HINTS = {
+const HINTS = {
   water: 'Water keeps 3 m off lots and clear of roads.',
 } as const;
 
@@ -185,7 +185,7 @@ export function unionRect(a: LandRect | null, b: LandRect | null): LandRect | nu
 }
 
 /** The samples within `reach` m of (`x`, `z`), as a rectangle cut to the land; null if none. */
-export function rectAround(land: Land, x: number, z: number, reach: number): LandRect | null {
+function rectAround(land: Land, x: number, z: number, reach: number): LandRect | null {
   const i0 = Math.max(0, Math.ceil((x - reach) / LAND_CELL));
   const j0 = Math.max(0, Math.ceil((z - reach) / LAND_CELL));
   const i1 = Math.min(land.cols, Math.floor((x + reach) / LAND_CELL) + 1);
@@ -616,7 +616,7 @@ export function settleWater(land: Land, rect: LandRect, wettable?: Wettable): La
 const profile = (t: number) => (t >= 1 ? 0 : 1 - smoothstep(0, 1, t));
 
 /** A peak (one point) or a range (along the dragged line): the height it adds (m) at a point, and the samples it reaches. */
-export interface Mountain {
+interface Mountain {
   lift(x: number, z: number): number;
   /** World bounds (m): x0, z0, x1, z1. */
   bounds: [number, number, number, number];

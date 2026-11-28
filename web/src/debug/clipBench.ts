@@ -19,14 +19,14 @@ import type { ModelClip } from '../render/shared/modelClips';
 import { GROWTH_TIMES } from '../render/shared/objectMotion';
 
 /** How a clip plays (see the file header). */
-export type Kind = 'use' | 'repeat' | 'loop' | 'idle' | 'growth' | 'clock';
+type Kind = 'use' | 'repeat' | 'loop' | 'idle' | 'growth' | 'clock';
 
 /** Seconds at rest before a clip plays, held open (a use), and running (a loop's rounds, at least two). */
 export const REST = 0.9;
 export const HOLD = 1.6;
-export const RUNNING = 2.4;
+const RUNNING = 2.4;
 /** How long each growth stage shows (planted, growing, ripe, picked), moving on from the one before included. */
-export const STAGE = 1.6;
+const STAGE = 1.6;
 
 /** The entry's `motions` as written (read loosely: a bench shows what's there). */
 interface RawMotions {
@@ -42,7 +42,7 @@ interface RawMotions {
 type RawUse = string | { clip: string; delay?: number; every?: number };
 
 /** How a clip the entry names plays (and a use's `delay` and `every`, a clock hand's `period` and `at`). */
-export interface Playing {
+interface Playing {
   kind: Kind;
   delay?: number;
   every?: number;

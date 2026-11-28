@@ -13,9 +13,9 @@ import type { SnapshotLayout } from '../core/snapshot';
 import type { GameShot, WallMode } from '../render/types';
 import * as pmath from './pmath';
 
-export type DirectorPace = 'calm' | 'lively';
+type DirectorPace = 'calm' | 'lively';
 
-export interface DirectorDeps {
+interface DirectorDeps {
   content: Content;
   layout: SnapshotLayout;
   /** Newest snapshot (not interpolated). */

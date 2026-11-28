@@ -68,7 +68,7 @@ import * as pmath from '../pmath';
  * the kind is the player's own choice, so a street or a lane stays one outside the town's and the villages' boxes
  * (with no area: the Build step gives it one); else it is a country road there.
  */
-export interface StreetStroke {
+interface StreetStroke {
   points: readonly Pt[];
   kind: RoadKind;
   asked?: boolean;
@@ -80,7 +80,7 @@ export interface StreetStroke {
 }
 
 /** What a name is given to: a road, a place (`OpenWorldDraft.places`), a village (an area), or the town. */
-export type Named = { kind: 'road'; road: number } | { kind: 'place'; place: number } | { kind: 'area'; area: number } | { kind: 'town' };
+type Named = { kind: 'road'; road: number } | { kind: 'place'; place: number } | { kind: 'area'; area: number } | { kind: 'town' };
 
 /** An end of a drawn street snaps to a road, or a dead end, this near (m, from the road's edge; from the dead end's last point). */
 export const SNAP = 10;
@@ -109,7 +109,7 @@ const NEAR_END = 6;
 /** A junction with another within `ROOM` m of it slides along its road by the least of these (m) that leaves room, either way. */
 const SLIDES = [4, 8, 12, 16];
 /** Wet stretches of a line closer than this (m) are crossed on one bridge (each bridge's straight approaches and the road's turns onto them would overlap). */
-export const ONE_CROSSING = 56;
+const ONE_CROSSING = 56;
 /** An outdoor place stands this near the end of its trail (m: `townCheck.ts` checks 6). */
 const TRAIL_END = 6;
 
@@ -452,7 +452,7 @@ function toEdge(line: Pt[], W: number, D: number): Pt[] {
 }
 
 /** The area whose box (and `NEAR_AREA` m round it) most of `line` runs in; -1: none. */
-export function areaOf(draft: NeighbourhoodDraft, line: readonly Pt[]): number {
+function areaOf(draft: NeighbourhoodDraft, line: readonly Pt[]): number {
   const areas = draft.open?.areas ?? [];
   let [best, most] = [-1, 0];
   areas.forEach((a, k) => {
@@ -538,7 +538,7 @@ export function streetLine(points: readonly Pt[], W: number, D: number, width: n
 }
 
 /** How a drawn street's line meets the town's roads (`streetCourse`). */
-export interface StreetCourse {
+interface StreetCourse {
   start: End;
   end: End;
   junctions: { at: Pt; road: number }[];
@@ -854,7 +854,7 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
  * the roads met end to end across a bridge (one of the two a bridge's), and on from them so, a piece at a time. Each
  * with whether its points run the way `road`'s do (+1) or against them (-1).
  */
-export function streetPieces(roads: readonly RoadPlan[], road: number): { road: number; along: 1 | -1 }[] {
+function streetPieces(roads: readonly RoadPlan[], road: number): { road: number; along: 1 | -1 }[] {
   const out: { road: number; along: 1 | -1 }[] = [];
   const seen = new Set([road]);
   const endOf = (o: RoadPlan, e: 0 | 1) => (e ? o.points[o.points.length - 1] : o.points[0]);
@@ -959,7 +959,7 @@ const TRAIL_STEP = 0.25;
  * its index and name; the others go at the end of the list, named after it with a number nobody in
  * town has (`taken`, added to). Where the street crosses it on a bridge's deck it passes under it, whole.
  */
-export function cutTrails(roads: readonly RoadPlan[], made: readonly number[], outdoor: readonly Rect[], taken: Set<string>): RoadPlan[] {
+function cutTrails(roads: readonly RoadPlan[], made: readonly number[], outdoor: readonly Rect[], taken: Set<string>): RoadPlan[] {
   const streets = made.map((i) => roads[i]).filter((r) => r.kind !== 'trail');
   if (!streets.length) return [...roads];
   const index = new RoadIndex(streets);
@@ -1115,7 +1115,7 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
  * The roads that go with road `road`: the motorway whole (its carriageways and its ramps) if it is one of them, else
  * the road alone.
  */
-export function motorwayOf(roads: readonly RoadPlan[], road: number): number[] {
+function motorwayOf(roads: readonly RoadPlan[], road: number): number[] {
   return roads[road] && isSeparated(roads[road].kind) ? roads.flatMap((r, i) => (isSeparated(r.kind) ? [i] : [])) : [road];
 }
 

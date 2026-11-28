@@ -9,7 +9,7 @@
 import { weighted } from './housegen';
 
 /** The surfaces a garden path or drive is laid in. */
-export const PATH_LOOKS = ['hex', 'concrete', 'brick', 'flagstone', 'gravel', 'asphalt'] as const;
+const PATH_LOOKS = ['hex', 'concrete', 'brick', 'flagstone', 'gravel', 'asphalt'] as const;
 export type PathLook = (typeof PATH_LOOKS)[number];
 
 export interface PavingSpec {

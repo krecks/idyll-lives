@@ -25,7 +25,7 @@ import { WALL_HEIGHT } from '../shared/walls';
 import type { BuildEffect, PlacementGhost, RendererDeps } from '../types';
 
 /** What placing needs of the renderer. */
-export interface PlacingView {
+interface PlacingView {
   /** The storey a lot row is on, and the first row of storey `k`. */
   storeyOf(z: number): number;
   rowOf(k: number): number;

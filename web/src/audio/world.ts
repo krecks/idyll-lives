@@ -682,7 +682,7 @@ export class WorldSound {
  * first wanted, then the rest one after another), the things' and the outdoors' sounds and the birds'
  * songs (each when first wanted). Made on the spot if workers aren't available.
  */
-export class WorkerSounds {
+class WorkerSounds {
   private worker: Worker | null = null;
   private rate = 0;
   private readonly ready = new Map<WorkerKind, AudioBuffer>();

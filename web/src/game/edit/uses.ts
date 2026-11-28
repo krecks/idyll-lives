@@ -24,7 +24,7 @@ export interface UseStamp {
 }
 
 /** A stroke painted (`paintUses`): an edit of the uses alone, which needs no settle of the land. */
-export type UsesPainted = Extract<Edited, { draft: NeighbourhoodDraft }> & { needsSettle: false };
+type UsesPainted = Extract<Edited, { draft: NeighbourhoodDraft }> & { needsSettle: false };
 
 /** A cell is a road's if its middle is this near the road's middle line past half its width (m). */
 const ROAD_REACH = 0.5;

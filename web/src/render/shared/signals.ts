@@ -19,7 +19,7 @@ import { townRoads } from './roads';
 export const RED = 0;
 export const AMBER = 1;
 export const GREEN = 2;
-export type Lamp = typeof RED | typeof AMBER | typeof GREEN;
+type Lamp = typeof RED | typeof AMBER | typeof GREEN;
 
 /** The lenses top to bottom, as the model's lens materials are named (`lens_<name>`, crates/art/outside/src/street_furniture). */
 export const SIGNAL_LAMPS = ['red', 'amber', 'green'] as const;
@@ -28,7 +28,7 @@ export const SIGNAL_LAMPS = ['red', 'amber', 'green'] as const;
 export const MOST_SIGNALS = 512;
 
 /** What changed in the rows since the last read. */
-export interface SignalChange {
+interface SignalChange {
   /** Heads came or went, or one stands elsewhere (a new world). */
   placed: boolean;
   /** A head shows another lamp. */
@@ -157,7 +157,7 @@ export function walkOf(state: number, states: States): boolean {
  * striding) below. The housing in the plain finish (vertex alpha: its roughness and metalness), the
  * figures in the glow's colours.
  */
-export interface PedestrianHead {
+interface PedestrianHead {
   housing: Geo;
   dontWalk: Geo;
   walk: Geo;

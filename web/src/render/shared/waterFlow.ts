@@ -29,7 +29,7 @@ import { clamp01, smoothstep } from '../../game/noise';
  * every few metres: it runs fast there, and foams only where it falls further), felt `rapidReach` samples up and
  * down from it.
  */
-export const FLOW = {
+const FLOW = {
   narrow: 6,
   slowest: 0.3,
   widthReach: 10,
@@ -43,7 +43,7 @@ export const FLOW = {
 } as const;
 
 /** How far round a rectangle (samples) `waterFlow` reads the land: the reach of everything it looks at, and room for the steps' ways. */
-export const FLOW_MARGIN = 16;
+const FLOW_MARGIN = 16;
 
 /** The flow of a land's water, by sample (row-major, as the land). */
 export interface WaterFlow {

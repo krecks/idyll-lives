@@ -111,7 +111,7 @@ function flush(leaving = false): void {
 }
 
 /** The screen the page is on: CSS size, device pixel ratio, device pixels. */
-export function screenInfo(): Record<string, unknown> {
+function screenInfo(): Record<string, unknown> {
   const dpr = window.devicePixelRatio || 1;
   return {
     window: [window.innerWidth, window.innerHeight],

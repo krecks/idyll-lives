@@ -8,7 +8,7 @@ import { flatOf, type FlatInfo, type PlotInfo } from '../core/protocol';
 import { distanceToRect } from '../render/shared/chunks';
 
 /** A lot as `placeAt` needs it. */
-export interface PlacePlot {
+interface PlacePlot {
   id: number;
   name: string;
   x: number;
@@ -49,7 +49,7 @@ export function flatsIn(w: Pick<Lots<PlacePlot>, 'flats'>, lot: number): FlatInf
 }
 
 /** An area (a hamlet) as `placeAt` needs it. */
-export interface PlaceArea {
+interface PlaceArea {
   name: string;
   x: number;
   z: number;
@@ -117,7 +117,7 @@ export function tripText(
 }
 
 /** What a resident rides on their way (`SimView.ride`). */
-export type SimRide = { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'out' | 'home' };
+type SimRide = { kind: 'bike' | 'scooter'; to: 'work' | 'school' | 'out' | 'home' };
 
 /** On a bike or an e-scooter, in words: "Cycling to work", "Riding the e-scooter home", "Cycling out" (a visit or an outing, its place unknown here). */
 export function rideText(kind: SimRide['kind'], to: SimRide['to']): string {
@@ -125,7 +125,7 @@ export function rideText(kind: SimRide['kind'], to: SimRide['to']): string {
 }
 
 /** The work taxi a resident waits for or rides (`SimView.taxi`, sim-core `taxi.rs`). */
-export type SimTaxi = { state: 'wait' | 'work' | 'home'; at?: number };
+type SimTaxi = { state: 'wait' | 'work' | 'home'; at?: number };
 
 /**
  * The work taxi, in words: "Waiting for the taxi", "Taxi to work · there about 08:40" (to school

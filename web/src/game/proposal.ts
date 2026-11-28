@@ -23,7 +23,7 @@ import { layoutHash, NO_USE, packUses, unpackUses, USE_CELL, USE_CODE, useOfCode
 import * as pmath from './pmath';
 
 /** How far behind the kerb a road's frontage is read for its use (m): the land a lot or a building fronting it stands on. */
-export const FRONT_PROBES = [6, 10, 14, 18] as const;
+const FRONT_PROBES = [6, 10, 14, 18] as const;
 /** Zoned cells further than this from a road (m) build nothing (step 2 hatches them), but a green that becomes an outdoor spot. */
 export const BUILD_REACH = 36;
 /** A green with no frontage this near an area's box (m) becomes an outdoor spot, a trail to it (`townCheck.ts` wants 150). */
@@ -56,7 +56,7 @@ const PAINT_ORDER: readonly UseKind[] = ['green', 'homes', 'rows', 'shops', 'pub
  * on cleared (`noUseCells`: under roads and water), and so are those too far from a road to build on
  * (`BUILD_REACH`), but the greens that are outdoor spots (`greenSpots`).
  */
-export function usesOf(draft: NeighbourhoodDraft, t: Templates): UseLayer {
+function usesOf(draft: NeighbourhoodDraft, t: Templates): UseLayer {
   const { cols, rows } = usesOfDraft(draft);
   const codes = new Uint8Array(cols * rows);
   const shapes: { kind: UseKind; rect?: Rect; poly?: readonly Pt[] }[] = [];
@@ -295,7 +295,7 @@ export function stretchesOf(draft: NeighbourhoodDraft, { dirty, fresh }: { dirty
 // ---- greens with no frontage: outdoor spots --------------------------------------------------------
 
 /** A green with no frontage that becomes an outdoor spot: its cells, its middle and the area it is nearest. */
-export interface GreenSpot {
+interface GreenSpot {
   cells: number[];
   centre: Pt;
   area: number;

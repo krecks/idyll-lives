@@ -35,7 +35,7 @@ export function lieBack(rig: SimRig): number {
   return (rig.body.stage === 'baby' ? LIE_BACK * 0.45 : LIE_BACK * rig.size) * rig.scale;
 }
 /** How far in front of its middle a body's chest stands out (m, `EMBRACE`). */
-export function chestDepth(rig: SimRig): number {
+function chestDepth(rig: SimRig): number {
   return EMBRACE.chest * rig.body.height * rig.scale * rig.build;
 }
 /** How far (m) each of two stepping in to hug or kiss steps (`EMBRACE`), from the distance between them: until their chests meet (`gap` m apart). */

@@ -33,7 +33,7 @@ export const BAY_LINES: readonly [number, number] = [2.8, 5.6];
 // ---- Laying car parks out ----
 
 /** How far a car park's stretch of road may turn (radians over its length and a bay either side): each bay faces away from the road at its own nearest point. */
-export const PARK_BEND = 0.3;
+const PARK_BEND = 0.3;
 /** How far a single bay's stretch may turn where an area has no straighter one for its share (`vergeParking`'s `bend`). */
 export const LOOSE_BEND = 0.6;
 /** How far off the grid's axes (radians) a row of more than two bays may run (`carParkFits`). */
@@ -57,7 +57,7 @@ export interface CarParkLaid {
  * facing away from the road at its own nearest point (nose in); its asphalt from the verge's edge back the bays'
  * depth; its P sign a metre past its far end, by the pavement, facing the road.
  */
-export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' | 's' | 'side'>, n: number, area: number, also: Pick<CarPark, 'serves' | 'square'> = {}): CarParkLaid {
+function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' | 's' | 'side'>, n: number, area: number, also: Pick<CarPark, 'serves' | 'square'> = {}): CarParkLaid {
   const road = roads[f.road];
   const ls = roadLengths(road);
   const { p, t } = pointAt(road.points, f.s, ls);
@@ -76,7 +76,7 @@ export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' |
 }
 
 /** What a car park is checked against and laid as (`carParkFits`): the driveways its bays keep clear of, how far its stretch may bend (`PARK_BEND` unless given), its area (0 unless given) and what else it is (`CarPark.serves`, `square`). */
-export interface ParkAs {
+interface ParkAs {
   drives?: readonly DriveLine[];
   bend?: number;
   area?: number;
@@ -89,7 +89,7 @@ export interface ParkAs {
  * and `MOUTH_CLEAR` m either end of it on land nothing takes (`ground`) inside the world's edge, every bay clear of
  * every driveway of `as.drives` (`clearOf`) and nearer its own street than any other road.
  */
-export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Frontage, n: number, offCorners: (f: Frontage) => boolean, { drives = [], bend = PARK_BEND, area = 0, also = {} }: ParkAs = {}): CarParkLaid | null {
+function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Frontage, n: number, offCorners: (f: Frontage) => boolean, { drives = [], bend = PARK_BEND, area = 0, also = {} }: ParkAs = {}): CarParkLaid | null {
   const road = roads[f.road];
   const ls = roadLengths(road);
   const L = ls[ls.length - 1];
@@ -163,7 +163,7 @@ export function vergeParking(roads: readonly RoadPlan[], ground: Ground, frontag
 }
 
 /** Takes a car park's land on `ground`: its asphalt and `MOUTH_CLEAR` m along the road either end (`CarParkLaid.clear`), so no lot's driveway comes out by it. */
-export function takeCarPark(ground: Ground, laid: CarParkLaid): void {
+function takeCarPark(ground: Ground, laid: CarParkLaid): void {
   // (Every tile it touches: a lot beside it keeps off its asphalt's corners too.)
   tilesOf(laid.clear, 0, (x, z) => {
     ground.take({ x, z, w: 1, d: 1 });

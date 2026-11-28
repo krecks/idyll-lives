@@ -13,8 +13,7 @@ import { loadTalk } from './text';
 import { cutShort, LINE_STOPS, LINE_TOKENS } from './writer';
 
 export { LlmWriter, WRITE_MS } from './writer';
-export { browserHint, deviceTest, llmDevice, report, runDeviceTest, stopDeviceTest, type DeviceReport, type TestResult } from './devices.svelte';
-export type { TalkText } from './prompt';
+export { browserHint, deviceTest, llmDevice, report, stopDeviceTest } from './devices.svelte';
 export { llmChosen, llmWrites, testDevices } from './talk.svelte';
 export { loadTalk } from './text';
 

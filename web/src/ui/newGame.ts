@@ -138,7 +138,7 @@ export function buildKey(layoutKey: string, layoutHash: string, buildSeed: numbe
 }
 
 /** What `app.svelte.ts` keeps of step 2's layout that the rules below read. */
-export interface LayoutLike {
+interface LayoutLike {
   key: string;
   proposal: Pick<Proposal, 'plan'>;
   plan?: NeighbourhoodDraft;
@@ -273,7 +273,7 @@ export function offerPage(town: NeighbourhoodDraft, streams: PeopleStreams, page
 }
 
 /** Step 1's figures: the land's size (m), and the share of it under water and under woods (0..1). */
-export interface LandStats {
+interface LandStats {
   width: number;
   depth: number;
   water: number;
@@ -313,7 +313,7 @@ function polygonArea(poly: readonly [number, number][]): number {
 }
 
 /** Step 4's choice: the household, the home chosen for it, and the game's choices. */
-export interface MoveIn {
+interface MoveIn {
   /** Step 3's town with its neighbours (the first wave). */
   town: NeighbourhoodDraft;
   /** The home chosen: a house's lot, or flat `flat` of the building on it. */

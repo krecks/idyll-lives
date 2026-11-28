@@ -38,7 +38,7 @@ export interface Rect {
 export type PavingWorld = Pick<WorldStructure, 'plots' | 'meta' | 'parking' | 'carParks'>;
 
 /** What a piece is paved with: the centre's stone in courses (`stone`), a workshop's yard, a car park's asphalt. */
-export type PavingSurface = 'stone' | 'yard' | 'asphalt';
+type PavingSurface = 'stone' | 'yard' | 'asphalt';
 
 /**
  * A piece to pave: what it is (a car park's apron is `carpark`), its outline (counter-clockwise seen from above), the lots cut out of it (`holes`) and
@@ -396,7 +396,7 @@ function crossTile(x: number, z: number, v: readonly number[]): Poly | null {
 const area = (poly: Poly): number => Math.abs(signedArea2(poly)) / 2;
 
 /** `poly` (convex) less what lies on the right of the line from `a` to `b` (seen from above, x right and z down). */
-export function clipBy(poly: readonly (readonly [number, number])[], a: readonly [number, number], b: readonly [number, number]): Poly {
+function clipBy(poly: readonly (readonly [number, number])[], a: readonly [number, number], b: readonly [number, number]): Poly {
   const side = (p: readonly [number, number]) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
   const out: Poly = [];
   for (let k = 0; k < poly.length; k++) {
@@ -477,7 +477,7 @@ export function courseCells(x0: number, z0: number, x1: number, z1: number, cour
  * Marks (1) the tiles of a `w` × `d` grid a convex outline `q` covers the middle of, less `holes`
  * (`any`: those it reaches into at all, near enough: a tile's middle within half its diagonal of it).
  */
-export function fillConvex(out: Uint8Array, w: number, d: number, q: readonly [number, number][], holes: readonly Rect[] = [], any = false): void {
+function fillConvex(out: Uint8Array, w: number, d: number, q: readonly [number, number][], holes: readonly Rect[] = [], any = false): void {
   const grow = any ? Math.SQRT1_2 : 0;
   const [bx0, bz0, bx1, bz1] = boxOf(q);
   const [x0, x1] = [Math.max(0, Math.floor(bx0 - grow)), Math.min(w - 1, Math.ceil(bx1 + grow))];
@@ -499,7 +499,7 @@ export function fillConvex(out: Uint8Array, w: number, d: number, q: readonly [n
 }
 
 /** Whether (`x`, `z`) is inside convex outline `q`: on the same side of every edge, whichever way round it is wound. */
-export function inConvex(q: readonly (readonly [number, number])[], x: number, z: number): boolean {
+function inConvex(q: readonly (readonly [number, number])[], x: number, z: number): boolean {
   let [pos, neg] = [false, false];
   for (let k = 0; k < q.length; k++) {
     const [a, b] = [q[k], q[(k + 1) % q.length]];

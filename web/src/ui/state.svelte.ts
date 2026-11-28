@@ -6,7 +6,7 @@ import type { RenderStats, WallMode } from '../render/types';
 import { NO_LAND, startBrush, type BrushState, type LandState } from './land/landTools';
 import { townHud } from './town/townHud.svelte';
 
-export interface MenuState {
+interface MenuState {
   objectId: number;
   /** A menu for food or a dish (an item) instead of an object: index 0 eats, 1 clears away. */
   itemId?: number;
@@ -30,7 +30,7 @@ export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' |
 export type BuildTab = 'furnish' | 'build' | 'home' | 'land';
 
 /** What Build mode puts up: wall covering (0: automatic, else wall covering + 1) and form, door and window style. */
-export interface BuildLook {
+interface BuildLook {
   cover: number;
   /** Floor covering (0: automatic, by room; else a floor covering + 1). */
   floor: number;
@@ -60,7 +60,7 @@ export interface Placing {
   tall?: number;
 }
 
-export interface SocialMenuState {
+interface SocialMenuState {
   /** Who would do it (and, for Talk…, say the words). */
   actor: number;
   target: number;
@@ -79,7 +79,7 @@ export interface BuyFilter {
   defs?: ReadonlySet<string>;
 }
 
-export interface FeedEntry {
+interface FeedEntry {
   event: SocialEvent;
   at: number;
 }

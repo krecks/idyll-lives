@@ -49,7 +49,7 @@ export function veilShown(fade: number, strength: number, edge: number, out: num
 }
 
 /** A box of the world (m). */
-export interface VeilBox {
+interface VeilBox {
   x0: number;
   z0: number;
   x1: number;
@@ -82,7 +82,7 @@ export function veilAt(rect: VeilRect, x: number, z: number, eye = Infinity): nu
 }
 
 /** `cutInView` is whole once the cut edge is this share of the half picture in from the picture's edge. */
-export const CUT_EASE = 0.15;
+const CUT_EASE = 0.15;
 
 /**
  * How far the cut edge of the landscape `box`, closed by its curtain (`curtain`'s `positions`: each sample's top, then

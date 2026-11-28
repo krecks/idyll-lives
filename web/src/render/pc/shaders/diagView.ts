@@ -18,7 +18,7 @@ import type { ShaderFeature } from './chunks';
 import { BASE } from './softLook';
 
 /** What the picture shows instead of the shading, if a diag view is asked for (read once). */
-export const DIAG_VIEW_MODE: 'albedo' | 'normals' | null = (() => {
+const DIAG_VIEW_MODE: 'albedo' | 'normals' | null = (() => {
   const diag = benchDiag();
   return diag.has('albedo') ? 'albedo' : diag.has('normals') ? 'normals' : null;
 })();

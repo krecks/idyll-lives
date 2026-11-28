@@ -16,7 +16,7 @@ import { armIK, axisAngle, footIK, lerpV, mul, onBody, pointOn, sub, toEuler, wo
 export const SEAT_MOVE: Vec = [0, -0.348, -0.19];
 const SEAT_FEET: Vec = [-0.02, 0, 0.25];
 
-export interface SeatOptions {
+interface SeatOptions {
   breath?: number;
   depth?: number;
   /** Back bent forward (deg) and turned (deg, + to the left); the head's own nod / turn / tilt. */
@@ -292,7 +292,7 @@ export function eatPose(t: number, at: Vec, head: Vec, lean: number): PoseSpec {
 }
 
 /** Where the hand comes up to with cutlery (`eatFork`): a fork's length out in front of and below the mouth (m, reference skeleton standing). */
-export const FORK_BITE: Vec = [0.07, 1.4, 0.3];
+const FORK_BITE: Vec = [0.07, 1.4, 0.3];
 
 /** Where the cup is held between sips (the palm, m, reference skeleton standing; the seated upper layer the same about the shoulder). */
 export const CUP_HELD: Vec = [0.12, 1.15, 0.27];

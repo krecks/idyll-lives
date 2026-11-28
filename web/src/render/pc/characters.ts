@@ -53,7 +53,7 @@ const RING_COLOR = '#7BE38A';
 const IDENTITY = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
 /** A part mesh as drawn (`ResidentView`'s `M`): its instanced draw, switched on, and how many it draws. */
-export interface PartDraw {
+interface PartDraw {
   readonly draw: Instances;
   readonly shadow: boolean;
   enabled: boolean;
@@ -63,7 +63,7 @@ export interface PartDraw {
 }
 
 /** A body's quilt as drawn (`ResidentView`'s `Q`). */
-export interface QuiltDraw {
+interface QuiltDraw {
   readonly draw: Instances;
   readonly matrices: Float32Array;
   readonly ext: Float32Array;
@@ -72,12 +72,12 @@ export interface QuiltDraw {
   count: number;
 }
 
-export interface ResidentViewOptions {
+interface ResidentViewOptions {
   /** The camera the residents are seen by (the faces' detail, the eyes' glances); default: the app's first enabled camera. */
   camera?: () => pc.CameraComponent | null;
 }
 
-export class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw, Prop> {
+class PlayCanvasResidentView implements ResidentView<PartDraw, QuiltDraw, Prop> {
   private readonly device: pc.GraphicsDevice;
   private poses: PoseTexture | null = null;
   private morphs: pc.Texture | null = null;
@@ -365,7 +365,7 @@ function firstCamera(app: pc.AppBase): pc.CameraComponent | null {
   return null;
 }
 
-export interface CharactersOptions extends ResidentViewOptions {
+interface CharactersOptions extends ResidentViewOptions {
   /** Builds again the props drawn without a model file that came (the game's). */
   refreshProps?: boolean;
   /** Residents cast sun shadows (the shadow-only copies are built; `QualitySettings.characterShadows`). */

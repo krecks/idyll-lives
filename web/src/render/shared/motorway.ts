@@ -50,7 +50,7 @@ const BARRIER_STEP = 2;
  * `markings.ts` `Lane.off`: its left on the town map, its right as the game shows it), and the verge between their edges
  * at this one's middle (m).
  */
-export interface MotorwayPair {
+interface MotorwayPair {
   other: number;
   side: 1 | -1;
   verge: number;
@@ -101,7 +101,7 @@ export function insideOf(roads: readonly RoadPlan[], ri: number): 1 | -1 {
 }
 
 /** A point on the line between two carriageways: where, how far along each (m), and the verge between their edges (m). */
-export interface BarrierPoint {
+interface BarrierPoint {
   x: number;
   z: number;
   sa: number;
@@ -116,7 +116,7 @@ const runsOf = new WeakMap<RoadPlan, Map<RoadPlan, BarrierPoint[][]>>();
  * `a` where `b` runs beside it (its middle within `MOTORWAY.apart` of `a`'s edge, and no nearer than their edges
  * meeting), midway between their middles. A run breaks where they part (a run of fewer than two points is left out).
  */
-export function barrierRuns(a: RoadPlan, b: RoadPlan): BarrierPoint[][] {
+function barrierRuns(a: RoadPlan, b: RoadPlan): BarrierPoint[][] {
   let byB = runsOf.get(a);
   const had = byB?.get(b);
   if (had) return had;
@@ -392,7 +392,7 @@ const SIGN_GORE = 4;
 const SIGN_RAMP_IN = 10;
 
 /** A sign's spot: where it stands, which way it faces (yaw: its +z turned to (sin, cos)), and how high its foot is. */
-export interface SignSpot {
+interface SignSpot {
   x: number;
   z: number;
   yaw: number;

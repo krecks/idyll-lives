@@ -7,7 +7,7 @@
 import type { NeighbourhoodDraft } from '../town';
 
 /** How many edits back undo reaches. */
-export const HISTORY_MOST = 50;
+const HISTORY_MOST = 50;
 
 export class TownHistory {
   private drafts: NeighbourhoodDraft[];

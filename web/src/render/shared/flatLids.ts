@@ -15,7 +15,7 @@ const LID_COLOUR = '#D6D1C7';
 export const LID_THICK = 0.15;
 
 /** A rectangle of ground tiles (x, z its corner on the ground's rows). */
-export interface TileRect {
+interface TileRect {
   x: number;
   z: number;
   w: number;
