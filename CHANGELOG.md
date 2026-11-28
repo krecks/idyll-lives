@@ -6,6 +6,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 
 - **Walk mode, freer:** the walked resident no longer takes over (no work, door, calls, rides or others' chats pull them off; work waits); stairs up and down by holding W, sliding along walls, Shift to run, F on what the crosshair is on and not through walls, a wider view and a steadier eye; in a car or at work, walk mode waits and resumes.
 - **A real kerb:** the step from the road up to the sidewalk is 75 mm, a real kerb's least (it was 33 mm); the sidewalk rises with it, and the lamps, mailboxes, hydrants, bins and benches on it stand on it as before (`roads.ts` `KERB_Y`, `WALK_Y`).
+- **Taxi bays:** an empty house's taxi bay moves with its door, so the kerbside furniture keeps clear of the right spot. Editing a road or a driveway while paused no longer slows every update after it. A taxi pulled over for another car goes back into its lane as other cars do; only one parked in its bay eases out.
 
 ## 0.9.0 — 2026-11-27
 

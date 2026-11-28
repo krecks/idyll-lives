@@ -135,8 +135,9 @@ pub(crate) fn pull_over(
     }
     let car = &w.cars[c];
     // (Its room run out: back in its lane, whatever; a work taxi parked beside the road,
-    // `park_beside`, eases back in as it pulls away.)
-    let room = if car.taxi {
+    // `park_beside`, further over than any car pulls over for another, eases back in as it pulls
+    // away.)
+    let room = if car.taxi && car.shift > PULL_MOST {
         room.max(car.shift - rate)
     } else {
         room
