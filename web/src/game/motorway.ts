@@ -21,9 +21,10 @@
  *   first the nearest the main town (`junction`, kept clear wider and longer for its ramps).
  * - **`finishMotorway`**, once the country roads are laid: where they pass under it (`crossings`) its carriageways are
  *   `raised` (spans closer than `MERGE_SPANS` m made one), over its water a `bridge`, each crossing listed in
- *   `crosses` on both roads; and its junction (`halfDiamond`): an off-ramp from one carriageway and an on-ramp onto the
- *   other, both on one side of the road under it, each about 125 m, merging into its carriageway at one end and meeting
- *   the road under it in a T `RAMP_T` m out from the carriageway at the other.
+ *   `crosses` on both roads (none if its profile can't stand clear over each as low as that road could lie there:
+ *   `clearsUnder`); and its junction (`halfDiamond`) at its junction's gate: an off-ramp from one carriageway and an
+ *   on-ramp onto the other, both on one side of the road under it, each about 125 m, merging into its carriageway at one
+ *   end and meeting the road under it in a T `RAMP_T` m out from the carriageway at the other.
  *
  * A world it doesn't fit (mountains, an island whose roads leave no room for its junction, a small world it would
  * cost a village) has none: `failed` says why, and the world is laid as it was. All its maths is `pmath`'s (the same towns on every engine).
@@ -31,7 +32,7 @@
 
 import type { RoadPlan } from '../core/protocol';
 import { isSeparated, ROAD_KIND } from '../core/roadKinds';
-import { CUT_MAX_MOTORWAY } from '../render/shared/builtSurface';
+import { CROSS_CLEAR, CUT_MAX_MOTORWAY, cutMostOf } from '../render/shared/builtSurface';
 import { CELL, type Cells } from './countryRouter';
 import { curve, dist, lengths, MEET, mergeSpans, nearest, nearestOn, pointAt, resample, rightOf, RoadIndex, round2, segmentAngle, gridKey, segmentCross, segmentGrid, SEG_CELL, sharpestTurn, tangent, type Pt } from './roads';
 import { mulberry32 } from './noise';
@@ -152,6 +153,8 @@ export interface MotorwayRoute {
   junction: number;
   /** Its profile's samples along its middle line (every `STEP` m, NaN over its water): where a gate may lift it over a road (`withVillages`). */
   heights: number[];
+  /** The land's height at (x, z) its course was judged on (`MotorwaySite.height`): the roads under it judged on it too (`clearsUnder`). None: not judged. */
+  height?: (x: number, z: number) => number;
 }
 
 /** A road crossing the motorway's middle line: which, how far along it (m) and along the middle line (m), and how square (radians from along). */
@@ -233,12 +236,12 @@ function edgeOf([x, z]: Pt, W: number, D: number): number {
 /**
  * A profile along a line sampled every `STEP` m: the land's heights `h` (NaN over the water: its bridge, held low over
  * it, as the land's surface holds a bridge's deck, no more than `WATER_DECK` over the lower of its banks), held within
- * `MOTORWAY_GRADE` and no more than `CUT` off the land, and over it by `lift[k]` at least where given. The heights, and
- * how much it cuts and fills (m², summed over the samples); null if no such profile exists.
+ * `grade` (`MOTORWAY_GRADE`) and no more than `most` (`CUT`) off the land, and over it by `lift[k]` at least where given.
+ * The heights, and how much it cuts and fills (m², summed over the samples); null if no such profile exists.
  */
-export function profileOf(h: readonly number[], lift: ReadonlyMap<number, number> = new Map()): { y: number[]; cut: number } | null {
+export function profileOf(h: readonly number[], lift: ReadonlyMap<number, number> = new Map(), grade = MOTORWAY_GRADE, most = CUT): { y: number[]; cut: number } | null {
   const n = h.length;
-  const g = MOTORWAY_GRADE * STEP;
+  const g = grade * STEP;
   const lo = new Array<number>(n);
   const hi = new Array<number>(n);
   // (Over the water: its banks' lower.)
@@ -252,7 +255,7 @@ export function profileOf(h: readonly number[], lift: ReadonlyMap<number, number
   }
   // (Lifted: on its deck, as high as it likes.)
   const bound = (k: number): [number, number] =>
-    Number.isNaN(h[k]) ? (Number.isFinite(bank[k]) ? [bank[k] - 1, bank[k] + WATER_DECK] : [-Infinity, Infinity]) : lift.has(k) ? [h[k] + lift.get(k)!, Infinity] : [h[k] - CUT, h[k] + CUT];
+    Number.isNaN(h[k]) ? (Number.isFinite(bank[k]) ? [bank[k] - 1, bank[k] + WATER_DECK] : [-Infinity, Infinity]) : lift.has(k) ? [h[k] + lift.get(k)!, Infinity] : [h[k] - most, h[k] + most];
   for (let k = 0; k < n; k++) {
     const [a, b] = bound(k);
     [lo[k], hi[k]] = k === 0 ? [a, b] : [Math.max(a, lo[k - 1] - g), Math.min(b, hi[k - 1] + g)];
@@ -519,7 +522,7 @@ export function routeMotorway(site: MotorwaySite): MotorwayRoute | { failed: str
       }
       const ways = carriageways(best.line, W, D);
       if (!ways) continue;
-      const route: MotorwayRoute = { middle: best.middle, ways, blocked: blockedOf(best.middle, gates, land, site.areas), gates, ...namesOf(site.seed), heights: best.heights };
+      const route: MotorwayRoute = { middle: best.middle, ways, blocked: blockedOf(best.middle, gates, land, site.areas), gates, ...namesOf(site.seed), heights: best.heights, height: heightOf(site) };
       const room = site.room ? site.room((r) => clearOfMotorway(route, r)) : full;
       tries++;
       // (Not where it leaves the villages too little room.)
@@ -781,8 +784,9 @@ export interface MotorwayLaid {
 /**
  * The motorway laid on `route` over the roads laid since (`roads`, to which its own go at index `base` on): its
  * carriageways raised where each road crosses under them and bridged over its water, and its half-diamond on the
- * crossing nearest the main town (`town`) that has room for one (`halfDiamond`). Named by `name` (each base made
- * unique by the caller). Null if no crossing has room for its junction.
+ * crossing nearest the main town (`town`) that has room for one (`halfDiamond`), at its junction's gate (`gates`' first:
+ * where a road from the town could climb to it; not a village's). Named by `name` (each base made unique by the
+ * caller). Null if no crossing there has room for its junction.
  */
 export function finishMotorway(route: MotorwayRoute, roads: readonly RoadPlan[], wet: (x: number, z: number) => boolean, town: Pt, base: number, name: (wanted: string) => string): MotorwayLaid | null {
   const found = crossings(route.middle, roads);
@@ -790,9 +794,10 @@ export function finishMotorway(route: MotorwayRoute, roads: readonly RoadPlan[],
   const { ls: lm } = chunksOf(route.middle);
   const far = new Map(found.map((c) => [c, dist(pointAt(route.middle, c.m, lm).p, town)]));
   const byTown = [...found].sort((a, b) => far.get(a)! - far.get(b)! || a.road - b.road);
+  if (!clearsUnder(route, found, roads, wet)) return null;
   const index = new RoadIndex(roads);
   for (const c of byTown) {
-    if (roads[c.road].kind === 'trail' || c.angle < CROSS_ANGLE) continue;
+    if (roads[c.road].kind === 'trail' || c.angle < CROSS_ANGLE || Math.abs(c.m - route.gates[0].s) > GATE_APART / 2) continue;
     const ramps = halfDiamond(route, c, roads, index, found, wet);
     if (!ramps) continue;
     const ways = route.ways.map((w) => decked(w, found, roads, wet));
@@ -816,6 +821,32 @@ export function finishMotorway(route: MotorwayRoute, roads: readonly RoadPlan[],
     return { roads: laid, under, junction: c.road, crossings: found };
   }
   return null;
+}
+
+/**
+ * Whether its profile (`profileOf`, at its kind's own grade and `CUT_MAX_MOTORWAY`: the limits the built land is held
+ * to) still fits with its deck `CROSS_CLEAR` m over each road crossing under it (`found`) as low as that road could lie
+ * there: within its grade and its cut (`cutMostOf`, a mountain country road's at most) of the land all along it. (A
+ * road climbing a steep hill just past it lies well over the land there, and the deck over it higher still: an
+ * embankment taller than a motorway's either side.) Not judged without the land (`route.height`).
+ */
+function clearsUnder(route: MotorwayRoute, found: readonly Crossing[], roads: readonly RoadPlan[], wet: (x: number, z: number) => boolean): boolean {
+  const { heights, height } = route;
+  if (!height) return true;
+  const lift = new Map<number, number>();
+  for (const c of found) {
+    const r = roads[c.road];
+    const kind = r.kind ?? 'street';
+    const [grade, cut] = [ROAD_KIND[kind].grade, cutMostOf(kind, true)];
+    const ls = lengths(r.points);
+    let low = -Infinity;
+    r.points.forEach(([x, z], j) => {
+      if (!wet(x, z)) low = Math.max(low, height(x, z) - cut - grade * Math.abs(ls[j] - c.s));
+    });
+    const k0 = Math.round(c.m / STEP);
+    for (let k = k0 - 3; k <= k0 + 3; k++) if (k >= 0 && k < heights.length && !Number.isNaN(heights[k])) lift.set(k, Math.max(lift.get(k) ?? -CUT_MAX_MOTORWAY, low + CROSS_CLEAR - heights[k]));
+  }
+  return !!profileOf(heights, lift, ROAD_KIND.motorway.grade, CUT_MAX_MOTORWAY);
 }
 
 /** Which way each carriageway's cars go, by the compass (the first's along the middle line, the second's against it). */
@@ -849,7 +880,8 @@ function decked(way: RoadPlan, found: readonly Crossing[], roads: readonly RoadP
   if (raised.length) out.raised = raised;
   const runs = wetRuns(way.points, wet, ls);
   if (runs.length) {
-    const decks = runs.map(([s0, s1]): [number, number] => [round2(Math.max(0, s0 - DECK_PAST)), round2(Math.min(L, s1 + DECK_PAST))]);
+    // (A deck out to its end reaches it: rounded up, not down short of it, the last metre over the water off it.)
+    const decks = runs.map(([s0, s1]): [number, number] => [round2(Math.max(0, s0 - DECK_PAST)), s1 + DECK_PAST >= L ? Math.ceil(L * 100) / 100 : round2(s1 + DECK_PAST)]);
     out.bridge = decks[0];
     if (decks.length > 1) out.bridges = decks.slice(1);
   }

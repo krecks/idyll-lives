@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **More new worlds generate cleanly:** a motorway's junction is laid where a road from the town can climb to it, and never over a road that climbs a steep hill just past it; a slip road meets its motorway without a step; a street left ending in the air by a country road given up to the slopes is cut back to its last junction; a river's extra bridge always joins the roads; a city's centre is found when its one-way streets leave the high street short, a winding main street is still chosen as the high street over a short lane, and a town's square no longer counts against its centre being the most built up; every village gets a parking bay; a motorway's bridge off an island reaches the world's edge.
+
 ## 0.9.0 — 2026-11-27
 
 - **Walk mode:** walk as the selected resident in first person: W/S walk, A/D turn, Q/E step aside, drag to look. F uses the thing in front of you, or on a person opens the socials and a typed "Talk…" chat the LLM answers. The resident's own free will waits while you walk.
