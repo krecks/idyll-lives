@@ -13,6 +13,8 @@ export const BETA_LIMITS = [0.3, 1.35] as const;
 // (The near plane a fiftieth of the camera's distance, never under 0.3 m: from the town overview's 200–300 m at 0.3 m
 // the roads, 1.2 cm over the ground, fought it in green patches. Close up nothing changes: 0.3 m to 15 m out.)
 export const LENS = { fov: 0.7, near: 0.3, far: 1600, nearShare: 1 / 50 } as const;
+/** Walk mode's lens (`setWalkView`): a wider view (~63° vertical) and a near plane close enough that a head leaning to a wall doesn't see through it. */
+export const WALK_LENS = { fov: 1.1, near: 0.05 } as const;
 /** The game camera's pose when a game opens (`OrbitControls`: azimuth, tilt and distance, m). */
 export const DEFAULT_ORBIT = { alpha: -Math.PI * 0.62, beta: 0.86, radius: 24 } as const;
 

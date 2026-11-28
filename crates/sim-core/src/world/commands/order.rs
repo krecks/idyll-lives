@@ -38,12 +38,14 @@ impl World {
         if riding || s.bound_for_car.is_some() || s.transition.is_some() {
             return Err(Error::new(format!("{} can't walk off now", s.name)));
         }
-        // Into a wall or a thing: they stop at it, not go the long way round to what's behind it.
+        // Into a wall or a thing: they stop at it or slide along it, up or down the stairs, not
+        // go the long way round to what's behind it.
         let from = self.sims[sim as usize].pos;
-        let [x, z] = if self.nav().line_walkable(from, [x, z]) {
-            [x, z]
-        } else {
+        // (A stop is steered at where the view last saw them, a step behind: they stop here.)
+        let [x, z] = if (x - from[0]).hypot(z - from[1]) < 0.3 {
             from
+        } else {
+            self.nav().steer_to(from, [x, z])
         };
         let World {
             sims,

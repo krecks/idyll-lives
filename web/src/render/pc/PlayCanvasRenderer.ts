@@ -76,7 +76,7 @@ import { both, within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
+import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend, WALK_LENS } from '../shared/lens';
 import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townClearance, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
 import { townView } from '../shared/townView';
 import { landscapeRing, WATER_Y } from '../shared/nature';
@@ -776,7 +776,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
   /** Walk mode (the resident row seen from, their eyes: `characters.unseen`): the way they look (heading in game x/z, pitch up; rad). */
-  private walk: { heading: number; pitch: number; eye: { x: number; y: number; z: number }; seen: boolean } | null = null;
+  private walk: { heading: number; pitch: number; eye: { x: number; y: number; z: number }; head: { x: number; y: number; z: number }; seen: boolean } | null = null;
   private framedView = '';
   /**
    * Whether a resident at ground point (x, z) on storey `k` is drawn: on the viewed lot (and just round
@@ -1469,7 +1469,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const own = LOOK.fog * (menus ? menuFog(radius, mountains < 1) : townFog(radius));
     let fog = own;
     if (blend > 0) {
-      const spread = Math.atan(Math.tan(LENS.fov / 2) * (this.cssSize.width / Math.max(1, this.cssSize.height)));
+      const spread = Math.atan(Math.tan(this.camera.fov / 2) * (this.cssSize.width / Math.max(1, this.cssSize.height)));
       fog = Math.max(own, edgeFog(radius, from, landEdge(ex, ey, ez, alpha, spread, r.x0, r.z0, r.x1, r.z1), beta) * blend * mountains);
     }
     if (Math.abs(fog - this.app.scene.fog.density) > fog * 0.01) this.app.scene.fog.density = fog;
@@ -1498,7 +1498,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       haze.set(r, (x, z) => scape.heightAt(x, z), pc.LAYERID_WORLD, `${landscapeId(scape)}|${scape.landVersion}`);
     }
     // (The eye in game space: the camera's heights are the engine's, the datum below the land's.)
-    const k = cutInView(r, haze.positions, ex, ey + this.datum, ez, alpha, beta, LENS.fov, this.cssSize.width / Math.max(1, this.cssSize.height));
+    const k = cutInView(r, haze.positions, ex, ey + this.datum, ez, alpha, beta, this.camera.fov, this.cssSize.width / Math.max(1, this.cssSize.height));
     if (k > 0 || this.worldHazeShown) haze.hold(k);
     this.worldHazeShown = k > 0;
   }
@@ -1604,7 +1604,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.landscape?.frameTiles(o.target.x, o.target.z, this.diag.has('notownwoods') ? 0 : this.townBlend, o.radius, this.diag.has('noimpostors') ? undefined : this.camera.eyeInGame(this.eyeNow));
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
-    const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
+    const fovH = 2 * Math.atan(Math.tan(this.camera.fov / 2) * aspect);
     const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => this.plots.find(world, x, z, reach), (plot) => {
       const taken = !!this.focusLotListener?.(plot.id);
       if (taken) {
@@ -1935,7 +1935,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.characters.unseen = index ?? -1;
     this.orbit.enabled = index === null;
     const heading = this.orbit.alpha + Math.PI;
-    this.walk = index === null ? null : { heading, pitch: 0, eye: { x: 0, y: 0, z: 0 }, seen: false };
+    this.walk = index === null ? null : { heading, pitch: 0, eye: { x: 0, y: 0, z: 0 }, head: { x: 0, y: 0, z: 0 }, seen: false };
+    this.camera.setLens(index === null ? { ...LENS, far: this.playFar } : { ...LENS, ...WALK_LENS, far: this.playFar });
     if (index === null) this.orbit.radius = Math.max(this.orbit.radius, 6);
     return heading;
   }
@@ -1948,11 +1949,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   /** Walk mode: the eye where the walker's head is (the orbit's target goes with it, for what's built and lit round it). */
-  private steerWalk(): void {
+  private steerWalk(dt: number): void {
     const w = this.walk!;
-    w.seen = this.simHead(this.characters.unseen, w.eye);
+    const was = w.seen;
+    w.seen = this.simHead(this.characters.unseen, w.head);
     if (!w.seen) return;
-    w.eye.y -= 0.12;
+    w.head.y -= 0.12;
+    // (Eased toward the head bone, so the walk's bob, idle sway and head turns don't shake the view; snapped when first seen.)
+    const ky = was ? 1 - Math.exp(-dt / 0.08) : 1;
+    const kx = was ? 1 - Math.exp(-dt / 0.05) : 1;
+    w.eye.x += (w.head.x - w.eye.x) * kx;
+    w.eye.y += (w.head.y - w.eye.y) * ky;
+    w.eye.z += (w.head.z - w.eye.z) * kx;
     this.orbit.target.x = w.eye.x;
     this.orbit.target.z = w.eye.z;
     this.orbit.radius = this.orbit.limits.radius[0];
@@ -2004,7 +2012,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   cameraInfo(): { fov: number; radius: readonly [number, number]; beta: readonly [number, number] } {
-    return { fov: LENS.fov, radius: this.orbit.limits.radius, beta: BETA_LIMITS };
+    return { fov: this.camera.fov, radius: this.orbit.limits.radius, beta: BETA_LIMITS };
   }
 
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
@@ -2217,7 +2225,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // A big world's land reaches further: its far plane too (the preset's, `OpenWorldQuality.far`: its far LOD's
     // houses to 650 m, the hills beyond). (The play camera's: the town view moves it out from there, `applyTownCamera`.)
     const far = (this.playFar = world.meta?.world?.size === 'big' ? this.quality.openWorld.far : LENS.far);
-    if (this.townBlendDrawn === 0 && this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
+    if (this.townBlendDrawn === 0 && this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, ...(this.walk && WALK_LENS), far });
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
     const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     this.roam.setFocus(viewIndex >= 0 ? viewIndex : null);
@@ -2232,7 +2240,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (The chunks the camera will see once it's turned to frame the lot, `buildSims`: those it looks at now would
       // stream in again behind the turn, the first frames of play.)
       const alpha = this.framingAlpha(world) ?? o.alpha;
-      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
+      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha, fovH: 2 * Math.atan(Math.tan(this.camera.fov / 2) * aspect) }, performance.now(), () => null, () => false);
       this.street.setChunks(this.roam.chunks);
     } else this.street.setChunks(null);
     this.viewOnRoads(this.orbit.target.x, this.orbit.target.z);
@@ -3142,7 +3150,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.findDarkRooms(frame);
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms, this.orbit.target.x, this.orbit.target.z); // (lamps and glows fading, which cast shadows, `lamps.ts`.)
     this.swingDoors(playbackRate(curr, h));
-    if (this.walk) this.steerWalk();
+    if (this.walk) this.steerWalk(this.frameDt / 1000);
     else {
       this.steerCamera(this.frameDt / 1000);
       this.settleTarget(this.frameDt / 1000);

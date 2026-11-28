@@ -27,8 +27,8 @@ export type Command =
   /** Curtains drawn shut or opened (sim-core `curtains.rs`): at once, nobody walks over. */
   | { type: 'drawCurtains'; object: number; shut: boolean }
   | { type: 'moveTo'; sim: number; x: number; z: number }
-  /** Walk mode: drop everything and walk to (x, z) now (`game/walk.ts`). */
-  | { type: 'steer'; sim: number; x: number; z: number }
+  /** Walk mode: drop everything and walk (`run`: run) to (x, z) now (`game/walk.ts`). */
+  | { type: 'steer'; sim: number; x: number; z: number; run?: boolean }
   /** Walk mode: while `on`, the resident chooses nothing on their own. */
   | { type: 'hold'; sim: number; on: boolean }
   | { type: 'social'; sim: number; target: number; social: number }

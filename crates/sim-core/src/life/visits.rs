@@ -602,18 +602,21 @@ pub(crate) type Knock = ((i32, i32), [f32; 2], f32);
 /// the door, at home, awake, and not busy with something the player asked for or a conversation.
 fn door_host(w: &World, plot: u32, guest: usize) -> Option<usize> {
     let door = w.plots[plot as usize].doorstep();
+    // (Not one the player walks: sent, they'd never come, and the guest wait on.)
     let free = |s: &crate::world::Sim| {
-        s.current.as_ref().is_none_or(|a| {
-            !a.task.directed
-                && !matches!(a.phase, Phase::Conversing { .. })
-                && !matches!(
-                    a.task.kind,
-                    TaskKind::Work
-                        | TaskKind::GoHome
-                        | TaskKind::Visit { .. }
-                        | TaskKind::Answer { .. }
-                )
-        }) && !s.queue.front().is_some_and(|t| t.directed)
+        !s.steered
+            && s.current.as_ref().is_none_or(|a| {
+                !a.task.directed
+                    && !matches!(a.phase, Phase::Conversing { .. })
+                    && !matches!(
+                        a.task.kind,
+                        TaskKind::Work
+                            | TaskKind::GoHome
+                            | TaskKind::Visit { .. }
+                            | TaskKind::Answer { .. }
+                    )
+            })
+            && !s.queue.front().is_some_and(|t| t.directed)
     };
     door_people(w, plot, guest)
         .filter(|&(_, s)| s.engaged_with.is_none() && free(s))

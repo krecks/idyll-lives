@@ -32,7 +32,7 @@ import { settings as liveSettings, type Settings } from '../settings/settings.sv
 import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
-import { WALK_KEYS, WalkMode, whereIs } from './walk';
+import { WALK_KEYS, WalkMode, wallOnLine, whereIs } from './walk';
 import { saveDebugReport } from '../ui/debugReport';
 import { lotInSentence, plotInfo } from '../ui/place';
 import { chosenOf } from '../ui/town/chosen';
@@ -609,7 +609,8 @@ async function openSession(
     // Time stands still in Build and Create.
     if (game.mode !== 'live') return;
     slowedFrom = null;
-    to = Math.max(0, Math.min(SUPER_SPEED, to));
+    // (Walking: no faster than real time.)
+    to = Math.max(0, Math.min(game.walking !== null ? 1 : SUPER_SPEED, to));
     // (The player's speed, also under a hold.)
     const was = speed.chosen;
     // (Under a menu: the speed it gives back.)
@@ -626,6 +627,8 @@ async function openSession(
     },
     selectSim(id) {
       if (!playerSims().includes(id)) return;
+      // (Walking stays with the one walked: commands go to `game.selected`, so another selected lets go first.)
+      if (id !== game.walking) controls.exitWalk();
       game.selected = id;
       game.socialMenu = null;
       if (liveSettings.directControl === 'always') controls.inspect(id);
@@ -635,7 +638,11 @@ async function openSession(
       game.socialMenu = null;
       // Their details and relationships come with UI updates while the panel is open.
       bridge.inspect(id);
-      if (id !== null && playerSims().includes(id)) game.selected = id;
+      if (id !== null && playerSims().includes(id)) {
+        // (As in `selectSim`: never another one selected under walk mode.)
+        if (id !== game.walking) controls.exitWalk();
+        game.selected = id;
+      }
       renderer.setSelectedSim(id);
       if (id === null && game.follow !== null) controls.follow(null);
     },
@@ -1286,6 +1293,8 @@ async function openSession(
   const ideas = ideaToasts(() => revealed && game.mode === 'live');
   bridge.onError((message) => {
     if (disposed) return;
+    // (Walking: most likely a steer refused, not sent again until the keys or the way change.)
+    if (game.walking !== null) walk.refused();
     toast(message);
     if (game.mode === 'build') play('error');
   });
@@ -1771,10 +1780,11 @@ async function openSession(
     return best;
   };
 
-  const openMenu = (objectId: number, x: number, y: number) => {
+  /** An object's pie menu; whether it opened (nothing to do with it: not). */
+  const openMenu = (objectId: number, x: number, y: number): boolean => {
     const placement = world?.objects.find((o) => o.id === objectId);
     const def = placement && content.object(placement.def);
-    if (!placement || !def) return;
+    if (!placement || !def) return false;
     // Uses the resident's age isn't for are greyed out (the kids' things for a grown-up, wine for a child).
     const stage = game.sims.find((s) => s.id === game.selected)?.stage;
     // Paid interactions show their price; the pie menu greys them out when funds run short.
@@ -1824,16 +1834,17 @@ async function openSession(
     // Curtains (content `overWindow`): drawn or opened (`PieMenu`'s -2).
     if (def.overWindow) items.unshift({ label: bridge.curtainShut(objectId) ? 'Open the curtains' : 'Draw the curtains', index: -2 });
     // Upgrades are bought in the catalog, not from here.
-    if (items.length === 0) return;
+    if (items.length === 0) return false;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
     play('menu');
+    return true;
   };
 
   /** Food or a dish: eat a serving, or clear it away (to the sink). */
-  const openItemMenu = (itemId: number, x: number, y: number) => {
+  const openItemMenu = (itemId: number, x: number, y: number): boolean => {
     const it = bridge.item(itemId);
     const def = it && content.item(it.def);
-    if (!it || !def) return;
+    if (!it || !def) return false;
     const edible = it.state === 'fresh' && it.servings > 0;
     const servings = it.servings > 1 ? ` (${it.servings} servings)` : '';
     const items = [
@@ -1842,6 +1853,7 @@ async function openSession(
     ];
     game.menu = { objectId: -1, itemId, title: `${def.label}${it.state === 'spoiled' ? ' (gone off)' : servings}`, x, y, items };
     play('menu');
+    return true;
   };
 
   const openSocialMenu = (actor: number, sim: number, x: number, y: number) => {
@@ -1866,35 +1878,58 @@ async function openSession(
     bridge,
     renderer,
     fits: inLot,
-    busy: () => !!(game.menu || game.socialMenu || game.pauseMenu || game.talkWith !== null),
+    busy: () => !!(game.menu || game.socialMenu || game.pauseMenu || game.talkWith !== null || game.townOpen || game.plannerOpen || game.jobBoardOpen || app.overlay !== null),
+    gone: () => game.walking === null || !playerSims().includes(game.walking),
+    // (In a car or at work: the camera goes with them, and walk mode takes up again once they're back.)
+    away: (on) => controls.follow(on ? game.walking : null),
     lost() {
       controls.exitWalk();
       toast('Walk mode ended: they left.');
     },
-    // F, within reach: whoever stands in front (their socials and Talk…), else the thing in the middle of the view (its uses).
+    // F, within reach and with no wall between: whoever is under the crosshair, else the thing there (its uses), else whoever stands in front.
     useAt(x, y) {
-      const me = game.walking !== null ? whereIs(bridge, game.walking) : null;
-      if (!me || game.walking === null) return;
-      const near = (px: number, pz: number) => pmath.hypot(px - me.x, pz - me.z) <= ARM;
-      const sim = walk.facing(REACH);
-      if (sim !== null) return openSocialMenu(game.walking, sim, x, y);
+      const walker = game.walking;
+      const me = walker !== null ? whereIs(bridge, walker) : null;
+      if (!me || walker === null) return;
+      const walled = (tx: number, tz: number) => wallOnLine(me.x, me.z, tx, tz, (ax, az, bx, bz) => buildBuy.wallAcross(ax, az, bx, bz));
+      const talk = (sim: number, at: { x: number; z: number }) => (walled(at.x, at.z) ? toast('Out of reach.', 1500) : openSocialMenu(walker, sim, x, y));
+      const use = (tx: number, tz: number, open: () => boolean) => {
+        if (walled(tx, tz)) toast('Out of reach.', 1500);
+        else if (!open()) toast('Nothing to do with that here.', 1500);
+      };
+      const aimed = simAt(x, y);
+      const them = aimed !== null && aimed !== walker ? whereIs(bridge, aimed) : null;
+      let far = !!them && pmath.hypot(them.x - me.x, them.z - me.z) > REACH;
+      if (aimed !== null && them && !far) return talk(aimed, them);
       const hit = renderer.pick(x, y);
       const item = hit.itemId != null ? bridge.item(hit.itemId) : undefined;
-      if (item && near(item.x, item.z)) return openItemMenu(item.id, x, y);
+      if (item) {
+        if (pmath.hypot(item.x - me.x, item.z - me.z) <= ARM) return use(item.x, item.z, () => openItemMenu(item.id, x, y));
+        far = true;
+      }
       const placement = hit.objectId !== null ? world?.objects.find((o) => o.id === hit.objectId) : undefined;
       if (placement) {
         // (The nearest point of its footprint: a sofa or a bed is reached from any side of it.)
         const [w, d] = placedSize(content, placement);
-        if (distanceToRect(me.x, me.z, placement.x, placement.z, w, d) <= ARM) return openMenu(placement.id, x, y);
+        if (distanceToRect(me.x, me.z, placement.x, placement.z, w, d) <= ARM) {
+          const px = Math.max(placement.x, Math.min(placement.x + w - 0.01, me.x));
+          const pz = Math.max(placement.z, Math.min(placement.z + d - 0.01, me.z));
+          return use(px, pz, () => openMenu(placement.id, x, y));
+        }
+        far = true;
       }
-      toast('Nothing to use here.', 1500);
+      const sim = walk.facing(REACH);
+      const at = sim !== null ? whereIs(bridge, sim) : null;
+      if (sim !== null && at) return talk(sim, at);
+      toast(far ? 'Too far: step closer.' : 'Nothing to use here.', 1500);
     },
   });
 
   let pointer: PointerInput | null = null;
   const attachPointer = () => new PointerInput(canvas, {
     click(x, y) {
-      if (game.pauseMenu) return;
+      // (Walk mode: F uses things, a drag looks round.)
+      if (game.pauseMenu || game.walking !== null) return;
       game.menu = null;
       game.socialMenu = null;
       game.townOpen = false;

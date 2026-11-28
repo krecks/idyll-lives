@@ -772,6 +772,7 @@ fn steering_drops_what_they_were_doing_and_walks_there() {
         sim: 0,
         x: 2.5,
         z: 5.5,
+        run: false,
     })
     .unwrap();
     assert_eq!(w.sims[0].queue.len(), 1, "the steer replaces the queue");
@@ -783,7 +784,8 @@ fn steering_drops_what_they_were_doing_and_walks_there() {
         w.apply(Command::Steer {
             sim: 0,
             x: 40.5,
-            z: 2.5
+            z: 2.5,
+            run: false,
         })
         .is_err()
     );
@@ -798,6 +800,7 @@ fn a_steer_is_refused_while_bound_for_a_car() {
         sim: 0,
         x: 2.5,
         z: 5.5,
+        run: false,
     };
     assert!(w.apply(steer.clone()).is_err(), "steered out of a car");
     w.sims[0].bound_for_car = None;
@@ -810,6 +813,14 @@ fn a_held_resident_chooses_nothing_until_let_go() {
     w.sims[0].needs[0] = 0.05;
     w.apply(Command::Hold { sim: 0, on: true }).unwrap();
     let at = w.sims[0].pos;
+    // (Something the game asks of them, not the player: a call home, a routine's next step.)
+    let asked = Task {
+        kind: TaskKind::GoHome,
+        directed: false,
+        routine: false,
+    };
+    w.sims[0].queue.push_back(asked);
+    w.sims[0].follow_up = Some(asked);
     for _ in 0..crate::mins(60.0) {
         w.tick_once();
     }
@@ -825,6 +836,51 @@ fn a_held_resident_chooses_nothing_until_let_go() {
 }
 
 #[test]
+fn a_steered_run_goes_twice_as_far() {
+    let walked = |run| {
+        let mut w = world();
+        w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+        w.sims[0].pos = [0.5, 11.5];
+        w.apply(Command::Steer {
+            sim: 0,
+            x: 5.5,
+            z: 11.5,
+            run,
+        })
+        .unwrap();
+        run_ticks(&mut w, crate::secs(1.5));
+        w.sims[0].pos[0] - 0.5
+    };
+    let (walk, run) = (walked(false), walked(true));
+    assert!(
+        walk > 1.0 && (run / walk - RUN_FACTOR).abs() < 0.15,
+        "walked {walk}, ran {run}"
+    );
+}
+
+#[test]
+fn steering_over_a_plot_edge_goes_straight_not_round_by_the_street() {
+    let town = r#"{"width":28,"depth":14,
+        "plots":[{"name":"West","x":0,"z":0,"w":14,"d":10,"entry":[7.5,9.5]},{"name":"East","x":14,"z":0,"w":14,"d":10,"entry":[21.5,9.5]}],
+        "households":[{"name":"Home","plot":0,"player":true},{"name":"Neighbour","plot":1}],
+        "sims":[{"name":"Ada","household":0,"x":12.5,"z":4.5},{"name":"Cy","household":1,"x":21.5,"z":1.5}]}"#;
+    let mut w = World::from_json(CONTENT, town, 7).unwrap();
+    w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+    w.apply(Command::Steer {
+        sim: 0,
+        x: 15.5,
+        z: 4.5,
+        run: false,
+    })
+    .unwrap();
+    for _ in 0..crate::mins(10.0) {
+        w.tick_once();
+        assert_eq!(w.sims[0].tile().1, 4, "off the straight line");
+    }
+    assert_eq!(w.sims[0].tile(), (15, 4), "into the neighbours' garden");
+}
+
+#[test]
 fn steering_into_a_wall_stops_at_it_rather_than_going_round() {
     let mut w = world();
     w.apply(Command::Hold { sim: 0, on: true }).unwrap();
@@ -834,6 +890,7 @@ fn steering_into_a_wall_stops_at_it_rather_than_going_round() {
         sim: 0,
         x: 6.7,
         z: 3.5,
+        run: false,
     })
     .unwrap();
     for _ in 0..crate::mins(10.0) {
@@ -844,7 +901,8 @@ fn steering_into_a_wall_stops_at_it_rather_than_going_round() {
         w.apply(Command::Steer {
             sim: 99,
             x: 1.5,
-            z: 1.5
+            z: 1.5,
+            run: false,
         })
         .is_err()
     );

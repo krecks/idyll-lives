@@ -356,7 +356,8 @@ pub(super) fn leisure_leaving(w: &mut World) {
             } else {
                 sim.here() && sim.away_until.is_none()
             };
-            if leave.is_some_and(|l| tick >= l) && !off && ready {
+            // (Walked by the player: out to it once let go, or it goes without them.)
+            if leave.is_some_and(|l| tick >= l) && !off && ready && !sim.steered {
                 go.push((i, place, r.directed, r.home));
             }
         }

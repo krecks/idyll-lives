@@ -159,6 +159,9 @@ pub enum Command {
         sim: u32,
         x: f32,
         z: f32,
+        /// Running (Shift held), `RUN_FACTOR` times as fast.
+        #[serde(default)]
+        run: bool,
     },
     /// Walk mode: while `on`, the resident chooses nothing on their own (`Sim::steered`).
     Hold {

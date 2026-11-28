@@ -41,11 +41,11 @@ export const STALL = 0.5;
  * a step covers metres; cutting corners of their path is the price): metres walked per tick
  * (`world::WALK_SPEED`: `doors.ts` `PACE` over the layout's `ticksPerSecond`), the fastest
  * walkers' trait, perk and emotion factors (1.15 x 1.2 x 1.08, angry or energised, in the base
- * game: 1.49) and some slack (packs' quicker walkers too). Further than that, or not walking in
- * both, is a jump.
+ * game: 1.49) and some slack (packs' quicker walkers too), times walk mode's run (sim-core `RUN_FACTOR`, 2:
+ * a resident run with Shift glides too). Further than that, or not walking in both, is a jump.
  */
 export const WALK_FASTEST = 1.5;
-export const WALK_SLACK = 1.2;
+export const WALK_SLACK = 1.2 * 2;
 /**
  * The walk, jog and run cycles play matched to the ground speed, up to this many times their own pace
  * (faster, they would only flicker; the feet slide instead). A walker who would need the walk faster

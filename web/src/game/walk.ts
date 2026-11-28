@@ -1,8 +1,8 @@
 /**
  * Walk mode: the player walks as one of their household, seen from their own eyes. W/S go forward
  * and back, A/D turn, Q/E step sideways (World of Warcraft's keys), a drag looks round, F uses what's
- * in the middle of the view or talks to whoever is there. The resident chooses nothing on their own
- * meanwhile (sim-core `Command::Hold`); each move is a `steer` to a point just ahead of them.
+ * in the middle of the view or talks to whoever is there, Shift runs. The resident chooses nothing on
+ * their own meanwhile (sim-core `Command::Hold`); each move is a `steer` to a point just ahead of them.
  */
 
 import type { SimBridge } from '../core/bridge';
@@ -55,14 +55,36 @@ export function inFront(me: { x: number; z: number }, heading: number, x: number
   return d <= reach && (d < 0.3 || (dx * pmath.cos(heading) + dz * pmath.sin(heading)) / d >= pmath.cos(Math.PI / 6));
 }
 
+/**
+ * Whether a wall stands across the way from (`ax`, `az`) to (`bx`, `bz`) (tiles), by `wallBetween` of each pair
+ * of neighbouring tiles it passes; a diagonal step is blocked only when both ways round it are.
+ */
+export function wallOnLine(ax: number, az: number, bx: number, bz: number, wallBetween: (ax: number, az: number, bx: number, bz: number) => boolean): boolean {
+  const steps = Math.ceil(pmath.hypot(bx - ax, bz - az) / 0.1);
+  let [px, pz] = [Math.floor(ax), Math.floor(az)];
+  for (let i = 1; i <= steps; i++) {
+    const [cx, cz] = [Math.floor(ax + ((bx - ax) * i) / steps), Math.floor(az + ((bz - az) * i) / steps)];
+    if (cx === px && cz === pz) continue;
+    if (cx !== px && cz !== pz) {
+      if ((wallBetween(px, pz, cx, pz) || wallBetween(cx, pz, cx, cz)) && (wallBetween(px, pz, px, cz) || wallBetween(px, cz, cx, cz))) return true;
+    } else if (wallBetween(px, pz, cx, cz)) return true;
+    [px, pz] = [cx, cz];
+  }
+  return false;
+}
+
 interface WalkDeps {
   bridge: SimBridge;
   renderer: Renderer;
   /** F: use or talk to what's at this point of the screen (CSS px). */
   useAt(x: number, y: number): void;
-  /** The resident is gone from the lot (to work, away): walk mode ends. */
+  /** The resident is gone for good (moved out, no longer the player's): walk mode ends. */
   lost(): void;
-  /** Keys go to a text box or a menu instead (the chat, a pie menu). */
+  /** Whether they are gone for good; else, off the map (in a car, at work), walk mode waits for them back. */
+  gone(): boolean;
+  /** They left the map (`on`, the camera follows them) or came back. */
+  away(on: boolean): void;
+  /** Keys go to a text box or a menu instead (the chat, a pie menu, a dialog): held keys wait, they don't steer. */
   busy(): boolean;
   /** A point a steer may aim at (on the lot: one off it is refused). */
   fits(x: number, z: number): boolean;
@@ -75,6 +97,12 @@ export class WalkMode {
   private readonly held = new Set<WalkKey>();
   private lastSteer = 0;
   private lastDir: [number, number] | null = null;
+  private run = false;
+  private lastRun = false;
+  /** A steer the simulation refused (`refused`): not sent again until the keys or the way change. */
+  private blocked: { keys: string; dir: [number, number] } | null = null;
+  /** Off the map (in a car, at work): the camera follows them until they're back. */
+  private away = false;
   private frame = 0;
   private last = 0;
   private drag: { x: number; y: number } | null = null;
@@ -87,17 +115,18 @@ export class WalkMode {
     const me = whereIs(this.deps.bridge, sim);
     if (!me) return;
     this.sim = sim;
-    this.deps.bridge.send({ type: 'hold', sim, on: true });
-    this.heading = this.deps.renderer.setWalkView(me.row);
     this.pitch = 0;
-    this.deps.renderer.setWalkLook(this.heading, this.pitch);
+    this.view(sim, me.row);
     const on = <K extends keyof WindowEventMap>(t: EventTarget, type: K, f: (e: WindowEventMap[K]) => void) => {
       t.addEventListener(type, f as EventListener);
       this.off.push(() => t.removeEventListener(type, f as EventListener));
     };
     on(window, 'keydown', (e) => this.key(e, true));
     on(window, 'keyup', (e) => this.key(e, false));
-    on(window, 'blur', () => this.held.clear());
+    on(window, 'blur', () => {
+      this.held.clear();
+      this.run = false;
+    });
     on(canvas, 'pointerdown', (e) => (this.drag = { x: e.clientX, y: e.clientY }));
     on(window, 'pointerup', () => (this.drag = null));
     on(window, 'pointermove', (e) => {
@@ -119,6 +148,9 @@ export class WalkMode {
     for (const f of this.off.splice(0)) f();
     this.held.clear();
     this.drag = null;
+    this.run = false;
+    this.blocked = null;
+    this.away = false;
     if (this.lastDir) this.stop(sim);
     this.lastDir = null;
     this.deps.renderer.setWalkView(null);
@@ -144,6 +176,22 @@ export class WalkMode {
     return best;
   }
 
+  /** The simulation refused the last steer (sheltering, in a car): no more of it until the keys or the way change. */
+  refused(): void {
+    if (this.lastDir) this.blocked = { keys: this.keys(), dir: this.lastDir };
+  }
+
+  private keys(): string {
+    return [...this.held].sort().join('') + (this.run ? '+' : '');
+  }
+
+  /** Into their eyes (as walk mode starts, and back from away): held again, the view theirs. */
+  private view(sim: number, row: number): void {
+    this.deps.bridge.send({ type: 'hold', sim, on: true });
+    this.heading = this.deps.renderer.setWalkView(row);
+    this.deps.renderer.setWalkLook(this.heading, this.pitch);
+  }
+
   private stop(sim: number): void {
     const me = whereIs(this.deps.bridge, sim);
     if (me) this.deps.bridge.send({ type: 'steer', sim, x: me.x, z: me.z });
@@ -151,6 +199,8 @@ export class WalkMode {
 
   private key(e: KeyboardEvent, down: boolean): void {
     const k = e.key.toLowerCase();
+    // (Shift itself, or any key with it: running is whether it's down now.)
+    this.run = e.shiftKey;
     if (down && (e.repeat || e.ctrlKey || e.metaKey || e.altKey)) return;
     if (down && this.deps.busy()) return;
     // (Typed into a text box: words, not steps.)
@@ -172,26 +222,44 @@ export class WalkMode {
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     const me = whereIs(this.deps.bridge, sim);
-    if (!me) return this.deps.lost();
-    // (A menu or the chat open: keys held when it opened walk no further.)
-    if (this.deps.busy()) this.held.clear();
-    const { dir, turn } = moveDir(this.held, this.heading);
+    if (!me) {
+      if (this.deps.gone()) return this.deps.lost();
+      if (!this.away) {
+        this.away = true;
+        this.lastDir = null;
+        this.blocked = null;
+        this.deps.renderer.setWalkView(null);
+        this.deps.away(true);
+      }
+      return;
+    }
+    if (this.away) {
+      this.away = false;
+      this.deps.away(false);
+      this.view(sim, me.row);
+    }
+    // (A menu, the chat or a dialog open: held keys wait, and walk again once it's closed if still down.)
+    const { dir, turn } = this.deps.busy() ? { dir: null, turn: 0 } : moveDir(this.held, this.heading);
     if (turn) {
       this.heading -= turn * TURN * dt;
       this.deps.renderer.setWalkLook(this.heading, this.pitch);
     }
     if (!dir) {
-      if (this.lastDir) this.stop(sim);
+      if (this.lastDir && !this.blocked) this.stop(sim);
       this.lastDir = null;
+      this.blocked = null;
       return;
     }
     // (Turning while walking bends the way a little each frame: a new steer only once it's bent ~8°.)
-    const changed = !this.lastDir || this.lastDir[0] * dir[0] + this.lastDir[1] * dir[1] < 0.99;
-    if (!changed && now - this.lastSteer < STEER_MS) return;
+    const bent = (a: [number, number] | null) => !a || a[0] * dir[0] + a[1] * dir[1] < 0.99;
+    if (this.blocked && this.blocked.keys === this.keys() && !bent(this.blocked.dir)) return;
+    this.blocked = null;
+    if (!bent(this.lastDir) && this.run === this.lastRun && now - this.lastSteer < STEER_MS) return;
     const [x, z] = [me.x + dir[0] * AHEAD, me.z + dir[1] * AHEAD];
     if (!this.deps.fits(x, z)) return;
     this.lastSteer = now;
     this.lastDir = dir;
-    this.deps.bridge.send({ type: 'steer', sim, x, z });
+    this.lastRun = this.run;
+    this.deps.bridge.send({ type: 'steer', sim, x, z, run: this.run });
   };
 }

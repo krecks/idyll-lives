@@ -157,6 +157,43 @@ fn residents_climb_the_stairs_to_use_things_upstairs() {
     );
 }
 
+/// Walk mode: steers `dir` 1.2 tiles ahead of them every 150 ms, for `secs` seconds.
+fn hold_key(w: &mut World, dir: [f32; 2], secs: u32) {
+    for _ in 0..secs * 1000 / 150 {
+        let [x, z] = w.sims[0].pos;
+        let (x, z) = (x + dir[0] * 1.2, z + dir[1] * 1.2);
+        w.apply(Command::Steer {
+            sim: 0,
+            x,
+            z,
+            run: false,
+        })
+        .unwrap();
+        for _ in 0..sim_core::secs(0.15) {
+            w.tick_once();
+        }
+    }
+}
+
+#[test]
+fn holding_a_key_walks_up_the_stairs_and_back_down() {
+    // The flight climbs -z from its foot (9, 7) to its top (9, 3); the landing is over (9, 2).
+    let mut w = house();
+    w.apply(Command::Hold { sim: 0, on: true }).unwrap();
+    w.sims[0].pos = [9.5, 7.5];
+    // (A little off the stair's line: they keep on it.)
+    hold_key(&mut w, [0.15, -1.0], 20);
+    let [x, z] = w.sims[0].pos;
+    assert_eq!(w.storey_of(z as i32), 1, "up: {x}, {z}");
+    hold_key(&mut w, [0.0, 1.0], 20);
+    let [x, z] = w.sims[0].pos;
+    assert_eq!(w.storey_of(z as i32), 0, "down: {x}, {z}");
+    // Walked into the room's back left corner at a slant, they slide along the walls into it.
+    hold_key(&mut w, [-1.0, -0.7], 20);
+    let [x, z] = w.sims[0].pos;
+    assert!(x < 4.6 && z < 2.6, "slid into the corner: {x}, {z}");
+}
+
 #[test]
 fn a_spiral_winds_up_a_square_of_tiles_and_comes_up_a_side_of_it() {
     let mut w = world(2);

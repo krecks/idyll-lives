@@ -173,6 +173,8 @@ impl World {
                     && s.visiting.is_none()
                     && s.adult(content)
                     && self.plot_at(x, z) == Some(plot)
+                    // (Not one the player walks: stopped each tick for a care never started.)
+                    && !s.steered
             })
             .collect();
         // Nothing to do if someone's already doing the crib's care (or on their way to).

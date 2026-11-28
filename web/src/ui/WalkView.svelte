@@ -46,7 +46,7 @@
 {#if game.walking !== null && game.mode === 'live'}
   <div class="cross" aria-hidden="true"></div>
   {#if game.talkWith === null}
-    <p class="keys glass">W/S walk · A/D turn · Q/E step aside · drag to look · F use or talk · Esc leave</p>
+    <p class="keys glass">W/S walk (W also stops what they're doing) · Shift run · A/D turn · Q/E step aside · drag to look · F use or talk · Esc leave</p>
   {/if}
 {/if}
 

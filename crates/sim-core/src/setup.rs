@@ -218,7 +218,9 @@ pub(crate) fn room_for(w: &World, h: u32, object: usize) -> bool {
 /// need that's run low).
 fn free(content: &Content, w: &World, s: &Sim, plot: u32) -> bool {
     let (x, z) = s.tile();
-    s.here()
+    // (Not one the player walks: sent, they'd never come.)
+    !s.steered
+        && s.here()
         && s.away_until.is_none()
         && s.visiting.is_none()
         && s.transition.is_none()

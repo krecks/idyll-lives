@@ -193,6 +193,11 @@ pub(crate) fn walk_route(
     goal: (i32, i32),
     target: [f32; 2],
 ) -> Option<Vec<[f32; 2]>> {
+    // (Walk mode: where the player steers in a straight line, through a gate or over a plot's
+    // edge, they go straight there, not round by the street.)
+    if sim.steered && ctx.nav.line_walkable(sim.pos, target) {
+        return Some(vec![target]);
+    }
     let grounds = grounds(
         ctx.tile_plot,
         ctx.halls,
@@ -357,7 +362,12 @@ pub(crate) fn progress(
 ) {
     let content = ctx.content;
     // (Before `current` is borrowed: how fast they walk, `walk_speed`.)
-    let walk = sim.walk_speed(content) * crate::ride::speed(content, sim, objects);
+    let run = if sim.steered && sim.running {
+        RUN_FACTOR
+    } else {
+        1.0
+    };
+    let walk = sim.walk_speed(content) * crate::ride::speed(content, sim, objects) * run;
     // (And how far they reach, on foot or on a bike, for the cars they keep clear of.)
     let body = crate::cars::Body::of(sim, content, objects, 0.0);
     let minutes = MINUTES_PER_TICK * ticks as f32;
