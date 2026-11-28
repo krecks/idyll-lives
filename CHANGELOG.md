@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Taxi bays:** an empty house's taxi bay moves with its door, so the kerbside furniture keeps clear of the right spot. Editing a road or a driveway while paused no longer slows every update after it. A taxi pulled over for another car goes back into its lane as other cars do; only one parked in its bay eases out.
+
 ## 0.9.0 — 2026-11-27
 
 - **Walk mode:** walk as the selected resident in first person: W/S walk, A/D turn, Q/E step aside, drag to look. F uses the thing in front of you, or on a person opens the socials and a typed "Talk…" chat the LLM answers. The resident's own free will waits while you walk.

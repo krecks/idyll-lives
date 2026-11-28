@@ -207,7 +207,7 @@ pub(crate) const PULL_AHEAD: f32 = 16.0;
 /// How near the furniture (or a country road's edge) a car pulled over comes (m), and how far
 /// right of its lane it pulls over at most (m).
 const PULL_EDGE: f32 = 0.1;
-const PULL_MOST: f32 = 0.7;
+pub(crate) const PULL_MOST: f32 = 0.7;
 /// Turning radius at the driveway's mouth (m).
 const TURN: f32 = 2.4;
 /// How far past the town's exit a car drives before it's gone (m).

@@ -258,6 +258,8 @@ impl Game {
     /// everything); with `lot`, the lot's walls, openings, diagonals, fences and floors too
     /// (never the rooms: `rooms`). See `sim_core::view::StructureSync`.
     pub fn structure_update(&mut self, lot: bool) -> String {
+        // (The taxi bays found here once an edit's made, not on every update while paused.)
+        sim_core::taxi::warm_kerbs(&mut self.world);
         self.structure.update_json(&self.world, lot)
     }
 
