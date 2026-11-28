@@ -67,22 +67,19 @@ impl Kerbs {
     }
 }
 
-/// Finds the stand (`stop_for`) of every household's house not yet found (every plot's again
-/// when the driveways or the network have changed since, `kerb_stamp`).
-pub(super) fn warm_kerbs(w: &mut World) {
+/// Finds the stand (`stop_for`) of every plot whose door moved since (every plot's again when the
+/// driveways or the network have changed since, `kerb_stamp`): every plot's, as `Kerbs::find`, so
+/// a house nobody lives in has its bay by its door too. The structure update asks for it as well,
+/// so an edit finds them once, not on every update until the next taxi plan.
+pub fn warm_kerbs(w: &mut World) {
     let stamp = kerb_stamp(w);
     if w.taxis.kerbs.stamp != stamp {
         w.taxis.kerbs = Kerbs::find(w, stamp);
     }
-    let mut moved = false;
-    for h in 0..w.households.len() {
-        let Some(plot) = w.households[h].plot else {
-            continue;
-        };
-        let Some(door) = w.plots.get(plot as usize).map(|p| p.arrival_point()) else {
-            continue;
-        };
-        let door = door.map(f32::to_bits);
+    let mut moved = w.taxis.kerbs.plots.len() > w.plots.len();
+    w.taxis.kerbs.plots.truncate(w.plots.len());
+    for plot in 0..w.plots.len() as u32 {
+        let door = w.plots[plot as usize].arrival_point().map(f32::to_bits);
         let kerbs = &w.taxis.kerbs;
         if kerbs
             .plots
