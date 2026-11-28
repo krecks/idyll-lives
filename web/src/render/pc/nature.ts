@@ -50,7 +50,7 @@ import { padGeometry, padMask, padsOf } from '../shared/pads';
 import { LAND_CELL, type Land, type LandRect } from '../../game/land';
 import { toLinear } from '../shared/math';
 import { computeNormals, sphereData } from '../shared/modelParts';
-import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnInputs, lawnLayer, lawnMask, sameLawnInputs, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnInputs, type LawnLayer, type LawnMask, type LawnPlacement, type Woods } from '../shared/nature';
+import { GROUND_TILE, groupInstances, hideLawn, keepBareTiles, LandscapeLayout, lawnChanges, lawnLayer, lawnMask, SPLIT_TRIANGLES, WIND, WIND_KIND, windSwayAt, type LawnLayer, type LawnMask, type LawnPlacement, type Woods } from '../shared/nature';
 import { smoothstep } from '../../game/noise';
 import type { OpenWorldQuality } from '../quality';
 import type { BenchDiag } from '../../debug/benchFlags';
@@ -112,8 +112,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private lawn: LawnLayer<Instances>[] = [];
   /** The lawn's grass (built with the rest; none before). */
   private grass: Grass | null = null;
-  /** What the lawn was last fitted to (`refreshLawn`). */
-  private lawnInputs: LawnInputs | null = null;
+  /** The world the lawn was last fitted to (`refreshLawn`). */
+  private lawnWorld: WorldStructure | null = null;
   /** What `refreshLawn` last hid, for the lawn built again since (`rebuild`). */
   private lawnMask: LawnMask | null = null;
   /** Each model's plants as built, to build again when a file they were built without comes (`rebuild`). */
@@ -190,7 +190,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const pads = this.surface ? perfTime('nature: pads', () => this.padDraws(app, parent, grounds)) : { slabs: [], edges: [] };
     draws.push(...pads.slabs, ...pads.edges);
     this.grounds = grounds;
-    this.pads = pads;
     if (this.seaSheet) draws.push((this.sheet = perfTime('nature: water', () => this.water(app, parent))));
     // (A height field's water above the sea's level: its own, tile by tile.)
     if (this.heightField) for (let k = 0; k < this.tiles.length; k++) draws.push(...this.pond(k));
@@ -225,9 +224,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return { positions, colors };
   }
 
-  /** The terrain's draws (a big world's tiles, else the one), the pads' and the country roads' (and what draws those), as built: what `relay` draws again. */
+  /** The terrain's draws (a big world's tiles, else the one) and the country roads' (and what draws those), as built: what `relay` draws again (the pads': `padGroups`). */
   private grounds: pc.Entity[] = [];
-  private pads: { slabs: pc.Entity[]; edges: pc.Entity[] } = { slabs: [], edges: [] };
   private roadDraws: pc.Entity[] = [];
   private roadBuilder: RoadBuilder | null = null;
 
@@ -258,7 +256,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const dirty = this.padsChanged(changed?.rect ?? null);
     const pads = perfTime('nature: pads', () => this.padDraws(app, parent, this.grounds, dirty), dirty ? `${dirty.size} tiles` : 'all');
     const old = [...pads.gone, ...this.roadDraws];
-    this.pads = pads;
     await pace?.();
     if (!this.host) {
       for (const e of pads.made) e.destroy();
@@ -350,7 +347,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.flowerSquares = [];
     for (const e of this.others) e.destroy();
     this.grounds = [];
-    this.pads = { slabs: [], edges: [] };
     this.padGroups.clear();
     this.padList = [];
     this.roadDraws = [];
@@ -400,15 +396,22 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    */
   refreshLawn(world: WorldStructure): void {
     this.world = world;
-    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to do.)
-    const inputs = perfTime('lawn: inputs', () => lawnInputs(world));
-    if (this.lawnInputs && sameLawnInputs(this.lawnInputs, inputs)) return;
-    this.lawnInputs = inputs;
-    const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world)));
+    // (A world message that changed nothing the lawn grows round, a focus lot shown: nothing to make again, but the
+    // lawn, its bare tiles and the grass all taken as made for this world, so the next change is from it, not from an
+    // older world kept and compared over more. Else made again only round what changed, all of it the first time.)
+    const was = this.lawnWorld;
+    const rects = was && perfTime('lawn: inputs', () => lawnChanges(was, world));
+    const change = was && rects ? { was, rects } : null;
+    this.lawnWorld = world;
+    if (change && !change.rects.length) {
+      this.grass?.refresh(world, this.lawnMask!, keepBareTiles(world, this.lawnMask!, change), change);
+      return;
+    }
+    const mask = (this.lawnMask = perfTime('lawn: mask', () => lawnMask(world, this.lawnMask, rects)));
     perfTime('lawn: flowers', () => hideLawn(this.lawn, mask, uploadLawn));
     // (Its bare tiles kept for the birds, who ask next.)
-    const bare = perfTime('lawn: bare tiles', () => keepBareTiles(world, inputs, mask));
-    perfTime('lawn: grass', () => this.grass?.refresh(world, mask, bare));
+    const bare = perfTime('lawn: bare tiles', () => keepBareTiles(world, mask, change));
+    perfTime('lawn: grass', () => this.grass?.refresh(world, mask, bare, change));
   }
 
   /**
@@ -777,12 +780,13 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       this.redrawTile(t, positions, colors);
     }
     this.sheetAsNeeded();
-    // (Roads or lots the land moved: the pads and the country roads drawn again on them.)
+    // (Roads or lots the land moved: the pads and the country roads drawn again on them; all the pads on a surface
+    // `takeRoads` solved again, whose blocks come one by one and only the first draws them.)
     if (this.builtMoved) {
       this.builtMoved = false;
       await pace?.();
       if (!this.host) return null;
-      perfTime('land: pads and roads', () => this.redrawBuilt());
+      perfTime('land: pads and roads', () => this.redrawBuilt(solved ? null : box));
     }
     const grass = this.grass?.grassField;
     if (grass) {
@@ -809,14 +813,20 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     map.lay(this.tiles.map((t) => t.mi));
   }
 
-  /** The pads and the country roads drawn again, whole, on the surface as it is now (the land moved them: `landDone`). */
-  private redrawBuilt(): void {
+  /**
+   * The pads and the country roads drawn again on the surface as it is now (the land moved them: `landDone`): the pads
+   * in the ground tiles over `box` (m: where the ground was shaded again, so the slabs take its colours) and those
+   * round a pad that moved (`padsChanged`), the rest kept (null: all of them); the roads whole (one draw of them all).
+   */
+  private redrawBuilt(box: [number, number, number, number] | null): void {
     if (!this.host || !this.surface) return;
     const { app, parent } = this.host;
-    const old = [...this.pads.slabs, ...this.pads.edges, ...this.roadDraws];
-    const pads = (this.pads = this.padDraws(app, parent, this.grounds));
+    const dirty = box && this.padsChanged(null);
+    if (dirty) for (const k of this.tilesIn(box)) dirty.add(k);
+    const pads = this.padDraws(app, parent, this.grounds, dirty);
+    const old = [...pads.gone, ...this.roadDraws];
     this.roadDraws = this.roadBuilder ? this.roadBuilder(this.roads, parent) : [];
-    const fresh = [...pads.slabs, ...pads.edges, ...this.roadDraws];
+    const fresh = [...pads.made, ...this.roadDraws];
     const gone = new Set(old);
     this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
     this.drawsChanged(fresh, old);
@@ -1260,7 +1270,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    * of each per ground tile.
    */
   /**
-   * The ground tiles whose pads are to be drawn again for the surface as it is now (`relay`): those within reach of
+   * The ground tiles whose pads are to be drawn again for the surface as it is now (`relay`, `landDone`): those within reach of
    * a lot whose pad came, went or moved since they were drawn, and those over `land` (land rect: where the land
    * changed). Null: all of them (none drawn yet).
    */

@@ -723,6 +723,10 @@ export interface Renderer {
   setGameShot(shot: GameShot | null, cut?: boolean): void;
   /** Keeps resident `index` (snapshot index) in the middle while the player turns and zooms; null stops. */
   followSim(index: number | null): void;
+  /** Walk mode: the camera in that resident's head, their body not drawn (null: the orbit camera). Returns the starting heading (rad, game x/z). */
+  setWalkView(index: number | null): number;
+  /** Walk mode: where the walker looks (heading in game x/z, pitch up; rad). */
+  setWalkLook(heading: number, pitch: number): void;
   /**
    * Lip sync: resident `index` (snapshot index) is saying a line with these mouth shapes, its
    * first sample heard at `startTime` (seconds on the `performance.now() / 1000` clock; the

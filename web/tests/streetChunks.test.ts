@@ -160,6 +160,45 @@ describe('the street in chunks', async () => {
     expect(all.geo.idx.length / 3 / houses).toBeLessThan(40);
   });
 
+  test('far off, a chunk kept between builds follows a house re-roofed or grown, a wall painted and the focus lot moving in it', () => {
+    const world = town(objects);
+    const street = new TownStreet(new HousePlanner(), world, options, 'game');
+    const id = chunkAt(world.plots[4].x + 10, 10);
+    const same = (w: WorldStructure, f: number) => expect(street.farChunk(id, f)!.key).toBe(new TownStreet(new HousePlanner(), w, options, 'game').farChunk(id, f)!.key);
+    const first = street.farChunk(id, NO_FOCUS)!;
+    // (Asked again with nothing changed: the one worked out, not its key strung again.)
+    expect(street.farChunk(id, NO_FOCUS)).toBe(first);
+    same(world, NO_FOCUS);
+    // The focus lot coming into the chunk, then another lot of it in focus.
+    same(world, 4);
+    same(world, 2);
+    // A house's outside painted all round.
+    const [x0, z0, x1, z1] = world.plots[4].house!;
+    const walls = [];
+    for (let x = x0; x < x1; x++) walls.push({ axis: 'h', x, z: z0, faces: [3, 0] }, { axis: 'h', x, z: z1, faces: [0, 3] });
+    for (let z = z0; z < z1; z++) walls.push({ axis: 'v', x: x0, z, faces: [3, 0] }, { axis: 'v', x: x1, z, faces: [0, 3] });
+    const painted = { ...world, walls } as unknown as WorldStructure;
+    street.setWorld(painted);
+    const after = street.farChunk(id, NO_FOCUS)!;
+    expect(after.key).not.toBe(first.key);
+    same(painted, NO_FOCUS);
+    // A house re-roofed, another a storey higher.
+    const plots = world.plots.map((p) => (p.id === 4 ? { ...p, roof: [1, 2] as [number, number] } : p.id === 2 ? { ...p, storeys: 2 } : p));
+    const next = { ...painted, plots } as WorldStructure;
+    street.setWorld(next);
+    expect(street.farChunk(id, NO_FOCUS)!.key).not.toBe(after.key);
+    same(next, NO_FOCUS);
+    same(next, 4);
+  });
+
+  test('a chunk planned again never hands back the lists of its instances it gave before (the street keeps a model’s copies while its lists are the same)', () => {
+    const street = new TownStreet(new HousePlanner(), town(objects), options, 'game');
+    for (const id of street.chunkIds()) {
+      const before = street.chunk(id, NO_FOCUS).batches;
+      for (const [k, list] of street.chunk(id, NO_FOCUS).batches) if (list.length) expect(list).not.toBe(before.get(k));
+    }
+  });
+
   test('a thing moved in a garden plans only its lot’s chunk again', () => {
     const street = new TownStreet(new HousePlanner(), town(objects), options, 'game');
     const ids = street.chunkIds();

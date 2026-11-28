@@ -379,6 +379,7 @@ pub fn cut_pocket(obj: Obj, cutter: Obj) -> Obj {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::_box;
 
     #[test]
     fn the_microwave_cavity_is_cut_as_blender_cuts_it() {

@@ -74,6 +74,22 @@ impl Lot {
         }
         out
     }
+
+    /// A fingerprint of `rooms_row_major` without building it: every tile in a room, by where it
+    /// is and which room, mixed into an FNV-like hash seeded with the size.
+    pub fn rooms_print(&self) -> u64 {
+        const PRIME: u64 = 0x0000_0100_0000_01b3;
+        let mut h = 0xcbf2_9ce4_8422_2325 ^ ((self.width as u64) << 32 | self.depth as u64);
+        for (x, z, s) in self.tiles() {
+            let room = self.rooms[s];
+            if room != OUTDOORS {
+                let at = z as u64 * self.width as u64 + x as u64;
+                h = (h ^ (at << 16 | u64::from(room))).wrapping_mul(PRIME);
+                h ^= h >> 29;
+            }
+        }
+        h
+    }
 }
 
 impl Lot {

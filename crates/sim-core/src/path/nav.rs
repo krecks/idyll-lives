@@ -504,6 +504,64 @@ impl NavGrid<'_> {
         self.line_walkable_with(a, b, None)
     }
 
+    /// Where a walker steered from `a` towards `b` gets (walk mode): straight along the line,
+    /// off a stair's top onto its landing and back down (the rest of the line carried to the
+    /// other storey), stopped short of what's in the way; or, blocked, sliding along it on
+    /// whichever of the line's two axes gets further. Never the long way round.
+    pub fn steer_to(&self, a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
+        let (end, all) = self.walk_along(a, b);
+        if all {
+            return end;
+        }
+        [[b[0], a[1]], [a[0], b[1]]]
+            .into_iter()
+            .map(|c| self.walk_along(a, c).0)
+            .fold(end, |best, p| {
+                if self.stairs.distance(a, p) > self.stairs.distance(a, best) + 1e-3 {
+                    p
+                } else {
+                    best
+                }
+            })
+    }
+
+    /// `steer_to`'s straight line: how far along it, and whether all the way.
+    fn walk_along(&self, a: [f32; 2], b: [f32; 2]) -> ([f32; 2], bool) {
+        // (Stopped this far short of a wall or a thing, so they don't walk into it.)
+        const SHORT: f32 = 0.3;
+        let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
+        let len = dx.hypot(dz).max(1e-6);
+        let steps = ((dx.abs().max(dz.abs())) / 0.1).ceil().max(1.0) as i32;
+        // (Rows the line has been carried up or down the stairs, and from how far along.)
+        let (mut shift, mut since) = (0, 0.0);
+        let at = |t: f32, shift: i32| [a[0] + dx * t, a[1] + dz * t + shift as f32];
+        let g = |z: i32| self.stairs.ground_z(z);
+        let (mut tx, mut tz) = (a[0].floor() as i32, a[1].floor() as i32);
+        for s in 1..=steps {
+            let t = s as f32 / steps as f32;
+            let p = at(t, shift);
+            let (nx, nz) = (p[0].floor() as i32, p[1].floor() as i32);
+            if (nx, nz) == (tx, tz) {
+                continue;
+            }
+            // Off the top step the way it climbs is the landing; off the landing back, the top.
+            let link = self.stairs.link(tx, tz).filter(|&(lx, lz)| {
+                lx == nx && g(lz) == g(tz) + (nz - tz) && self.tile_free(lx, lz)
+            });
+            if let Some((_, lz)) = link {
+                (shift, since) = (shift + lz - nz, t);
+                (tx, tz) = (nx, lz);
+                continue;
+            }
+            if (nx - tx).abs() > 1 || (nz - tz).abs() > 1 || !self.can_step(tx, tz, nx, nz) {
+                let back = t - 1.0 / steps as f32 - SHORT / len;
+                return (at(back.max(since), shift), false);
+            }
+            (tx, tz) = (nx, nz);
+        }
+        (at(1.0, shift), true)
+    }
+
     /// `line_walkable`, and with `grounds`, the line keeps off other people's plots, except
     /// the one either end is on (someone already in a garden walks straight out of it), and
     /// never goes straight from one plot into another (a path that had to keeps that step).

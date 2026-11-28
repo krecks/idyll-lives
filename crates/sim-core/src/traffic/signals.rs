@@ -102,8 +102,9 @@ impl Signal {
 
     /// Whether `p` is where those on foot never walk (`Travel::junction_tiles`): its box, between
     /// the kerbs out to the crosswalks (out past the box on an arm without one), and on an arm with
-    /// one, from its far side out to `KEEP_OFF` past the stop line; not on a crosswalk itself.
-    /// (Not a roundabout's.)
+    /// one, from its far side out to `KEEP_OFF` past the stop line, on one without from the box out
+    /// to `KEEP_OFF_OPEN` past it (`SignalArm::keep_off`); not on a crosswalk itself. (Not a
+    /// roundabout's.)
     pub(super) fn off_limits(&self, p: [f32; 2]) -> bool {
         if self.roundabout {
             return false;
@@ -115,7 +116,7 @@ impl Signal {
                 if a.crosswalk && along <= a.walk_to {
                     return false;
                 }
-                off |= a.crosswalk && along <= a.stop + KEEP_OFF;
+                off |= along <= a.stop + a.keep_off();
             }
             let (along, across) = a.inside(self.at, p);
             off |= across <= a.kerb && (-0.01..a.walk_from).contains(&along);
@@ -172,6 +173,16 @@ pub struct SignalArm {
 pub const NO_PHASE: u8 = u8::MAX;
 
 impl SignalArm {
+    /// How far out past its stop line its carriageway is off-limits to those on foot (m):
+    /// `KEEP_OFF` by its crosswalk, `KEEP_OFF_OPEN` on an arm without one.
+    pub(crate) fn keep_off(&self) -> f32 {
+        if self.crosswalk {
+            KEEP_OFF
+        } else {
+            KEEP_OFF_OPEN
+        }
+    }
+
     /// Whether cars come into the junction by it (not one whose cars only leave: `NO_PHASE`).
     pub fn inbound(&self) -> bool {
         self.phase != NO_PHASE
@@ -290,6 +301,11 @@ pub const STOP_GAP: f32 = 0.5;
 /// `Signal::off_limits`): they cross on the zebra, not just past it; and how far in from the kerb
 /// one on the crosswalk is in the road (m, `Signal::crossing`).
 pub const KEEP_OFF: f32 = 3.0;
+/// How far out past the stop line of an arm with no crosswalk (a country road's) its carriageway
+/// is off-limits to those on foot (m): they cross it out past the cars waiting at the lights, or
+/// at the other arms' crosswalks. Crossed anywhere past the box, they crossed in among the cars
+/// queued there and waited for them for hours, pushed aside by each (Skerry Island).
+pub const KEEP_OFF_OPEN: f32 = 12.0;
 /// How far round a lit junction's tiles kept off (tiles) the ground is looked over for any they
 /// would cut off (`left_open`).
 pub(super) const KEEP_OFF_ROOM: i32 = 4;

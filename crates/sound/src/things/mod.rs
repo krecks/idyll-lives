@@ -1,4 +1,4 @@
-//! The sounds of things in use, synthesised like the water (\`water\`, whose building blocks they share; no
+//! The sounds of things in use, synthesised like the water (`water`, whose building blocks they share; no
 //! sound files):
 //! - machines: a treadmill, the bikes, a rowing machine, a sewing machine, a pottery wheel, coffee machines, a blender and a
 //!   stand mixer, a microwave, a toaster, an oven's fan, a cooker hood;
@@ -7,25 +7,25 @@
 //!   bin, a cello played with a bow, someone singing to a karaoke track;
 //! - played once: a fridge door, a chest freezer's lid, a pedal bin, the vending machines, a phone box's call and its hanging up,
 //!   the microwave's ping, a doorbell's chime, toast popping up, coffee poured into a cup;
-//! - at home and in the garden (\`home\`, \`HOME\`): a vacuum cleaner, an iron, a broom, a mop, a mower, a hose,
+//! - at home and in the garden (`home`, `HOME`): a vacuum cleaner, an iron, a broom, a mop, a mower, a hose,
 //!   a watering can, shears, a kettle boiling (and switching itself off, played once), typing, a sauna's
 //!   stove, an electric fire, a knife and fork on a plate;
-//! - things happening (\`events\`): a door or a gate opened and shut, curtains drawn (blinds and shutters too), a car's door and its
+//! - things happening (`events`): a door or a gate opened and shut, curtains drawn (blinds and shutters too), a car's door and its
 //!   start, the post through a letterbox, a till, a drawer.
 //!
 //! Most are made the same few ways:
 //! - a motor or a fan: a tone at its speed with its harmonics (a transformer's hum at twice the mains,
 //!   100 Hz; a fan's blades passing), over the rush of air or the rumble of what it drives (the harmonics
-//!   turned from the first, \`harmonics\`: one \`sin\` a sample, not one each);
-//! - something struck (\`strike\`): a few modes ringing out over a short burst of noise, at the frequencies of
+//!   turned from the first, `harmonics`: one `sin` a sample, not one each);
+//! - something struck (`strike`): a few modes ringing out over a short burst of noise, at the frequencies of
 //!   the thing's size and stuff (a basketball's air rings at about 950 Hz), rung as a bank of decaying
-//!   rotations (\`Modal\`: no \`sin\` or \`exp\` a sample);
+//!   rotations (`Modal`: no `sin` or `exp` a sample);
 //! - events in a loop (darts, a rally) wrap round its end into its start, so nothing is cut off at the
 //!   seam; steady sounds under them are cross-faded as the water's are.
 //!
-//! Each is a stereo loop several seconds long (or a sound played once: \`ONCE_THINGS\`), made off the main
-//! thread the first time it's wanted. Was \`web/src/audio/things.ts\`; the arithmetic is the TypeScript's
-//! (\`dsp\`), to rounding where a tone is turned by rotation rather than a \`sin\` a sample.
+//! Each is a stereo loop several seconds long (or a sound played once: `ONCE_THINGS`), made off the main
+//! thread the first time it's wanted. Was `web/src/audio/things.ts`; the arithmetic is the TypeScript's
+//! (`dsp`), to rounding where a tone is turned by rotation rather than a `sin` a sample.
 
 use crate::dsp::m::*;
 use crate::dsp::*;
@@ -34,7 +34,7 @@ mod home;
 pub use home::{HOME, ONCE_HOME};
 pub mod events;
 
-/// The sounds of things, by name (\`THINGS\`).
+/// The sounds of things, by name (`THINGS`).
 pub const THINGS: [&str; 37] = [
     "treadmill",
     "bike",
@@ -90,7 +90,7 @@ pub const ONCE_THINGS: [&str; 11] = [
     "pour",
 ];
 
-/// A thing's sound by name (\`THINGS\`). None: no such thing.
+/// A thing's sound by name (`THINGS`). None: no such thing.
 pub fn make(kind: &str, rate: f64) -> Option<Stereo> {
     Some(match kind {
         "treadmill" => treadmill(rate),

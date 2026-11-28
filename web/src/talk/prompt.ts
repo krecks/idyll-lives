@@ -48,6 +48,8 @@ export interface TalkText {
   outcome: { good: string; bad: string };
   use: string;
   emotion: string;
+  /** Walk mode's chat: what the player's resident `{name}` said to `{me}` (`{words}`). */
+  heard: string;
   thought: Record<string, string>;
   blocklist: string[];
 }
@@ -89,6 +91,8 @@ export type LineEvent =
   /** Starting to use something: "Cook a meal (Stove)". */
   | { kind: 'use'; action: string }
   | { kind: 'emotion'; emotion: string }
+  /** Walk mode's chat: `other` said `words` to them, after the talk so far (`before`: `Name: "line"` lines, or ''). */
+  | { kind: 'heard'; other: string; words: string; before: string }
   /** A planner thought kind (`TalkText.thought`) and what it's about. */
   | { kind: 'thought'; thought: string; subject: string };
 
@@ -121,6 +125,10 @@ export function eventText(text: TalkText, me: string, e: LineEvent): string | nu
       return fillIn(text.use, { me, action: e.action });
     case 'emotion':
       return fillIn(text.emotion, { me, emotion: e.emotion });
+    case 'heard': {
+      const heard = fillIn(text.heard, { me, name: e.other, words: e.words });
+      return e.before ? `${e.before}\n${heard}` : heard;
+    }
     case 'thought': {
       const t = text.thought[e.thought];
       return t ? fillIn(t, { me, subject: e.subject }) : null;
@@ -163,7 +171,7 @@ export function buildMessages(
   const me = persona.first;
   const now = eventText(text, me, event);
   if (!now) return null;
-  const to = event.kind === 'social' ? event.other : undefined;
+  const to = event.kind === 'social' || event.kind === 'heard' ? event.other : undefined;
   const reply = fillIn(text.reply, { me });
   const quote = reply.trim().slice(-1);
   const demos = text.demos.flatMap((d): ChatMessage[] => [

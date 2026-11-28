@@ -146,6 +146,22 @@ pub(super) fn drops_objects_missing_from_content() {
         .replace(r#""def":"fridge""#, r#""def":"jukebox""#);
     let loaded = World::from_save_json(CONTENT, &json).unwrap();
     assert_eq!(loaded.objects.len(), 1);
+    // On a household's plot, its value goes back to the household (none in Creative).
+    let json = edited(|s| {
+        s["plots"] = serde_json::json!([{"name":"Home","x":0,"z":0,"w":12,"d":12,"public":false}]);
+        s["households"][0]["plot"] = 0.into();
+        s["objects"][0]["def"] = "jukebox".into();
+        s["objects"][0]["value"] = 300.into();
+    });
+    let before = World::from_save_json(CONTENT, &json.replace("jukebox", "fridge")).unwrap();
+    let loaded = World::from_save_json(CONTENT, &json).unwrap();
+    assert_eq!(loaded.objects.len(), 1);
+    let funds = |w: &World| w.households[0].funds;
+    assert_eq!(funds(&loaded), funds(&before) + 300);
+    let creative = json.replace(r#""mode":"living""#, r#""mode":"creative""#);
+    assert!(creative != json, "the save names its mode");
+    let loaded = World::from_save_json(CONTENT, &creative).unwrap();
+    assert_eq!(funds(&loaded), funds(&before));
 }
 
 /// A trait, perk or gender gone from the content is dropped on load, not the whole game: the

@@ -45,6 +45,11 @@ export class GameCamera {
     return this.entity.camera!;
   }
 
+  /** The lens's vertical field of view (radians) in use. */
+  get fov(): number {
+    return this.lens.fov;
+  }
+
   setLens(lens: Lens): void {
     this.lens = lens;
     const c = this.camera;

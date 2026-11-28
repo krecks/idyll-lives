@@ -37,6 +37,40 @@ export function doorLead(rate: number): number {
   return Math.max(DOOR_HAND, PACE * Math.max(rate, 1) * DOOR_SWING);
 }
 
+/** How far off (m) someone can be and still be going through a doorway (`goingThrough`), the lead `lead`: past it nobody is. */
+function doorReach(lead: number): number {
+  return Math.max(DOOR_CLEAR, lead + 0.5);
+}
+
+/** Cells (m) the residents on the move are sorted into (`moverCells`), at least. */
+const GATE_CELL = 8;
+
+/** The cells (m) to sort the movers into for a lead `lead` (`moverCells`): `GATE_CELL`, wider at a speed whose lead reaches further. */
+export function doorCell(lead: number): number {
+  return Math.max(GATE_CELL, doorReach(lead));
+}
+
+/** A cell's key (`moverCells`). */
+const cellKey = (cx: number, cz: number) => (cx + 1024) * 4096 + cz + 1024;
+
+/**
+ * The cells `size` m square the `movers` (`MOVER` floats each) are in, into `out`: with `size` at least `doorReach`,
+ * anyone a doorway's `goingThrough` would count is in its cell or one beside it (`anyoneNear`).
+ */
+export function moverCells(movers: readonly number[], size: number, out: Set<number>): void {
+  out.clear();
+  for (let i = 0; i < movers.length; i += MOVER) out.add(cellKey(Math.floor(movers[i] / size), Math.floor(movers[i + 1] / size)));
+}
+
+/** Whether anyone is in the cell (`moverCells`, `size` m) of (x, z) or one beside it. */
+export function anyoneNear(cells: ReadonlySet<number>, size: number, x: number, z: number): boolean {
+  if (!cells.size) return false;
+  const cx = Math.floor(x / size);
+  const cz = Math.floor(z / size);
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (cells.has(cellKey(cx + dx, cz + dz))) return true;
+  return false;
+}
+
 /**
  * Whether someone in `movers` (`MOVER` floats each) goes through the 1 m doorway whose middle is
  * `centre`, in a wall or fence along x (`axis` 'h') or z ('v'), or a diagonal wall (`axis` its unit
@@ -61,7 +95,7 @@ export function goingThrough(
   const [nx, nz] = axis === 'h' ? [0, 1] : axis === 'v' ? [1, 0] : [-axis[1], axis[0]];
   const [cx, cz] = centre;
   // (Further off than `lead` and half the doorway, or than `DOOR_CLEAR`, nobody is going through it.)
-  const reach = Math.max(DOOR_CLEAR, lead + 0.5);
+  const reach = doorReach(lead);
   let way = 0;
   for (let i = 0; i < movers.length; i += MOVER) {
     const dx = movers[i] - cx;

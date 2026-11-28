@@ -136,6 +136,14 @@ pub(crate) fn step_sim(
         break;
     }
 
+    // Walked by the player: nothing they didn't ask for (a routine's next step, the door, a
+    // call to come over, a ride along); only the player's own orders start.
+    if sim.steered {
+        sim.heeding = None;
+        sim.follow_up = sim.follow_up.filter(|t| t.directed);
+        sim.queue.retain(|t| t.directed);
+    }
+
     // Someone is talking to this Sim: stay put unless the player gives an order.
     if sim.engaged_with.is_some() {
         if sim.queue.front().is_some_and(|t| t.directed) {
@@ -167,14 +175,17 @@ pub(crate) fn step_sim(
     }
 
     // Off to work or school soon: the toilet first, out of habit.
-    if let Some(task) = ready_to_leave(sim, ctx, objects) {
+    if !sim.steered
+        && let Some(task) = ready_to_leave(sim, ctx, objects)
+    {
         end_activity(sim, content, objects);
         sim.follow_up = Some(task);
     }
 
     // Sitting with others near (on the sofa, round a table): now and then a word from the seat,
     // without getting up (`conversation::from_seat`).
-    let free_will = ctx.autonomy && ctx.households[sim.household as usize].free_will;
+    let free_will =
+        ctx.autonomy && ctx.households[sim.household as usize].free_will && !sim.steered;
     if free_will
         && sim.pose == Pose::Sit
         && sim.current.as_ref().is_some_and(|a| {
@@ -259,6 +270,7 @@ pub(crate) fn step_sim(
             // Standing in the road with nothing to do (set down there, or a talk there over):
             // off it first, to the pavement (free will or not).
             if sim.idle_ticks >= AUTONOMY_DELAY_TICKS
+                && !sim.steered
                 && let Some(task) = off_the_road(sim, ctx)
             {
                 sim.idle_ticks = 0;

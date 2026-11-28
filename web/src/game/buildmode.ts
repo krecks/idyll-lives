@@ -732,6 +732,13 @@ export class BuildBuyInput {
       !this.taken('floor', tx, tz, moving) && !this.takenBy(tx, tz, moving, (o) => !!o.hangsLow || !!o.headHeight) && !this.shadeOver(tx, tz, moving) && !this.diagonals.has(`${tx}:${tz}`) && !this.wallBetween(ix, iz, tx, tz);
   }
 
+  /** Walk mode's reach (`walk.ts` `wallOnLine`): whether a wall or a window, not a doorway or a fence, stands between two neighbouring tiles. */
+  wallAcross(ax: number, az: number, bx: number, bz: number): boolean {
+    const edge = bx !== ax ? { axis: 'v' as const, x: Math.max(ax, bx), z: az } : { axis: 'h' as const, x: ax, z: Math.max(az, bz) };
+    const state = this.edgeState(edge);
+    return state === 'wall' || state === 'window';
+  }
+
   /** Whether a wall (with or without a door or window) stands between two neighbouring tiles. */
   private wallBetween(ax: number, az: number, bx: number, bz: number): boolean {
     const edge =

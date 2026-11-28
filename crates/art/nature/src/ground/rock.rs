@@ -131,6 +131,7 @@ pub fn rock() -> Vec<Obj> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::{cut, lump};
     use artkit::boulder;
     use artkit::mesh::{Mesh, edge};
     use artkit::scene;

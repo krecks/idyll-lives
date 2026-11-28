@@ -225,6 +225,17 @@
       ],
     },
     {
+      title: 'Walking as a resident (Walk in their panel)',
+      keys: [
+        [['W', 'S'], 'Walk forward / back'],
+        [['A', 'D'], 'Turn left / right'],
+        [['Q', 'E'], 'Step left / right'],
+        [['Drag'], 'Look around'],
+        [['F'], 'Use what is in front, or talk to whoever is there'],
+        [['Esc'], 'Stop walking'],
+      ],
+    },
+    {
       title: 'Camera',
       keys: [
         [['Drag'], 'Rotate (left) / pan (right)'],

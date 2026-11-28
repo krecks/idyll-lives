@@ -2,9 +2,45 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Walk mode, freer:** the walked resident no longer takes over (no work, door, calls, rides or others' chats pull them off; work waits); stairs up and down by holding W, sliding along walls, Shift to run, F on what the crosshair is on and not through walls, a wider view and a steadier eye; in a car or at work, walk mode waits and resumes.
+- **A real kerb:** the step from the road up to the sidewalk is 75 mm, a real kerb's least (it was 33 mm); the sidewalk rises with it, and the lamps, mailboxes, hydrants, bins and benches on it stand on it as before (`roads.ts` `KERB_Y`, `WALK_Y`).
+
 ## 0.9.0 — 2026-11-27
 
-- **A real kerb:** the step from the road up to the sidewalk is 75 mm, a real kerb's least (it was 33 mm); the sidewalk rises with it, and the lamps, mailboxes, hydrants, bins and benches on it stand on it as before (`roads.ts` `KERB_Y`, `WALK_Y`).
+- **Walk mode:** walk as the selected resident in first person: W/S walk, A/D turn, Q/E step aside, drag to look. F uses the thing in front of you, or on a person opens the socials and a typed "Talk…" chat the LLM answers. The resident's own free will waits while you walk.
+- **Faster big towns:** a walk by road now goes round a lit junction's middle instead of searching the town tile by tile (it did so for 91 % of a city's walks to work). The slowest hour of a city day runs at about 2,100–2,500 ticks a second instead of 1,570–1,835, and the slowest steps are about half as long. Choosing an outing times the taxi's way in once.
+- **Traffic flows round taxis and junctions:** a work taxi waiting for its riders parks in its house's taxi bay beside the road, so the cars behind go by. Walkers on a 6 m lane keep clear of cars pulled over, cross in front of a car standing in a queue, and cross a country road's arm at a lit junction out past its stop line. Two cars turning round at once back up clear of each other. The generated island towns no longer lock up.
+- **Jobs start across the morning:** 70 careers start a quarter or half an hour either side of their old hour, so the morning traffic comes in a wave, not all at 9:00.
+- **Audit fixes:** furniture dropped on load gives its value back; the sounds' filters, beds and tones and the art build's checks fixed; the test saves are named for their towns.
+- **Lighter drawing in a big town:** the main thread's work per frame is about a third less by day (Medium, WebGPU, a 355-household town: 5.1 → 3.4 ms over the home, 7.6 → 5.9 ms over the whole town at 400 m). What changed:
+  - **Residents:**
+    - Held things are drawn once per holder, not once per resident in town.
+    - The pose texture is uploaded in small bands round the rows that changed.
+    - A paused resident is not posed again while nothing changed.
+    - Seats and footstools are looked up nearby, not across the whole town.
+    - A face's expression stops reading at its first unused pair.
+  - **Passes:**
+    - Bloom's passes are left out by day, and the contact shading's blurs are left out where it has faded to nothing.
+    - The menus' town fades its contact shading out as the game's town view does.
+  - **Shadows and mirrors:**
+    - The sun turns, and its shadow map is drawn again, only once it has moved a quarter of a degree.
+    - High's mirrors draw again only when something in them changed, and a mirror small on screen at most 12 times a second (the camera moving round a room with a mirror in view: 60 → 8 reflections a second, 120 → 14 extra draws a frame).
+  - **Traffic:**
+    - A swinging gate uploads its own leaf, not every gate in town.
+    - A traffic light's lamp changing doesn't look the ground up again.
+    - A car looks the ground up once for its body and its shadow.
+    - Doors and gates still ask only those near at super speed.
+  - **Building and editing:**
+    - A purchase uploads only the changed part of the grass mask, and the lawn map only when it changed.
+    - A lawn change makes the lawn again only round what changed: about 10 ms instead of 65 ms in a 960 m world.
+    - A land stroke redraws only the pads round it.
+    - The street keeps unchanged models' copies and far houses' keys between builds.
+  - **At night:**
+    - Who is up is found by grid, and far lots are relit in place.
+    - Neighbours' windows fading no longer count as a change on the viewed lot (it was about 50 a second, and kept High's mirrors drawing every frame).
+- **Things stand on the land as it is shaped:** after a land stroke, traffic lights, parked cars and rides, and the other lots' gates stand on the new ground at once. Before, they stayed up to a metre under it until the camera moved.
 
 ## 0.8.4 — 2026-11-26
 

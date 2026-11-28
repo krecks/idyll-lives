@@ -212,6 +212,8 @@ impl World {
             practice_fatigue: 0.0,
             nap_until: 0,
             ladder_ticks: 0,
+            steered: false,
+            running: false,
             job_search_from: 0,
             planner: Default::default(),
             mess: None,

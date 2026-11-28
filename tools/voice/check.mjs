@@ -9,6 +9,8 @@
  * - every voice style speaks, and prints its median pitch (`Preset.f0` in `voices.ts`);
  * - the voice controls work: pitch on a line changes the sound but not the timing, speed the
  *   length, depth the brightness; silence is trimmed;
+ * - the shipped dictionary knows every word of `LINES` (a broken `en-us.lexz` only shows as
+ *   wrong mouth shapes otherwise);
  * - and prints the time per line.
  *
  * In Bun the model runs on the CPU (no WebGPU): the game's GPU rounds a little differently, so
@@ -124,6 +126,8 @@ const ada = await say(first, line, { ...plain, style: 'F1' });
 const large = await say(first, line, { ...plain, style: 'F1', depth: 0.88 });
 if (!(centroid(large) < centroid(ada) * 0.95)) fail(`a larger voice should sound darker (${centroid(ada).toFixed(0)} Hz to ${centroid(large).toFixed(0)} Hz)`);
 if (Math.abs(large.length - ada.length) > 0.05 * ada.length) fail('depth should not change the timing');
+const unknown = LINES.flatMap((l) => phonemizer.unknownWords(l));
+if (unknown.length) fail(`the dictionary does not know ${unknown.join(', ')} (a broken en-us.lexz?)`);
 if (phonemizer.line('…', 1, 1).text !== '') fail('text without words should give nothing to say (the worker then skips the model)');
 if ((await say(first, '', ARLO)).length !== 0) fail('empty text should give no samples');
 // Trimmed: speech starts within 0.1 s.

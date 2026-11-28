@@ -708,7 +708,8 @@ pub(crate) fn shut_away(ctx: &Ctx, sim: &Sim, at: (i32, i32)) -> bool {
 /// door (a house whose only way out is through the bathroom: they go through rather than miss
 /// the shift).
 pub(crate) fn shut_ahead(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> bool {
-    if ctx.shut.is_empty() {
+    // (Walk mode: the player chose to walk in.)
+    if ctx.shut.is_empty() || sim.steered {
         return false;
     }
     let Some(act) = sim.current() else {
@@ -970,7 +971,8 @@ pub(crate) fn after_step(w: &mut World) {
                     object,
                     interaction,
                 },
-                directed: false,
+                // (Walked by the player, who asked for it: kept, not dropped as not theirs.)
+                directed: sim.steered,
                 routine: false,
             });
             sim.game = Some((object, interaction, false));

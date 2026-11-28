@@ -548,7 +548,7 @@ Then 20 texels of face morph (channel, weight) pairs, two a texel, a weight of 0
 
 | Texels | What | Written |
 |---|---|---|
-| 12 (`EXPRESSION_TEXELS`) | the expression: the 24 strongest of the expression channels (`face.ts` `FaceMixer`); a first channel of -1 means no morphs at all on this face this frame (too small on screen, `parts.ts` `MORPH_PX`) | every frame the face is posed |
+| 12 (`EXPRESSION_TEXELS`) | the expression: the 24 strongest of the expression channels (`face.ts` `FaceMixer`), the used pairs first (the shader reads no further than the first unused); a first channel of -1 means no morphs at all on this face this frame (too small on screen, `parts.ts` `MORPH_PX`) | every frame the face is posed |
 | 8 (`IDENTITY_TEXELS`) | the resident's own face: the 16 identity channels at the look's weights, signed, times the body's `faceScale` (`identity.ts` `writeIdentity`) | once, when the resident is built |
 
 A row is 33 x 3 + 11 + 20 = 130 texels. Disabled cuts are -10 (+10 for "below" cuts).

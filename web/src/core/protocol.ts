@@ -27,6 +27,10 @@ export type Command =
   /** Curtains drawn shut or opened (sim-core `curtains.rs`): at once, nobody walks over. */
   | { type: 'drawCurtains'; object: number; shut: boolean }
   | { type: 'moveTo'; sim: number; x: number; z: number }
+  /** Walk mode: drop everything and walk (`run`: run) to (x, z) now (`game/walk.ts`). */
+  | { type: 'steer'; sim: number; x: number; z: number; run?: boolean }
+  /** Walk mode: while `on`, the resident chooses nothing on their own. */
+  | { type: 'hold'; sim: number; on: boolean }
   | { type: 'social'; sim: number; target: number; social: number }
   | { type: 'joinCareer'; sim: number; career: number; level: number }
   | { type: 'quitCareer'; sim: number }
@@ -956,6 +960,11 @@ export interface WorldStructure {
    * head rows' order, an arm cars only leave by left out: no head stands there): the kerbside furniture keeps clear of them. Absent: none.
    */
   lightPoles?: [number, number, number][];
+  /**
+   * Where work taxis park beside the road for a house, up on the pavement on its side (x, z and half the bay's length along the
+   * road, m: sim-core `taxi::taxi_bays`): the kerbside furniture keeps clear of them. Absent: none.
+   */
+  taxiBays?: [number, number, number][];
   /**
    * Every junction where three or more roads for cars meet (sim-core `traffic::Signal`), for its
    * pad and markings: the lit ones first, in the snapshot's signal head rows' order, then those

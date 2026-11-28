@@ -89,7 +89,7 @@ fn keep_off(w: &mut World, signals: &[Signal]) {
         let r = sig
             .arms
             .iter()
-            .map(|a| (a.stop + KEEP_OFF).max(dist(sig.at, a.span[1])) + a.kerb)
+            .map(|a| (a.stop + a.keep_off()).max(dist(sig.at, a.span[1])) + a.kerb)
             .fold(0.0, f32::max)
             .ceil();
         let (x0, z0) = (

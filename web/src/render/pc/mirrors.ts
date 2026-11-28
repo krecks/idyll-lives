@@ -28,14 +28,16 @@
  *   in gamma space times 0.92, plus a hint of the glass's own tint, taken back to linear (the image
  *   processing comes after, on the whole picture).
  *
- * With a `rate` (Low and Medium) a reflection is drawn on demand and held in between ("held": its
- * camera is off and its target keeps the last picture): again when the camera moves, the mirror moves
- * (a cabinet's door), a resident in its view moves, or the renderer says something else changed
- * (`changed`: the sun, the lamps, things placed or moving), at most `rate` times a second. A held
- * reflection is looked up through the camera it was drawn for, so it stays on the glass while the
- * camera moves on (only its parallax lags, until the next draw). The picking that places the glasses
- * and ranks them runs only on the frames that may draw one. Without a rate (High) every reflection is
- * drawn every frame.
+ * A reflection is drawn on demand and held in between ("held": its camera is off and its target keeps
+ * the last picture): again when the camera moves, the mirror moves (a cabinet's door), a resident in its
+ * view moves, or the renderer says something else changed (`changed`: the sun, the lamps, things placed
+ * or moving, a door swinging, a fan turning, a fire's or a screen's flicker), with a `rate` (Low and
+ * Medium) at most that many times a second, without one (High) in the frame it changed, and a small glass
+ * on screen at most `SMALL_RATE` times a second at every preset (`mirrorPeriod`). A held
+ * reflection is looked up through the camera it was drawn for, so it stays on the glass while the camera
+ * moves on (only its parallax lags, until the next draw). The picking that places the glasses and ranks
+ * them runs only on the frames that may draw one. What moves only for the eye (the plants' sway, the
+ * water's flow) stands still in a held reflection until the next draw.
  *
  * Mirrors follow their object's instance matrix each frame, so things popping in, hidden storeys,
  * things on walls cut away and objects being moved need nothing extra. A reflection's target (and
@@ -61,7 +63,7 @@ export interface MirrorQuality {
   scale: number;
   /** Multisampling of a reflection (1: none). */
   samples: number;
-  /** At most this many draws of a reflection a second, each when something in it changed; 0: every frame. */
+  /** At most this many draws of a reflection a second, each when something in it changed; 0: in every frame something did. */
   rate: number;
 }
 
@@ -81,6 +83,22 @@ const MARGIN = 0.3;
 /** A resident's box round their head top: half its width, and how far it reaches down (m). */
 const RESIDENT_HALF = 0.4;
 const RESIDENT_DOWN = 1.9;
+/**
+ * How often a reflection draws again by its glass's share of the screen (its rectangle's area, as last drawn): a
+ * glass of `SMALL_SHARE` or less at most `SMALL_RATE` times a second, one of `BIG_SHARE` or more in every frame
+ * something in it changed, in between in between (the preset's `rate`, if lower, holds still). A small glass's
+ * parallax lagging a few frames isn't seen; a big one's is.
+ */
+const SMALL_SHARE = 0.02;
+const BIG_SHARE = 0.15;
+const SMALL_RATE = 12;
+
+/** The least time (ms) between two draws of a reflection whose glass covered `share` of the screen, under a preset's `period` (0: none). */
+export function mirrorPeriod(share: number, period: number): number {
+  const t = Math.min(1, Math.max(0, (share - SMALL_SHARE) / (BIG_SHARE - SMALL_SHARE)));
+  return Math.max(period, (1000 / SMALL_RATE) * (1 - t));
+}
+
 /** Milliseconds a draw may come before it is due (frames don't land on the time exactly). */
 const EARLY = 4;
 /** The camera counts as moved past this change in any of its view × projection's numbers. */
@@ -135,8 +153,10 @@ interface Reflection {
   owner: Item | null;
   drawnFace: Float32Array;
   drawnViewProj: Float32Array;
-  /** When the next draw is due (`frameNow()`), held to `rate`. */
+  /** When the next draw is due (`frameNow()`), held to `rate` and to its glass's size on screen (`mirrorPeriod`). */
   due: number;
+  /** Its glass's share of the screen when last drawn (0..1: its rectangle's area). */
+  share: number;
   /** Who it is being drawn for now, and something in it changed since it was drawn. */
   next: Item | null;
   dirty: boolean;
@@ -333,6 +353,7 @@ export class Mirrors {
       next: null,
       dirty: true,
       drawing: false,
+      share: 1,
       planes: new Float32Array(20),
       planeCount: 0,
       shows: new Float32Array(4),
@@ -445,10 +466,10 @@ export class Mirrors {
     this.viewProjNow();
     const viewProj = this.viewProjGame;
     const period = this.quality.rate > 0 ? 1000 / this.quality.rate : 0;
-    // A reflection draws again at most `rate` times a second: until one is due, nothing it shows
-    // can have changed in a way that matters, so the glasses keep their place and their held
-    // reflection, and the picking that would re-place them waits for the frame that draws.
-    if (period && !this.stale && !this.due(now, viewProj, residents)) return;
+    // A reflection draws again only when something it shows changed, at most `rate` times a second:
+    // until one is due, the glasses keep their place and their held reflection, and the picking that
+    // would re-place them waits for the frame that draws.
+    if (!this.stale && !this.due(now, viewProj, residents)) return;
     const cam = this.game.entity;
     const p = cam.getPosition();
     const eye = this.eye;
@@ -515,15 +536,16 @@ export class Mirrors {
         }
       }
       if (!r) continue;
-      // Every frame (High); held: drawn again at once for another mirror; when something in it changed, once it's due.
-      if (!period || r.owner !== item) {
+      // Held: drawn again at once for another mirror; when something in it changed, once it's due (at once without a rate).
+      if (r.owner !== item) {
         this.draw(r, item);
         continue;
       }
       if (this.stale || !same(item.face, r.drawnFace, STILL) || this.seenMoving(r, viewProj, residents)) r.dirty = true;
       if (r.dirty && now >= r.due - EARLY) {
-        // Steady at `rate` while it keeps changing; after a still spell, not two draws in a row.
-        r.due = Math.max(r.due + period, now + period * 0.75);
+        // Steady at its rate while it keeps changing; after a still spell, not two draws in a row.
+        const every = mirrorPeriod(r.share, period);
+        r.due = Math.max(r.due + every, now + every * 0.75);
         this.draw(r, item);
       }
     }
@@ -709,6 +731,7 @@ export class Mirrors {
     const py1 = Math.min(th, Math.ceil(((Math.min(1, y1) + 1) / 2) * th) + PAD);
     if (px1 <= px0 || py1 <= py0) return;
     r.rect.set(px0 / tw, py0 / th, (px1 - px0) / tw, (py1 - py0) / th);
+    r.share = r.rect.z * r.rect.w;
     r.camera.rect = r.rect;
     r.camera.scissorRect = r.rect;
     // The projection narrowed to that rectangle (the viewport puts it back where it was).
@@ -752,7 +775,7 @@ export class Mirrors {
 
   /**
    * Whether this frame can find anything to draw again: a reflection is due, and it was marked to
-   * draw again, or the camera moved since it was drawn, or a resident in its view did.
+   * draw again, or the camera moved since it was drawn, or a resident in its view (as it is now) did.
    */
   private due(now: number, viewProj: Float32Array, residents: MirrorResidents | null): boolean {
     let held = false;
@@ -761,9 +784,13 @@ export class Mirrors {
       if (!r) continue;
       held = true;
       if (now < r.due - EARLY) continue;
+      const shown = r.next?.slot === i;
+      // Who its view shows, again while anyone moves (`pick` finds it only in a frame that draws): else one walking
+      // into a view nobody was in would stay out of it.
+      if (shown && residents?.posed) this.seesResidents(r, residents);
       // Marked to draw again counts only while a glass still shows it: one no glass was given
       // isn't drawn, so its mark would otherwise hold every frame to a full pick until let go.
-      if ((r.dirty && r.next?.slot === i) || this.seenMoving(r, viewProj, residents)) return true;
+      if ((r.dirty && shown) || this.seenMoving(r, viewProj, residents)) return true;
     }
     // No reflection held (none made yet, or all let go): the glasses have to be picked again.
     return !held;

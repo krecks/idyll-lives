@@ -207,7 +207,7 @@ rewrites the models, the pack and centres.json in the tree.
    - `artkit::kit`: whole parts more than one family uses (`kit::tube!`, `fillet!`, `pull!`, `knob!`, `shaker!`,
      `moulding!`, `cabriole!`, `scroll!`, `bench_end!`, `songbird!`, `letters!`, `cut!`, `recessed_box!`, `mug!`,
      `throw!`, `board`, `tiled_walls!`, `steam_iron`, `duvet!` with `duvet_flap!` and `turn_down!`, `pleats!`,
-     `figure8`, `turn_round`, and `kit::WALL`, the wall's face in a one-deep footprint:
+     `figure8`, `turn_round`, `prism`, `fluted`, and `kit::WALL`, the wall's face in a one-deep footprint:
      [kit/mod.rs](../artkit/src/kit/mod.rs) has an example of each); `artkit::botany` for plants and trees; a
      family's helper's options are written with `artkit::options!`, as the kit's are.
 

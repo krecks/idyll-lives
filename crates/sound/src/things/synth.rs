@@ -5,13 +5,13 @@ use super::*;
 // Building blocks.
 
 /// The average level of the loops of separate knocks (darts, a rally): set by their average rather than
-/// their peak, as their knocks are short; the sharpest are rounded off a little (\`set_level\`).
+/// their peak, as their knocks are short; the sharpest are rounded off a little (`set_level`).
 pub(super) const SPARSE: f64 = 0.046;
 
 /// A mode: its frequency (Hz), the time it takes to die to a third (s) and its level.
 type Mode = [f64; 3];
 
-/// A short burst of noise in a band (its centre in Hz, its Q), dying away over \`tau\` seconds, at \`amp\`.
+/// A short burst of noise in a band (its centre in Hz, its Q), dying away over `tau` seconds, at `amp`.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Burst {
     hz: f64,
@@ -20,13 +20,13 @@ pub(super) struct Burst {
     amp: f64,
 }
 
-/// A burst (\`{ hz, q, tau, amp }\`).
+/// A burst (`{ hz, q, tau, amp }`).
 pub(super) fn burst(hz: f64, q: f64, tau: f64, amp: f64) -> Burst {
     Burst { hz, q, tau, amp }
 }
 
 /// A track of events: its two channels, its rate, and whether its events wrap round its end into its start
-/// (a loop of events, \`looped\`) or are cut off there (a sound played once, \`once\`). No overlap.
+/// (a loop of events, `looped`) or are cut off there (a sound played once, `once`). No overlap.
 pub(super) struct Ev {
     pub(super) left: Vec<f32>,
     pub(super) right: Vec<f32>,
@@ -44,7 +44,7 @@ impl From<Ev> for Stereo {
 }
 
 /// A track whose events wrap round its end into its start (a loop of events, no overlap; the TypeScript's
-/// \`loop\`).
+/// `loop`).
 pub(super) fn looped(rate: f64, seconds: f64) -> Ev {
     let t = track(rate, seconds, 0.0);
     Ev {
@@ -66,7 +66,7 @@ pub(super) fn once(rate: f64, seconds: f64) -> Ev {
     }
 }
 
-/// Adds \`v\` at sample \`i\`, left and right at \`l\` and \`r\`; past the end or before the start it wraps on a
+/// Adds `v` at sample `i`, left and right at `l` and `r`; past the end or before the start it wraps on a
 /// loop of events (an event set a hair before the loop's start rings on from its end, so the seam is whole),
 /// else it's dropped.
 pub(super) fn put(t: &mut Ev, i: f64, v: f64, l: f64, r: f64) {
@@ -79,7 +79,7 @@ pub(super) fn put(t: &mut Ev, i: f64, v: f64, l: f64, r: f64) {
     add(&mut t.right, i, v * r);
 }
 
-/// Something struck: its modes ringing out over a burst of noise, from \`at\` (s), at \`amp\`, placed at \`pan\`.
+/// Something struck: its modes ringing out over a burst of noise, from `at` (s), at `amp`, placed at `pan`.
 pub(super) fn strike(t: &mut Ev, at: f64, amp: f64, pan: f64, modes: &[Mode], burst: Burst) {
     let rate = t.rate;
     let start = js_round(at * rate);
@@ -113,8 +113,8 @@ pub(super) fn strike(t: &mut Ev, at: f64, amp: f64, pan: f64, modes: &[Mode], bu
     }
 }
 
-/// A rustle or a rub: noise in a band (\`hz\`, \`q\`; the TypeScript's defaults 4000 and 0.5), swelling and
-/// fading over \`seconds\`.
+/// A rustle or a rub: noise in a band (`hz`, `q`; the TypeScript's defaults 4000 and 0.5), swelling and
+/// fading over `seconds`.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn rustle(
     t: &mut Ev,
@@ -154,8 +154,53 @@ pub(super) fn swish(t: &mut Ev, r: &mut Rng, at: f64, seconds: f64, amp: f64, hz
     }
 }
 
-/// A motor's (or a fan's) tone: harmonics at \`partials\` levels (the fundamental first) of a speed \`hz(i)\`
-/// (Hz at sample \`i\`).
+/// A machine's steady sound, the same on both sides: a loop of `seconds` and its overlap (0.6 s), its layers
+/// summed as each is made (`add`), so the layers are not all kept until the end.
+pub(super) struct Bed {
+    sum: Vec<f64>,
+    rate: f64,
+    seconds: f64,
+}
+
+impl Bed {
+    pub(super) fn new(rate: f64, seconds: f64) -> Bed {
+        Bed {
+            sum: vec![0.0; round_usize((seconds + 0.6) * rate)],
+            rate,
+            seconds,
+        }
+    }
+
+    /// Its samples, the overlap's with them.
+    pub(super) fn len(&self) -> usize {
+        self.sum.len()
+    }
+
+    /// A layer added: `v(i, x)` for its sample `x` at `i`.
+    pub(super) fn add(&mut self, layer: Vec<f32>, mut v: impl FnMut(usize, f64) -> f64) {
+        for (i, (s, &x)) in self.sum.iter_mut().zip(&layer).enumerate() {
+            *s += v(i, x as f64);
+        }
+    }
+
+    /// The loop being made, both sides (to add to each, then `fold`).
+    pub(super) fn track(self) -> Track {
+        let mut t = track(self.rate, self.seconds, 0.6);
+        for (i, &v) in self.sum.iter().enumerate() {
+            t.left[i] = v as f32;
+            t.right[i] = v as f32;
+        }
+        t
+    }
+
+    /// The loop, its overlap folded into its start.
+    pub(super) fn fold(self) -> Stereo {
+        fold(self.track())
+    }
+}
+
+/// A motor's (or a fan's) tone: harmonics at `partials` levels (the fundamental first) of a speed `hz(i)`
+/// (Hz at sample `i`).
 pub(super) fn motor(n: usize, rate: f64, hz: impl Fn(usize) -> f64, partials: &[f64]) -> Vec<f32> {
     let mut d = vec![0.0f32; n];
     let mut phase = 0.0;
@@ -182,11 +227,11 @@ pub(super) fn noise(n: usize, rate: f64, r: &mut Rng, kind: Filter, hz: f64, q: 
     (0..n).map(|_| f.run(p.next(r)) as f32).collect()
 }
 
-/// Puts the parts together: the steady ones (already folded into their start: \`fold\`) and the events
-/// added; then a room (\`delays\` in ms, none for out of doors, mixed in at \`wet\`), the highs and lows taken
-/// off (\`low\`, \`high\`: a box or a small speaker; 0 for none), and the level set to an average of \`rms\`, or
-/// with 0 to a peak of \`peak\`. A loop's filters and room are already ringing at its start, as they were at
-/// its end (\`done_once\` for a sound played once, which starts from silence).
+/// Puts the parts together: the steady ones (already folded into their start: `fold`) and the events
+/// added; then a room (`delays` in ms, none for out of doors, mixed in at `wet`), the highs and lows taken
+/// off (`low`, `high`: a box or a small speaker; 0 for none), and the level set to an average of `rms`, or
+/// with 0 to a peak of `peak`. A loop's filters and room are already ringing at its start, as they were at
+/// its end (`done_once` for a sound played once, which starts from silence).
 #[allow(clippy::too_many_arguments)]
 pub(super) fn done(
     rate: f64,
@@ -201,7 +246,7 @@ pub(super) fn done(
     put_together(rate, parts, rms, peak, delays, wet, low, high, true)
 }
 
-/// \`done\` for a sound played once: its filters and room start from silence.
+/// `done` for a sound played once: its filters and room start from silence.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn done_once(
     rate: f64,
@@ -216,7 +261,7 @@ pub(super) fn done_once(
     put_together(rate, parts, rms, peak, delays, wet, low, high, false)
 }
 
-/// \`done\`'s work; \`lead\`: a loop, its filters and room run over a second of its end before its start.
+/// `done`'s work; `lead`: a loop, its filters and room run over a second of its end before its start.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn put_together(
     rate: f64,

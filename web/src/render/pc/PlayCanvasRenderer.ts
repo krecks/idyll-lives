@@ -28,7 +28,7 @@ import { BuildPreviews, mergeSurfaces } from './buildPreviews';
 import { GameCamera } from './camera';
 import { Characters, MAX_CHARACTERS } from './characters';
 import { createApp, createDevice, destroyApp } from './device';
-import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
+import { buildFences, regroundGates, swingGate, type Fences, type GateLeaf } from './fences';
 import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
 import { backEdges, curtainsLetThrough, gardenPool, GardenPools, windowPools, type GardenPool } from './gardenPools';
@@ -76,23 +76,24 @@ import { both, within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import { GameCameraRig, keepUp } from '../shared/cameraRig';
-import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend } from '../shared/lens';
+import { BETA_LIMITS, DEFAULT_ORBIT, LENS, RADIUS_LIMITS, TOWN_FROM, townBlend, WALK_LENS } from '../shared/lens';
 import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArrival, townClearance, townFar, townFog, townFogFrom, townNear, townOrbit } from '../shared/townCamera';
 import { townView } from '../shared/townView';
 import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
-import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
-import { STOREY as TOWN_STOREY } from '../shared/townBuildings';
+import { lotBuilding, lotUp, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
+import { STOREY as TOWN_STOREY, type TownBuilding } from '../shared/townBuildings';
+import { BoxGrid, type Box } from '../shared/boxGrid';
 import { lotWallsHeight, rayPrism, rectFootprint } from '../shared/buildingPick';
 import { closedParts, flatLids, inClosed, LID_THICK, viewedFlats, viewedLot, type ClosedPart } from '../shared/flatLids';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
 import { cutInView } from '../shared/landVeil';
-import { DOOR_SWING, doorLead, goingThrough, MOVER } from '../shared/doors';
+import { anyoneNear, DOOR_SWING, doorCell, doorLead, goingThrough, moverCells } from '../shared/doors';
 import { smooth } from '../../game/noise';
 import { withoutCloudShadows } from './cloudShadows';
-import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
+import { createLighting, lightingAt, sunTurned, type Lighting, type RGB } from '../shared/environment';
 import { playbackRate } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { isPaths, pathLayers, pavedRects } from '../shared/paving';
@@ -227,8 +228,6 @@ const TARGET_EASE = 0.25;
 const PIT_MARGIN = 0.3;
 /** The doors and gates opening or falling shut kept for the world's sound between its looks (`doorSounds`). */
 const DOOR_SOUNDS = 16;
-/** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`). */
-const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
 const ROOF_MIN_DISTANCE = 15;
 /** A roof's height (m) over a house's top storey, at most, for a click on it (`buildingAt`). */
@@ -302,6 +301,8 @@ const IDENTITY = Float32Array.of(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 
 /** No neighbours' houses (to look through). */
 const NO_HOUSES: readonly (readonly [number, number, number, number])[] = [];
+/** How often (ms) the neighbours' houses are looked at for who is up in them at night (`findDarkRooms`). */
+const NEIGHBOURS_EVERY_MS = 250;
 
 /** Whether two worlds' garages are the same (field by field, as `sameObject`). */
 function sameGarages(a: readonly GarageInfo[] | undefined, b: readonly GarageInfo[] | undefined): boolean {
@@ -531,6 +532,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private worldHaze: LandHaze | null = null;
   private worldHazeFor: { scape: Landscape | null; version: number } = { scape: null, version: -1 };
   private worldHazeShown = false;
+  /** The game's landscape and its `landVersion` what stands on its surface was last put on (`regroundPlaced`). */
+  private readonly groundedFor: { scape: Landscape | null; version: number } = { scape: null, version: -2 };
   private townShot: TownShot | null = null;
   private townHighlight: LotHighlight | null = null;
   private townWorld: WorldStructure | null = null;
@@ -597,11 +600,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The eye (game space) this frame, for the woods' impostors (`Landscape.frameTiles`). */
   private readonly eyeNow = { x: 0, y: 0, z: 0 };
   private townGround!: TownGroundMap;
-  private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null; up: string } = { chunks: null, houses: null, up: '' };
+  private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null } = { chunks: null, houses: null };
+  /** The far lots' houses drawn (`frameTownView`), their parts by lot id: lit in place as their people get up and go to bed (`findTownUp`). */
+  private townLotParts = new Map<number, TownBuilding[]>();
   /** The far lots with someone up in their house (`findTownUp`: by lot id, and as a key), and when they were last looked for. */
   private townUp: ReadonlySet<number> = new Set();
-  private townUpKey = '';
   private townUpAt = 0;
+  /** The night's scans' houses bucketed, by their list (`gridOf`). */
+  private readonly grids = new WeakMap<object, { boxes: readonly Box[]; grid: BoxGrid }>();
+  /** When the neighbours' houses were last looked at for who is up in them (`findDarkRooms`). */
+  private neighboursAt = -Infinity;
   /** The weekday of the newest snapshot (0 = Monday: sim-core `clock::weekday`), for the town's opening hours. */
   private lastWeekday = 0;
   /** The town view's movers this frame (reused, a pool), and their colours by hex. */
@@ -663,6 +671,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private doors: { leaf: HouseDoor; open: number }[] = [];
   /** Gates in the fences' meshes, each with how far open it stands (0 shut, as drawn) and the side it opens to. */
   private gates: { fences: Fences; leaf: GateLeaf; open: number; towards: number }[] = [];
+  /** The other lots' gates (they swing: drawn here, not by the street), on their pads where the town follows the land. */
+  private townGates: Fences | null = null;
   /** The doors and gates that opened or fell shut since `doorSounds` was last called (at most `DOOR_SOUNDS`), and the list handed out then. */
   private doorsHeard: DoorSound[] = [];
   private doorsHanded: DoorSound[] = [];
@@ -694,7 +704,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly awakeRooms = new Set<number>();
   private readonly occupiedRooms = new Set<number>();
   private readonly movers: number[] = [];
-  /** The cells (`GATE_CELL`) someone on the move is in this frame. */
+  /** The cells (`doorCell` m: `swingDoors`) someone on the move is in this frame. */
   private readonly moverCells = new Set<number>();
   /** Per neighbour's house (`Street.houses`): someone is up in there (scratch). */
   private readonly neighboursUp: boolean[] = [];
@@ -765,6 +775,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Whether the camera has caught up with the resident it follows (`keepUp`: then it stays near them). */
   private followCaught = false;
   private readonly followHead = { x: 0, y: 0, z: 0 };
+  /** Walk mode (the resident row seen from, their eyes: `characters.unseen`): the way they look (heading in game x/z, pitch up; rad). */
+  private walk: { heading: number; pitch: number; eye: { x: number; y: number; z: number }; head: { x: number; y: number; z: number }; seen: boolean } | null = null;
   private framedView = '';
   /**
    * Whether a resident at ground point (x, z) on storey `k` is drawn: on the viewed lot (and just round
@@ -1019,11 +1031,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`. On a land the town
     // follows, on its roads and its lots' pads too.)
     this.characters.setGround((x, z) => this.lot.landscape?.heightAt(x, z) ?? 0);
-    // (The cars, the parked rides and the traffic lights only on a land the town follows: elsewhere at 0, as ever.)
-    const builtGround = (x: number, z: number) => this.lot.landscape?.surface?.at(x, z) ?? 0;
-    this.cars.setGround(builtGround);
-    this.parkedRides.setGround(builtGround);
-    this.signals.setGround(builtGround);
     this.decorTemplates = new TemplateCache(this.app);
     this.storeyLayer = new pc.Entity('storeyLayer');
     this.lotRoot.addChild(this.storeyLayer);
@@ -1381,6 +1388,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** The menus' camera's view offset in game space (`viewShift`), worked out in place. */
   private readonly townShift: [number, number, number] = [0, 0, 0];
 
+  /** The game's built surface at a point (`BuiltSurface.at`), 0 off a land the town follows: what the cars, the parked rides and the traffic lights stand on. */
+  private readonly builtGround = (x: number, z: number): number => this.lot.landscape?.surface?.at(x, z) ?? 0;
+
   /** The menus' land's height at a point (0 before it has one): for the camera's planes (`applyTownCamera`). */
   private readonly townHeight = (x: number, z: number): number => this.lot.landscapeOf('town')?.heightAt(x, z) ?? 0;
 
@@ -1396,7 +1406,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const shift = viewShift(p.alpha, p.beta, p.targetScreenOffset.x, p.targetScreenOffset.y, this.townShift);
       this.applyTownCamera(p.radius, p.alpha, p.beta, ex, ey, ez, true, shift);
       this.landHaze?.show(p.radius, ex + shift[0], ez + shift[2]);
+      // (The contact shading faded out by the distance as the game's town view fades it, `frameTownView`.)
+      this.post?.setContact(1 - townBlend(p.radius));
       this.camera.setPose(p.alpha, p.beta, p.radius, p.target.x, p.target.y, p.target.z, p.targetScreenOffset.x, p.targetScreenOffset.y);
+    } else if (this.walk?.seen) {
+      // Looking out of the walker's eyes: the orbit pose turned round (the target a step ahead of the eye).
+      const { eye, heading, pitch } = this.walk;
+      const r = 0.3;
+      const [alpha, beta] = [heading + Math.PI, Math.PI / 2 + pitch];
+      const [tx, ty, tz] = [eye.x + r * Math.cos(heading) * Math.cos(pitch), eye.y + r * Math.sin(pitch), eye.z + r * Math.sin(heading) * Math.cos(pitch)];
+      this.applyTownCamera(r, alpha, beta, eye.x, eye.y, eye.z, false);
+      this.hazeWorld(alpha, beta, eye.x, eye.y, eye.z);
+      this.camera.setPose(alpha, beta, r, tx, ty, tz);
     } else {
       const o = this.orbit;
       // (The eye: target + radius × (cos α sin β, cos β, sin α sin β), game space.)
@@ -1448,7 +1469,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const own = LOOK.fog * (menus ? menuFog(radius, mountains < 1) : townFog(radius));
     let fog = own;
     if (blend > 0) {
-      const spread = Math.atan(Math.tan(LENS.fov / 2) * (this.cssSize.width / Math.max(1, this.cssSize.height)));
+      const spread = Math.atan(Math.tan(this.camera.fov / 2) * (this.cssSize.width / Math.max(1, this.cssSize.height)));
       fog = Math.max(own, edgeFog(radius, from, landEdge(ex, ey, ez, alpha, spread, r.x0, r.z0, r.x1, r.z1), beta) * blend * mountains);
     }
     if (Math.abs(fog - this.app.scene.fog.density) > fog * 0.01) this.app.scene.fog.density = fog;
@@ -1477,7 +1498,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       haze.set(r, (x, z) => scape.heightAt(x, z), pc.LAYERID_WORLD, `${landscapeId(scape)}|${scape.landVersion}`);
     }
     // (The eye in game space: the camera's heights are the engine's, the datum below the land's.)
-    const k = cutInView(r, haze.positions, ex, ey + this.datum, ez, alpha, beta, LENS.fov, this.cssSize.width / Math.max(1, this.cssSize.height));
+    const k = cutInView(r, haze.positions, ex, ey + this.datum, ez, alpha, beta, this.camera.fov, this.cssSize.width / Math.max(1, this.cssSize.height));
     if (k > 0 || this.worldHazeShown) haze.hold(k);
     this.worldHazeShown = k > 0;
   }
@@ -1583,7 +1604,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.landscape?.frameTiles(o.target.x, o.target.z, this.diag.has('notownwoods') ? 0 : this.townBlend, o.radius, this.diag.has('noimpostors') ? undefined : this.camera.eyeInGame(this.eyeNow));
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
-    const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
+    const fovH = 2 * Math.atan(Math.tan(this.camera.fov / 2) * aspect);
     const changed = this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha: o.alpha, fovH }, performance.now(), (x, z, reach) => this.plots.find(world, x, z, reach), (plot) => {
       const taken = !!this.focusLotListener?.(plot.id);
       if (taken) {
@@ -1614,7 +1635,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private buildTownView(world: WorldStructure): void {
     this.townGround.bake(world);
-    this.townLotsBy = { chunks: null, houses: null, up: '' };
+    this.townLotsBy = { chunks: null, houses: null };
   }
 
   /**
@@ -1640,18 +1661,29 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.townBuildings.setTime(this.lastMinute, this.lastWeekday);
     const houses = this.street.townHouses();
     const by = this.townLotsBy;
-    if (by.chunks === this.roam.chunks && by.houses === houses && by.up === this.townUpKey) return;
-    this.townLotsBy = { chunks: this.roam.chunks, houses, up: this.townUpKey };
+    if (by.chunks === this.roam.chunks && by.houses === houses) return;
+    this.townLotsBy = { chunks: this.roam.chunks, houses };
     const up = this.townUp;
     const land = this.lot.landscape;
     const ground = (x: number, z: number) => land?.heightAt(x, z) ?? 0;
-    this.townBuildings.setLots(houses.filter((h) => !this.street.chunkDrawn(h.chunk)).flatMap((h) => lotBuilding(h, ground, up.has(h.id))));
+    const parts = (this.townLotParts = new Map());
+    this.townBuildings.setLots(
+      houses
+        .filter((h) => !this.street.chunkDrawn(h.chunk))
+        .flatMap((h) => {
+          const drawn = lotBuilding(h, ground, up.has(h.id));
+          // (A lot with a look is lit by the hour, not by who is up.)
+          if (!h.look) parts.set(h.id, drawn);
+          return drawn;
+        }),
+    );
   }
 
   /**
    * Which far lots' houses have someone up in them (`townUp`, by lot id), twice a second while the town view is in
    * and the lamps are on: their windows glow at night only then (`lotBuilding`), as the neighbours' near the camera do
-   * (`findDarkRooms`). Nothing but the snapshot's positions is read.
+   * (`findDarkRooms`); the houses whose people got up or went to bed lit again in place (`lotUp`). Nothing but the
+   * snapshot's positions is read.
    */
   private findTownUp(frame: FrameState): void {
     if (this.townBlend <= 0 || this.lampsLevel <= 0 || frame.now - this.townUpAt < 500) return;
@@ -1660,6 +1692,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const k = layout.sim;
     const sleeping = this.sleepActions?.ids;
     const houses = this.street.townHouses();
+    const { boxes, grid } = this.gridOf(houses, (h) => h.box);
     const babies = this.babyStages();
     const sims = this.lastWorld?.sims ?? [];
     const up = new Set<number>();
@@ -1672,18 +1705,34 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const pz = curr[o + k.z];
       // (Upstairs is a storey's own rows: back to the ground's.)
       const gz = pz - this.rowOf(this.storeyOf(Math.floor(pz)));
-      for (const h of houses) {
-        const b = h.box;
-        if (px < b[0] || px > b[2] || gz < b[1] || gz > b[3]) continue;
-        up.add(h.id);
-        break;
-      }
+      const h = grid.find(boxes, px, gz);
+      if (h >= 0) up.add(houses[h].id);
     }
-    const key = [...up].sort((a, b) => a - b).join(',');
-    if (key === this.townUpKey) return;
-    this.townUpKey = key;
-    this.pictureChanged();
+    const was = this.townUp;
+    let relit = false;
+    let changed = false;
+    for (const id of new Set([...was, ...up])) {
+      if (was.has(id) === up.has(id)) continue;
+      changed = true;
+      const parts = this.townLotParts.get(id);
+      if (!parts) continue;
+      lotUp(parts, up.has(id));
+      relit = true;
+    }
+    if (!changed) return;
     this.townUp = up;
+    if (relit) this.townBuildings.relit();
+    this.pictureChanged();
+  }
+
+  /** Boxes bucketed for the night's scans (`BoxGrid`), made again only for another list. */
+  private gridOf<T>(list: readonly T[], box: (t: T) => Box): { boxes: readonly Box[]; grid: BoxGrid } {
+    let g = this.grids.get(list);
+    if (!g) {
+      const boxes = list.map(box);
+      this.grids.set(list, (g = { boxes, grid: new BoxGrid(boxes) }));
+    }
+    return g;
   }
 
   /**
@@ -1877,6 +1926,46 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.gameRig.setShot(shot, cut || this.townMode);
   }
 
+  /**
+   * Walk mode: the camera in resident row `index`'s head, their body not drawn (null: back to the
+   * orbit camera, which keeps their place). Returns the heading the view starts at (the camera's).
+   */
+  setWalkView(index: number | null): number {
+    this.pictureChanged();
+    this.characters.unseen = index ?? -1;
+    this.orbit.enabled = index === null;
+    const heading = this.orbit.alpha + Math.PI;
+    this.walk = index === null ? null : { heading, pitch: 0, eye: { x: 0, y: 0, z: 0 }, head: { x: 0, y: 0, z: 0 }, seen: false };
+    this.camera.setLens(index === null ? { ...LENS, far: this.playFar } : { ...LENS, ...WALK_LENS, far: this.playFar });
+    if (index === null) this.orbit.radius = Math.max(this.orbit.radius, 6);
+    return heading;
+  }
+
+  setWalkLook(heading: number, pitch: number): void {
+    if (!this.walk) return;
+    this.walk.heading = heading;
+    this.walk.pitch = pitch;
+    this.pictureChanged();
+  }
+
+  /** Walk mode: the eye where the walker's head is (the orbit's target goes with it, for what's built and lit round it). */
+  private steerWalk(dt: number): void {
+    const w = this.walk!;
+    const was = w.seen;
+    w.seen = this.simHead(this.characters.unseen, w.head);
+    if (!w.seen) return;
+    w.head.y -= 0.12;
+    // (Eased toward the head bone, so the walk's bob, idle sway and head turns don't shake the view; snapped when first seen.)
+    const ky = was ? 1 - Math.exp(-dt / 0.08) : 1;
+    const kx = was ? 1 - Math.exp(-dt / 0.05) : 1;
+    w.eye.x += (w.head.x - w.eye.x) * kx;
+    w.eye.y += (w.head.y - w.eye.y) * ky;
+    w.eye.z += (w.head.z - w.eye.z) * kx;
+    this.orbit.target.x = w.eye.x;
+    this.orbit.target.z = w.eye.z;
+    this.orbit.radius = this.orbit.limits.radius[0];
+  }
+
   followSim(index: number | null): void {
     this.pictureChanged();
     if (index !== this.followIndex) this.followCaught = false;
@@ -1923,7 +2012,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   cameraInfo(): { fov: number; radius: readonly [number, number]; beta: readonly [number, number] } {
-    return { fov: LENS.fov, radius: this.orbit.limits.radius, beta: BETA_LIMITS };
+    return { fov: this.camera.fov, radius: this.orbit.limits.radius, beta: BETA_LIMITS };
   }
 
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
@@ -2136,7 +2225,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // A big world's land reaches further: its far plane too (the preset's, `OpenWorldQuality.far`: its far LOD's
     // houses to 650 m, the hills beyond). (The play camera's: the town view moves it out from there, `applyTownCamera`.)
     const far = (this.playFar = world.meta?.world?.size === 'big' ? this.quality.openWorld.far : LENS.far);
-    if (this.townBlendDrawn === 0 && this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, far });
+    if (this.townBlendDrawn === 0 && this.camera.camera.farClip !== far) this.camera.setLens({ ...LENS, ...(this.walk && WALK_LENS), far });
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
     const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     this.roam.setFocus(viewIndex >= 0 ? viewIndex : null);
@@ -2151,7 +2240,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // (The chunks the camera will see once it's turned to frame the lot, `buildSims`: those it looks at now would
       // stream in again behind the turn, the first frames of play.)
       const alpha = this.framingAlpha(world) ?? o.alpha;
-      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
+      this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha, fovH: 2 * Math.atan(Math.tan(this.camera.fov / 2) * aspect) }, performance.now(), () => null, () => false);
       this.street.setChunks(this.roam.chunks);
     } else this.street.setChunks(null);
     this.viewOnRoads(this.orbit.target.x, this.orbit.target.z);
@@ -2189,6 +2278,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         const ours = storey === 0;
         const fences = buildFences(this.app, ours ? this.lotRoot : this.root, list, this.deps.content.fenceStyles, { wallAt, ...(!ours && pads ? { ground: (x: number, z: number) => pads.at(x, z) } : {}) });
         if (!fences) continue;
+        if (!ours) this.townGates = fences;
         this.lotEntities.push({ entity: fences.entity, storey });
         for (const leaf of fences.gates) this.gates.push({ fences, leaf, open: 0, towards: 1 });
       }
@@ -2200,6 +2290,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // landscape solves its surface again for this world, the one the street stands on too, and the land drawn again where
     // it moved.)
     const shaped = this.lot.landscape;
+    // (Solved there and then: what was placed on the surface before, the other lots' gates and maybe the traffic
+    // lights' poles, stands on it again with the next frame, `regroundPlaced`. The sun's shadows are taken again once
+    // everyone is home, `buildSims`.)
     const taken = shaped?.heightField ? shaped.takeRoads(world) : [];
     if (shaped && taken.length) void this.queueLand('land: roads taken', async () => {
       // (Behind the world's build and the warm-up, not in their way: on the way into a game, the land moved by a few
@@ -2639,9 +2732,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.townMode ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
   }
 
-  /** The garden's pools of lamplight, as bright as its lamps are now. */
-  private applyGardenPools(): void {
-    this.gardenPools?.update(this.glowLevel, this.poolOn, this.lampColor);
+  /** The garden's pools of lamplight, as bright as its lamps are now; whether one changed. */
+  private applyGardenPools(): boolean {
+    return this.gardenPools?.update(this.glowLevel, this.poolOn, this.lampColor) ?? false;
   }
 
   /** Model files that failed have come (gathered by `modelRefresh`): the world draws again what it drew without them (once no build runs). */
@@ -2727,6 +2820,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roofs = [];
     this.doors = [];
     this.gates = [];
+    this.townGates = null;
     this.stairwells = [];
     this.lotRooms = null;
     this.walls = this.wallsLow = null;
@@ -2790,10 +2884,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * The viewed lot's roof: only with walls up, and not when zoomed in (it would fill the view), unless a check keeps
-   * it (`keepRoof`). From the town view (`townWhole`) it is on whatever the walls' mode.
+   * it (`keepRoof`) or the camera is a walker's eyes (under it). From the town view (`townWhole`) it is on whatever the walls' mode.
    */
   private roofVisible(): boolean {
-    return (this.wallMode === 'up' || this.townWhole) && (this.roofKept || this.orbit.radius > ROOF_MIN_DISTANCE);
+    return (this.wallMode === 'up' || this.townWhole) && (this.roofKept || this.walk !== null || this.orbit.radius > ROOF_MIN_DISTANCE);
   }
 
   keepRoof(on: boolean): void {
@@ -2852,7 +2946,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * Where residents are this frame (`darkRooms`, `awakeRooms`, `occupiedRooms`, `movers`; away
-   * residents not counted), and which neighbours' houses have someone up in them (`neighboursUp`).
+   * residents not counted), and which neighbours' houses have someone up in them (`neighboursUp`, every
+   * `NEIGHBOURS_EVERY_MS`).
    */
   private findDarkRooms(frame: FrameState): void {
     const { curr, layout } = frame;
@@ -2874,11 +2969,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const sleeping = this.sleepActions.ids;
     const k = layout.sim;
     const W = world.width;
-    // Neighbours' houses only matter once their windows can glow.
-    const houses = this.townMode || this.lampsLevel <= 0 ? NO_HOUSES : this.street.houses;
+    // Neighbours' houses only matter once their windows can glow; who is up in them is looked for a few times a second
+    // (the street draws their windows again at most once a second, `Street.setUp`).
+    const all = this.townMode || this.lampsLevel <= 0 ? NO_HOUSES : this.street.houses;
+    const houses = all.length && frame.now - this.neighboursAt >= NEIGHBOURS_EVERY_MS ? all : NO_HOUSES;
     const up = this.neighboursUp;
-    up.length = houses.length;
-    up.fill(false);
+    const { boxes, grid } = this.gridOf(houses, (b) => b);
+    if (houses.length) {
+      this.neighboursAt = frame.now;
+      up.length = houses.length;
+      up.fill(false);
+    }
     const babies = this.babyStages();
     const count = curr[layout.header.simCount];
     for (let i = 0; i < count; i++) {
@@ -2907,13 +3008,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (asleep || baby || !houses.length) continue;
       // Upstairs is a storey's own rows: back to the ground's.
       const gz = pz - this.rowOf(this.storeyOf(z));
-      for (let h = 0; h < houses.length; h++) {
-        const b = houses[h];
-        if (px >= b[0] && px <= b[2] && gz >= b[1] && gz <= b[3]) {
-          up[h] = true;
-          break;
-        }
-      }
+      const h = grid.find(boxes, px, gz);
+      if (h >= 0) up[h] = true;
     }
     for (const room of awake) dark.delete(room);
     if (houses.length) this.street.setUp(up);
@@ -2972,19 +3068,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Only a leaf where it casts into the sun's map draws the map again: one across town moves the picture alone.)
     const casts = (c: readonly [number, number]) => this.sunShadows.reaches(c[0], c[1] - this.rowOf(this.storeyOf(Math.floor(c[1]))));
     // (A town has a gate in most gardens, a house a door or more a room: one standing shut with
-    // nobody within a cell of it isn't asked.)
+    // nobody within a cell of it isn't asked. The cells as wide as the lead reaches at this speed, at super speed tens of metres.)
+    const size = doorCell(lead);
     const near = this.moverCells;
-    near.clear();
-    const cell = (cx: number, cz: number) => (cx + 1024) * 4096 + cz + 1024;
-    for (let i = 0; i < movers.length; i += MOVER) near.add(cell(Math.floor(movers[i] / GATE_CELL), Math.floor(movers[i + 1] / GATE_CELL)));
-    const anyone = (x: number, z: number) => {
-      if (!near.size) return false;
-      const [cx, cz] = [Math.floor(x / GATE_CELL), Math.floor(z / GATE_CELL)];
-      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (near.has(cell(cx + dx, cz + dz))) return true;
-      return false;
-    };
+    moverCells(movers, size, near);
     for (const gate of this.gates) {
-      if (gate.open === 0 && lead < GATE_CELL && !anyone(gate.leaf.centre[0], gate.leaf.centre[1])) continue;
+      if (gate.open === 0 && !anyoneNear(near, size, gate.leaf.centre[0], gate.leaf.centre[1])) continue;
       const way = goingThrough(movers, gate.leaf.axis, gate.leaf.centre, gate.open === 1, lead, hand);
       // It opens away from the one coming through, and shuts the way it opened.
       if (way && gate.open === 0) gate.towards = way;
@@ -3000,7 +3089,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     for (const door of this.doors) {
       const { leaf } = door;
       // (Both in lot rows: the storey is in the row.)
-      if (door.open === 0 && lead < GATE_CELL && !anyone(leaf.centre[0], leaf.centre[1])) continue;
+      if (door.open === 0 && !anyoneNear(near, size, leaf.centre[0], leaf.centre[1])) continue;
       const target = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1, lead, hand) !== 0 ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
@@ -3020,7 +3109,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       // resident's pose does: held to the preset's `shadowRate`.)
       urgent ||= leaf.front;
     }
-    // (Doors and gates cast only the sun's shadow.)
+    // (Doors and gates cast only the sun's shadow. Any that swung shows in the mirrors' held reflections, whether it casts or not.)
+    if (swung) this.mirrors.changed();
     if (moved) this.sunShadows.moved(urgent, false);
     else if (swung) this.pictureChanged();
   }
@@ -3037,6 +3127,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const minute = this.fixedHour !== null ? this.fixedHour * 60 : (curr[layout.header.minute] ?? this.lastMinute);
     this.lastMinute = minute;
     this.lastWeekday = (Math.max(1, curr[layout.header.day] | 0) - 1) % 7;
+    this.regroundPlaced();
     if (this.townMode) return;
     // Which flats of the building in view may be shown open, asked again a few times a second.
     if (this.viewFlats.length && this.flatsOpen && frame.now - this.flatsAskedAt >= FLATS_ASK_MS) {
@@ -3050,7 +3141,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const step = fast ? Math.max(LIGHT_STEP, this.quality.lightingStep) : LIGHT_STEP;
     const due = this.lastLightMinute < 0 || frame.now - this.lastLightAt >= LIGHT_MIN_MS;
     if (due && Math.abs(minute - this.lastLightMinute) >= step) {
-      this.applyLighting(minute);
+      // (A step of the clock: the sun turned only once it has moved enough, `sunTurned`; lit afresh, at once.)
+      this.applyLighting(minute, this.lastLightMinute >= 0);
       this.lastLightMinute = minute;
       this.lastLightAt = frame.now;
     }
@@ -3058,11 +3150,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.findDarkRooms(frame);
     this.lamps.frame(this.frameDt / 1000, this.darkRooms, this.awakeRooms, this.orbit.target.x, this.orbit.target.z); // (lamps and glows fading, which cast shadows, `lamps.ts`.)
     this.swingDoors(playbackRate(curr, h));
-    this.steerCamera(this.frameDt / 1000);
-    this.settleTarget(this.frameDt / 1000);
-    this.keepCameraClear();
+    if (this.walk) this.steerWalk(this.frameDt / 1000);
+    else {
+      this.steerCamera(this.frameDt / 1000);
+      this.settleTarget(this.frameDt / 1000);
+      this.keepCameraClear();
+    }
     if (this.lot.update(frame)) {
-      this.mirrors.changed(); // (the objects' clips, the screens; things moving, in the held reflections.)
+      this.mirrors.changed(); // (the objects' clips, the screens, the fires' flicker; things moving, in the held reflections.)
       this.pictureChanged();
     }
     this.placing.frame(this.frameDt); // (the effects, the thing in hand.)
@@ -3242,8 +3337,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * rooms and beyond the view too, and what is hidden now (`drawHidden`); buy mode's red copy
    * (`drawRedCopies`); the sun's map drawn; every reflection drawn with everything in it
    * (`Mirrors.warm`: their targets and turned faces); the picture chain as the game has it (the
-   * multisampled scene, the image processing, Low's FXAA). The frame goes to the canvas, behind the
-   * veil; the sun's map, the reflections and the town's held frame are drawn again after.
+   * multisampled scene, the image processing, Low's FXAA), the passes it leaves out for now too
+   * (`PostProcessing.warm`). The frame goes to the canvas, behind the veil; the sun's map, the
+   * reflections and the town's held frame are drawn again after.
    *
    * WebGPU makes its pipelines in the frame that first needs them (PlayCanvas has no asynchronous way
    * there); WebGL2 could skip draws whose shaders still compile (`asyncCompile`, the previews' choice),
@@ -3263,7 +3359,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (And a lamp's shadow map, where lamps cast: its shadow pass's shaders, `lampShadows.ts`.)
     this.lampWarm = true;
     const lamps = this.lamps.warm(this.orbit.target.x, -this.orbit.target.z);
+    // (And the picture chain's passes left out for now: the bloom's by day, `post.ts` `idlePasses`.)
+    const post = this.post?.warm();
     return () => {
+      post?.();
       lamps();
       this.lampWarm = false;
       mirrors();
@@ -3381,9 +3480,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   /**
    * The time of day (`shared/environment.ts`): the sun, the sky's fill, the environment's light,
-   * the fog and the clear colour, in PlayCanvas's units (`lightUnits.ts`). No allocations.
+   * the fog and the clear colour, in PlayCanvas's units (`lightUnits.ts`). `step`: a step of the clock's, whose sun
+   * turns only once it has moved far enough (`sunTurned`); otherwise (a new hour, a load, the bench's) exactly. No
+   * allocations.
    */
-  private applyLighting(minute: number): void {
+  private applyLighting(minute: number, step = false): void {
     this.counts.lightingUpdates++;
     this.pictureChanged(); // (the sky, its light and the lamps', not all of which a held frame sees.)
     const l = lightingAt(minute, LOOK, this.lighting);
@@ -3396,9 +3497,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // A directional light shines along its entity's -y: turned from straight down to the sun's way (game space to PlayCanvas).
     const to = toEngine(l.sunDirection.x, l.sunDirection.y, l.sunDirection.z, this.vTmp).normalize();
     // Only a sun that turned draws its map again: a step that only changes the light's colour (every step of the
-    // night, whose moon stands still) leaves the shadows as they are; the held reflections take the new light either way.
+    // night, whose moon stands still, and most of the day's: `sunTurned`) leaves the shadows as they are; the held
+    // reflections take the new light either way.
     this.mirrors.changed();
-    if (!to.equals(this.sunWay)) {
+    if (step ? sunTurned(to, this.sunWay) : !to.equals(this.sunWay)) {
       this.sunWay.copy(to);
       const axis = this.vTmp2.cross(DOWN, to);
       const sin = axis.length();
@@ -3787,8 +3889,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /**
    * The game's land shaped (a stroke done, undone or redone): the street stands on the landscape's surface (one surface
    * for the land and what stands on it) and plans again the chunks whose roads or lots moved; the viewed lot follows its
-   * pad (the datum); the still casters' shadows
-   * are taken again.
+   * pad (the datum); the still casters' shadows are taken again (the traffic lights, the cars, the parked rides and the
+   * gates stand on it again with the next frame, `regroundPlaced`).
    */
   private landUnderTown(scape: Landscape): void {
     const surface = scape.surface;
@@ -3801,6 +3903,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const datum = surface.padY(at);
     this.applyDatum(datum);
     this.street.setLotY(datum);
+  }
+
+  /**
+   * Those that look the ground up only when placed stand on the surface again (solved again: a land stroke, a world's
+   * roads taken on; once a frame, `update`, as the game's landscape or its `landVersion` changes): the traffic lights'
+   * poles, the cars standing, the parked rides, the other lots' gates. (Only on a land the town follows: elsewhere at 0,
+   * as ever.)
+   */
+  private regroundPlaced(): void {
+    const scape = this.lot.landscape;
+    const version = scape?.landVersion ?? -1;
+    if (this.groundedFor.scape === scape && this.groundedFor.version === version) return;
+    [this.groundedFor.scape, this.groundedFor.version] = [scape, version];
+    this.signals.setGround(this.builtGround);
+    this.cars.setGround(this.builtGround);
+    this.parkedRides.setGround(this.builtGround);
+    if (this.townGates) regroundGates(this.townGates, this.builtGround);
   }
 
   pickLand(x: number, y: number): { x: number; y: number; z: number } | null {

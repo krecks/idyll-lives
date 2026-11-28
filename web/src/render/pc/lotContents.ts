@@ -49,6 +49,7 @@ import { LOOK as CUT } from '../shared/geometry';
 import { compose, multiply, quatYawPitchRoll, type Quat } from '../shared/math';
 import { REST_PROPS } from '../shared/characters/actions';
 import { contactAtlas, type ContactShape } from '../shared/contactShadow';
+import { playbackRate } from '../shared/gameSpeed';
 import { lampCasts } from '../shared/house';
 import { motionsOf, paintColors, painted, placementVariation, standInOf, type Motions } from '../shared/modelEntry';
 import { restPoses, slotOf } from '../shared/objectMotion';
@@ -183,6 +184,9 @@ function fireFlicker(id: number, seconds: number): number {
  * whose share past 1 is the emission's own factor, `GAME_GLOW_TINT`); whether that changed it.
  */
 function setGlow(g: Glow, i: number, f: number, gain = 1): boolean {
+  // (Compared as stored: a level or gain a float32 can't hold would read as changed every time.)
+  f = Math.fround(f);
+  gain = Math.fround(gain);
   if (g.colors[i * 4] === f && g.colors[i * 4 + 3] === gain) return false;
   g.colors.fill(f, i * 4, i * 4 + 3);
   g.colors[i * 4 + 3] = gain;
@@ -270,9 +274,14 @@ export class LotContents {
   private movingCasterDraws: Instances[] = [];
   private glows: Glow[] = [];
   private glowLight: GlowLight = { level: 0, dark: 1, lampOn: (id) => (this.lampsOff.has(id) ? 0 : 1), roomOn: () => 1, dimmed: () => false };
-  /** The objects residents use this frame (screens are lit by it) and when that was. */
+  /** The objects residents use this frame (screens are lit by it). */
   private readonly screenOn = new Set<number>();
-  private screenTime = 0;
+  /**
+   * The screens' and fires' flicker's clock (ms), on only while the game runs, as the flames' sway is: paused, nothing
+   * flickers, so a paused frame is held (`heldFrames.ts`). `flickerAt`: the frame's time it was last moved on at.
+   */
+  private flickerTime = 0;
+  private flickerAt = 0;
   /** Contact shadows under the objects: their material (`objectShadowMaterial`, its opacity this world's atlas of their shapes) and this world's draw. */
   private readonly shadowMaterial: pc.StandardMaterial;
   private shadowDraw: Instances | null = null;
@@ -1314,39 +1323,48 @@ export class LotContents {
   /**
    * The shades' and fires' glow (`lamps.ts` lights the rooms: `light` says how): each instance as
    * bright as its lamp, or its room's lights, at the lamps' level (by day too in a room without
-   * windows); a glow with nothing lit isn't drawn. Screens are lit by use (`update`).
+   * windows); a glow with nothing lit isn't drawn. Screens are lit by use (`update`). Whether a glow changed
+   * (only some lamps' and rooms' are drawn: the lot's).
    */
-  applyGlow(light: GlowLight): void {
+  applyGlow(light: GlowLight): boolean {
     this.glowLight = light;
+    let any = false;
     for (const g of this.glows) {
       if (g.screen) {
-        this.writeScreenGlow(g);
+        any = this.writeScreenGlow(g) || any;
         continue;
       }
       let lit = false;
+      let changed = false;
       g.rooms.forEach((room, i) => {
         const lamp = g.lamps[i];
         const lampOn = lamp >= 0 ? light.lampOn(lamp) : room ? light.roomOn(room) : 1;
         const dark = !!room && light.dimmed(room);
         const f = (dark ? 1 : light.level) * lampOn;
-        if (g.base) g.base[i] = f;
-        // (A light fitting's glass `LAMP_GLASS` times as bright, and where no daylight comes as bright to the eye as at night.)
-        setGlow(g, i, f, g.glass ? LAMP_GLASS * (dark ? light.dark : 1) : 1);
         lit ||= f > 0;
+        if (g.base) {
+          // A fire: `animateFires` flickers its colour about the base, so only the base changing is a change.
+          if (g.base[i] === Math.fround(f)) return;
+          g.base[i] = f;
+        }
+        // (A light fitting's glass `LAMP_GLASS` times as bright, and where no daylight comes as bright to the eye as at night.)
+        changed = setGlow(g, i, f, g.glass ? LAMP_GLASS * (dark ? light.dark : 1) : 1) || changed;
       });
       if (g.draw.destroyed) continue;
-      uploadGlow(g);
+      if (changed) uploadGlow(g);
+      any ||= changed || g.draw.enabled !== lit;
       g.draw.enabled = lit;
     }
+    return any;
   }
 
   /**
    * Screens (a TV, a monitor) are lit only while a resident uses them, and flicker a little while
    * they run; the glow mesh's vertex colour is the screen's, its instance colour the brightness.
    */
-  private writeScreenGlow(g: Glow): void {
+  private writeScreenGlow(g: Glow): boolean {
     const level = this.glowLight.level;
-    const t = this.screenTime / 1000;
+    const t = this.flickerTime / 1000;
     let changed = false;
     let on = false;
     for (let i = 0; i < g.ids.length; i++) {
@@ -1359,20 +1377,23 @@ export class LotContents {
       }
       changed = setGlow(g, i, f) || changed;
     }
-    if (g.draw.destroyed) return;
+    if (g.draw.destroyed) return false;
     // Uploaded only when a brightness changed; off (nobody watching) it isn't drawn at all.
     if (changed) uploadGlow(g);
-    if (g.draw.enabled !== on) g.draw.enabled = on;
+    if (g.draw.enabled === on) return changed;
+    g.draw.enabled = on;
+    return true;
   }
 
   /**
    * Fires flicker: the flames' glow wavers a little about the level the lighting gives it, each fire
    * on a beat of its own, so the warm light it seems to give changes over time, while its flames sway
    * (`ObjectMotion.burning`: near the camera, not on Low, not with Reduce motion); otherwise it holds
-   * steady. `applyGlow` says whether they're drawn.
+   * steady. `applyGlow` says whether they're drawn. Whether a glow changed.
    */
-  private animateFires(frame: FrameState): void {
-    const t = frame.now / 1000;
+  private animateFires(): boolean {
+    const t = this.flickerTime / 1000;
+    let any = false;
     for (const g of this.glows) {
       if (!g.base || g.draw.destroyed) continue;
       let changed = false;
@@ -1384,14 +1405,16 @@ export class LotContents {
       }
       // Uploaded only when a brightness changed.
       if (changed) uploadGlow(g);
+      any ||= changed;
     }
+    return any;
   }
 
-  /** Which screens are on this frame: the objects residents are using (not just walking to). */
-  private animateScreens(frame: FrameState): void {
+  /** Which screens are on this frame: the objects residents are using (not just walking to); whether one's glow changed. */
+  private animateScreens(frame: FrameState): boolean {
     let any = false;
     for (const g of this.glows) any ||= g.screen;
-    if (!any) return;
+    if (!any) return false;
     const { curr, layout } = frame;
     const k = layout.sim;
     this.screenOn.clear();
@@ -1402,24 +1425,27 @@ export class LotContents {
       const id = curr[o + k.object] | 0;
       if (id >= 0) this.screenOn.add(id);
     }
-    this.screenTime = frame.now;
-    for (const g of this.glows) if (g.screen) this.writeScreenGlow(g);
+    let changed = false;
+    for (const g of this.glows) if (g.screen) changed = this.writeScreenGlow(g) || changed;
+    return changed;
   }
 
   // --- each frame ----------------------------------------------------------------------
 
   /**
    * The game's frame (not the overview's): doors that open while residents use what they're on,
-   * ambient clips near the camera (the sun's shadows aren't drawn again for those), the screens.
-   * Whether anything a use moves moved.
+   * ambient clips near the camera (the sun's shadows aren't drawn again for those), the screens, the fires' flicker.
+   * Whether anything moved (what a use moves, or an ambient clip), or a screen's or a fire's glow changed: the mirrors'
+   * held reflections show them all.
    */
   update(frame: FrameState): boolean {
     toGame(this.camera.getPosition(), this.eye);
     const moved = this.motion.update(frame, frame.layout.actions ?? [], this.eye);
     if (moved.moved && this.movingPartsCast) this.hooks.partsMoved();
-    this.animateScreens(frame);
-    this.animateFires(frame);
-    return moved.moved;
+    if (playbackRate(frame.curr, frame.layout.header) > 0) this.flickerTime += Math.max(0, frame.now - this.flickerAt);
+    this.flickerAt = frame.now;
+    const screens = this.animateScreens(frame);
+    return this.animateFires() || screens || moved.moved || moved.ambient;
   }
 
   // --- dev tools (`RendererDebugHooks`) ------------------------------------------------

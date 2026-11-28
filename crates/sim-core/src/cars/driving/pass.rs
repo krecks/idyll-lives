@@ -134,7 +134,13 @@ pub(crate) fn pull_over(
         w.cars[c].waits_for = Some(o.first);
     }
     let car = &w.cars[c];
-    // (Its room run out: back in its lane, whatever.)
+    // (Its room run out: back in its lane, whatever; a work taxi parked beside the road,
+    // `park_beside`, eases back in as it pulls away.)
+    let room = if car.taxi {
+        room.max(car.shift - rate)
+    } else {
+        room
+    };
     let shift = shift.min(room).max(0.0);
     if (shift - car.shift).abs() < 1e-5 {
         return;
@@ -159,6 +165,60 @@ pub(crate) fn pull_over(
     if let Some(s) = car.shown.as_mut() {
         s.0 = at;
     }
+}
+
+/// How far right of its lane a work taxi standing at a stop parks (m, `park_beside`): up on the
+/// pavement or the verge, a car going by in that lane clear of it by `PARK_CLEAR`.
+pub(crate) fn park_shift(wid: f32) -> f32 {
+    wid / 2.0 + CAR_HALF + PARK_CLEAR
+}
+const PARK_CLEAR: f32 = GAP + 0.1;
+
+/// Work taxi `c`, standing at a stop, a tick nearer parked beside the road (`park_shift`,
+/// `PULL_RATE` a tick, never into another: `guard`), so the cars behind it go on by in their lane
+/// instead of out round it into the other, where a queue coming the other way left them no way:
+/// they turned round, and the queue waited for them, the island's only road out for good, Kelpay.
+/// Only at a taxi bay (`taxi::at_bay`): the kerbside furniture keeps clear of those; and not while
+/// anyone's on their way to its door (it would move from under them). Whether it pulled over
+/// further this tick (None: not at a bay, and it stands in its lane as before).
+pub(crate) fn park_beside(w: &mut World, c: usize) -> Option<bool> {
+    let car = &w.cars[c];
+    let (_, route) = car.route.as_ref()?;
+    let (p, yaw, back) = route.at(car.progress);
+    let half = [car.len / 2.0, car.wid / 2.0];
+    let body = |s: f32| Rect {
+        at: shifted(p, yaw, s),
+        yaw,
+        half,
+    };
+    let want = park_shift(car.wid);
+    if back || !crate::taxi::at_bay(w, body(want).at) {
+        return None;
+    }
+    let shift = car.shift + (want - car.shift).clamp(-PULL_RATE, PULL_RATE);
+    // (Those riding in it, `car_bound` too, are seated where it is each tick: no one to move from under.)
+    let coming = |s: &crate::world::Sim| {
+        s.car_bound() == Some(c as u32)
+            && !s
+                .current()
+                .is_some_and(|a| matches!(a.phase, crate::world::Phase::Driving))
+    };
+    if (shift - car.shift).abs() < 1e-5 || w.sims.iter().any(coming) {
+        return Some(false);
+    }
+    let mut others = vehicles(&w.cars, Some(c));
+    others.extend(parked(&w.cars));
+    if guard(&body(car.shift), &body(shift), car.layer(), others.iter()).is_some() {
+        return Some(false);
+    }
+    let at = body(shift).at;
+    let car = &mut w.cars[c];
+    car.shift = shift;
+    car.spot = at;
+    if let Some(s) = car.shown.as_mut() {
+        s.0 = at;
+    }
+    Some(true)
 }
 
 /// Room to spare (m) in `Near::reach` for how far a car may move between `cars::update` building
@@ -412,12 +472,13 @@ pub(crate) fn pass_stands(w: &mut World) {
         .filter(|(_, k)| {
             k.taxi
                 && k.standing
+                && k.shift < park_shift(k.wid) - 1e-3
                 && k.sight == Sight::Seen
                 && matches!(k.state, CarState::Leaving | CarState::Arriving)
         })
         .filter_map(|(o, k)| {
             // (Where it stands in its lane, as it stood still: not as it pulls over for one coming
-            // the other way.)
+            // the other way. Parked beside the road, `park_beside`, it's in nobody's way.)
             let (_, route) = k.route.as_ref()?;
             let (p, yaw, _) = route.at(k.progress);
             Some((

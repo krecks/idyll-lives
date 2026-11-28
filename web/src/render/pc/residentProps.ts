@@ -3,8 +3,8 @@
  * model), the tools on the station they cook at (`tool.*`), and the part of an object they use that
  * they hold (content `held`, `<model key>#<part>`: a guitar, a mop, a dumbbell in each hand). One
  * template per key, built the first time it's asked for; each of its meshes drawn instanced, one copy
- * per resident row, placed by a matrix of its own (game space, 16 floats a row of `matrices`; a row
- * of zeros draws nothing). A prop nobody holds isn't drawn at all.
+ * per resident holding it, placed by a matrix of its own (game space, 16 floats a resident row of
+ * `matrices`; a row of zeros: not held there). A prop nobody holds isn't drawn at all.
  *
  * Built without its file, a prop is a small block (`ITEM_STAND_IN`), built again when the file comes
  * (the residents' code asks the cache to, `shared/characters/residents.ts`), the block taken down once
@@ -61,14 +61,18 @@ export class ResidentProps {
     });
   }
 
-  /** Per frame: draws prop `p` for the first `count` rows (its matrices as written; 0: not at all), its copies uploaded (a few kB at most). */
+  /**
+   * Per frame: draws prop `p` for those of the first `count` rows that hold it (a matrix set; 0: not at all), packed
+   * into its first copies: only the holders' copies uploaded and drawn, not a row of zeros for everyone else in town.
+   */
   show(p: Prop, count: number): void {
-    const used = count > 0;
     for (const d of p.draws) {
+      let n = 0;
+      for (let i = 0; i < count; i++) if (p.matrices[i * 16 + 15] !== 0) d.setMatrix(n++, p.matrices, i * 16);
+      const used = n > 0;
       if (d.enabled !== used) d.enabled = used;
       if (!used) continue;
-      d.setCount(count);
-      for (let i = 0; i < count; i++) d.setMatrix(i, p.matrices, i * 16);
+      d.setCount(n);
       d.update(false);
     }
   }

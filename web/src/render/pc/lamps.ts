@@ -106,8 +106,8 @@ export interface LampView {
 export interface LampHooks {
   house: HouseBuilder;
   lot: LotContents;
-  /** The garden's pools of lamplight again (their lamps' fades: `Lamps.lampOn`). */
-  pools(): void;
+  /** The garden's pools of lamplight again (their lamps' fades: `Lamps.lampOn`); whether one changed. */
+  pools(): boolean;
   /** What casts the lamps' shadows now (`lampShadows.ts`; one list, filled anew at each call). */
   casters(): pc.MeshInstance[];
 }
@@ -436,8 +436,7 @@ export class Lamps {
     const switched = this.fadeLamps(dt);
     if (this.fadeRoomLights(dt) && (this.lampsLevel > 0 || this.view.storey() < 0 || this.dimmed.size > 0)) this.applyRoomLights();
     if ((this.fadeWindowGlow(dt) || switched) && (this.lampsLevel > 0 || this.view.storey() < 0 || this.dimmed.size > 0)) {
-      this.hooks.house.setWindowGlow(this.windowGlowOn);
-      this.applyGlow();
+      this.applyGlow(this.hooks.house.setWindowGlow(this.windowGlowOn));
     }
   }
 
@@ -457,14 +456,17 @@ export class Lamps {
     return this.view.town() ? 0 : Math.min(1, Math.max(0, (this.lampsLevel - 0.35) / 0.5));
   }
 
-  /** The shades' glow (`LotContents.applyGlow`) and the garden's pools. */
-  private applyGlow(): void {
+  /**
+   * The shades' glow (`LotContents.applyGlow`) and the garden's pools; `windows`: the house's windows changed. Told
+   * only if something drawn changed: the fades are the whole town's (its rooms going dark as their residents fall
+   * asleep, every frame of the night), the lot's only a few of them.
+   */
+  private applyGlow(windows = false): void {
     this.glow.level = this.glowLevel;
     // (Where no daylight comes, a lamp's glass as bright to the eye as at night, as its light is: `applyRoomLights`.)
     this.glow.dark = NIGHT_EXPOSURE / this.exposure;
-    this.hooks.lot.applyGlow(this.glow);
-    this.hooks.pools();
-    this.onChanged?.();
+    const shades = this.hooks.lot.applyGlow(this.glow);
+    if (this.hooks.pools() || shades || windows) this.onChanged?.();
   }
 
   /** The interior lights at the night level of the last lighting update, out in rooms where everyone is asleep. */

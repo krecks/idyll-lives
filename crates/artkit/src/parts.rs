@@ -106,13 +106,20 @@ pub(crate) fn join_into(first: Obj, others: &[Obj]) {
 /// `b`'s points, faces and materials added to `a`.
 pub(crate) fn append(a: &mut Mesh, b: &Mesh) {
     let (v0, l0) = (a.verts.len() as u32, a.loops.len());
+    // a face on no material stays on none (`glb::write` writes it without one): not on `a`'s first, nor on a slot
+    // `b`'s materials are about to fill
+    for face in &mut a.faces {
+        if face.mat as usize >= a.mats.len() {
+            face.mat = u16::MAX;
+        }
+    }
     let slots: Vec<u16> = b.mats.iter().map(|&m| a.slot(m)).collect();
     a.verts.extend_from_slice(&b.verts);
     for (f, face) in b.faces.iter().enumerate() {
         let corners: Vec<u32> = b.corners(f).iter().map(|&v| v + v0).collect();
         a.push_face(
             &corners,
-            slots.get(face.mat as usize).copied().unwrap_or(0),
+            slots.get(face.mat as usize).copied().unwrap_or(u16::MAX),
             face.smooth,
         );
     }

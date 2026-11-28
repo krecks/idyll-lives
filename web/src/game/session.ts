@@ -25,12 +25,14 @@ import { threadStats } from '../debug/threads';
 import { DEVLOG, devlog, devlogNextSample, devlogPaused, devlogSlowFrame, renderSample, SAMPLE_MS, SLOW_FRAME_MS } from '../debug/devlog';
 import type { CameraPose, Renderer, SimLook, WallMode } from '../render/types';
 import { carRowIsTaxi } from '../render/shared/cars';
+import { distanceToRect } from '../render/shared/chunks';
 import { WARM_LOTS, warmLots } from '../render/shared/focus';
 import { townView, type TownGoTo } from '../render/shared/townView';
 import { settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
+import { WALK_KEYS, WalkMode, wallOnLine, whereIs } from './walk';
 import { saveDebugReport } from '../ui/debugReport';
 import { lotInSentence, plotInfo } from '../ui/place';
 import { chosenOf } from '../ui/town/chosen';
@@ -49,7 +51,7 @@ import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { addedObjects, BuildBuyInput, editFeedback, liveAdded, placeEffect, type Picked } from './buildmode';
 import { flatRefuses } from './flatBuild';
-import { ownSize } from './surfaces';
+import { ownSize, placedSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { faceFromId, householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
@@ -391,7 +393,7 @@ async function openSession(
   let storeyCheckAt = 0;
   /** The storey in view follows the resident looked at as they go up or down the stairs. */
   const followStorey = (now: number) => {
-    if (now < storeyCheckAt || game.storeys - game.lowestStorey < 2 || game.mode !== 'live' || now - storeyChosenAt < STOREY_STAY_MS) return;
+    if (now < storeyCheckAt || game.storeys - game.lowestStorey < 2 || game.mode !== 'live' || game.walking !== null || now - storeyChosenAt < STOREY_STAY_MS) return;
     storeyCheckAt = now + 250;
     const id = game.inspected ?? game.selected;
     const snap = bridge.latest();
@@ -476,7 +478,7 @@ async function openSession(
    */
   function closeUp() {
     const home = homePlot();
-    if (game.mode !== 'live' || game.follow !== null || viewPlot === null || home === null || mayOpenNow(viewPlot)) return;
+    if (game.mode !== 'live' || game.follow !== null || game.walking !== null || viewPlot === null || home === null || mayOpenNow(viewPlot)) return;
     showPlot(home, false);
   }
 
@@ -509,6 +511,7 @@ async function openSession(
     revealed &&
     game.mode === 'live' &&
     game.follow === null &&
+    game.walking === null &&
     !game.pauseMenu &&
     !game.menu &&
     !game.socialMenu &&
@@ -606,7 +609,8 @@ async function openSession(
     // Time stands still in Build and Create.
     if (game.mode !== 'live') return;
     slowedFrom = null;
-    to = Math.max(0, Math.min(SUPER_SPEED, to));
+    // (Walking: no faster than real time.)
+    to = Math.max(0, Math.min(game.walking !== null ? 1 : SUPER_SPEED, to));
     // (The player's speed, also under a hold.)
     const was = speed.chosen;
     // (Under a menu: the speed it gives back.)
@@ -623,6 +627,8 @@ async function openSession(
     },
     selectSim(id) {
       if (!playerSims().includes(id)) return;
+      // (Walking stays with the one walked: commands go to `game.selected`, so another selected lets go first.)
+      if (id !== game.walking) controls.exitWalk();
       game.selected = id;
       game.socialMenu = null;
       if (liveSettings.directControl === 'always') controls.inspect(id);
@@ -632,7 +638,11 @@ async function openSession(
       game.socialMenu = null;
       // Their details and relationships come with UI updates while the panel is open.
       bridge.inspect(id);
-      if (id !== null && playerSims().includes(id)) game.selected = id;
+      if (id !== null && playerSims().includes(id)) {
+        // (As in `selectSim`: never another one selected under walk mode.)
+        if (id !== game.walking) controls.exitWalk();
+        game.selected = id;
+      }
       renderer.setSelectedSim(id);
       if (id === null && game.follow !== null) controls.follow(null);
     },
@@ -646,6 +656,50 @@ async function openSession(
       }
       // Letting go leaves the camera where it is: the lot under it becomes the focus as the
       // camera roams (`onFocusLot`), rather than a jump home before a "look here" flies off.
+    },
+    enterWalk(id) {
+      if (game.mode !== 'live' || !playerSims().includes(id)) return;
+      controls.exitWalk();
+      controls.openTalk(null);
+      if (game.follow !== null) controls.follow(null);
+      takeBack();
+      walk.enter(id, canvas);
+      if (walk.sim === null) return toast(`${game.roster.find((s) => s.id === id)?.name ?? 'They'} isn't here to walk.`);
+      game.selected = id;
+      game.walking = id;
+      game.menu = null;
+      game.socialMenu = null;
+      walkSaved = { walls: game.wallMode, storey: game.storey, speed: game.speed };
+      // Seen from inside: walls up, the roof on, every storey (a ceiling over each room), and no faster than real time.
+      controls.setWallMode('up');
+      setStorey(game.storeys - 1);
+      if (game.speed > 1) controls.setSpeed(1);
+    },
+    exitWalk() {
+      if (game.walking === null) return;
+      controls.openTalk(null);
+      walk.exit();
+      game.walking = null;
+      if (walkSaved) {
+        controls.setWallMode(walkSaved.walls);
+        setStorey(walkSaved.storey);
+        if (walkSaved.speed > 1 && game.speed === 1) controls.setSpeed(walkSaved.speed);
+      }
+      walkSaved = null;
+    },
+    openTalk(id) {
+      const was = game.talkWith;
+      if (was !== null && was !== game.walking) bridge.send({ type: 'hold', sim: was, on: false });
+      game.talkFrom = id === null ? null : (game.socialMenu?.actor ?? game.walking ?? game.selected);
+      game.talkWith = id;
+      game.socialMenu = null;
+      // (Nothing new of their own while the chat is open: what they're at already goes on.)
+      if (id !== null && id !== game.walking) bridge.send({ type: 'hold', sim: id, on: true });
+    },
+    async answer(words, before, signal) {
+      const id = game.talkWith;
+      if (id === null) return null;
+      return voices.answer(id, game.talkFrom ?? game.selected, words, before, signal);
     },
     frameHouse() {
       takeBack();
@@ -843,6 +897,11 @@ async function openSession(
       game.customising = null;
       // (Build and Create happen at home: see below.)
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
+      if (mode !== 'live') {
+        controls.exitWalk();
+        // (A chat opened from a social menu, not walking: closed too, its resident let go.)
+        controls.openTalk(null);
+      }
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
       if (mode !== 'build') landMode.putAway();
@@ -1234,6 +1293,8 @@ async function openSession(
   const ideas = ideaToasts(() => revealed && game.mode === 'live');
   bridge.onError((message) => {
     if (disposed) return;
+    // (Walking: most likely a steer refused, not sent again until the keys or the way change.)
+    if (game.walking !== null) walk.refused();
     toast(message);
     if (game.mode === 'build') play('error');
   });
@@ -1719,10 +1780,11 @@ async function openSession(
     return best;
   };
 
-  const openMenu = (objectId: number, x: number, y: number) => {
+  /** An object's pie menu; whether it opened (nothing to do with it: not). */
+  const openMenu = (objectId: number, x: number, y: number): boolean => {
     const placement = world?.objects.find((o) => o.id === objectId);
     const def = placement && content.object(placement.def);
-    if (!placement || !def) return;
+    if (!placement || !def) return false;
     // Uses the resident's age isn't for are greyed out (the kids' things for a grown-up, wine for a child).
     const stage = game.sims.find((s) => s.id === game.selected)?.stage;
     // Paid interactions show their price; the pie menu greys them out when funds run short.
@@ -1772,16 +1834,17 @@ async function openSession(
     // Curtains (content `overWindow`): drawn or opened (`PieMenu`'s -2).
     if (def.overWindow) items.unshift({ label: bridge.curtainShut(objectId) ? 'Open the curtains' : 'Draw the curtains', index: -2 });
     // Upgrades are bought in the catalog, not from here.
-    if (items.length === 0) return;
+    if (items.length === 0) return false;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
     play('menu');
+    return true;
   };
 
   /** Food or a dish: eat a serving, or clear it away (to the sink). */
-  const openItemMenu = (itemId: number, x: number, y: number) => {
+  const openItemMenu = (itemId: number, x: number, y: number): boolean => {
     const it = bridge.item(itemId);
     const def = it && content.item(it.def);
-    if (!it || !def) return;
+    if (!it || !def) return false;
     const edible = it.state === 'fresh' && it.servings > 0;
     const servings = it.servings > 1 ? ` (${it.servings} servings)` : '';
     const items = [
@@ -1790,12 +1853,83 @@ async function openSession(
     ];
     game.menu = { objectId: -1, itemId, title: `${def.label}${it.state === 'spoiled' ? ' (gone off)' : servings}`, x, y, items };
     play('menu');
+    return true;
   };
+
+  const openSocialMenu = (actor: number, sim: number, x: number, y: number) => {
+    game.socialMenu = { actor, target: sim, x, y, options: null };
+    play('menu');
+    bridge.requestSocialOptions(actor, sim).then(
+      (options) => {
+        if (game.socialMenu?.target === sim) game.socialMenu = { ...game.socialMenu, options };
+      },
+      (err) => {
+        console.warn('[social] options failed', err);
+        if (game.socialMenu?.target === sim) game.socialMenu = null;
+      },
+    );
+  };
+
+  /** Walk mode (`walk.ts`): F reaches someone this far (tiles) from where the walker stands, and a thing's nearest edge this far. */
+  const REACH = 2.5;
+  const ARM = 1.5;
+  let walkSaved: { walls: WallMode; storey: number; speed: number } | null = null;
+  const walk = new WalkMode({
+    bridge,
+    renderer,
+    fits: inLot,
+    busy: () => !!(game.menu || game.socialMenu || game.pauseMenu || game.talkWith !== null || game.townOpen || game.plannerOpen || game.jobBoardOpen || app.overlay !== null),
+    gone: () => game.walking === null || !playerSims().includes(game.walking),
+    // (In a car or at work: the camera goes with them, and walk mode takes up again once they're back.)
+    away: (on) => controls.follow(on ? game.walking : null),
+    lost() {
+      controls.exitWalk();
+      toast('Walk mode ended: they left.');
+    },
+    // F, within reach and with no wall between: whoever is under the crosshair, else the thing there (its uses), else whoever stands in front.
+    useAt(x, y) {
+      const walker = game.walking;
+      const me = walker !== null ? whereIs(bridge, walker) : null;
+      if (!me || walker === null) return;
+      const walled = (tx: number, tz: number) => wallOnLine(me.x, me.z, tx, tz, (ax, az, bx, bz) => buildBuy.wallAcross(ax, az, bx, bz));
+      const talk = (sim: number, at: { x: number; z: number }) => (walled(at.x, at.z) ? toast('Out of reach.', 1500) : openSocialMenu(walker, sim, x, y));
+      const use = (tx: number, tz: number, open: () => boolean) => {
+        if (walled(tx, tz)) toast('Out of reach.', 1500);
+        else if (!open()) toast('Nothing to do with that here.', 1500);
+      };
+      const aimed = simAt(x, y);
+      const them = aimed !== null && aimed !== walker ? whereIs(bridge, aimed) : null;
+      let far = !!them && pmath.hypot(them.x - me.x, them.z - me.z) > REACH;
+      if (aimed !== null && them && !far) return talk(aimed, them);
+      const hit = renderer.pick(x, y);
+      const item = hit.itemId != null ? bridge.item(hit.itemId) : undefined;
+      if (item) {
+        if (pmath.hypot(item.x - me.x, item.z - me.z) <= ARM) return use(item.x, item.z, () => openItemMenu(item.id, x, y));
+        far = true;
+      }
+      const placement = hit.objectId !== null ? world?.objects.find((o) => o.id === hit.objectId) : undefined;
+      if (placement) {
+        // (The nearest point of its footprint: a sofa or a bed is reached from any side of it.)
+        const [w, d] = placedSize(content, placement);
+        if (distanceToRect(me.x, me.z, placement.x, placement.z, w, d) <= ARM) {
+          const px = Math.max(placement.x, Math.min(placement.x + w - 0.01, me.x));
+          const pz = Math.max(placement.z, Math.min(placement.z + d - 0.01, me.z));
+          return use(px, pz, () => openMenu(placement.id, x, y));
+        }
+        far = true;
+      }
+      const sim = walk.facing(REACH);
+      const at = sim !== null ? whereIs(bridge, sim) : null;
+      if (sim !== null && at) return talk(sim, at);
+      toast(far ? 'Too far: step closer.' : 'Nothing to use here.', 1500);
+    },
+  });
 
   let pointer: PointerInput | null = null;
   const attachPointer = () => new PointerInput(canvas, {
     click(x, y) {
-      if (game.pauseMenu) return;
+      // (Walk mode: F uses things, a drag looks round.)
+      if (game.pauseMenu || game.walking !== null) return;
       game.menu = null;
       game.socialMenu = null;
       game.townOpen = false;
@@ -1818,20 +1952,7 @@ async function openSession(
       const direct = liveSettings.directControl === 'always';
       const actor = direct ? game.selected : game.inspected !== null && playerSims().includes(game.inspected) ? game.inspected : null;
       const sim = simAt(x, y);
-      if (sim !== null && actor !== null && sim !== actor) {
-        game.socialMenu = { target: sim, x, y, options: null };
-        play('menu');
-        bridge.requestSocialOptions(actor, sim).then(
-          (options) => {
-            if (game.socialMenu?.target === sim) game.socialMenu = { ...game.socialMenu, options };
-          },
-          (err) => {
-            console.warn('[social] options failed', err);
-            if (game.socialMenu?.target === sim) game.socialMenu = null;
-          },
-        );
-        return;
-      }
+      if (sim !== null && actor !== null && sim !== actor) return openSocialMenu(actor, sim, x, y);
       if (sim !== null) {
         if (!direct) controls.inspect(sim === game.inspected ? null : sim);
         return;
@@ -1926,6 +2047,12 @@ async function openSession(
       if (e.key === 'Escape') controls.setMode('live');
       return;
     }
+    // Walk mode: its keys are its own (`walk.ts`), and Escape leaves it once no menu or chat is open.
+    // (W walls, E eyedropper and F follow otherwise.)
+    if (game.walking !== null && game.mode === 'live') {
+      if ((WALK_KEYS.has(e.key.toLowerCase()) || e.key.toLowerCase() === 'f') && !e.ctrlKey && !e.metaKey && !e.altKey) return;
+      if (e.key === 'Escape' && !game.menu && !game.socialMenu && game.talkWith === null && !game.townOpen) return controls.exitWalk();
+    }
     const route = routeKey(e, {
       paused: game.pauseMenu,
       dialog: (game.plannerOpen && game.mode === 'live') || game.jobBoardOpen || app.overlay !== null,
@@ -1940,6 +2067,7 @@ async function openSession(
       if (buildBuy.cancel()) return;
       if (game.mode !== 'live') return controls.setMode('live');
       if (game.menu || game.socialMenu) return controls.closeMenu();
+      if (game.talkWith !== null) return controls.openTalk(null);
       if (game.journalOpen) return void (game.journalOpen = false);
       if (game.follow !== null) return controls.follow(null);
       if (game.inspected !== null && liveSettings.directControl !== 'always') return controls.inspect(null);
@@ -2335,6 +2463,7 @@ async function openSession(
       if (townView.goTo === goTo) townView.goTo = null;
       renderer.setGameShot(null);
       renderer.followSim(null);
+      controls.exitWalk();
       services.previews.keep(false);
       // (The town's faces not drawn yet: not for the next game, nor the menus.)
       services.previews.cancelAhead();

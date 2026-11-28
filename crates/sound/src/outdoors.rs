@@ -56,38 +56,30 @@ pub fn car_engine(rate: f64) -> Vec<f32> {
         *v = rasp.run(pink.next(&mut r)) as f32;
     }
     let mut d = fold(noise).left;
-    // The overtones, each a little weaker than the last, each wavering at its own slow pace (whole turns a loop).
-    struct Part {
-        k: f64,
-        amp: f64,
-        wobble: f64,
-        depth: f64,
-        phase: f64,
-    }
-    let parts: Vec<Part> = (0..12)
+    // The overtones, each a little weaker than the last, each wavering at its own slow pace (whole turns a loop):
+    // its level, its wavering's depth, and the two turned by rotation (no `sin` a sample).
+    let mut parts: Vec<(f64, f64, Osc, Osc)> = (0..12)
         .map(|k| {
             let amp = (if k % 2 == 1 { 0.7 } else { 1.0 }) / pow((k + 1) as f64, 1.15);
             let wobble = 1.0 + (r.next() * 5.0).floor();
             let depth = 0.1 + 0.2 * r.next();
             let phase = r.next() * 2.0 * PI;
-            Part {
-                k: (k + 1) as f64,
+            let k = (k + 1) as f64;
+            (
                 amp,
-                wobble,
                 depth,
-                phase,
-            }
+                Osc::new(wobble / seconds, rate, phase),
+                Osc::new(firing * k, rate, phase * k),
+            )
         })
         .collect();
-    for (i, s) in d.iter_mut().enumerate() {
-        let t = i as f64 / rate;
+    let mut firings = Osc::new(firing, rate, 0.0);
+    for s in d.iter_mut() {
         let mut v = 0.0;
-        for p in &parts {
-            v += p.amp
-                * (1.0 + p.depth * sin((2.0 * PI * p.wobble * t) / seconds + p.phase))
-                * sin(2.0 * PI * firing * p.k * t + p.phase * p.k);
+        for (amp, depth, wobble, tone) in &mut parts {
+            v += *amp * (1.0 + *depth * wobble.next()) * tone.next();
         }
-        let beat = 0.5 + 0.5 * sin(2.0 * PI * firing * t);
+        let beat = 0.5 + 0.5 * firings.next();
         *s = (v + 1.6 * *s as f64 * (0.4 + 0.6 * beat * beat)) as f32;
     }
     // From under the bonnet: the highs stay in (the filter run round the loop, so the seam stays whole).
@@ -154,13 +146,25 @@ pub fn leaves(rate: f64) -> Stereo {
         let mut grass = Biquad::with(rate, Filter::Bandpass, 1500.0, 0.6);
         let mut air = Biquad::with(rate, Filter::Lowpass, 380.0, 0.6);
         let mut low = Pink::new();
-        let ch = out.ch(c);
-        for i in 0..n {
+        // The flutter's and the heave's `tanh` every 32 samples, drawn straight between (they move far slower).
+        let shape = |i: usize| {
+            let i = i.min(n - 1);
+            (
+                0.55 + 0.45 * tanh(flutter[i] as f64),
+                1.0 + 0.25 * tanh(heave[i] as f64),
+            )
+        };
+        let (mut from, mut to) = ((0.0, 0.0), shape(0));
+        for (i, o) in out.ch(c).iter_mut().enumerate() {
+            if i & 31 == 0 {
+                (from, to) = (to, shape(i + 32));
+            }
+            let x = (i & 31) as f64 / 32.0;
+            let f = from.0 + (to.0 - from.0) * x;
+            let h = from.1 + (to.1 - from.1) * x;
             let w = pink.next(&mut r);
-            let f = 0.55 + 0.45 * tanh(flutter[i] as f64);
-            let h = 1.0 + 0.25 * tanh(heave[i] as f64);
             let near = h * (leaves.run(w) * 2.2 * f + grass.run(w) * 0.5 * (0.6 + 0.4 * f));
-            ch[i] = (near + air.run(low.next(&mut r)) * 0.5) as f32;
+            *o = (near + air.run(low.next(&mut r)) * 0.5) as f32;
         }
     }
     set_level(fold(out), RMS, 1.0)

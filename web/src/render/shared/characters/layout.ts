@@ -28,8 +28,9 @@
  *      the hem), w the height under which a shell's hem is loose (m, at rest on the resident's body)
  * Disabled cuts are -10 (or +10 for "below" cuts) so their predicate always / never holds.
  * Then `MORPH_TEXELS` texels of (channel, weight, channel, weight); weight 0 = unused: first the
- * `EXPRESSION_TEXELS` of the face's expression, written every frame (`face.ts` `FaceMixer`; a first
- * channel of -1: no morphs at all on this face this frame), then the `IDENTITY_TEXELS` of the resident's
+ * `EXPRESSION_TEXELS` of the face's expression, written every frame (`face.ts` `FaceMixer`; the used pairs
+ * first, the shader reading no further than the first unused; a first channel of -1: no morphs at all on
+ * this face this frame), then the `IDENTITY_TEXELS` of the resident's
  * own face (`identity.ts`), written once when the resident is built. Their weights are signed.
  */
 

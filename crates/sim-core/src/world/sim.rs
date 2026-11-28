@@ -55,6 +55,8 @@ pub(crate) const UNREACHABLE: usize = 4;
 pub(crate) const PERSON_UNREACHABLE_TICKS: u64 = crate::secs(0.5);
 /// Walking speed in tiles per tick (1.5 m per real second at 1×).
 pub(crate) const WALK_SPEED: f32 = 1.5 / TICKS_PER_SECOND as f32;
+/// How many times as fast a resident the player walks goes running (`Sim::running`).
+pub(crate) const RUN_FACTOR: f32 = 2.0;
 /// Idle time before a Sim picks something on its own: a beat seen standing there, a real second
 /// (counted in their steps, so a turn at lower detail covers it, `lod.rs`). Those listening in on a
 /// talk wait longer for its next social (`conversation::REGROUP_TICKS`).
@@ -251,6 +253,10 @@ pub struct Sim {
     /// Up from the upper bunk: the ticks left climbing down its ladder, doing nothing else meanwhile
     /// (`LADDER_DOWN_TICKS`). Not saved: a load finds them down already.
     pub(crate) ladder_ticks: u32,
+    /// Walk mode (`Command::Hold`): they choose nothing on their own. Not saved: a load lets go.
+    pub(crate) steered: bool,
+    /// Walk mode: the last `Command::Steer` ran (`RUN_FACTOR`). Not saved, like `steered`.
+    pub(crate) running: bool,
     /// The first day this Sim looks for work again (after quitting or being let go).
     pub job_search_from: u32,
     /// Routines, goals and how planned blocks went (see `planner`).
@@ -558,8 +564,10 @@ impl Sim {
 
     /// Whether another Sim can pull this one into a conversation right now.
     pub fn available_for_social(&self, content: &Content) -> bool {
-        // (Nor someone at a game for two, or on their way to one: `partners.rs`.)
-        if self.engaged_with.is_some()
+        // (Nor someone at a game for two, or on their way to one: `partners.rs`; nor someone the
+        // player walks, whom nobody else calls over, hands a plate, rings or bids goodbye.)
+        if self.steered
+            || self.engaged_with.is_some()
             || self.heeding.is_some()
             || self.pose == Pose::Lie
             || self.away_until.is_some()

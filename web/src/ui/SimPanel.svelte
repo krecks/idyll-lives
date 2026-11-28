@@ -76,6 +76,18 @@
           </div>
         </div>
         <div class="actions">
+          {#if mine && !baby}
+            <button
+              class="icon-btn"
+              class:on={game.walking === sim.id}
+              title={game.walking === sim.id ? 'Stop walking (Esc)' : `Walk as ${sim.name}: WASD QE, F to use or talk`}
+              aria-label="Walk"
+              aria-pressed={game.walking === sim.id}
+              onclick={() => (game.walking === sim.id ? services.controls.exitWalk() : services.controls.enterWalk(sim.id))}
+            >
+              <Icon name="icon.ui.move" size={16} />
+            </button>
+          {/if}
           <button
             class="icon-btn"
             class:on={game.follow === sim.id}

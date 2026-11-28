@@ -480,7 +480,7 @@ async function matrix(o) {
               if (!result.ok) failed++;
               Object.assign(result, { cell: { preset, backend, scenario, throttle, diag, throughput, run } });
               results.push(result);
-              console.log(result.ok ? `${result.fps.toFixed(1)} fps, frame p50 ${result.interval?.p50.toFixed(1)} ms, CPU ${result.cpu?.frame.avg.toFixed(1)} ms, GPU ${result.gpu.frame ? result.gpu.frame.avg.toFixed(1) : 'n/a'} ms` : `failed: ${result.error}`);
+              console.log(result.ok ? `${result.fps.toFixed(1)} fps, frame p50 ${result.interval?.p50.toFixed(1)} ms, CPU ${result.cpu?.frame.avg.toFixed(1)} ms, GPU ${result.gpu.frame ? result.gpu.frame.avg.toFixed(1) : 'n/a'} ms${result.gpu.overlapped ? ' (overlapped: not GPU time)' : ''}` : `failed: ${result.error}`);
               writeFileSync(join(out, 'results.json'), JSON.stringify(results, null, 1));
             }
           }
@@ -526,7 +526,7 @@ function table(o, results) {
     const m = (get) => median(ok.map(get));
     const r = ok[0];
     rows.push(
-      `| ${c.preset} | ${c.backend} | ${c.scenario} | ${c.diag} | ${c.throttle} | ${f(m((x) => x.fps))} | ${f(m((x) => x.interval?.p50))} / ${f(m((x) => x.interval?.p95))} / ${f(m((x) => x.interval?.p99))} | ${f(m((x) => x.cpu?.frame.avg), 2)} (${f(m((x) => x.cpu?.update.avg), 2)} + ${f(m((x) => x.cpu?.render.avg), 2)}) | ${r.gpu.frame ? `${f(m((x) => x.gpu.frame?.avg), 2)} / ${f(m((x) => x.gpu.frame?.p95), 2)}` : 'n/a'} | ${f(m((x) => x.drawCalls.total), 0)} (${f(m((x) => x.drawCalls.shadow), 0)} / ${f(m((x) => x.drawCalls.mirrors), 0)}) | ${f(m((x) => x.triangles.total / 1e6), 2)} (${f(m((x) => x.triangles.shadow / 1e6), 2)} / ${f(m((x) => x.triangles.mirrors / 1e6), 2)}) | ${r.passes.length} · ${f(r.pixelSamples / 1e6, 1)} · ${f(m((x) => x.targetBytes / 1e6), 0)} | ${f(m((x) => x.residentsMs), 2)} | ${f(m((x) => x.lightingPerSecond), 1)} | ${f(m((x) => x.reflectionsPerSecond ?? 0), 1)} | ${f(m((x) => x.sunShadowsPerSecond?.whole ?? 0), 1)} + ${f(m((x) => x.sunShadowsPerSecond?.moving ?? 0), 1)} | ${f(m((x) => x.longTasks.count), 0)} | ${r.fingerprint} |`,
+      `| ${c.preset} | ${c.backend} | ${c.scenario} | ${c.diag} | ${c.throttle} | ${f(m((x) => x.fps))} | ${f(m((x) => x.interval?.p50))} / ${f(m((x) => x.interval?.p95))} / ${f(m((x) => x.interval?.p99))} | ${f(m((x) => x.cpu?.frame.avg), 2)} (${f(m((x) => x.cpu?.update.avg), 2)} + ${f(m((x) => x.cpu?.render.avg), 2)}) | ${r.gpu.frame ? `${f(m((x) => x.gpu.frame?.avg), 2)} / ${f(m((x) => x.gpu.frame?.p95), 2)}${r.gpu.overlapped ? ' (overlapped)' : ''}` : 'n/a'} | ${f(m((x) => x.drawCalls.total), 0)} (${f(m((x) => x.drawCalls.shadow), 0)} / ${f(m((x) => x.drawCalls.mirrors), 0)}) | ${f(m((x) => x.triangles.total / 1e6), 2)} (${f(m((x) => x.triangles.shadow / 1e6), 2)} / ${f(m((x) => x.triangles.mirrors / 1e6), 2)}) | ${r.passes.length} · ${f(r.pixelSamples / 1e6, 1)} · ${f(m((x) => x.targetBytes / 1e6), 0)} | ${f(m((x) => x.residentsMs), 2)} | ${f(m((x) => x.lightingPerSecond), 1)} | ${f(m((x) => x.reflectionsPerSecond ?? 0), 1)} | ${f(m((x) => x.sunShadowsPerSecond?.whole ?? 0), 1)} + ${f(m((x) => x.sunShadowsPerSecond?.moving ?? 0), 1)} | ${f(m((x) => x.longTasks.count), 0)} | ${r.fingerprint} |`,
     );
   }
   return rows.join('\n') + '\n';

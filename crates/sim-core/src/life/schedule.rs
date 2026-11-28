@@ -272,7 +272,8 @@ fn schedule_school(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
     if tick < leave {
         return;
     }
-    if !heading_out(sim) && !in_a_car(sim) {
+    // (Walked by the player: they go when let go, or miss the day.)
+    if !heading_out(sim) && !in_a_car(sim) && !sim.steered {
         set_off(sim, content, objects, tick);
     }
 }
@@ -315,7 +316,7 @@ fn schedule_work(w: &mut World, i: usize, day: u32, fresh: Option<u64>) {
         miss_shift(w, i, day);
         return;
     }
-    if tick < leave || heading_out(sim) || in_a_car(sim) {
+    if tick < leave || heading_out(sim) || in_a_car(sim) || sim.steered {
         return;
     }
     if let Some(baby) = stays_home_for(w, i) {

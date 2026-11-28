@@ -2,7 +2,8 @@
 //!
 //! Objects, genders, traits, perks, needs, interactions, feelings and careers are stored by id
 //! (not index), so saves survive content changes; anything that no longer exists is
-//! dropped on load. In-progress activities restart from the beginning on load.
+//! dropped on load (an object, or a thing bought to set up, with its value back to its
+//! household). In-progress activities restart from the beginning on load.
 //!
 //! Version history (what each version brought; this build opens none older than
 //! `OLDEST_SAVE_VERSION`, so what an older file lacked no longer matters): 1 = single household; 2 = town (households, plots), relationships,

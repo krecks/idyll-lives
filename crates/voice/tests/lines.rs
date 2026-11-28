@@ -114,6 +114,36 @@ fn every_line_phonemizes_from_the_dictionary() {
     );
 }
 
+/// Every resident's first and last name (`base.json` `names`): `{me}` and `{name}` hold them, so a
+/// name the dictionary misses is spoken and mouthed as a guess. `-- --ignored` lists them.
+#[test]
+#[ignore = "622 of 793 names (2026-11-27) are not in Misaki's dictionary; the owner decides"]
+fn every_name_is_in_the_dictionary() {
+    let Some(g2p) = g2p() else { return };
+    let base = read_json(&content_dir().join("base.json"));
+    let names = &base["names"];
+    let mut all = BTreeSet::new();
+    for list in [
+        &names["first"],
+        &names["byGender"]["female"],
+        &names["byGender"]["male"],
+        &names["last"],
+    ] {
+        all.extend(list.as_array().unwrap().iter().map(|n| n.as_str().unwrap()));
+    }
+    assert!(all.len() > 100, "found only {} names", all.len());
+    let unknown: Vec<&str> = all
+        .into_iter()
+        .filter(|n| !g2p.unknown_words(n).is_empty())
+        .collect();
+    assert!(
+        unknown.is_empty(),
+        "{} names not in the dictionary (guessed): {}",
+        unknown.len(),
+        unknown.join(", ")
+    );
+}
+
 #[test]
 fn every_line_reads_as_plain_text() {
     let mut all = Vec::new();
