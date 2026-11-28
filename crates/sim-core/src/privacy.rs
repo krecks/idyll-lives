@@ -671,9 +671,8 @@ pub(crate) fn shut_to(shut: &[Shut], me: u32, mine: Option<(u32, usize)>, room: 
             && (s.doing.is_none() || s.doing != mine)
             && !s.claimants.contains(&me)
     };
-    let found = room != OUTDOORS && in_room(shut, room).iter().any(shut_by);
-    debug_assert_eq!(found, room != OUTDOORS && shut.iter().any(shut_by));
-    found
+    // (`in_room` holds to a scan of all of `shut` while it is sorted by room: `check_index`.)
+    room != OUTDOORS && in_room(shut, room).iter().any(shut_by)
 }
 
 /// Whether `room`, kept shut, may be walked through to a room beyond: a bedroom (claimed), unless
@@ -686,9 +685,24 @@ fn passable(shut: &[Shut], room: u16) -> bool {
 
 /// Whether `sim` keeps a room shut now.
 pub fn keeps_shut(world: &World, sim: u32) -> bool {
-    let keeps = world.shut_by.get(sim as usize).copied().unwrap_or(false);
-    debug_assert_eq!(keeps, world.shut.iter().any(|s| s.by == sim));
-    keeps
+    // (Held to a scan of `World::shut`: `check_index`.)
+    world.shut_by.get(sim as usize).copied().unwrap_or(false)
+}
+
+/// Panics if the rooms kept shut aren't sorted by room (as `shut_to` looks them up) or `keeps_shut`'s
+/// index differs from a scan of them (the tick calls this about once a game minute).
+pub(crate) fn check_index(world: &World) {
+    assert!(
+        world.shut.is_sorted_by_key(|s| s.room),
+        "`World::shut` not sorted by room"
+    );
+    for sim in 0..world.sims.len() as u32 {
+        assert_eq!(
+            keeps_shut(world, sim),
+            world.shut.iter().any(|s| s.by == sim),
+            "`World::shut_by` differs from `World::shut`"
+        );
+    }
 }
 
 /// Whether the thing at tile `at` (where it's used from) is in a room kept shut to `sim` by

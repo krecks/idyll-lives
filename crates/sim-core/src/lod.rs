@@ -143,9 +143,15 @@ pub(crate) fn plan(w: &mut World) {
             let at = tick + i as u64;
             at.is_multiple_of(LOD_TICKS) && (at.is_multiple_of(FAR_TICKS) || !w.far_away(i))
         };
-        debug_assert_eq!(
-            due(w),
-            (tick + i as u64).is_multiple_of(if w.far_away(i) { FAR_TICKS } else { LOD_TICKS })
+        // (Off a `LOD_TICKS` tick both sides are false: `far_away` only asked on one.)
+        debug_assert!(
+            !(tick + i as u64).is_multiple_of(LOD_TICKS)
+                || due(w)
+                    == (tick + i as u64).is_multiple_of(if w.far_away(i) {
+                        FAR_TICKS
+                    } else {
+                        LOD_TICKS
+                    })
         );
         let s = &w.sims[i];
         // Off to work or school (or told to do something): no waiting for their turn. Nor for

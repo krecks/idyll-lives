@@ -15,7 +15,9 @@
 //! where one of them is drawn (`common::drawn`); a car held up for good counts anywhere.
 //!
 //! Make the worlds first: `bun tools/worlds/sample.ts worlds.json`,
-//! then `WORLDS=worlds.json cargo test --release -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`.
+//! then `WORLDS=worlds.json cargo test --profile checks -p sim-core --test sim generated_worlds:: -- --ignored --nocapture`
+//! (Cargo.toml's `checks`: optimised, the debug assertions kept). `FAIL_FAST=1` stops every world
+//! at its next game hour once one has failed.
 
 use crate::common;
 use common::TICKS_PER_HOUR;
@@ -29,8 +31,14 @@ use sim_core::world::{MAX_SIMS, Plot, TaskKind};
 
 /// `check` for each of `items`, a few at a time (one per core, or `WORLD_THREADS` at most: each
 /// world plays on its own, and a path search's budget counts on its own thread), the results in
-/// the items' order.
-fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> Vec<T> {
+/// the items' order. The worlds with the most residents go first, so the slowest don't start last.
+fn each_world<T: Send>(
+    items: &[(usize, &serde_json::Value)],
+    check: impl Fn(&(usize, &serde_json::Value)) -> T + Sync,
+) -> Vec<T> {
+    let residents = |k: usize| items[k].1["town"]["sims"].as_array().map_or(0, Vec::len);
+    let mut order: Vec<usize> = (0..items.len()).collect();
+    order.sort_by_key(|&k| std::cmp::Reverse(residents(k)));
     let threads = std::env::var("WORLD_THREADS")
         .ok()
         .and_then(|n| n.parse().ok())
@@ -45,9 +53,9 @@ fn each_world<I: Sync, T: Send>(items: &[I], check: impl Fn(&I) -> T + Sync) -> 
                 scope.spawn(|| {
                     let mut done = Vec::new();
                     loop {
-                        let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        let Some(item) = items.get(k) else { break };
-                        done.push((k, check(item)));
+                        let n = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(&k) = order.get(n) else { break };
+                        done.push((k, check(&items[k])));
                     }
                     done
                 })
@@ -1235,6 +1243,9 @@ fn generated_worlds_cars_keep_to_the_roads() {
         Some((seed.parse().ok()?, plot.parse().ok()?))
     });
     let items: Vec<(usize, &serde_json::Value)> = worlds.iter().enumerate().collect();
+    // (FAIL_FAST=1: once a world has failed, the others stop at their next game hour.)
+    let fail_fast = std::env::var("FAIL_FAST").is_ok_and(|v| v == "1");
+    let failed = std::sync::atomic::AtomicBool::new(false);
     let results = each_world(&items, |&(i, world)| {
         let mut failures = Vec::new();
         // (Worlds driven, cars, with no way out, drives to work, trips, taxi riders at work and
@@ -1388,6 +1399,16 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let mut slips = Slips::default();
         while w.tick < end {
             w.tick_once();
+            if fail_fast && w.tick.is_multiple_of(TICKS_PER_HOUR) {
+                use std::sync::atomic::Ordering::Relaxed;
+                if !failures.is_empty() {
+                    failed.store(true, Relaxed);
+                }
+                if failed.load(Relaxed) {
+                    eprintln!("  {label}: stopped, a world failed (FAIL_FAST)");
+                    return (tally, failures, None);
+                }
+            }
             // (The first half day: `HalfDay`'s checks, and the whole town checked every three hours.)
             let k = w.tick - start;
             if k <= HALF_DAY {
@@ -1602,6 +1623,9 @@ fn generated_worlds_cars_keep_to_the_roads() {
             started.elapsed().as_secs_f32()
         );
         let ridden = half.finish(&w, &label, cellars, &mut failures);
+        if !failures.is_empty() {
+            failed.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
         (tally, failures, ridden)
     });
     let mut failures = Vec::new();

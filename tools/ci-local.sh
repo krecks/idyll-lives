@@ -12,7 +12,12 @@
 #   SEED_BASE=3 tools/ci-local.sh generated
 #                                the generated-world checks over other sample worlds (default 0:
 #                                CI's). The same seed base makes the same worlds, so a failure
-#                                replays; the release gate runs `generated` over five seed bases.
+#                                replays.
+#   SEED_BASES="0 1 2 3 4 5" tools/ci-local.sh generated
+#                                the release gate: every base's worlds made at once, the houses
+#                                checked once, then each base's worlds run in turn (the first to
+#                                fail ends it). FAIL_FAST=1 also stops a base's other worlds once
+#                                one has failed.
 #   SLOW_TESTS=1 tools/ci-local.sh sim web
 #                                with the slow tests: the simulation's long runs (`slow-tests`
 #                                feature) and the renderer's town-building files (`*.slow.test.ts`).
@@ -59,25 +64,47 @@ step() {
       cargo test -p sim-wasm --locked
       cargo run -p sim-core --example tickbench --locked ${SLOW_TESTS:+--features slow-tests}
       ;;
-    # The ignored generated_* tests need sample files made first. In the simulation tests' own build
-    # (already optimised): a release build of the whole test binary would cost more than it saves.
+    # The ignored generated_* tests need sample files made first. In Cargo.toml's `checks` profile
+    # (optimised, the debug assertions and overflow checks kept, the ticks the same to the bit): the
+    # 43-game-hour runs are some 95 % ticking, so its build pays for itself many times over.
     generated)
-      local out
+      local out base pids=()
       out=$(mktemp -d)
-      # (Gone even when a test fails, which ends the script; the path taken now, as `out` is this
-      # step's own.)
-      trap "rm -rf '$out'" EXIT
+      # (Gone even when a test fails, which ends the script, as are samples still being made; the
+      # path taken now, as `out` is this step's own.)
+      trap "kill \$(jobs -p) 2>/dev/null; rm -rf '$out'" EXIT
+      # Worlds three per kind (every one Big), the same seed base making the same worlds: every base's
+      # made at once (one process each), then the houses once.
       # (`--no-timing`: their time budgets were measured on an M3 Pro, so a slower or busy machine
       # doesn't fail the gate; the timings are still printed.)
+      local bases=${SEED_BASES:-${SEED_BASE:-0}}
+      for base in $bases; do
+        echo "Sample worlds of seed base $base."
+        "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds-$base.json" 3 --seed-base "$base" --no-timing > "$out/sample-$base.log" 2>&1 &
+        pids+=($!)
+      done
       "${bun_ci[@]}" tools/housegen/sample.ts "$out/houses.json" --no-timing
-      # Worlds three per kind (every one Big), the same seed base making the same worlds.
-      local base=${SEED_BASE:-0}
-      echo "Sample worlds of seed base $base."
-      "${bun_ci[@]}" tools/worlds/sample.ts "$out/worlds.json" 3 --seed-base "$base" --no-timing
-      if ! HOUSES="$out/houses.json" WORLDS="$out/worlds.json" cargo test -p sim-core --locked --test sim -- --ignored generated_houses:: generated_worlds::; then
-        echo "The generated-world checks failed on seed base $base (again: SEED_BASE=$base tools/ci-local.sh generated)." >&2
-        exit 1
-      fi
+      # (shortcut: waited for in turn, so a later base's failure waits on the earlier ones' samples;
+      # `wait -n` once macOS's bash is past 3.2.)
+      local k=0
+      for base in $bases; do
+        wait "${pids[$k]}" || { cat "$out/sample-$base.log"; echo "The sample worlds of seed base $base failed." >&2; exit 1; }
+        cat "$out/sample-$base.log"
+        k=$((k + 1))
+      done
+      local test=(cargo test -p sim-core --locked --profile checks --test sim -- --ignored)
+      # First what only loads the worlds (and the houses, the first time): a fault there stops the
+      # step before the long run. Then the long run, its per-world times shown (`--nocapture`).
+      local houses=generated_houses::
+      for base in $bases; do
+        # (`$houses` unquoted: gone once the houses are checked.)
+        if ! HOUSES="$out/houses.json" WORLDS="$out/worlds-$base.json" "${test[@]}" $houses generated_worlds::generated_worlds_are_driven_across ||
+          ! WORLDS="$out/worlds-$base.json" "${test[@]}" generated_worlds::generated_worlds_cars_keep_to_the_roads --nocapture; then
+          echo "The generated-world checks failed on seed base $base (again: SEED_BASE=$base tools/ci-local.sh generated)." >&2
+          exit 1
+        fi
+        houses=
+      done
       rm -rf "$out"
       ;;
     # The residents' clips on both bodies at every life stage (known failures: tools/characters/clip-baseline.json).

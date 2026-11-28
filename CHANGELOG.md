@@ -9,6 +9,10 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **Taxi bays:** an empty house's taxi bay moves with its door, so the kerbside furniture keeps clear of the right spot. Editing a road or a driveway while paused no longer slows every update after it. A taxi pulled over for another car goes back into its lane as other cars do; only one parked in its bay eases out.
 - **More new worlds generate cleanly:** a motorway's junction is laid where a road from the town can climb to it, and never over a road that climbs a steep hill just past it; a slip road meets its motorway without a step; a street left ending in the air by a country road given up to the slopes is cut back to its last junction; a river's extra bridge always joins the roads; a city's centre is found when its one-way streets leave the high street short, a winding main street is still chosen as the high street over a short lane, and a town's square no longer counts against its centre being the most built up; every village gets a parking bay; a motorway's bridge off an island reaches the world's edge.
 
+For developers:
+
+- **Faster generated-world checks:** `tools/ci-local.sh generated` builds in a new `checks` profile (optimised, debug assertions and overflow checks kept, the ticks the same to the bit), runs the quick checks before the 43-game-hour run, starts the biggest worlds first and prints each world's time. `SEED_BASES="0 1 2 3 4 5"` makes every base's worlds at once for the release gate, and `FAIL_FAST=1` stops the other worlds once one has failed. The tick's per-resident cross-checks of the partner and kept-shut indexes now run as whole-index checks about once a game minute.
+
 ## 0.9.0 — 2026-11-27
 
 - **Walk mode:** walk as the selected resident in first person: W/S walk, A/D turn, Q/E step aside, drag to look. F uses the thing in front of you, or on a person opens the socials and a typed "Talk…" chat the LLM answers. The resident's own free will waits while you walk.
