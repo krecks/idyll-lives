@@ -1,6 +1,6 @@
 //! Which families `cargo art` builds (`ll_art::pick`), and `--centres`: every family's models' centres, and no
 //! others.
-#[path = "../../artkit/tests/common/cypress.rs"]
+#[path = "../../artkit/tests/all/common/cypress.rs"]
 mod cypress;
 
 use ll_art::{centres_of, pick, registry};

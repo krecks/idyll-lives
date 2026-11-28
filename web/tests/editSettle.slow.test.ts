@@ -5,7 +5,7 @@
 // it settled instead, and the Street tool's live checks forecast it; a street bridged over a river keeps its deck dry for walkers; undo settles to the same bytes; a
 // lot removed and added again settles like the original; a lot removed moves the land only round itself (the
 // planes the town was laid with kept: `open.gentle`) and no road; an edit's settle on the biggest worlds is timed.
-// `SLOW_TESTS=1 bun test tests/editSettle.slow.test.ts`.
+// `bun test tests/editSettle.slow.test.ts` by hand; the slow set is `bun run test:slow` in web/ (`SLOW_TESTS=1 tools/ci-local.sh web`; CI on v* tags and by hand).
 import { describe, expect, test } from 'bun:test';
 import { inWorkerOf, loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';

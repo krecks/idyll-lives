@@ -16,6 +16,8 @@ cd "$(dirname "$0")/.."
 bin="${CARGO_HOME:-$HOME/.cargo}/bin"
 export PATH="$bin:$PATH"
 if [[ -n "${GITHUB_PATH:-}" ]]; then echo "$bin" >> "$GITHUB_PATH"; fi
+# The wasm packages are kept on this machine between jobs (tools/wasm-cache.sh), which CI would otherwise skip: GITHUB_ENV carries it to the later steps.
+export LL_WASM_CACHE=1; if [[ -n "${GITHUB_ENV:-}" ]]; then echo "LL_WASM_CACHE=1" >> "$GITHUB_ENV"; fi
 if ! command -v rustup >/dev/null; then
   echo "No rustup here: installing it (the toolchain comes next)."
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |

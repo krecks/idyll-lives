@@ -15,6 +15,7 @@ serde_json = "1"
 # the sim-core suite take minutes.
 [profile.dev]
 opt-level = 1
+debug = "line-tables-only"
 
 [profile.release]
 opt-level = 3
@@ -31,6 +32,7 @@ inherits = "release"
 lto = false
 codegen-units = 16
 incremental = true
+debug = "line-tables-only"
 # (a length read from a file is not trusted: a product that wraps is a slice to the wrong place, not a small number)
 overflow-checks = true
 # (`cargo art` builds a thread a model and says which one failed: a panic unwinds to it.)

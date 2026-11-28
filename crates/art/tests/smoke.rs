@@ -1,7 +1,7 @@
 //! `cargo art` from end to end on a model that needs no leaf cards: the Italian cypress (the kernel's own, kept
 //! with its tests), built by the runner under another root and compared with the committed files and pack entry,
 //! which the trees family built, triangle for triangle.
-#[path = "../../artkit/tests/common/cypress.rs"]
+#[path = "../../artkit/tests/all/common/cypress.rs"]
 mod cypress;
 
 use ll_art::{Options, run_family};

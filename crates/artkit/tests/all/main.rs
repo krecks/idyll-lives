@@ -1,0 +1,51 @@
+//! The artkit tests, in one binary: each file here is a module of them, `common` their shared fixtures.
+//! Run one file's tests with a filter, `cargo test -p artkit --test all api_cut::`.
+
+mod common;
+
+mod api_cut;
+mod api_edit;
+mod api_family;
+mod api_inset;
+mod api_join;
+mod api_macros;
+mod api_misc;
+mod api_names;
+mod api_shade;
+mod api_subdivide;
+mod api_transform;
+mod api_weighted;
+mod api_whole;
+mod bevel;
+mod bevel_fixes;
+mod botany;
+mod botany_plants;
+mod clips;
+mod cypress;
+mod decimate;
+mod eased;
+mod face_centre;
+mod fill_slats;
+mod flip_normals;
+mod forms;
+mod forms_object_of;
+mod glb_no_material;
+mod glb_read;
+mod kit;
+mod kit_cuts;
+mod kit_letters;
+mod kit_packs;
+mod more_shapes;
+mod ngons;
+mod normals_joined;
+mod numbers;
+mod place;
+mod shade_built;
+mod shade_ties;
+mod shapes;
+mod smooth_angle;
+mod soft;
+mod track_quat;
+mod unit_normals;
+mod validate;
+mod weld;

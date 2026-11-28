@@ -2,7 +2,7 @@
 // `Land.seeded` 'follow'): from the town job, in its preview and in its town file, as the surface worked out
 // from that file has it (its roads and pads on the land stored), unshaped (`edited` false) and kept by
 // `applyLand` while unshaped; a town laid again on it is graded into it again, not flattened. Classic worlds
-// and drafts from older code get none (they stay flat). `SLOW_TESTS=1 bun test tests/landFollow.slow.test.ts`.
+// and drafts from older code get none (they stay flat). `bun test tests/landFollow.slow.test.ts` by hand; the slow set is `bun run test:slow` in web/ (`SLOW_TESTS=1 tools/ci-local.sh web`; CI on v* tags and by hand).
 import { describe, expect, test } from 'bun:test';
 import { loadContent, templatesOf, usePublicFetch } from './support/content';
 

@@ -5,8 +5,7 @@
  * least `FLOOR`'s worlds have one and at least its villages are placed, one fewer than there were (2026-11-24, the
  * motorway before the villages and costing none of them, the lake's villages along its shore: 47 of the 66 worlds,
  * from 31 when it came after them, none among mountains; their villages 185, from 180). Each world with one has nothing wrong
- * with it (`motorwayProblems`) and every crossing on both roads under a deck. `SLOW_TESTS=1 bun test
- * tests/motorwayFit.slow.test.ts`; `bun tools/worlds/map.ts <dir> 2 --classic` draws the same worlds' maps.
+ * with it (`motorwayProblems`) and every crossing on both roads under a deck. `bun test tests/motorwayFit.slow.test.ts` by hand; the slow set is `bun run test:slow` in web/ (`SLOW_TESTS=1 tools/ci-local.sh web`; CI on v* tags and by hand); `bun tools/worlds/map.ts <dir> 2 --classic` draws the same worlds' maps.
  */
 import { describe, expect, test } from 'bun:test';
 import { loadContent, templatesOf, usePublicFetch } from './support/content';

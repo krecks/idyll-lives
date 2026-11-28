@@ -3,7 +3,7 @@
 // carried; a new world (`generateWorld`) is that land and that town; a river kept as planned bridged, one
 // painted over bridged to the villages across it, a river cross a village on every quarter (none with no villages),
 // a city too big for any quarter told so; the land as step 1 left it, and its level, kept away from the town (no jump in height
-// between the steps); and a land the player shaped still taking a town, its town file carrying that land. `SLOW_TESTS=1 bun test tests/landFirst.slow.test.ts`.
+// between the steps); and a land the player shaped still taking a town, its town file carrying that land. `bun test tests/landFirst.slow.test.ts` by hand; the slow set is `bun run test:slow` in web/ (`SLOW_TESTS=1 tools/ci-local.sh web`; CI on v* tags and by hand).
 import { describe, expect, test } from 'bun:test';
 import { networks } from './support/roads';
 import { loadContent, templatesOf, usePublicFetch } from './support/content';

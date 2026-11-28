@@ -5,7 +5,7 @@
 // twice and no hard problem its layout hadn't, the rest of the town standing as it was; an untouched layout built
 // again from another seed is about as dense as the generator's town, kind by kind (a table printed); a cluster
 // painted far from every town along a street of its own is a village; the brush never paints water or a road; and
-// step 2's summary is within a quarter of what Build makes (exactly it for an untouched layout; an edit that leaves the zones be moves it by what it changes). `SLOW_TESTS=1 bun test tests/buildFromUses.slow.test.ts`.
+// step 2's summary is within a quarter of what Build makes (exactly it for an untouched layout; an edit that leaves the zones be moves it by what it changes). `bun test tests/buildFromUses.slow.test.ts` by hand; the slow set is `bun run test:slow` in web/ (`SLOW_TESTS=1 tools/ci-local.sh web`; CI on v* tags and by hand).
 import { describe, expect, test } from 'bun:test';
 import { inWorkerOf, loadContent, templatesOf, usePublicFetch } from './support/content';
 
