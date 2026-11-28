@@ -189,12 +189,24 @@ impl Relationships {
     /// Current partner of `a`, if any.
     pub fn partner_of(&self, a: usize) -> Option<usize> {
         let partner = self.partner.get(a).copied().flatten().map(|b| b as usize);
-        debug_assert_eq!(
-            partner,
-            (0..self.n).find(|&b| b != a && self.get(a, b).partners),
+        // (The whole index against a scan: `check_partners`, about once a game minute.)
+        debug_assert!(
+            partner.is_none_or(|b| self.get(a, b).partners),
             "partners changed without `set_partners`"
         );
         partner
+    }
+
+    /// Panics if the partner index differs from a scan of every pair (`partner_of` checks only
+    /// that the indexed partner is one: the tick calls this about once a game minute).
+    pub fn check_partners(&self) {
+        for a in 0..self.n {
+            assert_eq!(
+                self.partner.get(a).copied().flatten().map(|b| b as usize),
+                (0..self.n).find(|&b| b != a && self.get(a, b).partners),
+                "partners changed without `set_partners`"
+            );
+        }
     }
 
     pub fn adjust(&mut self, a: usize, b: usize, friendship: f32, romance: f32) {

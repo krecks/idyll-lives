@@ -114,9 +114,9 @@
     {
       "name": "sim-privacy",
       "file": "crates/sim-core/src/privacy.rs",
-      "sha256": "01571a9bc70cf9fcedd69d2d657ad4799065f9aaa8b1d6b7daa287005e095ee7",
-      "by": "playtest/design-proposals",
-      "reason": "PR #115, owner's OK: someone waiting outside a room kept shut gives up after 50 game minutes (WAIT_MINUTES, was 60)."
+      "sha256": "c44a98aa401c6252d51fe02d5952beb42046301f8765be56160e3c1249f68aa5",
+      "by": "perf/generated-checks",
+      "reason": "perf/generated-checks, behaviour unchanged: the per-call debug cross-checks (a full scan each call) moved to a whole-index check about once a game minute in the tick; grid_identity identical."
     },
     {
       "name": "living-town-lens",
@@ -193,9 +193,9 @@
     {
       "name": "sim-social-relationships",
       "file": "crates/sim-core/src/social/relationships.rs",
-      "sha256": "d1907f240475e89c6a7e3efd1cbac67e8743412535dff1d897e73f3a895dd5d3",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. Social's last accepted change stands (0.8.3 missing-items run: cleaning tools, the post at home, household cars and their events, nobody moves house at the wheel)."
+      "sha256": "1c4ef8d3af87b7fa3513ee440b3f420df9c2ace76a2899d257c559d71fe9debe",
+      "by": "perf/generated-checks",
+      "reason": "perf/generated-checks, behaviour unchanged: the per-call debug cross-checks (a full scan each call) moved to a whole-index check about once a game minute in the tick; grid_identity identical."
     },
     {
       "name": "sim-social-events",

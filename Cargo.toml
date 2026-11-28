@@ -22,6 +22,16 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 
+# The generated-world checks (tools/ci-local.sh `generated`): days of big towns ticked, so optimised as the
+# tools are, with the dev build's assertions and overflow checks kept (the ticks are the same to the bit).
+[profile.checks]
+inherits = "release"
+lto = false
+codegen-units = 16
+debug-assertions = true
+overflow-checks = true
+debug = "line-tables-only"
+
 # The repo's tools (crates/tools): the aliases in .cargo/config.toml, their tests and CI's tools job.
 # Release's optimisations without its fat LTO, in 16 codegen units and incremental, so a change to the
 # tools builds again in seconds where fat LTO took about a minute; their outputs are the same to the

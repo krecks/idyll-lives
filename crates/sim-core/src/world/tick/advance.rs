@@ -309,6 +309,11 @@ impl World {
         crate::profile::phase("staff::update", || crate::staff::update(self));
         self.build_briefs(tick);
         crate::profile::phase("privacy::refresh", || crate::privacy::refresh(self));
+        // (The indexes read per resident each tick, held to full scans about once a game minute.)
+        if cfg!(debug_assertions) && tick.is_multiple_of(crate::TICKS_PER_MINUTE) {
+            self.relationships.check_partners();
+            crate::privacy::check_index(self);
+        }
         crate::profile::phase("lod::plan", || crate::lod::plan(self));
         let steps_start = crate::profile::start();
         // Those who go first when the tick's searches run over budget: the player's household
@@ -502,11 +507,7 @@ impl World {
                 eating: s.eating_seated(),
                 game: s.game,
                 // (`partners::free_now`, its start just above.)
-                free: {
-                    let free = available && crate::partners::free_besides(&self.content, s, tick);
-                    debug_assert_eq!(free, crate::partners::free_now(&self.content, s, tick));
-                    free
-                },
+                free: available && crate::partners::free_besides(&self.content, s, tick),
                 bound_for_car: s.bound_for_car.filter(|_| {
                     s.current()
                         .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))

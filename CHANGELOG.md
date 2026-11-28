@@ -2,6 +2,12 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+For developers:
+
+- **Faster generated-world checks:** `tools/ci-local.sh generated` builds in a new `checks` profile (optimised, debug assertions and overflow checks kept, the ticks the same to the bit), runs the quick checks before the 43-game-hour run, starts the biggest worlds first and prints each world's time. `SEED_BASES="0 1 2 3 4 5"` makes every base's worlds at once for the release gate, and `FAIL_FAST=1` stops the other worlds once one has failed. The tick's per-resident cross-checks of the partner and kept-shut indexes now run as whole-index checks about once a game minute.
+
 ## 0.9.0 — 2026-11-27
 
 - **Walk mode:** walk as the selected resident in first person: W/S walk, A/D turn, Q/E step aside, drag to look. F uses the thing in front of you, or on a person opens the socials and a typed "Talk…" chat the LLM answers. The resident's own free will waits while you walk.
