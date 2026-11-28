@@ -11,9 +11,9 @@
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "feff89eba0cde0204b16dcf3f9bf8ed0aaf14851cc619955f92f6d21151b0e76",
-      "by": "real-town-simp-render",
-      "reason": "simplify round: 'barn' dropped from BuildingUse, a use no lot's look has (no generator, sample or reader makes one since the backdrop went)",
+      "sha256": "04e20a24b0631af789266bce88a125e37208bd738a9ce2c3e41de5347b5e31a9",
+      "by": "chore/dead-code",
+      "reason": "dead-code pass: types nothing outside protocol.ts uses made private (export dropped), OpenWorldTownFields deleted, two doc pointers moved; no shape change",
       "region": "living-town-types"
     },
     {
