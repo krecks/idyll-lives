@@ -93,7 +93,7 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
         const [x, z] = [(i % ground.w) + 0.5, Math.floor(i / ground.w) + 0.5];
         if (!ground.takenAt(x, z) && !steep(x, z)) free++;
       });
-      const score = dist(p, middle) + (road.kind === 'lane' ? 40 : road.kind === 'avenue' ? AVENUE_HIGH_STREET : 0) + (1 - free / Math.max(1, all)) * 200 + (BAND - band) * 3;
+      const score = dist(p, middle) + (road.kind === 'lane' ? 40 : road.kind === 'avenue' ? AVENUE_HIGH_STREET : 0) + (1 - free / Math.max(1, all)) * 200;
       if (!best || score < best.score) best = { road: r, s0: mid - half, s1: mid + half, side: near.side, score };
     }
   }
@@ -204,7 +204,7 @@ function densityRatio(W: number, D: number, taken: Uint8Array, box: Rect, polys:
 
 /**
  * Centre `c` of a town of `W` × `D` made the densest (`narrowCentre`) over its land as laid: its open land is no road
- * of `roads` (but a trail), water (`water`, one per tile, if any), green (`greens`) or lot but a building's (`lots`:
+ * of `roads` (but a trail), water (`water`, one per tile, if any), green (`greens`), its square or lot but a building's (`lots`:
  * each lot's rectangle, and whether it is a building's, built over: a named place's or a building of flats'; a home's
  * lot is mostly its garden), against the rest of its area's box `box`.
  */
@@ -212,6 +212,8 @@ export function densestCentre(c: Centre, roads: readonly RoadPlan[], W: number, 
   const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), W, D, 0);
   if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
   for (const g of greens) fillPoly(g, W, D, (i) => (taken[i] = 1));
+  // (Its square kept open, as a green is: never built on.)
+  if (c.square) fillPoly(c.square, W, D, (i) => (taken[i] = 1));
   const built: Pt[][] = [];
   for (const { rect: r, built: building } of lots) {
     if (building) built.push(rectPoly(r));

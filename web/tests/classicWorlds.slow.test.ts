@@ -16,8 +16,10 @@
 // carriageways on the other sides of its middle line, its ramps with them), and when the motorway went down before
 // the villages (2026-11-24: its course chosen with the main town alone, none costing a village; the villages kept
 // clear of it, its gates chosen by them; no side T where another area's street comes up end to end), and when 70 careers'
-// hours moved a quarter or half an hour (2026-11-27: the jobs' starts spread across the morning). A change that
-// moves one on purpose re-pins it here.
+// hours moved a quarter or half an hour (2026-11-27: the jobs' starts spread across the morning), and when seed bases 1,
+// 3, 4 and 5 were made to generate (2026-11-28: a centre's high street no longer marked down for the narrower band a
+// winding street takes, forest 22, 223520 and 104735; the motorway's junction only at its junction's gate, lakeside
+// 215603 and forest 104735). A change that moves one on purpose re-pins it here.
 import { describe, expect, test } from 'bun:test';
 import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { createHash } from 'node:crypto';
@@ -40,11 +42,11 @@ const GOLDEN: [ClassicKind, number, string][] = [
   ['lakeside', 11, '02414342ce8855bf'],
   ['lakeside', 22, '158fec3671ad17d8'],
   ['forest', 11, '202ec567588e8385'],
-  ['forest', 22, '683716bec9dfac10'],
+  ['forest', 22, '862e6b520520c10d'],
   ['dense', 808114082, '6f15a39acd379243'],
   ['dense', 45, 'b07f18985ff04e7d'],
   ['small', 199762, '53d1404115b4fca6'],
-  ['forest', 223520, '8a0082da846d38ad'],
+  ['forest', 223520, '658c715804d8c682'],
   ['medium', 104735, '5112db7531757ede'],
   ['mountain', 231441, '440da34c5376b012'],
   ['lakeside', 239360, '195159c7796d6c94'],
@@ -52,11 +54,11 @@ const GOLDEN: [ClassicKind, number, string][] = [
   ['small', 278952, '42c9fbdd83d24ac0'],
   ['forest', 278953, 'efbeefdcf0cf3485'],
   ['forest', 425059, 'ba5acf0db8a2ca53'],
-  ['lakeside', 215603, '3c8671f2f9082669'],
+  ['lakeside', 215603, '0e25121b41c694f1'],
   ['forest', 320330, '5dd92e45a38195b0'],
   ['dense', 320329, '51d0d0ed6b4267d4'],
   ['seaside', 215602, '41c5be8cacda85f9'],
-  ['forest', 104735, '0b5dbb8f2623fa4c'],
+  ['forest', 104735, '753dd6daa5b7da0f'],
   ['forest', 112654, 'fceda88fd52e89da'],
   ['lakeside', 225304, '766ed383611cfb30'],
   ['small', 314192, 'c402c860ae43f8cd'],

@@ -1502,7 +1502,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
         { road: at, end: 1, area: -1, p: site.b, dir: u, used: false },
       ];
       const ons = ends.map((q) => wayOn(q, -1));
-      if (ons.some((o) => !o)) continue;
+      // (Not one both of whose roads on run out of the world: it would join nothing, a network of its own.)
+      if (ons.some((o) => !o) || ons.every((o) => o!.made.side >= 0)) continue;
       const placeNear = (p: Pt) => plans.filter((plan) => bank(plan.centre) === bank(p)).sort((x, y) => dist(x.centre, p) - dist(y.centre, p))[0] ?? plans[0];
       const named = placeNear(site.a).name;
       roads.push(crossing(site.a, site.b, ['join', 'join'], uniqueName(`${named} Bridge`, `${named} Old Bridge`)));
@@ -1660,8 +1661,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // (The centre's buildings of flats from a stream of their own, so the rest is drawn as it was.)
   const centreFlats = mulberry32(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
   // The main town's centre: its high street and a square off it, kept clear of lots (on the street the one-way pairs
-  // were laid round, a lane of a pair now a street).
-  const centre = chooseCentre(worldRoads, high ? [high.road] : plans[0].roads, plans[0].centre, ground, 0, tooSteep);
+  // were laid round, a lane of a pair now a street; else, a pair's widened roads joining it having left it too short, as
+  // if there were none).
+  const centre = (high && chooseCentre(worldRoads, [high.road], plans[0].centre, ground, 0, tooSteep)) || chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, tooSteep);
   const inCentre = (f: Frontage) => !!centre && inside(centre.poly, f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10);
   const lots = new LotPlacer(content, t, ground, worldRoads, spec.gaps, rand, true);
   const names: (string | undefined)[] = worldRoads.map((r) => r.name);
@@ -1933,7 +1935,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // (An area whose bays all went: a pair, or one, by the verge where none is by a driveway now.)
   for (const [a, plan] of plans.entries()) {
     if (spec.classic || parking.some((b) => b.area === a)) continue;
-    for (const p of vergeParking(worldRoads, ground, frontageOf(worldRoads, plan.roads, plan.centre, rand), 2, a, nearCorners, lines, LOOSE_BEND)) {
+    const frontage = frontageOf(worldRoads, plan.roads, plan.centre, rand);
+    const pair = vergeParking(worldRoads, ground, frontage, 2, a, nearCorners, lines, LOOSE_BEND);
+    for (const p of pair.length ? pair : vergeParking(worldRoads, ground, frontage, 1, a, nearCorners, lines, LOOSE_BEND)) {
       parking.push(...p.bays.map((b) => ({ ...b, park: carParks.length })));
       carParks.push(p.park);
     }

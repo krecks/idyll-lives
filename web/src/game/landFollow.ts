@@ -612,13 +612,37 @@ function giveUp(
     gone.add(r);
     given.roads++;
   }
-  // Dead ends too long, cut back to `COURT` m past the last road they meet.
-  for (const c of courts) {
-    if (gone.has(c.road)) continue;
+  // A road's end that joined one left out, meeting nothing now: cut back to the last road that meets it (its lots past
+  // that left out), not left in the air. Dead ends too long, cut back to `COURT` m past the last road they meet.
+  const hung: { road: number; end: 0 | 1; at: number; past: number }[] = [];
+  roads.forEach((r, i) => {
+    if (!gone.size || gone.has(i)) return;
+    const L = lengths(r.points).at(-1)!;
+    const others = roads.filter((_, j) => j !== i && !gone.has(j));
+    const reach = (o: RoadPlan) => Math.max(o.width, r.width) / 2 + 1;
+    for (const e of [0, 1] as const) {
+      const p = r.points[e ? r.points.length - 1 : 0];
+      if (r.ends[e] !== 'join' || others.some((o) => nearest(o.points, p[0], p[1]).dist <= reach(o))) continue;
+      // (Where along it the others' ends meet it.)
+      const met: number[] = [];
+      for (const o of others) {
+        for (const q of [o.points[0], o.points[o.points.length - 1]]) {
+          const n = nearest(r.points, q[0], q[1]);
+          if (n.dist <= reach(o)) met.push(n.s);
+        }
+      }
+      const at = e === 1 ? Math.max(0, ...met) : Math.min(L, ...met);
+      if (e === 1 ? at > 0 : at < L) hung.push({ road: i, end: e, at, past: 0 });
+    }
+  });
+  const cut = new Set<number>();
+  for (const c of [...hung, ...courts.map((c) => ({ ...c, past: COURT }))]) {
+    // (One cut once this round: the next its own, cut again next round.)
+    if (gone.has(c.road) || cut.has(c.road)) continue;
     const r = roads[c.road];
     const ls = lengths(r.points);
     const L = ls[ls.length - 1];
-    const [from, to] = c.end === 1 ? [0, c.at + COURT] : [c.at - COURT, L];
+    const [from, to] = c.end === 1 ? [0, c.at + c.past] : [c.at - c.past, L];
     const pts: Pt[] = [pointAt(r.points, from, ls).p];
     for (let k = 0; k < r.points.length; k++) if (ls[k] > from && ls[k] < to) pts.push(r.points[k]);
     pts.push(pointAt(r.points, to, ls).p);
@@ -626,7 +650,8 @@ function giveUp(
     // (Never one that leaves the roads in two.)
     if (!oneNetwork(trimmed, gone)) continue;
     roads = trimmed;
-    given.courts++;
+    cut.add(c.road);
+    if (c.past) given.courts++;
     // (The lots past the new end.)
     entries.forEach((p, n) => {
       if (p.entry?.road === c.road && (p.entry.s < from - 0.5 || p.entry.s > to + 0.5)) lots.add(n);

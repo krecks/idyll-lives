@@ -986,7 +986,14 @@ export class BuiltSurface {
     profiles.forEach((p, r) => {
       if (!this.draped(r) && (this.pairs[r] || this.overs.some((o) => o.road === r))) rampUp(p);
     });
-    for (const node of merges) this.join(node);
+    // (Each ramp's end at its carriageway's height once more, the ramp on from it brought within its grade: the lifts
+    // since moved them apart. The carriageway left as it is: held level there, it would step up or down either side.)
+    for (const node of merges) {
+      const ways = node.atts.filter((a) => !a.merge && a.from >= 0).map((a) => ({ y: profiles[a.road].y, was: profiles[a.road].y.slice(a.from, a.to + 1), from: a.from }));
+      this.join(node);
+      for (const w of ways) w.y.set(w.was, w.from);
+      for (const a of node.atts) if (a.merge && a.from >= 0) easeOut(profiles[a.road], a.from, a.to);
+    }
   }
 
   /**
@@ -1691,6 +1698,22 @@ function rampUp(p: Profile): void {
   const { y, s, grade } = p;
   for (let i = 1; i < y.length; i++) y[i] = Math.max(y[i], y[i - 1] - grade * (s[i] - s[i - 1]));
   for (let i = y.length - 2; i >= 0; i--) y[i] = Math.max(y[i], y[i + 1] - grade * (s[i + 1] - s[i]));
+}
+
+/**
+ * A road's samples out either way from its held ones `from`..`to` brought within its grade of them (each of the one
+ * before it, outwards, till one already is, or one another junction holds): not below its floor.
+ */
+function easeOut(p: Profile, from: number, to: number): void {
+  const { y, s, floor, pin, grade } = p;
+  for (const dir of [1, -1]) {
+    for (let i = dir > 0 ? to + 1 : from - 1; i >= 0 && i < y.length && !pin[i]; i += dir) {
+      const most = grade * Math.abs(s[i] - s[i - dir]);
+      const want = Math.max(floor[i], Math.min(y[i - dir] + most, Math.max(y[i - dir] - most, y[i])));
+      if (want === y[i]) break;
+      y[i] = want;
+    }
+  }
 }
 
 /** A bridge's deck up to its floor. */
