@@ -25,17 +25,25 @@ export function usePublicFetch(): void {
   });
 }
 
+// Memoized per process: no test writes to the loaded content or templates, so every file shares one parse.
+let contentP: Promise<Content> | undefined;
 /** The shipped content (content/base.json), through the stubbed fetch. */
-export async function loadContent(): Promise<Content> {
-  const { Content } = await import('../../src/content/content');
-  return Content.load('http://localhost/content/base.json');
+export function loadContent(): Promise<Content> {
+  return (contentP ??= import('../../src/content/content').then(({ Content }) => Content.load('http://localhost/content/base.json')));
 }
 
+const templatesCache = new WeakMap<Content, Promise<Templates>>();
 /** The shipped house templates (houses.json, housegen.json) with `content`'s object infos and tiles. */
-export async function templatesOf(content: Content): Promise<Templates> {
-  const { objectInfos } = await import('../../src/game/housegen');
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${PUBLIC}/content/${file}`, 'utf8')) as T;
-  return { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+export function templatesOf(content: Content): Promise<Templates> {
+  let p = templatesCache.get(content);
+  if (!p) {
+    p = import('../../src/game/housegen').then(({ objectInfos }) => {
+      const json = <T>(file: string) => JSON.parse(readFileSync(`${PUBLIC}/content/${file}`, 'utf8')) as T;
+      return { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+    });
+    templatesCache.set(content, p);
+  }
+  return p;
 }
 
 /** A town job as the worker runs it: sent, run, and its result sent back. */

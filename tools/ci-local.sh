@@ -37,6 +37,13 @@ if command -v bun >/dev/null && [[ "$(bun --version)" != "$pinned" ]]; then
   bun_ci=(bunx "bun@$pinned")
 fi
 
+# Each shared Bun step runs once per invocation (`all` needs the web's install four times over). Run in this
+# shell, not in a `( )` step, so the record survives to the next step.
+ran=" "
+once() { if [[ "$ran" != *" $1 "* ]]; then ran+="$1 "; "$@"; fi; }
+web_install() { (cd web && "${bun_ci[@]}" install --frozen-lockfile); }
+web_sound() { (cd web && "${bun_ci[@]}" run sound); }
+
 step() {
   printf '\n== %s\n' "$1"
   case "$1" in
@@ -78,19 +85,19 @@ step() {
     # The renderer's engine-neutral tests.
     # (The town-building files, `*.slow.test.ts`, only with SLOW_TESTS.)
     # (The tests that make sounds load the sounds' wasm: `bun run sound` builds it.)
-    web) (cd web && "${bun_ci[@]}" install --frozen-lockfile && "${bun_ci[@]}" run sound && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
+    web) once web_install && once web_sound && (cd web && "${bun_ci[@]}" run test && if [[ -n "${SLOW_TESTS:-}" ]]; then "${bun_ci[@]}" run test:slow; fi) ;;
     # The character build, the object gate, the models' kernel, runner and families, and the content and
     # texture tools, in the build the aliases above and below run (Cargo.toml's `tools` profile).
     tools) cargo test -p ll-tools -p sound -p artkit -p ll-art -p art-nature -p art-wet -p art-rooms -p art-packs -p art-outside -p art-things --profile tools --locked ;;
     # The PlayCanvas shader chunks' anchors and private names the renderer relies on (tools/render/chunks.json),
     # in the release build the game imports: its package, then the tools' check.
-    chunks) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-chunks ;;
+    chunks) once web_install && cargo check-chunks ;;
     # Every shipped model against the reference's kinds (what is outside held by tools/art/gate-baseline.json);
     # every use the renderer can play; every model at the gate, with the Khronos glTF validator (web/'s package,
     # about 10 s).
     sizes) cargo review sizes --check ;;
     uses) cargo review uses --check ;;
-    models) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-glb --validate ;;
+    models) once web_install && cargo check-glb --validate ;;
     # What the game builds as it runs (houses near and far, the lots' buildings closed, a street, fences, cars) at the models'
     # gate: a fixed set of samples dumped by the game's own generators (about 2 s; no browser, no wasm, no
     # packages), then held to the same rules, what they find today by tools/art/gate-baseline.json (about 12 s).
@@ -99,7 +106,7 @@ step() {
     # for byte (crates/art; about 10 s on twelve cores on top of the tools' build): a model changed in code and not rebuilt, or a
     # build that gives other bytes on another machine, fails here.
     art) cargo art --all --check ;;
-    types) (cd web && bun run wasm && bun run sound && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;
+    types) (cd web && bun run wasm) && once web_sound && (cd web && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;
     *)
       echo "unknown step: $1 (steps: ${all[*]})" >&2
       return 2

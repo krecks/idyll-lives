@@ -1,6 +1,6 @@
 //! `cargo art <family> --preview --sheet`: the Italian cypress (the trees family's, kept with the kernel's tests),
 //! drawn into a scratch folder.
-#[path = "../../artkit/tests/common/cypress.rs"]
+#[path = "../../artkit/tests/all/common/cypress.rs"]
 mod cypress;
 
 use ll_tools::checkglb::Paths;

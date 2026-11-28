@@ -49,6 +49,9 @@ key=$(
     git ls-files --others --exclude-standard -- $inputs | while read -r f; do echo "$f $(git hash-object "$f")"; done
     rustc -V
     wasm-bindgen -V
+    # (The build environment and the user's cargo config change the wasm too; grep and cat may find nothing.)
+    { env | grep -E '^(RUSTFLAGS|CARGO_ENCODED_RUSTFLAGS|CARGO_TARGET_.*RUSTFLAGS|CARGO_PROFILE_|CARGO_BUILD_)' | sort; } || true
+    cat ~/.cargo/config.toml 2>/dev/null || true
     # (This script too: its build commands.)
     cat tools/wasm-cache.sh
   } | sha256 | cut -c1-24

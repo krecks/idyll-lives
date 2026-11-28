@@ -18,13 +18,13 @@
 #          web/public/content files; the sim tests read web/public/content and web/public/assets
 #          (the manifests, and every model they name must be there).
 #   web    the clip check: tools/characters (check_clips.ts, transitions.ts, clip-baseline.json),
-#          the sounds' wasm the tests load (crates/sound, crates/sound-wasm, Cargo.*, .cargo/, the
+#          the sim's and the sounds' wasm the tests load (crates/sim-wasm, crates/sound, crates/sound-wasm, Cargo.*, .cargo/, the
 #          toolchain: `bun run sound`),
 #          web/src's clips, furniture.json and actions.ts, web/public/assets/characters/rig.json;
 #          the renderer tests: web/ (src, tests, public, package.json and bun.lock for
 #          `bun install`); doors, tickRates and snapshotLayout read crates/sim-core/src, the slow
 #          sampleWorlds runs tools/worlds/sample.ts.
-#   tools  ll-tools (on sim-core) and its tests: crates/, Cargo.*, .cargo/, the toolchain; web/ but
+#   tools  ll-tools (on sim-core) and its tests: crates/sim-core, crates/tools, crates/artkit, crates/art, crates/sound, Cargo.*, .cargo/, the toolchain; web/ but
 #          web/tests: web/public (assets, content, the voice and LLM licences), web/src (the
 #          pinned regions, actions.ts, audio/world.ts, the patched shaders), web/package.json and
 #          bun.lock (the chunk check's PlayCanvas); tools/pins/pins.json (pinned files in web/src
@@ -54,11 +54,14 @@ jobs_for() {
     .github/workflows/ci.yml | tools/ci-local.sh | tools/ci-changes.sh | tools/ci-runner.sh) J="rust web tools" ;;
     rust-toolchain.toml | Cargo.toml | Cargo.lock | .cargo/*) J="rust web tools" ;;
     crates/tools/README.md | crates/art/*.md) J="" ;;
-    crates/sim-core/src/* | crates/sound/* | crates/sound-wasm/*) J="rust web tools" ;;
-    crates/*) J="rust tools" ;;
+    crates/sim-core/src/* | crates/sound/*) J="rust web tools" ;;
+    crates/sim-wasm/* | crates/sound-wasm/*) J="rust web" ;;
+    crates/sim-core/* | crates/tools/* | crates/artkit/* | crates/art/*) J="rust tools" ;;
+    crates/*) J="rust" ;;
     web/public/content/* | web/public/assets/*) J="rust web tools" ;;
     web/tests/fixtures/junctions.ts) J="web tools" ;;
     web/tests/*) J="web" ;;
+    web/src/render/pc/* | web/src/ui/* | web/src/llm/* | web/src/*.svelte | web/*.html) J="web" ;;
     web/*) J="web tools" ;;
     tools/characters/README.md) J="" ;;
     tools/characters/* | tools/worlds/*) J="web" ;;

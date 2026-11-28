@@ -8,7 +8,7 @@
 // area refused, and a small 640 m land refusing every site cleanly; a village across a river painted over the
 // land bridged to the town, the water under its bridge water again once it is removed. The settle (the `edit`
 // job) takes the village placed and moved.
-// `SLOW_TESTS=1 bun test tests/editVillages.slow.test.ts`.
+// `bun test tests/editVillages.slow.test.ts` by hand; the slow set is `bun run test:slow` in web/ (`SLOW_TESTS=1 tools/ci-local.sh web`; CI on v* tags and by hand).
 import { describe, expect, test } from 'bun:test';
 import { inWorkerOf, loadContent, templatesOf, usePublicFetch } from './support/content';
 

@@ -3,7 +3,7 @@
 // in the water, a bridge no longer than the generator's over a river that is now the land's to the villages across it,
 // and the world keeps its name and its main town's shape; the draft carries the land (graded flat under the
 // town) and its water and zones come from it. Unshaped worlds are as they were (the classic and world-option
-// goldens). `SLOW_TESTS=1 bun test tests/relaidTown.slow.test.ts`.
+// goldens). `bun test tests/relaidTown.slow.test.ts` by hand; the slow set is `bun run test:slow` in web/ (`SLOW_TESTS=1 tools/ci-local.sh web`; CI on v* tags and by hand).
 import { describe, expect, test } from 'bun:test';
 import { networks } from './support/roads';
 import { loadContent, templatesOf, usePublicFetch } from './support/content';
